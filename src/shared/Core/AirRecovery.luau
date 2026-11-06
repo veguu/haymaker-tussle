@@ -27,6 +27,15 @@ export type Settings = {
 	MaxFallSpeed: number,
 	FallDrag: number,
 	MinAirSeconds: number,
+	LiftEnabled: boolean,
+	LiftSpeed: number,
+	LiftSeconds: number,
+	LiftGravityScale: number,
+	LiftForwardSpeed: number,
+	LiftCooldown: number,
+	LiftsPerFall: number,
+	LiftFallingSpeed: number,
+	LiftFloorCheck: number,
 }
 
 -- How finely `predictRise` and `timeToDrop` walk the fall. Coarse is fine: they plan a jump.
@@ -136,15 +145,17 @@ end
 
 --- The flat push one punch gives, given how fast the body is already going. It adds up to the cap along
 --- its own direction and no further. Speed the other way doesn't count against it.
+--- `boost` is the most it adds, BoostSpeed if left out (the recovery lift uses LiftForwardSpeed).
 function AirRecovery.push(
 	cfg: Settings,
 	vx: number,
 	vz: number,
 	dirX: number,
-	dirZ: number
+	dirZ: number,
+	boost: number?
 ): (number, number)
 	local along = vx * dirX + vz * dirZ
-	local add = math.clamp(cfg.MaxSpeed - along, 0, cfg.BoostSpeed)
+	local add = math.clamp(cfg.MaxSpeed - along, 0, boost or cfg.BoostSpeed)
 	return dirX * add, dirZ * add
 end
 
@@ -152,6 +163,33 @@ end
 --- rising, and repeated punches can't add up to a climb.
 function AirRecovery.lift(cfg: Settings, vy: number): number
 	return math.clamp(cfg.UpAssistCeiling - vy, 0, cfg.UpAssist)
+end
+
+--- The recovery lift. Does a punch thrown in the air right now earn one? Only falling (`vy` at most
+--- -LiftFallingSpeed), with no floor close below (`floorBelow` false, which is the caller's raycast), not
+--- slammed, at least LiftCooldown since the last (`sinceLast`), and fewer than LiftsPerFall already this
+--- fall (`used`). Rising bodies and ordinary punches never get it.
+function AirRecovery.earnsLift(
+	cfg: Settings,
+	vy: number,
+	floorBelow: boolean,
+	slammed: boolean,
+	sinceLast: number,
+	used: number
+): boolean
+	return cfg.LiftEnabled
+		and not slammed
+		and not floorBelow
+		and vy <= -cfg.LiftFallingSpeed
+		and sinceLast >= cfg.LiftCooldown
+		and used < cfg.LiftsPerFall
+end
+
+--- One step of the fall while a recovery lift is running. It replaces whatever fall rule the body was on
+--- for those LiftSeconds, so the two never stack: `vy` is what physics left after a whole `dt` of full
+--- `gravity`, and this hands back all but LiftGravityScale of it.
+function AirRecovery.liftFall(cfg: Settings, gravity: number, vy: number, dt: number): number
+	return vy + gravity * (1 - cfg.LiftGravityScale) * dt
 end
 
 --- A push fades on its own in the air, at a steady rate.

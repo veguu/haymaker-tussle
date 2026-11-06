@@ -12,6 +12,13 @@
 -- `moveFunction` field, so we replace that one field to receive the input
 -- instead of moving the character. This controller is then the only Move caller.
 -- That field is not a documented API, so a missing one warns loudly at startup.
+--
+-- Also here, because they all shape this one body's movement: Q's committed dash (Core/Momentum),
+-- the nitro boost held on Shift (Core/Nitro, passed to Momentum as Modifiers), the recovery lift on a
+-- punch thrown while falling off the edge (Core/AirRecovery), and the follow-up snap (Core/DiveKick).
+-- How they meet: nitro needs the ground and normal movement, so a dash may run inside it but a
+-- launch, hold, clash, stun or kick ends it. A knock ends a dash and any recovery lift. The kick takes
+-- the body over entirely until it's done.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -19,6 +26,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ContextActionService = game:GetService("ContextActionService")
 local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
+local UserInputService = game:GetService("UserInputService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local Signal = require(ReplicatedStorage.Packages.Signal)
@@ -29,12 +37,15 @@ local Clash = require(ReplicatedStorage.Shared.Core.Clash)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local DiveKick = require(ReplicatedStorage.Shared.Core.DiveKick)
 local Momentum = require(ReplicatedStorage.Shared.Core.Momentum)
+local Nitro = require(ReplicatedStorage.Shared.Core.Nitro)
 local TrainingLayout = require(ReplicatedStorage.Shared.Core.TrainingLayout)
 local Net = require(ReplicatedStorage.Shared.Net)
+local StaminaBar = require(script.Parent.Parent.Ui.StaminaBar)
 
 local STEP_NAME = "HaymakerMovement"
 local PROPEL_ACTION = "HaymakerPropel"
 local KICK_ACTION = "HaymakerKick"
+local NITRO_ACTION = "HaymakerNitro"
 local STEP_PRIORITY = Enum.RenderPriority.Input.Value + 1
 local INPUT_STALE_SECONDS = 0.25
 local MIN_LIFT = 1 -- below this a knock isn't a lift, just the floor's own tiny motion
@@ -45,6 +56,9 @@ local UNDO_SECONDS = 1 -- a refused punch's push is taken back only if the answe
 local cfg = GameConfig.Movement
 local kickCfg = GameConfig.Kick
 local airCfg = GameConfig.AirRecovery
+local nitroCfg = GameConfig.Nitro
+local NITRO_KEY = (Enum.KeyCode :: any)[GameConfig.Controls.Nitro.Key] :: Enum.KeyCode
+local NITRO_PAD_KEY = (Enum.KeyCode :: any)[GameConfig.Controls.Nitro.GamepadKey] :: Enum.KeyCode
 
 local MovementController = Knit.CreateController({
 	Name = "MovementController",
@@ -109,6 +123,17 @@ local function driveOf(x: number, z: number): (Momentum.Drive, number)
 	return "side", side
 end
 
+-- Where the camera looks, flat on the ground, or nil when it's pointing straight up or down.
+local function flatCameraForward(): Vector3?
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return nil
+	end
+	local look = camera.CFrame.LookVector
+	local flat = Vector3.new(look.X, 0, look.Z)
+	return if flat.Magnitude > 0.001 then flat.Unit else nil
+end
+
 -- Current Studio keeps the stock module directly under StarterPlayer; older places
 -- copy it into PlayerScripts. Use whichever exists, and never make a second copy.
 local function findPlayerModule(player: Player): any
@@ -165,7 +190,9 @@ function MovementController:_bind(
 	character: Model,
 	input: Input,
 	readout: TextLabel?,
-	propelRemote: RemoteEvent?
+	propelRemote: RemoteEvent?,
+	bar: StaminaBar.Bar?,
+	nitroRemotes: { start: RemoteEvent?, stop: RemoteEvent? }
 )
 	local trove = Trove.new()
 	trove:AttachToInstance(character)
@@ -225,29 +252,23 @@ function MovementController:_bind(
 	local pushGraceUntil = 0
 	local lift = 0 -- a punch's small lift, waiting for this step's velocity
 	local punchRequested = false
-	local lastPush: { x: number, z: number, up: number, at: number }? = nil
+	local lastPush: { x: number, z: number, up: number, at: number, lifted: boolean }? = nil
 	local slammed = false -- driven down by a kick, so its fall isn't lightened
-	-- How a launched body comes down, to plan a jump at one.
-	local targetFall: DiveKick.TargetFall = {
-		timeToDrop = function(vy: number, height: number): number
-			return AirRecovery.timeToDrop(
-				airCfg,
-				workspace.Gravity,
-				kickCfg.AirGravityScale,
-				vy,
-				height
-			)
-		end,
-		rise = function(vy: number, seconds: number): number
-			return AirRecovery.predictRise(
-				airCfg,
-				workspace.Gravity,
-				kickCfg.AirGravityScale,
-				vy,
-				seconds
-			)
-		end,
-	}
+	-- The recovery lift: the vertical speed it sets this step, how long its lighter gravity has left, and
+	-- how many this fall has had.
+	local liftTo: number? = nil
+	local liftLeft = 0
+	local liftsThisFall = 0
+	local lastLiftAt = -math.huge
+	-- Nitro: held is the key; the stamina and ramp are Core/Nitro's. `carrying` is speed over normal top
+	-- speed left from a boost that has ended, which bleeds off at its own rate.
+	local nitro = Nitro.new(nitroCfg)
+	local nitroHeld = false
+	local nitroHeldBy: Enum.UserInputType? = nil
+	local nitroShown = false -- what the server was last told
+	local carrying = false
+	local kickAccepted = false
+	local fx = Knit.GetController("FxController")
 	local prompt = Knit.GetController("KickPromptController")
 	local kickRemotes = {
 		request = Net.client("KickRequest"),
@@ -259,34 +280,106 @@ function MovementController:_bind(
 		kick = nil
 		kickTarget = nil
 		kickAwaiting = false
+		kickAccepted = false
 		airRun = nil
 		prompt:Hide()
 	end
 	trove:Add(endKick)
 
-	-- Who you can jump at: your own launch wherever it is, otherwise the closest other one in reach.
-	-- Returns the target, and whether it's your own.
-	local function jumpTarget(position: Vector3): (Model?, boolean)
-		local best: Model? = nil
-		local bestDistance = math.huge
+	-- Only solid parts count as being in the way; fighters never do.
+	local function solidParams(): RaycastParams
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = CollectionService:GetTagged("HT_Combatant")
+		params.RespectCanCollide = true
+		params.IgnoreWater = true
+		return params
+	end
+
+	-- Who you can follow up, by the same rule the server uses: anyone floating within range with nothing
+	-- solid in between, picked by distance and how far off where you face they are. The server makes
+	-- the real pick and says so; this only decides whether to show the prompt.
+	local function jumpTarget(position: Vector3): Model?
 		local myId = Players.LocalPlayer.UserId
+		local params = solidParams()
+		local models: { Model } = {}
+		local candidates: { DiveKick.Candidate } = {}
 		for _, other in CollectionService:GetTagged("HT_Combatant") do
 			local otherRoot = other:FindFirstChild("HumanoidRootPart") :: BasePart?
 			if other ~= character and otherRoot and other:GetAttribute("HT_Air") == "float" then
 				local at = otherRoot.Position
-				if other:GetAttribute("HT_AirBy") == myId then
-					return other :: Model, true
-				end
-				if DiveKick.canJumpAt(kickCfg, false, position.X, position.Z, at.X, at.Z) then
-					local distance = (at - position).Magnitude
-					if distance < bestDistance then
-						best, bestDistance = other :: Model, distance
-					end
+				local own = other:GetAttribute("HT_AirBy") == myId
+				local range = if own then kickCfg.FollowUpOwnRange else kickCfg.FollowUpRange
+				if
+					(at - position).Magnitude <= range
+					and workspace:Raycast(position, at - position, params) == nil
+				then
+					table.insert(models, other :: Model)
+					table.insert(candidates, {
+						x = at.X,
+						y = at.Y,
+						z = at.Z,
+						own = own,
+					})
 				end
 			end
 		end
-		return best, false
+		local facing = root.CFrame.LookVector
+		local index = DiveKick.pickFollowUp(
+			kickCfg,
+			position.X,
+			position.Y,
+			position.Z,
+			facing.X,
+			facing.Z,
+			candidates
+		)
+		return if index then models[index] else nil
 	end
+
+	-- Is there a floor close below? Then a punch in the air isn't off the edge.
+	local function floorBelow(): boolean
+		local reach = airCfg.LiftFloorCheck + humanoid.HipHeight + root.Size.Y / 2
+		return workspace:Raycast(root.Position, Vector3.new(0, -reach, 0), solidParams()) ~= nil
+	end
+
+	-- Tells the server when the boost starts and stops, so everyone else sees the trail.
+	local function showNitro(on: boolean)
+		if on == nitroShown then
+			return
+		end
+		nitroShown = on
+		local remote = if on then nitroRemotes.start else nitroRemotes.stop
+		if remote then
+			remote:FireServer()
+		end
+	end
+	local function releaseNitro()
+		nitroHeld = false
+		nitroHeldBy = nil
+	end
+	local function stopNitro()
+		releaseNitro()
+		nitro = Nitro.stop(nitro)
+		showNitro(false)
+		fx:SetNitro(character, false, 0)
+	end
+	trove:Add(stopNitro)
+
+	-- The server's pick for the follow-up. It only counts for a squat waiting on it, so a late answer
+	-- can never start anything.
+	local function onKickAccepted(target: Model)
+		if kick and kick.phase == "squat" and not kickAccepted and target and target.Parent then
+			kickTarget = target
+			kickAccepted = true
+		end
+	end
+	self._kickAccepted = onKickAccepted
+	trove:Add(function()
+		if self._kickAccepted == onKickAccepted then
+			self._kickAccepted = nil
+		end
+	end)
 
 	-- The server says this kick connected. Stay on the frozen pose through the stop, then push off them:
 	-- backward from where you face at a propel's speed, held until you land, and upward by how well you
@@ -332,44 +425,16 @@ function MovementController:_bind(
 		end
 	end
 
-	-- The spring, worked out now, at the end of the squat. The strength fits the distance, but the
-	-- direction is the player's: where the keys point, or where they're facing. An aim that's nearly
-	-- right is forgiven. Nothing here follows the target after this one moment.
-	local function springJump(squat: DiveKick.State, inputX: number, inputZ: number): DiveKick.State
-		local targetRoot = kickTarget and kickTarget:FindFirstChild("HumanoidRootPart") :: BasePart?
-		local aimX, aimZ = inputX, inputZ
-		if aimX == 0 and aimZ == 0 then
-			aimX, aimZ = Momentum.facing(state)
-		end
+	-- The snap, at the end of the squat, once the server has accepted it: straight at the target it
+	-- picked, timed by the distance. Arriving on your side of them, so the kick sends them the way you
+	-- came unless the keys swing you round.
+	local function snapJump(squat: DiveKick.State, targetRoot: BasePart): DiveKick.State
 		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
 		-- Right here for your own jump: waiting to hear it back from the server would put it in mid-air.
-		Knit.GetController("FxController")
-			:JumpBreak(character, GameConfig.Effects.GroundBreakOwnReach)
-		if not targetRoot then
-			return DiveKick.spring(squat, 0, kickCfg.LeapMax, 0)
-		end
-		local offset = targetRoot.Position - root.Position
-		local moving = targetRoot.AssemblyLinearVelocity
-		local plan = DiveKick.planJump(
-			kickCfg,
-			offset.X,
-			offset.Y,
-			offset.Z,
-			moving.X,
-			moving.Y,
-			moving.Z,
-			cfg.KnockbackDecay,
-			workspace.Gravity * kickCfg.AirGravityScale,
-			targetFall
-		)
-		local dirX, dirZ = DiveKick.aimJump(kickCfg, aimX, aimZ, plan.towardX, plan.towardZ)
-		return DiveKick.spring(
-			squat,
-			dirX * plan.carry,
-			plan.leap,
-			dirZ * plan.carry,
-			plan.meet + kickCfg.JumpMissGrace
-		)
+		fx:JumpBreak(character, GameConfig.Effects.GroundBreakOwnReach)
+		local offset = root.Position - targetRoot.Position
+		local approach = DiveKick.approachSeconds(kickCfg, offset.Magnitude)
+		return DiveKick.snap(squat, offset.X, offset.Z, approach, approach + kickCfg.JumpMissGrace)
 	end
 
 	-- The server decides knockback, and this client applies it because it owns the body.
@@ -394,6 +459,8 @@ function MovementController:_bind(
 			return
 		end
 		endKick()
+		-- A hit's own lift and fall take over from any recovery lift still running.
+		liftTo, liftLeft = nil, 0
 		state = Momentum.applyKnock(state, cfg, velocity.X, velocity.Z, speedKeep)
 		knockGraceUntil = os.clock() + cfg.KnockbackGraceSeconds
 		local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
@@ -428,6 +495,9 @@ function MovementController:_bind(
 		steerX, steerZ, pushX, pushZ, lift = 0, 0, 0, 0, 0
 		punchRequested, propelRequested, kickRequested = false, false, false
 		lastPush = nil
+		liftTo, liftLeft, liftsThisFall = nil, 0, 0
+		nitro = Nitro.stop(nitro)
+		carrying = false
 		state = if face and face.Magnitude > 0.01
 			then Momentum.new(face.X, face.Z)
 			else Momentum.stopped(state)
@@ -449,6 +519,13 @@ function MovementController:_bind(
 			pushX -= pushed.x
 			pushZ -= pushed.z
 			lift -= pushed.up
+			if pushed.lifted then
+				-- The rise it already gave can't be taken back, but the rest of it stops, and it doesn't
+				-- count against the fall's allowance.
+				liftTo, liftLeft = nil, 0
+				liftsThisFall = math.max(liftsThisFall - 1, 0)
+				lastLiftAt = -math.huge
+			end
 		end
 	end
 
@@ -490,6 +567,50 @@ function MovementController:_bind(
 		ContextActionService:UnbindAction(KICK_ACTION)
 	end)
 
+	-- Shift (or L3) held is nitro. Holding is all this records: the step decides whether it can run.
+	ContextActionService:BindActionAtPriority(
+		NITRO_ACTION,
+		function(_name: string, inputState: Enum.UserInputState, inputObject: InputObject)
+			if inputState == Enum.UserInputState.Begin then
+				nitroHeld = true
+				nitroHeldBy = inputObject.UserInputType
+			elseif
+				inputState == Enum.UserInputState.End
+				or inputState == Enum.UserInputState.Cancel
+			then
+				releaseNitro()
+			end
+			return Enum.ContextActionResult.Sink
+		end,
+		true,
+		Enum.ContextActionPriority.High.Value,
+		NITRO_KEY,
+		NITRO_PAD_KEY
+	)
+	ContextActionService:SetTitle(NITRO_ACTION, "Nitro")
+	trove:Add(function()
+		ContextActionService:UnbindAction(NITRO_ACTION)
+	end)
+	-- A release that happens outside the game window never arrives, so losing focus lets go.
+	trove:Add(UserInputService.WindowFocusReleased:Connect(releaseNitro))
+
+	-- The key really still down? An End swallowed by something else can't leave it held.
+	local function nitroStillHeld(): boolean
+		if not nitroHeld then
+			return false
+		end
+		if UserInputService:GetFocusedTextBox() then
+			return false
+		end
+		local by = nitroHeldBy
+		if by == Enum.UserInputType.Keyboard then
+			return UserInputService:IsKeyDown(NITRO_KEY)
+		elseif by and string.find(by.Name, "Gamepad") then
+			return UserInputService:IsGamepadButtonDown(by, NITRO_PAD_KEY)
+		end
+		return true -- touch has no polled state; End and Cancel cover it
+	end
+
 	trove:BindToRenderStep(STEP_NAME, STEP_PRIORITY, function(dt: number)
 		local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
 		local inputX, inputZ = worldInput(input)
@@ -497,9 +618,68 @@ function MovementController:_bind(
 
 		local now = os.clock()
 		local air = character:GetAttribute("HT_Air")
+		-- A hold carries its own deadline, so even a release that never arrives can't keep anyone stuck.
+		local holdUntil = character:GetAttribute("HT_HoldUntil") :: number?
+		if air == "hold" and holdUntil and workspace:GetServerTimeNow() >= holdUntil then
+			air = "float"
+		end
 		airSeconds = if grounded then 0 else airSeconds + dt
 		if grounded then
 			slammed = false
+			liftsThisFall = 0
+			liftLeft = 0
+		end
+		liftLeft = math.max(liftLeft - dt, 0)
+
+		-- Nitro: held, on the ground (or only just off it), moving forward or sideways, with nothing
+		-- else in charge of the body. Anything that takes the body over ends it, through this same check.
+		if nitroHeld and not nitroStillHeld() then
+			releaseNitro()
+		end
+		local nitroMoving = math.sqrt(inputX * inputX + inputZ * inputZ) >= cfg.InputDeadzone
+			and drive ~= "back"
+		local eligible = nitroCfg.Enabled
+			and nitroHeld
+			and nitroMoving
+			and (grounded or airSeconds < nitroCfg.AirGraceSeconds)
+			and air == nil
+			and kick == nil
+			and airRun == nil
+			and humanoid.Health > 0
+			and character:GetAttribute("HT_Stunned") == nil
+			and character:GetAttribute("HT_ClashAt") == nil
+			and character:GetAttribute("HT_Clash") == nil
+		local wasBoosting = nitro.active
+		nitro = Nitro.step(nitroCfg, nitro, eligible, dt)
+		local boostLevel = Nitro.level(nitroCfg, nitro)
+		if wasBoosting and not nitro.active then
+			carrying = true
+		elseif nitro.active and not wasBoosting then
+			fx:NitroStarted(character)
+		end
+		if carrying and state.speed <= cfg.MaxSpeed then
+			carrying = false
+		end
+		showNitro(nitro.active)
+		fx:SetNitro(character, nitro.active, boostLevel)
+		if bar then
+			bar:Set(Nitro.share(nitroCfg, nitro), nitro.active, nitro.exhausted, dt)
+		end
+		-- What the boost changes for the movement step: a higher top speed to chase, harder turning,
+		-- and afterwards a quicker bleed of the extra speed. Nothing at all once it has worn off.
+		local boost: Momentum.Modifiers? = nil
+		if nitro.active then
+			boost = {
+				maxSpeed = Nitro.topSpeed(nitroCfg, cfg.MaxSpeed, boostLevel),
+				acceleration = nitroCfg.RampAcceleration * boostLevel,
+				turnScale = Nitro.turnScale(nitroCfg, boostLevel),
+				overspeedDeceleration = nitroCfg.ReleaseDeceleration,
+			}
+		elseif boostLevel > 0 or carrying then
+			boost = {
+				turnScale = Nitro.turnScale(nitroCfg, boostLevel),
+				overspeedDeceleration = if carrying then nitroCfg.ReleaseDeceleration else nil,
+			}
 		end
 
 		-- Hung in the air while someone is attached. The kick's own knock takes over at once.
@@ -573,32 +753,12 @@ function MovementController:_bind(
 		if not kick then
 			local canJump = grounded and not floating and kickRemotes.request ~= nil
 			local target = if canJump and now >= kickReadyAt then jumpTarget(root.Position) else nil
-			-- Launched too far, or nearly down: there's no jump that would get there, so don't offer one.
-			if target then
-				local targetRoot = target:FindFirstChild("HumanoidRootPart") :: BasePart
-				local offset = targetRoot.Position - root.Position
-				local moving = targetRoot.AssemblyLinearVelocity
-				if
-					not DiveKick.canReach(
-						kickCfg,
-						offset.X,
-						offset.Y,
-						offset.Z,
-						moving.X,
-						moving.Y,
-						moving.Z,
-						cfg.KnockbackDecay,
-						workspace.Gravity * kickCfg.AirGravityScale,
-						targetFall
-					)
-				then
-					target = nil
-				end
-			end
 			if target then
 				if pressed then
 					kickReadyAt = now + kickCfg.Cooldown
+					-- Only a guess until the server says which target it picked.
 					kickTarget = target
+					kickAccepted = false
 					kick = DiveKick.start()
 					state = Momentum.stopped(state)
 					prompt:Hide()
@@ -666,7 +826,7 @@ function MovementController:_bind(
 			elseif
 				kickTarget
 				and character:GetAttribute("HT_Skill") == "chase"
-				and kickTarget:GetAttribute("HT_Air") == "float"
+				and kickTarget:GetAttribute("HT_Air") ~= nil
 			then
 				-- Still got there in the end: it still counts.
 				local targetRoot = kickTarget:FindFirstChild("HumanoidRootPart") :: BasePart?
@@ -701,6 +861,11 @@ function MovementController:_bind(
 			-- aligned, losing the target or being hit out of it ends the move.
 			local over = (before == "chase" and kick.t >= LAND_CHECK_SECONDS and grounded)
 				or ((before == "attach" or before == "flip") and (skill == nil or not targetRoot))
+				-- Never accepted: nothing happened, and it can be tried again shortly.
+				or (before == "squat" and not kickAccepted and kick.t >= kickCfg.AcceptWaitSeconds)
+			if over and before == "squat" then
+				kickReadyAt = now + LAND_CHECK_SECONDS
+			end
 			-- During the timing the keys aim the kick, unless in shift lock, when the camera does.
 			local stepX, stepZ = inputX, inputZ
 			if before == "attach" and Knit.GetController("ShiftLockController"):IsLocked() then
@@ -723,8 +888,14 @@ function MovementController:_bind(
 			if nextKick == nil then
 				endKick()
 			else
-				if nextKick.phase == "squat" and nextKick.t >= kickCfg.JumpSquatSeconds then
-					nextKick = springJump(nextKick, inputX, inputZ)
+				-- The squat ends in the snap, but only once the server has said yes and which target.
+				if
+					nextKick.phase == "squat"
+					and nextKick.t >= kickCfg.JumpSquatSeconds
+					and kickAccepted
+					and targetRoot
+				then
+					nextKick = snapJump(nextKick, targetRoot)
 				end
 				if before == "attach" and nextKick.phase == "flip" then
 					-- The ring ran out with no press. The kick still comes, as a red.
@@ -732,12 +903,13 @@ function MovementController:_bind(
 					prompt:Hide()
 				end
 				local position = root.Position
+				-- The server holds them from the moment it accepts, so "hold" is the usual case here.
 				if
 					nextKick.phase == "chase"
 					and skill == "chase"
 					and targetRoot
 					and kickTarget
-					and kickTarget:GetAttribute("HT_Air") == "float"
+					and kickTarget:GetAttribute("HT_Air") ~= nil
 				then
 					local offset = position - targetRoot.Position
 					if DiveKick.isTouching(kickCfg, offset.X, offset.Y, offset.Z) then
@@ -777,18 +949,13 @@ function MovementController:_bind(
 				if vx and vy and vz then
 					root.AssemblyLinearVelocity = Vector3.new(vx, vy, vz)
 				end
-				-- In the jump you face where you're going. Once aligned, you face them. In the rebound
-				-- you keep looking the way you kicked.
+				-- From the snap on you face them. In the rebound you keep looking the way you kicked.
 				local faceTo = Vector3.zero
-				if nextKick.phase == "chase" then
-					faceTo = if inputX ~= 0 or inputZ ~= 0
-						then Vector3.new(inputX, 0, inputZ)
-						else Vector3.new(
-							nextKick.vx + nextKick.steerX,
-							0,
-							nextKick.vz + nextKick.steerZ
-						)
-				elseif nextKick.phase == "attach" or nextKick.phase == "flip" then
+				if
+					nextKick.phase == "chase"
+					or nextKick.phase == "attach"
+					or nextKick.phase == "flip"
+				then
 					faceTo = Vector3.new(at.X - position.X, 0, at.Z - position.Z)
 				end
 				if faceTo.Magnitude > 0.5 then
@@ -809,30 +976,82 @@ function MovementController:_bind(
 			punchRequested = false
 			lastPush = nil
 			if airSeconds >= airCfg.MinAirSeconds then
-				local moving = root.AssemblyLinearVelocity
+				local airMoving = root.AssemblyLinearVelocity
 				local faceX, faceZ = Momentum.facing(state)
 				local dirX, dirZ =
 					AirRecovery.direction(inputX, inputZ, faceX, faceZ, cfg.InputDeadzone)
-				local addX, addZ = AirRecovery.push(airCfg, moving.X, moving.Z, dirX, dirZ)
-				local up = if slammed then 0 else AirRecovery.lift(airCfg, moving.Y)
+				-- Falling off the edge, the punch's dash also lifts: once, and only so many per fall.
+				local recovering = AirRecovery.earnsLift(
+					airCfg,
+					airMoving.Y,
+					floorBelow(),
+					slammed,
+					now - lastLiftAt,
+					liftsThisFall
+				)
+				local addX, addZ = AirRecovery.push(
+					airCfg,
+					airMoving.X,
+					airMoving.Z,
+					dirX,
+					dirZ,
+					if recovering then airCfg.LiftForwardSpeed else nil
+				)
+				-- The lift replaces the small top-up rather than adding to it.
+				local up = if slammed or recovering
+					then 0
+					else AirRecovery.lift(airCfg, airMoving.Y)
+				if recovering then
+					liftTo = airCfg.LiftSpeed
+					liftLeft = airCfg.LiftSeconds
+					liftsThisFall += 1
+					lastLiftAt = now
+				end
 				pushX += addX
 				pushZ += addZ
 				lift += up
 				pushGraceUntil = now + PUSH_GRACE_SECONDS
-				lastPush = { x = addX, z = addZ, up = up, at = now }
-				Knit.GetController("FxController")
-					:AirPunchGust(character, Vector3.new(dirX, 0, dirZ))
+				lastPush = { x = addX, z = addZ, up = up, at = now, lifted = recovering }
+				fx:AirPunchGust(character, Vector3.new(dirX, 0, dirZ))
 			end
 		end
 
 		if propelRequested then
 			propelRequested = false
-			local propelled = Momentum.tryPropel(state, cfg, inputX, inputZ, drive)
+			-- A or D held as Q goes down bends the dash that way; both, or neither, is straight.
+			local curve = Momentum.dashCurve(cfg, side)
+			local aimX, aimZ = inputX, inputZ
+			if curve ~= 0 and state.speed <= cfg.RestSnapSpeed then
+				-- From a standstill a curved dash starts where the camera looks, not sideways.
+				local forward = flatCameraForward()
+				if forward then
+					aimX, aimZ = forward.X, forward.Z
+				end
+			end
+			-- Boosted at the moment Q goes down: faster, longer, a longer cooldown, and it costs stamina.
+			local boosted = nitro.active and nitro.stamina >= nitroCfg.DashStaminaCost
+			local options: Momentum.DashOptions = if boosted
+				then {
+					curve = curve,
+					speedScale = nitroCfg.DashSpeedMultiplier,
+					durationScale = nitroCfg.DashDurationMultiplier,
+					arcScale = nitroCfg.DashArcMultiplier,
+					cooldown = nitroCfg.DashCooldown,
+				}
+				else { curve = curve }
+			local propelled = Momentum.tryPropel(state, cfg, aimX, aimZ, drive, options)
 			if propelled then
 				state = propelled
+				if boosted then
+					nitro = (Nitro.spend(nitro, nitroCfg.DashStaminaCost))
+				end
 				self.Propelled:Fire()
-				Knit.GetController("FxController")
-					:PropelGust(character, Vector3.new(state.headingX, 0, state.headingZ))
+				fx:PropelGust(
+					character,
+					Vector3.new(state.headingX, 0, state.headingZ),
+					state.dashSeconds,
+					boosted
+				)
 				if propelRemote then
 					propelRemote:FireServer()
 				end
@@ -882,7 +1101,8 @@ function MovementController:_bind(
 				end
 			end
 			wasSideSteering = not nothingHeld and drive == "side"
-			-- In an air run the controls work just as they do on the floor.
+			-- In an air run the controls work just as they do on the floor. A boost only shapes this
+			-- ordinary step; there's no other movement rule for it.
 			state = Momentum.step(
 				state,
 				cfg,
@@ -891,7 +1111,8 @@ function MovementController:_bind(
 				grounded or airRun ~= nil,
 				dt,
 				drive,
-				side
+				side,
+				boost
 			)
 			if airRun and airRun.keep then
 				state, airRun.keep = Momentum.airKeep(state, airRun.keep, inputX, inputZ)
@@ -945,6 +1166,16 @@ function MovementController:_bind(
 			wanted = math.sqrt(totalX * totalX + totalZ * totalZ)
 		end
 
+		-- A recovery lift sets the vertical speed once, then for its few moments its own lighter gravity
+		-- stands in for whichever fall rule the body is on, so the two never stack or fight.
+		local function withLift(fall: number): number
+			if liftTo then
+				return math.max(velocity.Y, liftTo)
+			elseif liftLeft > 0 then
+				return AirRecovery.liftFall(airCfg, workspace.Gravity, velocity.Y, dt)
+			end
+			return fall + lift
+		end
 		if floating then
 			-- Rises on the launch's own lighter gravity, falls on the general rule, and the flat speed is
 			-- exactly what the knock says.
@@ -955,22 +1186,23 @@ function MovementController:_bind(
 				velocity.Y,
 				dt
 			)
-			root.AssemblyLinearVelocity = Vector3.new(totalX, fall + lift, totalZ)
+			root.AssemblyLinearVelocity = Vector3.new(totalX, withLift(fall), totalZ)
 		elseif airRun then
 			-- The Humanoid barely moves itself in the air, so the speed is set exactly.
 			local fall = velocity.Y + workspace.Gravity * (1 - airRun.gravityScale) * dt
 			if airRun.maxFall then
 				fall = math.max(fall, -airRun.maxFall)
 			end
-			root.AssemblyLinearVelocity = Vector3.new(totalX, fall + lift, totalZ)
+			root.AssemblyLinearVelocity = Vector3.new(totalX, withLift(fall), totalZ)
 		elseif freeAir then
 			-- A slam keeps all its gravity, so a kick still drives them down as hard as it meant to.
 			local fall = if slammed
 				then velocity.Y
 				else AirRecovery.fallVelocity(airCfg, workspace.Gravity, 1, velocity.Y, dt)
-			root.AssemblyLinearVelocity = Vector3.new(totalX, fall + lift, totalZ)
+			root.AssemblyLinearVelocity = Vector3.new(totalX, withLift(fall), totalZ)
 		end
 		lift = 0
+		liftTo = nil
 
 		local faceX, faceZ = Momentum.facing(state)
 		local heading = Vector3.new(faceX, 0, faceZ)
@@ -994,8 +1226,9 @@ function MovementController:_bind(
 			local propelText = if wait > 0
 				then string.format("Propel %.1f", wait)
 				else "Propel ready"
+			local nitroText = if nitro.active then "NITRO" else `Nitro {math.floor(nitro.stamina)}`
 			readout.Text =
-				`Speed {math.floor(realSpeed + 0.5)} / {cfg.MaxSpeed}   {propelText}   Stagger {character:GetAttribute(
+				`Speed {math.floor(realSpeed + 0.5)} / {cfg.MaxSpeed}   {propelText}   {nitroText}   Stagger {character:GetAttribute(
 					"HT_Stagger"
 				) or 0}`
 		end
@@ -1044,12 +1277,27 @@ function MovementController:KnitStart()
 	end
 	local propelStarted = Net.client("PropelStarted")
 	if propelStarted then
-		propelStarted.OnClientEvent:Connect(function(other: Player)
+		propelStarted.OnClientEvent:Connect(function(other: Player, boosted: boolean?)
 			if other and other.Character then
-				Knit.GetController("FxController"):PropelGust(other.Character, nil)
+				local seconds = cfg.PropelSeconds
+					* (if boosted then GameConfig.Nitro.DashDurationMultiplier else 1)
+				Knit.GetController("FxController")
+					:PropelGust(other.Character, nil, seconds, boosted == true)
 			end
 		end)
 	end
+	local kickAccepted = Net.client("KickAccepted")
+	if kickAccepted then
+		kickAccepted.OnClientEvent:Connect(function(target: Model)
+			if self._kickAccepted then
+				self._kickAccepted(target)
+			end
+		end)
+	end
+	local nitroRemotes = {
+		start = Net.client("NitroStart"),
+		stop = Net.client("NitroStop"),
+	}
 	local kickImpact = Net.client("KickImpact")
 	if kickImpact then
 		kickImpact.OnClientEvent:Connect(
@@ -1062,9 +1310,17 @@ function MovementController:KnitStart()
 	end
 	local input = hookInput(player)
 	local readout = makeReadout()
+	local bar: StaminaBar.Bar? = nil
+	if GameConfig.Nitro.Enabled then
+		local gui = Instance.new("ScreenGui")
+		gui.Name = "HT_Nitro"
+		gui.ResetOnSpawn = false
+		gui.Parent = player:WaitForChild("PlayerGui")
+		bar = StaminaBar.new(gui)
+	end
 
 	local function onCharacter(character: Model)
-		self:_bind(character, input, readout, propelRemote)
+		self:_bind(character, input, readout, propelRemote, bar, nitroRemotes)
 	end
 	player.CharacterAdded:Connect(onCharacter)
 	if player.Character then

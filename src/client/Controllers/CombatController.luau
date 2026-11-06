@@ -11,6 +11,7 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
@@ -99,6 +100,28 @@ function CombatController:KnitStart()
 	local buffered: number? = nil
 	local undoPress: number? = nil
 	local undoSide = "Left"
+	-- Holding the button: the next punch goes the moment the cooldown allows, exactly as a press then
+	-- would. `heldBy` is the input holding it, polled so a lost release can't leave it held.
+	local held = false
+	local heldBy: Enum.UserInputType? = nil
+	local holdBlockedUntil = 0 -- after a refusal, a hold waits a cooldown before trying again
+
+	local function letGo()
+		held = false
+		heldBy = nil
+	end
+
+	local function stillHeld(): boolean
+		if not held then
+			return false
+		end
+		if heldBy == Enum.UserInputType.MouseButton1 then
+			return UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+		elseif heldBy and string.find(heldBy.Name, "Gamepad") then
+			return UserInputService:IsGamepadButtonDown(heldBy, Enum.KeyCode.ButtonR2)
+		end
+		return true -- touch has no polled state; End and Cancel cover it
+	end
 
 	-- The same things the server refuses a punch for, so no swing plays that was never going to count.
 	local function canPunch(character: Model?): boolean
@@ -125,41 +148,86 @@ function CombatController:KnitStart()
 		request:FireServer()
 	end
 
-	-- One press is one punch: holding the button never repeats it. Pressed a moment too early, it's
-	-- remembered once, and thrown as soon as it can be. It's not a queue: a second early press just
-	-- replaces the first.
-	ContextActionService:BindAction(ACTION, function(_name: string, inputState: Enum.UserInputState)
-		if inputState == Enum.UserInputState.Begin then
-			local now = os.clock()
-			local character = player.Character
-			if character and character:GetAttribute("HT_Clash") then
-				if clashTap then
-					clashTap:FireServer()
+	-- A press is one punch, thrown at once. Pressed a moment too early, it's remembered once, and thrown
+	-- as soon as it can be. It's not a queue: a second early press just replaces the first.
+	-- Holding the button after that throws the next punch each time the cooldown allows, through the same
+	-- gates as a press, so a hold is never faster than clicking and keeps the same combo. Letting go stops
+	-- it at once. A clash still takes one tap per press: holding never mashes.
+	ContextActionService:BindAction(
+		ACTION,
+		function(_name: string, inputState: Enum.UserInputState, inputObject: InputObject)
+			if inputState == Enum.UserInputState.Begin then
+				local now = os.clock()
+				local character = player.Character
+				if character and character:GetAttribute("HT_Clash") then
+					letGo()
+					if clashTap then
+						clashTap:FireServer()
+					end
+				elseif not character or not canPunch(character) then
+					buffered = nil
+					held = true
+					heldBy = inputObject.UserInputType
+				else
+					held = true
+					heldBy = inputObject.UserInputType
+					local readyAt = lastPress + punchCfg.Cooldown + recovery
+					if now >= readyAt then
+						throw(now, character)
+					elseif Combat.pressBuffers(punchCfg, now, readyAt) then
+						buffered = now
+					end
 				end
-			elseif not character or not canPunch(character) then
-				buffered = nil
-			else
-				local readyAt = lastPress + punchCfg.Cooldown + recovery
-				if now >= readyAt then
-					throw(now, character)
-				elseif Combat.pressBuffers(punchCfg, now, readyAt) then
-					buffered = now
-				end
+			elseif
+				inputState == Enum.UserInputState.End
+				or inputState == Enum.UserInputState.Cancel
+			then
+				letGo()
 			end
-		end
-		return Enum.ContextActionResult.Pass
-	end, true, Enum.UserInputType.MouseButton1, Enum.KeyCode.ButtonR2)
+			return Enum.ContextActionResult.Pass
+		end,
+		true,
+		Enum.UserInputType.MouseButton1,
+		Enum.KeyCode.ButtonR2
+	)
 	ContextActionService:SetTitle(ACTION, "Punch")
 
-	RunService.Heartbeat:Connect(function()
-		if not buffered then
-			return
+	-- Anything that could swallow the release lets go: the window losing focus, and a new body.
+	UserInputService.WindowFocusReleased:Connect(letGo)
+	player.CharacterAdded:Connect(function(character: Model)
+		letGo()
+		buffered = nil
+		local humanoid = character:WaitForChild("Humanoid", 10)
+		if humanoid and humanoid:IsA("Humanoid") then
+			humanoid.Died:Connect(letGo)
 		end
+	end)
+	player.CharacterRemoving:Connect(letGo)
+
+	RunService.Heartbeat:Connect(function()
 		local now = os.clock()
 		local character = player.Character
-		if not Combat.bufferLive(punchCfg, now, buffered) or not canPunch(character) then
-			buffered = nil
-		elseif character and now >= lastPress + punchCfg.Cooldown + recovery then
+		if buffered then
+			if not Combat.bufferLive(punchCfg, now, buffered) or not canPunch(character) then
+				buffered = nil
+			elseif character and now >= lastPress + punchCfg.Cooldown + recovery then
+				throw(now, character)
+			end
+			return
+		end
+		if not held then
+			return
+		end
+		if not stillHeld() or (character and character:GetAttribute("HT_Clash")) then
+			letGo()
+			return
+		end
+		if
+			character
+			and canPunch(character)
+			and now >= holdBlockedUntil
+			and now >= lastPress + punchCfg.Cooldown + recovery
+		then
 			throw(now, character)
 		end
 	end)
@@ -170,9 +238,11 @@ function CombatController:KnitStart()
 				if kind == "miss" then
 					recovery = punchCfg.MissRecovery
 				elseif kind == "refused" then
-					-- It never happened, so the timing and the combo go back to before it.
+					-- It never happened, so the timing and the combo go back to before it. A hold
+					-- waits a cooldown before asking again, so it can't hammer the server.
 					lastPress = undoPress or lastPress
 					nextSide = undoSide
+					holdBlockedUntil = os.clock() + punchCfg.Cooldown
 					movement:PunchRefused()
 				elseif kind == "clash" then
 					buffered = nil
@@ -193,6 +263,8 @@ function CombatController:KnitStart()
 				lastPress = os.clock()
 				recovery = 0
 				buffered = nil
+				-- The last mash may still be down: punching again takes a fresh press.
+				letGo()
 			end
 		end)
 	end

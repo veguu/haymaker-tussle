@@ -30,15 +30,22 @@ local GameConfig = {
 		CoastMaxAngle = 45,
 		ForwardInputThreshold = 0.3,
 		BrakeDeceleration = 60,
+		-- Q: a committed dash. It eases up to PropelSpeed over PropelRampSeconds, holds it, then eases back
+		-- down to running speed over the last PropelEaseOutSeconds of PropelSeconds. While it runs the keys
+		-- can only nudge it (PropelSteerRate, degrees per second); afterwards steering comes back over
+		-- PropelControlReturnSeconds. Holding A or D as Q is pressed bends it into an arc of PropelArcDegrees,
+		-- left or right. A and D together, or neither, is a straight dash.
 		PropelSpeed = 84,
-		PropelSeconds = 0.8,
+		PropelSeconds = 0.65,
 		PropelRampSeconds = 0.1,
+		PropelEaseOutSeconds = 0.28,
 		PropelCooldown = 3,
-		PropelMinSpeed = 16,
-		PropelBodyTurnRate = 600,
-		PropelGripRate = 180,
-		PropelMaxSlip = 55,
-		PropelScrub = 16,
+		PropelSteerRate = 20,
+		PropelControlReturnSeconds = 0.25,
+		PropelArcDegrees = 80,
+		PropelCurveInputThreshold = 0.35,
+		-- How far the body leans ahead into a curved dash, in degrees. Past 20 it makes drift smoke.
+		PropelCurveBodyLead = 24,
 		KnockbackAirDecay = 20,
 		KnockbackMaxSpeed = 250,
 		HitSpeedKeep = 0.3,
@@ -417,19 +424,28 @@ local GameConfig = {
 	Kick = {
 		Cooldown = 15,
 		AirGravityScale = 0.7,
-		StealRange = 26,
 		JumpSquatSeconds = 0.067,
-		LeapMin = 70,
-		LeapMax = 150,
-		SteerSpeed = 42,
-		AirAcceleration = 190,
-		JumpCarryMax = 170,
-		JumpMeetShare = 0.62,
-		JumpMeetMin = 0.4,
-		JumpMeetMax = 1.25,
-		JumpShortShare = 0.12,
-		JumpShortMax = 7,
-		AimForgiveDegrees = 14,
+		-- The follow-up approach: once the server accepts it, a straight snap to beside the target, taking
+		-- distance / ApproachSpeed seconds, kept between ApproachMinSeconds and ApproachMaxSeconds. It
+		-- re-aims every frame, so a target that drifts a little is still reached. JumpMissGrace past that,
+		-- not touching them, it has missed. ApproachMaxSpeed must stay under Security.TeleportSpeed.
+		ApproachSpeed = 260,
+		ApproachMinSeconds = 0.08,
+		ApproachMaxSeconds = 0.65,
+		ApproachMaxSpeed = 280,
+		AcceptWaitSeconds = 0.6,
+		-- Who can be followed up: anyone launched with nothing solid between, within FollowUpOwnRange studs
+		-- for your own uppercut (a strong one throws them 150 studs within a second) or FollowUpRange for
+		-- someone else's. The pick is the lowest of distance * (1 + FollowUpAimWeight * (1 - cos) / 2),
+		-- where cos compares where you face with the way to them, times FollowUpOwnShare for your own
+		-- launch. Client and server use the same rule, and the server's pick is the one that counts.
+		FollowUpRange = 80,
+		FollowUpOwnRange = 170,
+		FollowUpAimWeight = 0.6,
+		FollowUpOwnShare = 0.8,
+		-- The target is held still, by the server, from the moment the follow-up is accepted until it
+		-- resolves, and never for longer than HoldTimeout.
+		HoldTimeout = 2.5,
 		JumpMissGrace = 0.15,
 		MissCarryKeep = 18,
 		MissGravityScale = 0.3,
@@ -439,7 +455,7 @@ local GameConfig = {
 		LaunchSteerSpeed = 26,
 		LaunchSteerAcceleration = 90,
 		LaunchSteerStaggerLoss = 0.5,
-		ChaseSeconds = 4,
+		ChaseSeconds = 1.2,
 		TouchFlat = 8,
 		TouchTall = 10,
 		AttachAbove = 0.5,
@@ -471,6 +487,16 @@ local GameConfig = {
 		BounceLift = 75,
 		StunMaxSeconds = 2.5,
 		StunAfterLanding = 0.2,
+		-- The finisher: a kick graded in FinisherGrades launches the target hard away from the kicker and
+		-- upward, instead of slamming it down. Outward speed is a punch's strength (so stagger counts) times
+		-- the grade's share times FinisherPushScale, at most FinisherMaxSpeed. They lose control for
+		-- FinisherStunSeconds, then can punch to recover as usual. Red still slams.
+		FinisherGrades = { green = true, orange = true },
+		FinisherPushScale = 2,
+		FinisherMaxSpeed = 220,
+		FinisherLift = 45,
+		FinisherStunSeconds = 0.45,
+		FinisherShake = 1.3,
 	},
 	AirRecovery = {
 		BoostSpeed = 24,
@@ -485,13 +511,79 @@ local GameConfig = {
 		MinAirSeconds = 0.1,
 		HitRecoilShare = 0.5,
 		PunchWhileLaunched = true,
+		-- The recovery lift: a punch thrown while falling with no floor close below (off the edge) also
+		-- sets the vertical speed to LiftSpeed, once, and for LiftSeconds gravity is LiftGravityScale of
+		-- normal, so it rises a few studs and arcs over. Its forward push is LiftForwardSpeed instead of
+		-- BoostSpeed. At most LiftsPerFall per fall, and LiftCooldown apart, so it can't be used to fly.
+		LiftEnabled = true,
+		LiftSpeed = 26,
+		LiftSeconds = 0.25,
+		LiftGravityScale = 0.5,
+		LiftForwardSpeed = 24,
+		LiftCooldown = 1.2,
+		LiftsPerFall = 2,
+		LiftFallingSpeed = 2, -- falling at least this fast (studs/s) counts as falling
+		LiftFloorCheck = 14, -- a floor within this many studs below means it isn't off the edge
+	},
+	-- Shift: nitro. Speed eases toward SpeedMultiplier times normal top speed over RampSeconds, on an
+	-- S-curve (RampCurve above 1: gentle start, strongest in the middle, settling into the top), with up to
+	-- RampAcceleration extra acceleration to follow it. Stamina drains while it runs (about 3 s from full),
+	-- then refills after RechargeDelay. Run dry, it stays off until ExhaustedRecharge is back. It runs on
+	-- the ground while moving forward or sideways, never braking, held, clashing, stunned or in the air
+	-- (past AirGraceSeconds).
+	Nitro = {
+		Enabled = true,
+		SpeedMultiplier = 2,
+		RampSeconds = 0.9,
+		RampCurve = 2,
+		RampAcceleration = 150,
+		RampDownSeconds = 0.35,
+		StaminaMax = 100,
+		DrainPerSecond = 33,
+		RechargeDelay = 0.8,
+		RechargePerSecond = 14,
+		ActivateMin = 15,
+		ExhaustedRecharge = 40,
+		AirGraceSeconds = 0.2,
+		-- Handling: at full boost the heading turns at TurnScale of the normal rate.
+		TurnScale = 0.28,
+		-- Speed above normal top speed, once nitro ends, bleeds off at this rate (studs/s per second).
+		ReleaseDeceleration = 18,
+		-- Q while boosted: faster and longer, a longer cooldown, and it costs stamina.
+		DashSpeedMultiplier = 1.35,
+		DashDurationMultiplier = 1.3,
+		DashCooldown = 3.5,
+		DashStaminaCost = 15,
+		DashArcMultiplier = 0.85,
+		-- Camera: pulled in toward the character, with a light shake, both eased in and out.
+		CameraZoomStuds = 3.5,
+		CameraMinDistance = 6,
+		CameraEaseIn = 4,
+		CameraEaseOut = 4,
+		ShakeStuds = 0.06,
+		ShakeRollDegrees = 0.35,
+		ShakeFrequency = 11,
+		-- Trail behind the root part, seen by everyone.
+		TrailLifetime = 0.28,
+		TrailWidth = 1.8,
+		TrailColor = "8FD3FF",
+		TrailTransparency = 0.3,
+		TrailLightEmission = 0.6,
+		-- Stamina bar, bottom middle.
+		BarScreenY = 0.95,
+		BarWidth = 240,
+		BarHeight = 10,
+		BarHideSeconds = 1.2,
+		-- Server mirror of stamina: this much slack for clock differences.
+		ServerStaminaSlack = 10,
+		ServerToggleSeconds = 0.08,
 	},
 	-- Keyboard bindings that more than one script needs to agree on. Key is an Enum.KeyCode name, Label is
 	-- what the controls panel shows.
 	Controls = {
 		ShiftLock = { Key = "LeftControl", Label = "Ctrl" },
-		-- Reserved for the nitro boost. Nothing binds it yet: it only appears in the controls panel.
-		Nitro = { Key = "LeftShift", Label = "Shift", ComingSoon = true },
+		-- Held for the nitro boost. GamepadKey is the controller button for it.
+		Nitro = { Key = "LeftShift", Label = "Shift", GamepadKey = "ButtonL3", GamepadLabel = "L3" },
 	},
 	ShiftLock = {
 		CameraOffsetX = 0,

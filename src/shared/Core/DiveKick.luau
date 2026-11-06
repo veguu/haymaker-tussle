@@ -1,14 +1,15 @@
 --!strict
 -- DiveKick - the air kick's phases, as plain maths with no Roblox instances.
 --
--- It starts with someone launched by an uppercut in the air. Whoever launched them can jump at any
--- range the jump can cover. Anyone else has to be close, and doing so takes the jump over. Either way
--- it's once per so many landed uppercuts, with a shortest time between jumps too.
--- squat: first Space. A few frames down into the legs, still on the floor.
--- chase: the spring. Its arc and strength are worked out once, at that moment, to meet them in the
---   air, and its direction is where the player aims. It never follows them after that: only the
---   movement keys steer it. Once it has missed, it's no longer a committed jump at all: the player
---   goes back to ordinary movement, in the air.
+-- It starts with someone launched by an uppercut in the air: the follow-up. Anyone launched within
+-- FollowUpRange can be followed up, with nothing solid in between; `pickFollowUp` says which, and the
+-- server's pick is the one that counts. Once per Cooldown.
+-- squat: first Space. A few frames down into the legs, still on the floor, waiting for the server to
+--   accept it. Nothing moves until it has, and if it never does, the squat simply ends.
+-- chase: the snap. A straight, fast move to beside them, re-aimed every frame at where they are, so it
+--   arrives in `approach` seconds whatever small drift they make. The server holds them still from the
+--   moment it accepts. If something solid stops it short, it has missed: the player goes back to
+--   ordinary movement, in the air.
 -- attach: close, so both are held in the air and you align beside them. A ring closes at a moment
 --   that differs each time; press Space as it meets the key. Meanwhile the movement keys swing you
 --   around them: they'll be kicked the way the keys point, and you'll rebound the other way.
@@ -19,30 +20,17 @@
 
 local DiveKick = {}
 
--- How a launched target comes down, for planning a jump at them, when that isn't simply one gravity
--- all the way. The caller supplies these from AirRecovery.
-export type TargetFall = {
-	-- Seconds until a body at vertical speed `vy` has dropped `height`.
-	timeToDrop: (vy: number, height: number) -> number,
-	-- How much higher it is after `seconds` at vertical speed `vy`. Negative is lower.
-	rise: (vy: number, seconds: number) -> number,
-}
-
 export type Settings = {
 	AirGravityScale: number,
-	StealRange: number,
 	JumpSquatSeconds: number,
-	LeapMin: number,
-	LeapMax: number,
-	SteerSpeed: number,
-	AirAcceleration: number,
-	JumpCarryMax: number,
-	JumpMeetShare: number,
-	JumpMeetMin: number,
-	JumpMeetMax: number,
-	JumpShortShare: number,
-	JumpShortMax: number,
-	AimForgiveDegrees: number,
+	ApproachSpeed: number,
+	ApproachMinSeconds: number,
+	ApproachMaxSeconds: number,
+	ApproachMaxSpeed: number,
+	FollowUpRange: number,
+	FollowUpOwnRange: number,
+	FollowUpAimWeight: number,
+	FollowUpOwnShare: number,
 	JumpMissGrace: number,
 	KickAimRate: number,
 	LaunchSteerSpeed: number,
@@ -76,6 +64,14 @@ export type Settings = {
 
 export type Phase = "squat" | "chase" | "attach" | "flip"
 export type Grade = "red" | "orange" | "green"
+
+-- Someone who could be followed up: where they are, and whether it's your own launch.
+export type Candidate = {
+	x: number,
+	y: number,
+	z: number,
+	own: boolean,
+}
 
 -- Where a rebound starts from. `height` is the feet above the platform's top. `speed` is the flat
 -- speed to use, and `gravity` what you'll fall under.
@@ -112,161 +108,85 @@ export type State = {
 	sideZ: number,
 	qteAt: number,
 	missAt: number,
-}
-
-export type JumpPlan = {
-	meet: number,
-	leap: number,
-	carry: number,
-	towardX: number,
-	towardZ: number,
-	reachable: boolean,
+	-- The snap's length in seconds, while it runs.
+	approach: number?,
 }
 
 local FLIP_GRACE = 0.5 -- how long a flip waits for the server before giving up
 local RING_RUN_OUT = 0.04 -- how long after the last usable moment an unpressed ring gives up
+local SNAP_MIN_REMAINING = 1 / 30 -- the snap never aims to close the gap faster than this
 
---- Can this jumper go for this target? Their own launch, at any range. Anyone else's, only when
---- close; only the flat distance counts, since the target may already be far overhead. Whether the
---- jump could actually get there is a separate question: see `canReach`.
-function DiveKick.canJumpAt(
+--- How a follow-up candidate scores: lower is better, nil if out of range (FollowUpOwnRange for your own
+--- launch, FollowUpRange for anyone else's). The distance counts, and so
+--- does how far off where you face it is: straight ahead counts as it is, directly behind as
+--- (1 + FollowUpAimWeight) times further. Your own launch counts FollowUpOwnShare as far. `slack` is extra
+--- range for the server, which sees both bodies slightly late.
+function DiveKick.followUpScore(
 	cfg: Settings,
-	isOwn: boolean,
 	x: number,
+	y: number,
 	z: number,
-	targetX: number,
-	targetZ: number
-): boolean
-	if isOwn then
-		return true
+	faceX: number,
+	faceZ: number,
+	candidate: Candidate,
+	slack: number?
+): number?
+	local dx, dy, dz = candidate.x - x, candidate.y - y, candidate.z - z
+	local distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+	local range = if candidate.own then cfg.FollowUpOwnRange else cfg.FollowUpRange
+	if distance > range + (slack or 0) then
+		return nil
 	end
-	local dx, dz = targetX - x, targetZ - z
-	return dx * dx + dz * dz <= cfg.StealRange * cfg.StealRange
+	local flat = math.sqrt(dx * dx + dz * dz)
+	local faceSize = math.sqrt(faceX * faceX + faceZ * faceZ)
+	local cosine = 1
+	if flat > 0.01 and faceSize > 0.01 then
+		cosine = (dx * faceX + dz * faceZ) / (flat * faceSize)
+	end
+	local score = distance * (1 + cfg.FollowUpAimWeight * (1 - cosine) / 2)
+	if candidate.own then
+		score *= cfg.FollowUpOwnShare
+	end
+	return score
+end
+
+--- The follow-up target: the candidate with the lowest score, or nil if none is in range. Candidates
+--- are already known to be valid (launched, fightable, nothing solid in between); this only picks. Client
+--- and server both use it, so they agree unless two are nearly level, and then the server's pick stands.
+function DiveKick.pickFollowUp(
+	cfg: Settings,
+	x: number,
+	y: number,
+	z: number,
+	faceX: number,
+	faceZ: number,
+	candidates: { Candidate },
+	slack: number?
+): number?
+	local best: number? = nil
+	local bestScore = math.huge
+	for index, candidate in candidates do
+		local score = DiveKick.followUpScore(cfg, x, y, z, faceX, faceZ, candidate, slack)
+		if score and score < bestScore then
+			best, bestScore = index, score
+		end
+	end
+	return best
+end
+
+--- How long the snap to a target this far away takes.
+function DiveKick.approachSeconds(cfg: Settings, distance: number): number
+	return math.clamp(
+		distance / math.max(cfg.ApproachSpeed, 1),
+		cfg.ApproachMinSeconds,
+		cfg.ApproachMaxSeconds
+	)
 end
 
 --- Close enough to start the kick? Bodies are tall and narrow, so it's a short wide cylinder rather
 --- than a ball. It doesn't need real contact, but nothing happens from any further away.
 function DiveKick.isTouching(cfg: Settings, dx: number, dy: number, dz: number): boolean
 	return dx * dx + dz * dz <= cfg.TouchFlat * cfg.TouchFlat and math.abs(dy) <= cfg.TouchTall
-end
-
---- The spring of the jump, worked out once. It picks a moment partway through their remaining time
---- in the air, then an arc reaching their height at that moment and a strength covering the distance
---- to where they'll be, a little short so that it takes a small correction to finish. The strength
---- is automatic; `towardX`, `towardZ` is only used to forgive a nearly right aim. A long launch
---- therefore gets a long jump, without anything following the target afterward. `reachable` says
---- whether the jump's limits allow it at all.
---- `dx`, `dy`, `dz` is from you to them, `vx`, `vy`, `vz` how they're moving, `decay` how fast their
---- push fades, `gravity` the air gravity. `fall` says how they really fall, when that isn't simply
---- `gravity` all the way down: they rise on it and then fall on the lighter rules in AirRecovery.
-function DiveKick.planJump(
-	cfg: Settings,
-	dx: number,
-	dy: number,
-	dz: number,
-	vx: number,
-	vy: number,
-	vz: number,
-	decay: number,
-	gravity: number,
-	fall: TargetFall?
-): JumpPlan
-	local height = math.max(dy, 0)
-	local airLeft = if fall
-		then fall.timeToDrop(vy, height)
-		else (vy + math.sqrt(vy * vy + 2 * gravity * height)) / gravity
-	local meet = math.clamp(airLeft * cfg.JumpMeetShare, cfg.JumpMeetMin, cfg.JumpMeetMax)
-	-- You rise and fall on `gravity`. With nothing else given they do too, so the height between you
-	-- closes at a steady rate. Otherwise it's how far they've really moved by then.
-	local neededLeap = if fall
-		then (height + fall.rise(vy, meet) + gravity * meet * meet / 2) / meet
-		else vy + height / meet
-	local leap = math.clamp(neededLeap, cfg.LeapMin, cfg.LeapMax)
-	-- Where they'll be by then, with their push fading along the way.
-	local speed = math.sqrt(vx * vx + vz * vz)
-	local toX, toZ = dx, dz
-	if speed > 0.01 then
-		local moving = if decay > 0 then math.min(meet, speed / decay) else meet
-		local travel = speed * moving - decay * moving * moving / 2
-		toX += vx / speed * travel
-		toZ += vz / speed * travel
-	end
-	local distance = math.sqrt(toX * toX + toZ * toZ)
-	local short = math.min(distance * cfg.JumpShortShare, cfg.JumpShortMax)
-	local neededCarry = (distance - short) / meet
-	local reachable = airLeft >= meet
-		and neededLeap <= cfg.LeapMax
-		and neededCarry <= cfg.JumpCarryMax
-	local carry = math.min(neededCarry, cfg.JumpCarryMax)
-	if distance < 0.01 then
-		return {
-			meet = meet,
-			leap = leap,
-			carry = 0,
-			towardX = 0,
-			towardZ = 0,
-			reachable = reachable,
-		}
-	end
-	return {
-		meet = meet,
-		leap = leap,
-		carry = carry,
-		towardX = toX / distance,
-		towardZ = toZ / distance,
-		reachable = reachable,
-	}
-end
-
---- Would a jump pressed now be able to get there? It allows for the squat, since the jump leaves the
---- floor a moment later and they'll have moved on by then. This decides whether to offer the jump.
-function DiveKick.canReach(
-	cfg: Settings,
-	dx: number,
-	dy: number,
-	dz: number,
-	vx: number,
-	vy: number,
-	vz: number,
-	decay: number,
-	gravity: number,
-	fall: TargetFall?
-): boolean
-	local wait = cfg.JumpSquatSeconds
-	local plan = DiveKick.planJump(
-		cfg,
-		dx + vx * wait,
-		dy + vy * wait - gravity * wait * wait / 2,
-		dz + vz * wait,
-		vx,
-		vy - gravity * wait,
-		vz,
-		decay,
-		gravity,
-		fall
-	)
-	return plan.reachable
-end
-
---- Where the jump actually goes: the player's aim, unless that's nearly right, when it's forgiven
---- into exactly right. An aim further off stays as it is, and so misses unless they correct it.
-function DiveKick.aimJump(
-	cfg: Settings,
-	aimX: number,
-	aimZ: number,
-	towardX: number,
-	towardZ: number
-): (number, number)
-	local size = math.sqrt(aimX * aimX + aimZ * aimZ)
-	if size < 0.001 then
-		return towardX, towardZ
-	end
-	aimX, aimZ = aimX / size, aimZ / size
-	local cosine = aimX * towardX + aimZ * towardZ
-	if cosine >= math.cos(math.rad(cfg.AimForgiveDegrees)) then
-		return towardX, towardZ
-	end
-	return aimX, aimZ
 end
 
 --- Directional air control: pushes the velocity toward where the keys point, up to `limit`. With no
@@ -368,6 +288,29 @@ function DiveKick.spring(state: State, vx: number, vy: number, vz: number, missA
 	return nextState
 end
 
+--- Off the floor in the snap: `approach` seconds to reach them. `dx`, `dz` is the flat offset from the
+--- target to the jumper, which is the side you'll arrive on. Past `missAt` without touching, it has missed.
+function DiveKick.snap(
+	state: State,
+	dx: number,
+	dz: number,
+	approach: number,
+	missAt: number
+): State
+	local nextState = table.clone(state)
+	nextState.phase = "chase"
+	nextState.t = 0
+	nextState.vx, nextState.vy, nextState.vz = 0, 0, 0
+	nextState.steerX, nextState.steerZ = 0, 0
+	nextState.approach = approach
+	nextState.missAt = missAt
+	local size = math.sqrt(dx * dx + dz * dz)
+	if size > 0.01 then
+		nextState.sideX, nextState.sideZ = dx / size, dz / size
+	end
+	return nextState
+end
+
 --- Has this jump missed? Then it's yours to recover from.
 function DiveKick.hasMissed(state: State): boolean
 	return state.phase == "chase" and state.t >= state.missAt
@@ -433,7 +376,7 @@ function DiveKick.press(state: State): State
 	return nextState
 end
 
---- One step. `gravity` is the air gravity. In the jump, the keys steer on top of what it gave you.
+--- One step. `gravity` is the air gravity. The snap is committed: the keys play no part in it.
 --- Returns the new state, or nil when the move has ended.
 function DiveKick.step(
 	state: State,
@@ -446,16 +389,9 @@ function DiveKick.step(
 	local nextState = table.clone(state)
 	nextState.t += dt
 	if state.phase == "chase" then
-		nextState.vy -= gravity * dt
-		nextState.steerX, nextState.steerZ = DiveKick.airSteer(
-			state.steerX,
-			state.steerZ,
-			inputX,
-			inputZ,
-			cfg.SteerSpeed,
-			cfg.AirAcceleration,
-			dt
-		)
+		if state.approach == nil then
+			nextState.vy -= gravity * dt
+		end
 	elseif state.phase == "attach" then
 		if nextState.t >= DiveKick.ringEnd(cfg, state.qteAt) then
 			return DiveKick.press(state)
@@ -470,9 +406,11 @@ function DiveKick.step(
 	return nextState
 end
 
---- The velocity this phase sets, or nil to leave the body to physics. In the air it's only its own
---- velocity: the target plays no part until close. After that you align beside them and stay with
---- them, and the flip takes you up over them.
+--- The velocity this phase sets, or nil to leave the body to physics. In the snap it heads straight for
+--- the spot beside them it will attach at, timed to get there as the snap ends: it's re-aimed every
+--- frame, so a target that drifts a little is still reached, but never faster than ApproachMaxSpeed.
+--- It's a velocity, not a teleport, so walls really stop it. After that you align beside them and stay
+--- with them, and the flip takes you up over them.
 function DiveKick.velocity(
 	state: State,
 	cfg: Settings,
@@ -487,7 +425,23 @@ function DiveKick.velocity(
 	targetVZ: number
 ): (number?, number?, number?)
 	if state.phase == "chase" then
-		return state.vx + state.steerX, state.vy, state.vz + state.steerZ
+		local approach = state.approach
+		if approach == nil then
+			return state.vx, state.vy, state.vz
+		end
+		local remaining = math.max(approach - state.t, SNAP_MIN_REMAINING)
+		local wantX = targetX + state.sideX * cfg.AttachSide
+		local wantY = targetY + cfg.AttachAbove
+		local wantZ = targetZ + state.sideZ * cfg.AttachSide
+		local vx = targetVX + (wantX - x) / remaining
+		local vy = targetVY + (wantY - y) / remaining
+		local vz = targetVZ + (wantZ - z) / remaining
+		local speed = math.sqrt(vx * vx + vy * vy + vz * vz)
+		if speed > cfg.ApproachMaxSpeed then
+			local share = cfg.ApproachMaxSpeed / speed
+			vx, vy, vz = vx * share, vy * share, vz * share
+		end
+		return vx, vy, vz
 	elseif state.phase == "attach" or state.phase == "flip" then
 		local side = if state.phase == "flip" then cfg.FlipSide else cfg.AttachSide
 		local up = if state.phase == "flip" then cfg.FlipAbove else cfg.AttachAbove

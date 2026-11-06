@@ -41,11 +41,11 @@ About 13,500 lines of game code. Everything is `--!strict`.
 |---|---|
 | **CombatService** | Punches. Rate limit (8/s token bucket), cooldown 0.32 s plus 0.1 s after a whiff, 0.1 s press buffer on the client. After the 0.08 s windup the swing is live for 0.08 s, swept between Heartbeats from the attacker's current position and facing. The attacker is led 0.18 s forward along server-measured motion, and targets are rewound by ping + 0.175 s (capped at 0.3 s). Punches resolve in strike order, and simultaneous ones that reach each other become a clash. A hit cancels the target's own wind-up. |
 | **ClashService** | Two simultaneous punches: both are pinned 3.4 studs apart and mash for up to 2.5 s. A 14-tap lead wins, a gap of 1 or less at the timeout is a tie. The winner's finisher goes through normal knockback, capped at 130. Outside punches bounce off ("repel"). |
-| **KickService** | Air kick. An uppercut marks the target `HT_Air="float"`. Jump (Space) → chase → attach (target held, `"hold"`) → timing ring → flip → impact, graded red, orange or green. A green stuns and bounces the target. 15 s cooldown. |
+| **KickService** | Air kick. An uppercut marks the target `HT_Air="float"`. Jump (Space) → the server picks the target and holds it (`"hold"`, `HT_HoldUntil`) → snap → attach → timing ring → flip → impact, graded red, orange or green. Orange and green are finishers that launch the target away and up; red slams it down. 15 s cooldown. |
 | **KnockbackService** | Sends launches to the owning client (or to DummyService). Players don't collide (`HT_Characters` collision group). Bumps are decided by the server every 0.05 s from closing speed. |
 | **StaggerService** | Stagger 0-100, +12 per hit, -6 for landing a hit, recovers 10/s after 3 s. Published as the `HT_Stagger` attribute. Knockback multiplier rises to 2.5× at max. |
 | **SpeedAuditService** | Samples positions every 0.05 s and keeps 1 s of history. Trusted speed is capped at 40. Provides `PositionAt` for rewind and `Lead` for the attacker's lead. |
-| **PropelService** | Relays "X propelled" to other clients for effects. The propel itself runs client-side. |
+| **PropelService** | Relays "X propelled" (and whether boosted) to other clients for effects. The dash itself runs client-side. Also keeps a server copy of each player's nitro stamina and sets `HT_Nitro`, which draws the trail for everyone. |
 | **DummyService** | Server-owned R6 dummies on the same Momentum rules. They never attack. They can be stationary (anchored) or patrol a line. |
 | **TrainingService** | Builds the training hub and stations A-F, the floor pads, the launch pads and the `HT_InTraining` attribute. `AllowsFight` decides who can hit whom. |
 | **TestFloorService** | Temporary floor at y=100 with rings and a wall, and respawns anyone who falls. |
@@ -70,11 +70,11 @@ About 13,500 lines of game code. Everything is `--!strict`.
 
 ## Controls (current)
 
-Click/R2 punch · Q/B propel · Space/Y air kick (and the timing press) · **Left Ctrl shift lock** · Alt (E in Studio)/L1 lock on · Left Shift is reserved for nitro ("Coming soon", does nothing yet). Jumping is disabled (`JumpEnabled = false`). The keys come from `GameConfig.Controls`. Details: [[Haymaker Tussle - Controls and Punch Hitbox]].
+Click/R2 punch (hold to repeat) · Q/B dash (A or D curves it) · Space/Y air kick (and the timing press) · **Left Ctrl shift lock** · Alt (E in Studio)/L1 lock on · Left Shift/L3 held for nitro. Jumping is disabled (`JumpEnabled = false`). The keys come from `GameConfig.Controls`. Details: [[Haymaker Tussle - Controls and Punch Hitbox]].
 
 ## Character attributes (the shared state)
 
-`HT_Stagger`, `HT_Air` (`float`/`hold`), `HT_AirBy`, `HT_HoldFace`, `HT_Skill` (`chase`/`attach`/`flip`/`kick`), `HT_KickAt`, `HT_KickGrade`, `HT_Stunned`, `HT_Clash`, `HT_ClashAt`, `HT_ClashFace`, `HT_ClashScore`, `HT_Dummy`, `HT_Stationary`. On the player: `HT_InTraining`, `HT_ShiftLocked`, `HT_TutorialStep`. On workspace: `HaymakerCombatDebug` turns on server trace prints.
+`HT_Stagger`, `HT_Air` (`float`/`hold`), `HT_AirBy`, `HT_HoldFace`, `HT_Skill` (`chase`/`attach`/`flip`/`kick`), `HT_KickAt`, `HT_KickGrade`, `HT_Stunned`, `HT_Clash`, `HT_ClashAt`, `HT_ClashFace`, `HT_ClashScore`, `HT_Dummy`, `HT_Stationary`, `HT_Nitro`, `HT_HoldUntil`. On the player: `HT_InTraining`, `HT_ShiftLocked`, `HT_TutorialStep`. On workspace: `HaymakerCombatDebug` turns on server trace prints.
 
 ## The punch hitbox, precisely
 

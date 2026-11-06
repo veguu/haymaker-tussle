@@ -5,6 +5,7 @@
 --
 -- Keys that other scripts bind come from GameConfig.Controls, so the panel can't disagree with them. A row
 -- marked `soon` is a reserved key with nothing bound to it yet: it's shown dimmed and pressing it does nothing.
+-- None is reserved right now; the marking stays for the next one.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,17 +26,18 @@ type Row = { key: string, action: string, soon: boolean? }
 local ROWS: { [string]: { Row } } = {
 	mouse = {
 		{ key = "Click", action = "Punch" },
-		{ key = "Q", action = "Propel" },
+		{ key = "Q", action = "Dash (A or D curves it)" },
 		{ key = "Space", action = "Air kick" },
 		{ key = controls.ShiftLock.Label, action = "Shift lock: camera aims the kick" },
 		{ key = if RunService:IsStudio() then "E" else "Alt", action = "Lock on" },
-		{ key = controls.Nitro.Label, action = "Nitro — Coming soon", soon = controls.Nitro.ComingSoon },
+		{ key = controls.Nitro.Label, action = "Nitro (hold)" },
 	},
 	gamepad = {
 		{ key = "R2", action = "Punch" },
-		{ key = "B", action = "Propel" },
+		{ key = "B", action = "Dash (stick curves it)" },
 		{ key = "Y", action = "Air kick" },
 		{ key = "L1", action = "Lock on" },
+		{ key = controls.Nitro.GamepadLabel, action = "Nitro (hold)" },
 	},
 }
 local ROW_HEIGHT = 30

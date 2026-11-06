@@ -24,8 +24,11 @@ export type EventName =
 	| "Knockback" -- server to the target's client: launch velocity, and lift if airborne
 	| "BumpHappened" -- server to all: these two characters bumped
 	| "PropelRequest" -- client to server: I propelled. No arguments, ever.
-	| "PropelStarted" -- server to other clients: this player propelled
+	| "PropelStarted" -- server to other clients: this player propelled, and whether it was boosted
+	| "NitroStart" -- client to server: I started the nitro boost. No arguments, ever.
+	| "NitroStop" -- client to server: my nitro boost ended. No arguments, ever.
 	| "KickRequest" -- client to server: I jumped at someone in the air. No arguments, ever.
+	| "KickAccepted" -- server to the jumper's client: your follow-up is on, at this target
 	| "KickAttach" -- client to server: I reached them. No arguments, ever.
 	| "KickCommit" -- client to server: I pressed the timing key. No arguments, ever.
 	| "KickImpact" -- server to all: this character's kick landed, on this target, here

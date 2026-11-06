@@ -4,11 +4,19 @@
 -- The server keeps its own cooldown and clock, picks the target itself and checks every distance.
 --
 -- An uppercut that lands marks the target with the HT_Air attribute: "float" lightens gravity on
--- whoever owns that body, "hold" hangs them still while someone is locked on. It clears on landing.
--- HT_AirBy says whose uppercut it was. They can always jump; anyone else close by can jump instead,
--- which takes it over and cancels anyone already jumping at that target.
--- HT_Stunned is the loss of control, and only a green kick causes it, from the moment it sends them
--- down until they've landed from the bounce. Every path out of it clears on a timer too.
+-- whoever owns that body, "hold" hangs them still while someone is following them up. It clears on
+-- landing. HT_AirBy says whose uppercut it was, which counts a little in their favour when picking.
+-- THE FOLLOW-UP. The server picks the target itself, by the same rule the client shows
+-- (DiveKick.pickFollowUp): someone floating, fightable, within FollowUpRange, with nothing solid in the
+-- way. The moment it accepts, the target is held ("hold", with HT_HoldUntil as a deadline its own client
+-- also respects) so it can't drift out of the snap, and the jumper is told which target it is
+-- (KickAccepted). The hold ends the moment the kick lands, misses, is cancelled or times out
+-- (HoldTimeout), whichever is first. A target held by one follow-up can't be taken by another.
+-- THE FINISHER. A kick graded in FinisherGrades launches the target hard away from the kicker and up,
+-- with a short loss of control (FinisherStunSeconds). Red still slams them down.
+-- HT_Stunned is the loss of control: a finisher's short one, or a green slam's (when green isn't a
+-- finisher) from the moment it sends them down until they've landed from the bounce. Every path out
+-- of it clears on a timer too.
 --
 -- KNOWN GAP, the same as all movement here: the client owns its body, so a cheat could fly
 -- somewhere false during the chase, or ignore its own HT_Air. The clock limits for how long.
@@ -34,6 +42,7 @@ local FACE_ATTRIBUTE = "HT_HoldFace" -- which way a held body turns, to face who
 local QTE_ATTRIBUTE = "HT_KickAt" -- seconds after touching that this jump's ring meets the key
 local STUN_ATTRIBUTE = "HT_Stunned"
 local GRADE_ATTRIBUTE = "HT_KickGrade" -- red, orange or green, once the kick's timing is known
+local HOLD_UNTIL_ATTRIBUTE = "HT_HoldUntil" -- server time a hold ends by, whatever else happens
 local FACE_EVERY = 0.1 -- how often a held body turns to follow whoever is aiming around it
 local CLOCK_TOLERANCE = 0.3 -- forgives honest lag between the client's clock and ours
 local RING_RUN_OUT_LAG = 0.06 -- an unpressed ring waits this much longer, for a press on its way
@@ -62,6 +71,8 @@ type Record = {
 	phaseAt: number,
 	startedAt: number,
 	held: boolean,
+	heldAt: number,
+	startGap: number,
 	qteAt: number,
 	facedAt: number,
 	grade: DiveKick.Grade,
@@ -71,6 +82,36 @@ type Record = {
 local active: { [Player]: Record } = {}
 local lastUse: { [Player]: number } = {}
 local launched: { [Model]: number } = {}
+local stunTokens: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
+local nextStunToken = 0
+
+-- A stun that ends on its own, without ending a later one early.
+local function stunFor(target: Model, seconds: number)
+	nextStunToken += 1
+	local token = nextStunToken
+	stunTokens[target] = token
+	target:SetAttribute(STUN_ATTRIBUTE, true)
+	task.delay(seconds, function()
+		if stunTokens[target] == token then
+			stunTokens[target] = nil
+			if target.Parent then
+				target:SetAttribute(STUN_ATTRIBUTE, nil)
+			end
+		end
+	end)
+end
+
+local function hold(record: Record, now: number)
+	record.held = true
+	record.heldAt = now
+	record.target:SetAttribute(AIR_ATTRIBUTE, "hold")
+	record.target:SetAttribute(HOLD_UNTIL_ATTRIBUTE, workspace:GetServerTimeNow() + cfg.HoldTimeout)
+end
+
+local function letGo(target: Model)
+	target:SetAttribute(FACE_ATTRIBUTE, nil)
+	target:SetAttribute(HOLD_UNTIL_ATTRIBUTE, nil)
+end
 
 local function trace(message: string)
 	if workspace:GetAttribute("HaymakerCombatDebug") then
@@ -92,8 +133,10 @@ local function finish(player: Player)
 		record.character:SetAttribute(GRADE_ATTRIBUTE, nil)
 		if record.held then
 			-- Let go without a kick: they carry on falling.
-			record.target:SetAttribute(AIR_ATTRIBUTE, "float")
-			record.target:SetAttribute(FACE_ATTRIBUTE, nil)
+			if record.target:GetAttribute(AIR_ATTRIBUTE) == "hold" then
+				record.target:SetAttribute(AIR_ATTRIBUTE, "float")
+			end
+			letGo(record.target)
 			launched[record.target] = os.clock()
 		end
 		active[player] = nil
@@ -153,7 +196,7 @@ local function clearAir(target: Model)
 	launched[target] = nil
 	target:SetAttribute(AIR_ATTRIBUTE, nil)
 	target:SetAttribute(AIR_BY_ATTRIBUTE, nil)
-	target:SetAttribute(FACE_ATTRIBUTE, nil)
+	letGo(target)
 end
 
 --- Whatever a kick or a launch has left on this body, gone, for when it's being moved somewhere else.
@@ -171,14 +214,25 @@ function KickService:_impact(player: Player, record: Record)
 	local root = Combatants.rootOf(record.character)
 	local target = record.target
 	local targetRoot = Combatants.rootOf(target)
-	if not root or not targetRoot then
+	-- Whatever happened to them since, a target that's no longer valid is never hit, and nobody else is.
+	if
+		not root
+		or not targetRoot
+		or not Combatants.isAlive(target)
+		or not Knit.GetService("CombatService"):CanFight(record.character, target)
+	then
+		trace(`{player.Name}'s kick found no valid target: nothing landed`)
 		finish(player)
 		return
 	end
+	local finisher = (cfg.FinisherGrades :: { [string]: boolean })[record.grade] == true
 	local share = DiveKick.gradeShare(cfg, record.grade)
 	local stagger = Knit.GetService("StaggerService")
 	local before = stagger:Get(target)
 	local push = Combat.punchStrength(GameConfig.Knockback, staggerCfg, 0, before) * share
+	if finisher then
+		push = math.min(push * cfg.FinisherPushScale, cfg.FinisherMaxSpeed)
+	end
 	stagger:AddAmount(target, math.floor(cfg.StaggerAdded * share + 0.5))
 	Knit.GetService("CombatService"):MarkHit(target)
 
@@ -192,21 +246,52 @@ function KickService:_impact(player: Player, record: Record)
 	local away = if flat.Magnitude > 0.01
 		then flat.Unit
 		else Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
-	local slam = cfg.SlamSpeed * share
+	local slam = if finisher then 0 else cfg.SlamSpeed * share
 	trace(
-		`{player.Name} kicked {target.Name}: {record.grade}, {math.floor(push)} outward, {math.floor(
-			slam
-		)} down, {stop} s stop`
+		`{player.Name} kicked {target.Name}: {record.grade}{if finisher then " finisher" else ""}, {math.floor(
+			push
+		)} outward, {math.floor(slam)} down, {stop} s stop`
 	)
 	local knockback = Knit.GetService("KnockbackService")
 	self._hitConfirmed:FireAllClients(record.character, target, math.floor(push))
 	stagger:Relieve(record.character)
-	self._impactEvent:FireAllClients(record.character, target, position, true, share, stop)
+	self._impactEvent:FireAllClients(
+		record.character,
+		target,
+		position,
+		true,
+		share,
+		stop,
+		finisher
+	)
 
 	-- A true hit stop: both are held in the air already, so they simply stay held a moment longer
-	-- with the kick's pose on show. Then the launch, and the floor takes it when they arrive; past
-	-- the edge, there's no floor to take it.
+	-- with the kick's pose on show. Then the launch, once. A finisher sends them flying away and up,
+	-- and they get control back shortly after to try to recover. Otherwise the floor takes the slam
+	-- when they arrive; past the edge, there's no floor to take it.
 	local character = record.character
+	if finisher then
+		task.delay(stop, function()
+			clearAir(target)
+			if target.Parent == nil or not Combatants.isAlive(target) then
+				return
+			end
+			stunFor(target, cfg.FinisherStunSeconds)
+			knockback:Launch(
+				target,
+				away.X * push,
+				away.Z * push,
+				cfg.FinisherLift,
+				cfg.FinisherLift
+			)
+		end)
+		task.delay(cfg.RecoverSeconds, function()
+			if active[player] == record then
+				finish(player)
+			end
+		end)
+		return
+	end
 	local bounces = record.grade == "green"
 	task.delay(stop, function()
 		clearAir(target)
@@ -278,32 +363,53 @@ local function beginFlip(record: Record, grade: DiveKick.Grade)
 	setPhase(record, "flip")
 end
 
--- Who this body can jump at: its own launch wherever that is, otherwise the closest other one in
--- reach. Returns the target, and whether it was this player's own launch.
-local function jumpTarget(player: Player, character: Model, root: BasePart): (Model?, boolean)
+-- Is anything solid between these two points? Fighters and anything that doesn't collide don't count.
+local function clearPath(from: Vector3, to: Vector3): boolean
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = CollectionService:GetTagged(Combatants.TAG)
+	params.RespectCanCollide = true
+	params.IgnoreWater = true
+	return workspace:Raycast(from, to - from, params) == nil
+end
+
+-- Who this body can follow up: everyone floating that it may fight, in range, with a clear path, picked
+-- by the shared rule. The range has RANGE_TOLERANCE of slack, since both bodies are slightly old here.
+local function jumpTarget(player: Player, character: Model, root: BasePart): Model?
 	local combat = Knit.GetService("CombatService")
-	local best: Model? = nil
-	local bestDistance = cfg.StealRange + RANGE_TOLERANCE
+	local models: { Model } = {}
+	local candidates: { DiveKick.Candidate } = {}
 	for target in launched do
+		local other = Combatants.rootOf(target)
 		if
-			target ~= character
+			other
+			and target ~= character
 			and target:GetAttribute(AIR_ATTRIBUTE) == "float"
+			and Combatants.isAlive(target)
 			and combat:CanFight(character, target)
+			and clearPath(root.Position, other.Position)
 		then
-			local other = Combatants.rootOf(target)
-			if other then
-				if target:GetAttribute(AIR_BY_ATTRIBUTE) == player.UserId then
-					return target, true
-				end
-				local offset = other.Position - root.Position
-				local distance = Vector3.new(offset.X, 0, offset.Z).Magnitude
-				if distance <= bestDistance then
-					best, bestDistance = target, distance
-				end
-			end
+			table.insert(models, target)
+			table.insert(candidates, {
+				x = other.Position.X,
+				y = other.Position.Y,
+				z = other.Position.Z,
+				own = target:GetAttribute(AIR_BY_ATTRIBUTE) == player.UserId,
+			})
 		end
 	end
-	return best, false
+	local look = root.CFrame.LookVector
+	local index = DiveKick.pickFollowUp(
+		cfg,
+		root.Position.X,
+		root.Position.Y,
+		root.Position.Z,
+		look.X,
+		look.Z,
+		candidates,
+		RANGE_TOLERANCE
+	)
+	return if index then models[index] else nil
 end
 
 -- Turns a held body to face whoever is touching it.
@@ -321,6 +427,7 @@ function KickService:KnitInit()
 	self._commit = Net.server("KickCommit")
 	self._impactEvent = Net.server("KickImpact")
 	self._hitConfirmed = Net.server("HitConfirmed")
+	self._accepted = Net.server("KickAccepted")
 end
 
 function KickService:KnitStart()
@@ -348,14 +455,7 @@ function KickService:KnitStart()
 			return
 		end
 		lastUse[player] = now
-		trace(`{player.Name} jumped`)
-		-- Only one jump per target: whoever jumped last has it, and anyone else's ends here.
-		for other, theirs in active do
-			if other ~= player and theirs.target == target and theirs.phase == "chase" then
-				trace(`{player.Name} took {other.Name}'s jump at {target.Name}`)
-				finish(other)
-			end
-		end
+		local targetRoot = Combatants.rootOf(target) :: BasePart
 		local record: Record = {
 			character = character,
 			target = target,
@@ -363,14 +463,21 @@ function KickService:KnitStart()
 			phaseAt = now,
 			startedAt = now,
 			held = false,
+			heldAt = now,
+			startGap = (targetRoot.Position - root.Position).Magnitude,
 			qteAt = DiveKick.pickQte(cfg, math.random()),
 			facedAt = 0,
 			grade = "red",
 			stopUntil = 0,
 		}
+		trace(`{player.Name} follows up {target.Name} from {math.floor(record.startGap)} studs`)
 		character:SetAttribute(QTE_ATTRIBUTE, record.qteAt)
 		active[player] = record
+		-- Held from now, so they can't move out of the snap. A held target is nobody else's to take.
+		hold(record, now)
+		faceJumper(record, root, targetRoot)
 		setPhase(record, "chase")
+		self._accepted:FireClient(player, target)
 	end)
 
 	self._attach.OnServerEvent:Connect(function(player: Player, ...)
@@ -381,21 +488,36 @@ function KickService:KnitStart()
 		local target = record.target
 		local root = Combatants.rootOf(record.character)
 		local targetRoot = Combatants.rootOf(target)
-		if not root or not targetRoot or target:GetAttribute(AIR_ATTRIBUTE) ~= "float" then
+		if
+			not root
+			or not targetRoot
+			or target:GetAttribute(AIR_ATTRIBUTE) ~= "hold"
+			or not Combatants.isAlive(target)
+		then
 			return
 		end
 		local gap = (targetRoot.Position - root.Position).Magnitude
 		local closing = root.AssemblyLinearVelocity.Magnitude
 			+ targetRoot.AssemblyLinearVelocity.Magnitude
-		local allowed = cfg.TouchFlat + cfg.TouchTall + ATTACH_TOLERANCE
-		if gap > allowed + closing * ATTACH_LAG_SECONDS then
+		local allowed = cfg.TouchFlat
+			+ cfg.TouchTall
+			+ ATTACH_TOLERANCE
+			+ closing * ATTACH_LAG_SECONDS
+		-- The snap is far faster than this server sees it, so while it can still be on its way, being no
+		-- further than where it started (the target is held) is enough. It was in range and clear then.
+		local since = os.clock() - record.phaseAt
+		if since <= cfg.ApproachMaxSeconds + cfg.JumpMissGrace + CLOCK_TOLERANCE then
+			allowed = math.max(allowed, record.startGap + ATTACH_TOLERANCE)
+		end
+		if gap > allowed then
 			trace(`{player.Name} attach refused: {math.floor(gap)} studs away`)
 			return
 		end
 		trace(`{player.Name} attached at {math.floor(gap)} studs`)
 		faceJumper(record, root, targetRoot)
-		record.held = true
-		target:SetAttribute(AIR_ATTRIBUTE, "hold")
+		if not record.held then
+			hold(record, os.clock())
+		end
 		setPhase(record, "attach")
 	end)
 
@@ -449,13 +571,24 @@ function KickService:KnitStart()
 				or not root
 				or not Combatants.isAlive(record.character)
 			local waited = now - record.phaseAt
-			local over = false
+			local target = record.target
+			-- The target stopped being valid: nobody is hit, and nobody else is taken instead.
+			local over = target.Parent == nil or not Combatants.isAlive(target)
+			if record.held and now - record.heldAt >= cfg.HoldTimeout then
+				trace(`{player.Name}'s hold on {target.Name} timed out`)
+				over = true
+			end
 			if record.phase == "chase" then
-				over = waited >= cfg.ChaseSeconds + CLOCK_TOLERANCE
-					or launched[record.target] == nil
-					or (root ~= nil and waited >= LIFTOFF_SECONDS and not isAirborne(root))
+				over = over
+					or waited >= cfg.ChaseSeconds + CLOCK_TOLERANCE
+					or launched[target] == nil
+					or (
+						root ~= nil
+						and waited >= LIFTOFF_SECONDS + cfg.ApproachMaxSeconds
+						and not isAirborne(root)
+					)
 			elseif record.phase == "attach" then
-				over = launched[record.target] == nil
+				over = over or launched[record.target] == nil
 				if waited >= DiveKick.ringEnd(cfg, record.qteAt) + RING_RUN_OUT_LAG then
 					trace(`{player.Name} never pressed: red`)
 					beginFlip(record, "red")

@@ -5,9 +5,15 @@
 -- bends the heading at a limited rate, and that rate falls as speed rises: that
 -- limit is what turns a swerve into an arc. There is no swerve button.
 --
--- A propel is a burst of speed that loosens the grip, like a car drifting. For its
--- length the BODY swings toward the input quickly, while the heading (real travel)
--- follows it slowly, so the character slides wide with the body angled into the turn.
+-- A propel (Q) is a committed dash. It eases up to its speed, holds it, and eases back down to
+-- running speed, all on a fixed profile, so there's never a sudden jump in velocity. While it runs the
+-- keys can only nudge it. A curved dash (A or D held as it starts) bends its heading through a fixed
+-- arc, smoothly, fastest in the middle, with the body leaning a little ahead into the turn. When it
+-- ends, normal steering comes back gradually rather than all at once.
+--
+-- A boost (nitro) is passed in as Modifiers for each step: a higher top speed to accelerate toward, a
+-- share of the normal turn rate, and how fast speed above normal top speed bleeds off afterwards.
+-- Without one, every rule is exactly as before.
 --
 -- Headings are unit vectors on the ground plane (x, z), as Roblox world axes.
 
@@ -31,12 +37,13 @@ export type Settings = {
 	PropelSpeed: number,
 	PropelSeconds: number,
 	PropelRampSeconds: number,
+	PropelEaseOutSeconds: number,
 	PropelCooldown: number,
-	PropelMinSpeed: number,
-	PropelBodyTurnRate: number,
-	PropelGripRate: number,
-	PropelMaxSlip: number,
-	PropelScrub: number,
+	PropelSteerRate: number,
+	PropelControlReturnSeconds: number,
+	PropelArcDegrees: number,
+	PropelCurveInputThreshold: number,
+	PropelCurveBodyLead: number,
 	ReverseDeceleration: number,
 	TurnRateLowSpeed: number,
 	TurnRateHighSpeed: number,
@@ -66,6 +73,14 @@ export type State = {
 	propelCooldownLeft: number?,
 	bodyX: number?,
 	bodyZ: number?,
+	-- The running dash's shape, fixed when it starts: how long it lasts, its top speed, the speed it
+	-- started from, and its whole arc in radians (positive is a right turn, 0 is straight).
+	dashSeconds: number?,
+	dashPeak: number?,
+	dashFrom: number?,
+	dashArc: number?,
+	-- Seconds until steering is fully back after a dash.
+	controlReturnLeft: number?,
 	-- Knockback velocity, on top of normal travel. Normal movement never replaces it.
 	knockX: number?,
 	knockZ: number?,
@@ -75,9 +90,35 @@ export type State = {
 -- A or D alone is "side".
 export type Drive = "forward" | "back" | "side"
 
+-- What a boost changes for one step. Every field is optional; left out, the normal rule applies.
+export type Modifiers = {
+	-- Top speed to accelerate toward, instead of MaxSpeed.
+	maxSpeed: number?,
+	-- Extra acceleration on top of Acceleration while below that top speed.
+	acceleration: number?,
+	-- Share of the normal turn rate, 0 to 1.
+	turnScale: number?,
+	-- Speed above MaxSpeed bleeds off at least this fast, for after a boost.
+	overspeedDeceleration: number?,
+}
+
+-- How a dash starts. Left out, it's a plain straight dash.
+export type DashOptions = {
+	-- -1 curves left, +1 right, 0 is straight.
+	curve: number?,
+	speedScale: number?,
+	durationScale: number?,
+	arcScale: number?,
+	cooldown: number?,
+}
+
 local BRAKE_MAX_ALIGNMENT = 0.5 -- S brakes unless travel is already within about 60 degrees of the S direction
 local REVERSE_ANGLE = math.pi / 2 -- steering further than this from travel brakes instead of accelerating
-local PROPEL_SETTLE_SECONDS = 0.25 -- the body straightens up over the last of a propel, so it never snaps
+
+local function smooth(t: number): number
+	local x = math.clamp(t, 0, 1)
+	return x * x * (3 - 2 * x)
+end
 
 local function isFinite(n: number): boolean
 	return n == n and n ~= math.huge and n ~= -math.huge
@@ -161,7 +202,8 @@ local function moveStep(
 	grounded: boolean,
 	dt: number,
 	drive: Drive?,
-	side: number?
+	side: number?,
+	mods: Modifiers?
 ): State
 	if not (isFinite(inputX) and isFinite(inputZ)) then
 		inputX, inputZ = 0, 0
@@ -172,6 +214,10 @@ local function moveStep(
 
 	local speed, hx, hz = state.speed, state.headingX, state.headingZ
 	local control = if grounded then 1 else cfg.AirControl
+	-- Turning only: a boost makes the heading harder to bend, but braking and speed changes are untouched.
+	local turnControl = control
+		* math.clamp(if mods and mods.turnScale then mods.turnScale else 1, 0, 1)
+	local topSpeed = if mods and mods.maxSpeed then mods.maxSpeed else cfg.MaxSpeed
 	local length = math.sqrt(inputX * inputX + inputZ * inputZ)
 	local amount = math.min(length, 1)
 	local hasInput = amount >= cfg.InputDeadzone
@@ -212,7 +258,7 @@ local function moveStep(
 			local sideAmount = side or 0
 			if math.abs(sideAmount) >= cfg.InputDeadzone then
 				turn = if sideAmount > 0 then 1 else -1
-				local angle = turn * Momentum.turnRate(cfg, speed) * control * dt
+				local angle = turn * Momentum.turnRate(cfg, speed) * turnControl * dt
 				local c, s = math.cos(angle), math.sin(angle)
 				hx, hz = hx * c - hz * s, hx * s + hz * c
 			end
@@ -234,7 +280,7 @@ local function moveStep(
 	end
 
 	local newX, newZ, remaining, turn =
-		steer(cfg, speed, hx, hz, inputX / length, inputZ / length, grounded, control, dt)
+		steer(cfg, speed, hx, hz, inputX / length, inputZ / length, grounded, turnControl, dt)
 
 	if math.abs(remaining) > REVERSE_ANGLE and kind ~= "side" then
 		-- Steering against travel with W: brake through the turn, so reversing at speed
@@ -242,11 +288,16 @@ local function moveStep(
 		-- one straight to the other keeps all your speed.
 		speed = math.max(speed - cfg.ReverseDeceleration * control * dt, 0)
 	else
-		local target = cfg.MaxSpeed * amount
+		local target = topSpeed * amount
 		if speed < target then
-			speed = math.min(speed + cfg.Acceleration * control * dt, target)
+			local boost = if mods and mods.acceleration then mods.acceleration else 0
+			speed = math.min(speed + (cfg.Acceleration + boost) * control * dt, target)
 		else
-			speed = math.max(speed - cfg.CoastDeceleration * control * dt, target)
+			local fall = cfg.CoastDeceleration
+			if speed > cfg.MaxSpeed and mods and mods.overspeedDeceleration then
+				fall = math.max(fall, mods.overspeedDeceleration)
+			end
+			speed = math.max(speed - fall * control * dt, target)
 		end
 	end
 
@@ -313,6 +364,7 @@ function Momentum.applyKnock(
 	nextState.speed = state.speed * (speedKeep or cfg.HitSpeedKeep)
 	-- Getting hit ends a propel, so a bump's speed loss really stands.
 	nextState.propelLeft, nextState.bodyX, nextState.bodyZ = nil, nil, nil
+	nextState.controlReturnLeft = nil
 	return nextState
 end
 
@@ -407,6 +459,7 @@ function Momentum.stopped(state: State): State
 	nextState.forwardCoast = false
 	nextState.knockX, nextState.knockZ = nil, nil
 	nextState.propelLeft, nextState.bodyX, nextState.bodyZ = nil, nil, nil
+	nextState.controlReturnLeft = nil
 	return nextState
 end
 
@@ -428,7 +481,7 @@ end
 --- True while a propel is still building up, when the character can't match it yet.
 function Momentum.isPropelBuilding(state: State, cfg: Settings): boolean
 	local left = state.propelLeft or 0
-	return left > 0 and cfg.PropelSeconds - left < cfg.PropelRampSeconds
+	return left > 0 and (state.dashSeconds or cfg.PropelSeconds) - left < cfg.PropelRampSeconds
 end
 
 local function signedAngle(ax: number, az: number, bx: number, bz: number): number
@@ -440,84 +493,117 @@ local function rotated(x: number, z: number, angle: number): (number, number)
 	return x * c - z * s, x * s + z * c
 end
 
--- One step of a propel. The body chases the input fast, the heading chases the body
--- slowly, and the angle between them (the slip) is what makes it a drift.
-local function propelStep(
+-- How far round a dash's arc it is after `elapsed` of `total` seconds, from 0 to 1. The turn rate follows
+-- a half sine: nothing at the start, fastest in the middle, nothing again at the end, so it never snaps.
+local function arcShare(elapsed: number, total: number): number
+	return (1 - math.cos(math.pi * math.clamp(elapsed / total, 0, 1))) / 2
+end
+
+-- The dash's speed after `elapsed` seconds: eased up to the peak, held, then eased down to `exit`.
+local function dashSpeed(
+	cfg: Settings,
+	elapsed: number,
+	total: number,
+	from: number,
+	peak: number,
+	exit: number
+): number
+	local ramp = math.min(cfg.PropelRampSeconds, total)
+	local easeOut = math.min(cfg.PropelEaseOutSeconds, math.max(total - ramp, 0))
+	if elapsed < ramp then
+		return from + (peak - from) * smooth(elapsed / ramp)
+	end
+	local fadeAt = total - easeOut
+	if elapsed < fadeAt or easeOut <= 0 then
+		return peak
+	end
+	return peak + (exit - peak) * smooth((elapsed - fadeAt) / easeOut)
+end
+
+-- One step of a dash. Its speed and arc follow the fixed profile; the keys only nudge the heading at
+-- PropelSteerRate, so nothing can turn it round. The top speed it eases back down to is whatever the
+-- normal rules would allow right now, so a dash out of a boost ends at boosted speed.
+local function dashStep(
 	state: State,
 	cfg: Settings,
 	inputX: number,
 	inputZ: number,
 	grounded: boolean,
 	dt: number,
-	drive: Drive?
+	mods: Modifiers?
 ): State
+	local total = state.dashSeconds or cfg.PropelSeconds
 	local left = (state.propelLeft or 0) - dt
+	local elapsed = total - math.max(left, 0)
+	local before = elapsed - dt
+	local peak = state.dashPeak or cfg.PropelSpeed
+	local from = state.dashFrom or state.speed
+	local top = if mods and mods.maxSpeed then mods.maxSpeed else cfg.MaxSpeed
+	local exit = math.min(top, peak)
 	local hx, hz = state.headingX, state.headingZ
+
 	if left <= 0 then
+		-- Over: ordinary running from here, already at the speed it eased down to, and steering comes
+		-- back over the next moment instead of all at once.
 		return {
-			speed = state.speed,
+			speed = exit,
 			headingX = hx,
 			headingZ = hz,
 			turn = 0,
 			coastElapsed = 0,
 			forwardCoast = true,
+			controlReturnLeft = cfg.PropelControlReturnSeconds,
 		}
 	end
 
 	local control = if grounded then 1 else cfg.AirControl
-	local bx, bz = state.bodyX or hx, state.bodyZ or hz
-	local speed = state.speed
-	local length = 0
+	local arc = state.dashArc or 0
+	if arc ~= 0 then
+		hx, hz =
+			rotated(hx, hz, arc * (arcShare(elapsed, total) - arcShare(math.max(before, 0), total)))
+	end
 	if isFinite(inputX) and isFinite(inputZ) then
-		length = math.sqrt(inputX * inputX + inputZ * inputZ)
-	end
-	if length >= cfg.InputDeadzone then
-		if (drive or "forward") == "back" then
-			speed = math.max(speed - cfg.BrakeDeceleration * control * dt, 0)
-		else
-			local maxStep = math.rad(cfg.PropelBodyTurnRate) * control * dt
-			local remaining = signedAngle(bx, bz, inputX / length, inputZ / length)
-			bx, bz = rotated(bx, bz, math.clamp(remaining, -maxStep, maxStep))
+		local length = math.sqrt(inputX * inputX + inputZ * inputZ)
+		if length >= cfg.InputDeadzone then
+			local nudge = math.rad(cfg.PropelSteerRate) * control * dt
+			local remaining = signedAngle(hx, hz, inputX / length, inputZ / length)
+			hx, hz = rotated(hx, hz, math.clamp(remaining, -nudge, nudge))
 		end
 	end
-
-	local grip = math.rad(cfg.PropelGripRate) * control * dt
-	local slip = signedAngle(hx, hz, bx, bz)
-	local follow = math.clamp(slip, -grip, grip)
-	hx, hz = rotated(hx, hz, follow)
-	slip -= follow
-	local cap = math.rad(cfg.PropelMaxSlip) * math.clamp(left / PROPEL_SETTLE_SECONDS, 0, 1)
-	if math.abs(slip) > cap then
-		slip = if slip > 0 then cap else -cap
-		bx, bz = rotated(hx, hz, slip)
+	local size = math.sqrt(hx * hx + hz * hz)
+	if size > 0.0001 then
+		hx, hz = hx / size, hz / size
 	end
 
-	if cfg.PropelSeconds - left < cfg.PropelRampSeconds then
-		speed = math.min(speed + cfg.PropelSpeed / cfg.PropelRampSeconds * dt, cfg.PropelSpeed)
-	else
-		local lost = cfg.PropelScrub * math.abs(math.sin(slip)) * dt
-		if speed > cfg.MaxSpeed then
-			local fadeSeconds = math.max(cfg.PropelSeconds - cfg.PropelRampSeconds, 0.001)
-			lost += (cfg.PropelSpeed - cfg.MaxSpeed) / fadeSeconds * dt
-		end
-		speed = math.max(speed - lost, math.min(speed, cfg.PropelMinSpeed))
+	-- A curve leans the body ahead into the turn, most in the middle of it.
+	local bend = math.sin(math.pi * math.clamp(elapsed / total, 0, 1))
+	local bx, bz = hx, hz
+	local turn = 0
+	if arc ~= 0 then
+		local lean = (if arc > 0 then 1 else -1) * math.rad(cfg.PropelCurveBodyLead) * bend
+		bx, bz = rotated(hx, hz, lean)
+		turn = (if arc > 0 then 1 else -1) * bend
 	end
 
 	return {
-		speed = speed,
+		speed = dashSpeed(cfg, elapsed, total, from, peak, exit),
 		headingX = hx,
 		headingZ = hz,
-		turn = math.clamp(slip / math.rad(cfg.PropelMaxSlip), -1, 1),
+		turn = turn,
 		coastElapsed = 0,
 		forwardCoast = true,
 		propelLeft = left,
 		bodyX = bx,
 		bodyZ = bz,
+		dashSeconds = total,
+		dashPeak = peak,
+		dashFrom = from,
+		dashArc = arc,
 	}
 end
 
---- One step of movement, including any propel in progress. Takes the same input as
---- moveStep. Returns a new state; never mutates.
+--- One step of movement, including any dash in progress. Takes the same input as moveStep, plus
+--- an optional boost. Returns a new state; never mutates.
 function Momentum.step(
 	state: State,
 	cfg: Settings,
@@ -526,30 +612,60 @@ function Momentum.step(
 	grounded: boolean,
 	dt: number,
 	drive: Drive?,
-	side: number?
+	side: number?,
+	mods: Modifiers?
 ): State
 	if not isFinite(dt) or dt <= 0 then
 		return state
 	end
 	local cooldown = math.max((state.propelCooldownLeft or 0) - dt, 0)
 	local knockX, knockZ = fadeKnock(state, cfg, inputX, inputZ, grounded, dt)
-	local nextState = if (state.propelLeft or 0) > 0
-		then propelStep(state, cfg, inputX, inputZ, grounded, dt, drive)
-		else moveStep(state, cfg, inputX, inputZ, grounded, dt, drive, side)
+	local nextState: State
+	if (state.propelLeft or 0) > 0 then
+		nextState = dashStep(state, cfg, inputX, inputZ, grounded, dt, mods)
+	else
+		-- Just out of a dash, steering fades back in on top of whatever the boost allows.
+		local returning = math.max((state.controlReturnLeft or 0) - dt, 0)
+		local stepMods: Modifiers? = mods
+		if returning > 0 then
+			local share = smooth(1 - returning / math.max(cfg.PropelControlReturnSeconds, 0.001))
+			local base: Modifiers = mods or {}
+			local scaled: Modifiers = table.clone(base)
+			scaled.turnScale = (base.turnScale or 1) * share
+			stepMods = scaled
+		end
+		nextState = moveStep(state, cfg, inputX, inputZ, grounded, dt, drive, side, stepMods)
+		nextState.controlReturnLeft = if returning > 0 then returning else nil
+	end
 	nextState.propelCooldownLeft = cooldown
 	nextState.knockX, nextState.knockZ = knockX, knockZ
 	return nextState
 end
 
---- Starts a propel along the current travel, or toward the input from a standstill. It
---- never goes backward: S is refused without spending the cooldown. Returns the new
---- state, or nil if refused.
+--- Which way a dash pressed now curves, from how much of the input points to the camera's right
+--- (`side`, -1 to +1, as MovementController works it out). A and D together cancel out in the input,
+--- so they make a straight dash, the same as neither.
+function Momentum.dashCurve(cfg: Settings, side: number): number
+	if side >= cfg.PropelCurveInputThreshold then
+		return 1
+	elseif side <= -cfg.PropelCurveInputThreshold then
+		return -1
+	end
+	return 0
+end
+
+--- Starts a dash along the current travel, or toward the input from a standstill. It never goes
+--- backward: S is refused without spending the cooldown. `options` shapes it: a curve, and the scales a
+--- boosted dash uses. Returns the new state, or nil if refused. Its speed is a fixed profile rather than
+--- something added, so pressing again can never stack speed: one runs at a time, and the cooldown
+--- starts the moment it does.
 function Momentum.tryPropel(
 	state: State,
 	cfg: Settings,
 	inputX: number,
 	inputZ: number,
-	drive: Drive?
+	drive: Drive?,
+	options: DashOptions?
 ): State?
 	if (state.propelCooldownLeft or 0) > 0 or (state.propelLeft or 0) > 0 then
 		return nil
@@ -566,6 +682,10 @@ function Momentum.tryPropel(
 			end
 		end
 	end
+	local o: DashOptions = options or {}
+	local total = math.max(cfg.PropelSeconds * (o.durationScale or 1), 0.05)
+	local curve = o.curve or 0
+	local arc = if curve > 0 then 1 elseif curve < 0 then -1 else 0
 	return {
 		speed = state.speed,
 		headingX = hx,
@@ -573,12 +693,16 @@ function Momentum.tryPropel(
 		turn = 0,
 		coastElapsed = 0,
 		forwardCoast = true,
-		propelLeft = cfg.PropelSeconds,
-		propelCooldownLeft = cfg.PropelCooldown,
+		propelLeft = total,
+		propelCooldownLeft = o.cooldown or cfg.PropelCooldown,
 		bodyX = hx,
 		bodyZ = hz,
 		knockX = state.knockX,
 		knockZ = state.knockZ,
+		dashSeconds = total,
+		dashPeak = math.max(cfg.PropelSpeed * (o.speedScale or 1), state.speed),
+		dashFrom = state.speed,
+		dashArc = arc * math.rad(cfg.PropelArcDegrees) * (o.arcScale or 1),
 	}
 end
 

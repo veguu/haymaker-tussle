@@ -19,6 +19,7 @@ local Sfx = require(ReplicatedStorage.Shared.Sfx)
 local GroundBreak = require(ReplicatedStorage.Shared.Core.GroundBreak)
 
 local cfg = GameConfig.Effects
+local nitroCfg = GameConfig.Nitro
 local LIGHT = Color3.fromRGB(226, 238, 252)
 local SHADE = Color3.fromRGB(176, 205, 236)
 local ROCK = Color3.fromRGB(120, 112, 104)
@@ -165,9 +166,15 @@ local function gustSide(feet: Vector3, right: Vector3, back: Vector3, side: numb
 	})
 end
 
---- A gust on both sides of the feet, trailing behind the propel direction.
-function FxController:PropelGust(character: Model, direction: Vector3?)
-	propelEnds[character] = os.clock() + GameConfig.Movement.PropelSeconds
+--- A gust on both sides of the feet, trailing behind the propel direction. `seconds` is how long that
+--- dash runs, for its drift smoke; a boosted one sounds lower and heavier.
+function FxController:PropelGust(
+	character: Model,
+	direction: Vector3?,
+	seconds: number?,
+	boosted: boolean?
+)
+	propelEnds[character] = os.clock() + (seconds or GameConfig.Movement.PropelSeconds)
 	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if not root then
 		return
@@ -188,8 +195,125 @@ function FxController:PropelGust(character: Model, direction: Vector3?)
 	local feet = root.Position - Vector3.yAxis * cfg.FootDrop
 	gustSide(feet, right, -forward, 1)
 	gustSide(feet, right, -forward, -1)
+	if boosted then
+		gustSide(feet - forward * 1.5, right, -forward, 1.6)
+		gustSide(feet - forward * 1.5, right, -forward, -1.6)
+	end
 
-	Sfx.play("propel", root, PITCH_VARY)
+	local sound = Sfx.play("propel", root, PITCH_VARY)
+	if sound and boosted then
+		sound.PlaybackSpeed *= 0.82
+	end
+end
+
+-- NITRO: a trail behind anyone boosting, and for your own boost a camera pulled in with a light shake.
+local trails: { [Model]: { trail: Trail, a: Attachment, b: Attachment } } = setmetatable(
+	{},
+	{ __mode = "k" }
+) :: any
+
+-- Starts or ends the trail behind this character. Ending lets the tail fade before it's removed.
+local function setTrail(character: Model, on: boolean)
+	local existing = trails[character]
+	if on == (existing ~= nil) then
+		return
+	end
+	if not on and existing then
+		trails[character] = nil
+		existing.trail.Enabled = false
+		task.delay(nitroCfg.TrailLifetime + 0.05, function()
+			existing.trail:Destroy()
+			existing.a:Destroy()
+			existing.b:Destroy()
+		end)
+		return
+	end
+	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return
+	end
+	local half = nitroCfg.TrailWidth / 2
+	local a = Instance.new("Attachment")
+	a.Name = "HT_NitroTrailTop"
+	a.Position = Vector3.new(0, half, 0.6)
+	a.Parent = root
+	local b = Instance.new("Attachment")
+	b.Name = "HT_NitroTrailBottom"
+	b.Position = Vector3.new(0, -half, 0.6)
+	b.Parent = root
+	local trail = Instance.new("Trail")
+	trail.Name = "HT_NitroTrail"
+	trail.Attachment0 = a
+	trail.Attachment1 = b
+	trail.Lifetime = nitroCfg.TrailLifetime
+	trail.MinLength = 0.1
+	trail.Color = ColorSequence.new(Color3.fromHex(nitroCfg.TrailColor), LIGHT)
+	trail.Transparency = NumberSequence.new(nitroCfg.TrailTransparency, 1)
+	trail.WidthScale = NumberSequence.new(1, 0.35)
+	trail.LightEmission = nitroCfg.TrailLightEmission
+	trail.Parent = root
+	trails[character] = { trail = trail, a = a, b = b }
+end
+
+-- The camera layer: how much of the pull and shake is on now, and what it's easing toward.
+local nitroWeight = 0
+local nitroWant = 0
+local NITRO_CAMERA_STEP = "HT_NitroCamera"
+local cameraBound = false
+
+local function nitroCameraStep(dt: number)
+	local rate = if nitroWant > nitroWeight then nitroCfg.CameraEaseIn else nitroCfg.CameraEaseOut
+	nitroWeight += (nitroWant - nitroWeight) * math.min(rate * dt, 1)
+	if nitroWant <= 0 and nitroWeight < 0.002 then
+		nitroWeight = 0
+		RunService:UnbindFromRenderStep(NITRO_CAMERA_STEP)
+		cameraBound = false
+		return
+	end
+	local camera = workspace.CurrentCamera
+	if not camera or camera.CameraType ~= Enum.CameraType.Custom then
+		return
+	end
+	-- Pulled straight in along the view, never closer than CameraMinDistance. It's worked out fresh
+	-- from the camera's own position every frame, so nothing is left behind when it eases off.
+	local distance = (camera.Focus.Position - camera.CFrame.Position).Magnitude
+	local pull = math.min(
+		nitroCfg.CameraZoomStuds * nitroWeight,
+		math.max(distance - nitroCfg.CameraMinDistance, 0)
+	)
+	local t = os.clock() * nitroCfg.ShakeFrequency
+	local shake = nitroCfg.ShakeStuds * nitroWeight
+	camera.CFrame *= CFrame.new(math.noise(t, 0.3) * shake, math.noise(0.7, t) * shake, -pull) * CFrame.Angles(
+		0,
+		0,
+		math.rad(math.noise(t, 4.1) * nitroCfg.ShakeRollDegrees * nitroWeight)
+	)
+end
+
+--- Your own boost, every frame: on or off, and how far up its ramp. The trail follows `active`; the
+--- camera eases toward the boost level, and back to nothing once it ends.
+function FxController:SetNitro(character: Model, active: boolean, level: number)
+	setTrail(character, active)
+	nitroWant = if active then math.clamp(level, 0, 1) else 0
+	if nitroWant > 0 and not cameraBound then
+		cameraBound = true
+		-- After the lock-on camera, which replaces the stock camera's view at Camera + 1.
+		RunService:BindToRenderStep(
+			NITRO_CAMERA_STEP,
+			Enum.RenderPriority.Camera.Value + 2,
+			nitroCameraStep
+		)
+	end
+end
+
+--- The moment a boost kicks in: a low whoosh.
+function FxController:NitroStarted(character: Model)
+	local root = character:FindFirstChild("HumanoidRootPart")
+	local sound = Sfx.play("propel", root, PITCH_VARY)
+	if sound then
+		sound.PlaybackSpeed *= 0.7
+		sound.Volume *= 0.6
+	end
 end
 
 --- A puff of the propel's wind behind a punch thrown in the air, level with the body. It has no sound of
@@ -342,8 +466,8 @@ function FxController:ClashRepel(target: Model, attacker: Model)
 	Sfx.play("punch_hit", rootT, PITCH_VARY)
 end
 
--- A camera hit that fades to exactly nothing: a shake and a quick widen of the view. This is
--- the only thing that moves the camera for effect, and it only ever adds to what's there.
+-- A camera hit that fades to exactly nothing: a shake and a quick widen of the view. This and the
+-- nitro layer are the only things that move the camera for effect, and both only add to what's there.
 function FxController:CameraKick(size: number)
 	local camera = workspace.CurrentCamera
 	if not camera then
@@ -380,10 +504,46 @@ function FxController:KickImpact(
 	target: Model?,
 	position: Vector3,
 	hit: boolean,
-	share: number
+	share: number,
+	finisher: boolean?
 )
 	local up = Vector3.yAxis
 	local power = (if hit then 1 else 0.55) * share
+	if finisher then
+		-- A finisher throws them away: a blast of streaks along the way they're going, and puffs left
+		-- along the first of their flight.
+		local attackerRoot = attacker:FindFirstChild("HumanoidRootPart") :: BasePart?
+		local line = if attackerRoot then position - attackerRoot.Position else Vector3.zero
+		local away = Vector3.new(line.X, 0, line.Z)
+		away = if away.Magnitude > 0.01 then away.Unit else Vector3.zAxis
+		local right = Vector3.new(-away.Z, 0, away.X)
+		for index = -2, 2 do
+			streak(
+				position + right * index * 0.5 + up * (index % 2) * 0.4,
+				away + up * 0.35,
+				7 * power,
+				cfg.KickImpactSeconds * 0.5,
+				math.abs(index) * 0.015
+			)
+		end
+		local targetRoot = target and target:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if targetRoot then
+			for index = 1, cfg.TrailPuffs + 2 do
+				task.delay(index * cfg.TrailPuffSeconds, function()
+					if targetRoot.Parent then
+						spawnBlob({
+							from = CFrame.new(targetRoot.Position),
+							to = CFrame.new(targetRoot.Position + up * 0.5),
+							fromSize = ball(1.6),
+							toSize = ball(3.2),
+							seconds = cfg.HitBurstSeconds * 1.4,
+							colour = SHADE,
+						})
+					end
+				end)
+			end
+		end
+	end
 	local feet = position - up * cfg.FootDrop + up * 0.2
 	local seconds = cfg.KickImpactSeconds
 
@@ -444,7 +604,7 @@ function FxController:KickImpact(
 	local me = Players.LocalPlayer.Character
 	local shake = 0
 	if me == attacker or me == target then
-		shake = power
+		shake = power * (if finisher then GameConfig.Kick.FinisherShake else 1)
 	elseif me and me:FindFirstChild("HumanoidRootPart") then
 		local distance = ((me :: any).HumanoidRootPart.Position - position).Magnitude
 		shake = math.clamp(1 - distance / cfg.KickShakeRange, 0, 1) * 0.5 * power
@@ -717,10 +877,11 @@ function FxController:KnitStart()
 				position: Vector3,
 				hit: boolean,
 				share: number,
-				stop: number
+				stop: number,
+				finisher: boolean?
 			)
 				if attacker and attacker.Parent then
-					self:KickImpact(attacker, target, position, hit, share)
+					self:KickImpact(attacker, target, position, hit, share, finisher == true)
 					local anim = Knit.GetController("AnimController")
 					if stop > 0 then
 						anim:KickLanded(attacker, target, stop, share)
@@ -732,6 +893,7 @@ function FxController:KnitStart()
 		)
 	end
 	local last = 0
+	local me = Players.LocalPlayer
 	RunService.Heartbeat:Connect(function()
 		local now = os.clock()
 		if now - last < cfg.DriftPuffEvery then
@@ -739,8 +901,14 @@ function FxController:KnitStart()
 		end
 		last = now
 		for _, player in Players:GetPlayers() do
-			if player.Character then
-				driftSmoke(player.Character)
+			local character = player.Character
+			if character then
+				driftSmoke(character)
+				-- Everyone else's boost shows from the server's word on it. Your own shows at once,
+				-- from MovementController.
+				if player ~= me then
+					setTrail(character, character:GetAttribute("HT_Nitro") == true)
+				end
 			end
 		end
 	end)
