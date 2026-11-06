@@ -1,0 +1,27 @@
+{
+  // Luau language server: Roblox types, and the game's layout from Rojo
+  "luau-lsp.platform.type": "roblox",
+  "luau-lsp.sourcemap.enabled": true,
+  "luau-lsp.sourcemap.autogenerate": true,
+  "luau-lsp.sourcemap.rojoProjectFile": "default.project.json",
+  "luau-lsp.completion.imports.enabled": true,
+
+  // Match how Studio stores scripts: LF, no added final newline
+  "files.eol": "\n",
+  "files.insertFinalNewline": false,
+
+  "[luau]": {
+    "editor.defaultFormatter": "JohnnyMorganz.stylua",
+    "editor.formatOnSave": false,
+    "editor.insertSpaces": false,
+    "editor.tabSize": 4
+  },
+
+  "files.exclude": {
+    "**/*.rbxl.lock": true
+  },
+  "search.exclude": {
+    "Packages": true,
+    "src/shared/Config/AnimClips.luau": true
+  }
+}

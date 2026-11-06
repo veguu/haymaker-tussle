@@ -22,6 +22,7 @@ All 50 scripts in `src/` were checked against Studio and match exactly. Packages
 
 - `rojo serve` and connect in Studio. Edit the files here, not in Studio, or the sync overwrites your Studio edits.
 - `selene src` checks for code problems. `stylua src` formats the code.
-- `rojo sourcemap -o sourcemap.json` lets luau-lsp in VS Code resolve the game's requires.
+- Open this folder in VS Code. The Luau, Selene and StyLua extensions are installed, and `.vscode/settings.json` points the Luau extension at this Rojo project, so autocomplete and type errors understand the game's requires. It keeps `sourcemap.json` up to date by itself.
+- Formatting on save is off, because StyLua would add a final newline to every file it touches. Format a file by hand (Shift+Alt+F) when you want to.
 
 The project only manages `ReplicatedStorage.Shared`, `ReplicatedStorage.Packages`, `ServerScriptService.Server` and `StarterPlayer.StarterPlayerScripts.Client`. Everything else in the place (the map, sounds, settings) stays as it is in Studio.
