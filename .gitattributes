@@ -1,0 +1,4 @@
+# Studio stores scripts with LF line endings; keep them that way on Windows too.
+* text=auto eol=lf
+*.rbxl binary
+*.rbxm binary
