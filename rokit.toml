@@ -1,0 +1,8 @@
+# Haymaker Tussle toolchain. Run `rokit install` after cloning.
+# Versions from the vault's External Tooling note (current as of October 2026).
+[tools]
+rojo = "rojo-rbx/rojo@7.7.1"
+wally = "UpliftGames/wally@0.3.2"
+selene = "Kampfkarren/selene@0.32.0"
+stylua = "JohnnyMorganz/StyLua@2.6.0"
+luau-lsp = "JohnnyMorganz/luau-lsp@1.70.1"

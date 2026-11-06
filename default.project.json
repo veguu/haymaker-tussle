@@ -1,0 +1,57 @@
+{
+  "name": "Haymaker Tussle",
+  "servePlaceIds": [136102156542862],
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "$ignoreUnknownInstances": true,
+      "Packages": {
+        "$path": "Packages"
+      },
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "$ignoreUnknownInstances": true,
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "$ignoreUnknownInstances": true,
+      "$properties": {
+        "AvatarJointUpgrade": "Enabled",
+        "CameraMaxZoomDistance": 128.0,
+        "CharacterBreakJointsOnDeath": false,
+        "CharacterUseJumpPower": false,
+        "DevComputerCameraMovementMode": "Follow",
+        "DevTouchCameraMovementMode": "Follow",
+        "EnableMouseLockOption": false,
+        "GameSettingsAvatar": "R6",
+        "UseImprovedCharacterEvents": {
+          "Enum": 0
+        }
+      },
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "$ignoreUnknownInstances": true,
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    }
+  },
+  "syncbackRules": {
+    "ignoreTrees": ["ReplicatedStorage/Packages"],
+    "ignoreProperties": {
+      "Instance": ["SerializedOverrides"]
+    }
+  }
+}
