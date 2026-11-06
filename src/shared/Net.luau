@@ -31,7 +31,7 @@ export type EventName =
 	| "KickImpact" -- server to all: this character's kick landed, on this target, here
 	| "TutorialDone" -- client to server: I finished or skipped the tutorial. No arguments, ever.
 	| "PunchResult" -- server to client(s): this character's swing was hit, miss, cancelled, refused or clash
-	| "PunchDebug" -- server to all, only with Debug.ShowHitbox: the real attack volume and its verdicts
+	| "PunchDebug" -- server to all, for the hitbox display: a swing going live (and for how long) or ending, with its verdicts
 	| "ClashStarted" -- server to all: these two characters are clashing, for up to this many seconds
 	| "ClashTap" -- client to server: I pressed punch during a clash. No arguments, ever.
 	| "ClashEnded" -- server to all: this clash is over: winner (or nil), reason, and both final scores

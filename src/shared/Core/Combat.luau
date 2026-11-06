@@ -22,7 +22,14 @@ export type PunchSettings = {
 	UppercutDegrees: number,
 	CloseRange: number,
 	CloseDegrees: number,
-	VerticalLimit: number,
+	HurtboxBelow: number,
+	HurtboxAbove: number,
+	HookBandLow: number,
+	HookBandHigh: number,
+	UppercutBandLow: number,
+	UppercutBandHigh: number,
+	SweepStepStuds: number,
+	SweepMaxSteps: number,
 	ActiveSeconds: number?,
 	MissRecovery: number?,
 	BufferSeconds: number?,
@@ -154,14 +161,30 @@ local function gapToSector(
 	return math.sqrt(distance * distance + along * along - 2 * distance * along * math.cos(turn))
 end
 
+--- The heights a swing's volume covers, in studs from the attacker's root part: low, high. A hook sweeps across
+--- at chest height; an uppercut's fist rises above the head.
+function Combat.swingBand(cfg: PunchSettings, side: string?): (number, number)
+	if side == "Uppercut" then
+		return cfg.UppercutBandLow, cfg.UppercutBandHigh
+	end
+	return cfg.HookBandLow, cfg.HookBandHigh
+end
+
+--- Does the target's hurtbox, at root height `ty`, overlap the swing's height band from a root at `ay`?
+function Combat.heightOverlaps(cfg: PunchSettings, ay: number, ty: number, side: string?): boolean
+	local low, high = Combat.swingBand(cfg, side)
+	return ty - cfg.HurtboxBelow <= ay + high and ty + cfg.HurtboxAbove >= ay + low
+end
+
 --- Does this swing reach the target? Facing is a flat unit vector. Returns the answer and, when it's no,
 --- why. Line of sight is checked separately by the service.
 ---
---- The target is its hurtbox: an upright capsule of TargetRadius, with no regard for accessories or effects.
---- The attack is three shapes together, and it connects when the hurtbox touches any of them:
+--- The target is its hurtbox: an upright capsule of TargetRadius from HurtboxBelow under its root to
+--- HurtboxAbove over it, with no regard for accessories or effects. The attack is a volume spanning the swing's
+--- height band (swingBand) over three flat shapes together, and it connects when the hurtbox touches any of them:
 --- - the swing's reach, a sector of Range over the arc from swingArc,
 --- - a close sector of CloseRange over CloseDegrees either way, for someone at your side,
---- - a contact disc of OverlapRadius, centre to centre, for someone you're inside.
+--- - a contact disc of OverlapRadius, centre to centre, for bodies touching or inside each other.
 --- These overlap, so the reach falls away smoothly toward the back rather than at a cliff.
 function Combat.inHitbox(
 	cfg: PunchSettings,
@@ -175,7 +198,7 @@ function Combat.inHitbox(
 	tz: number,
 	side: string?
 ): (boolean, string?)
-	if math.abs(ty - ay) > cfg.VerticalLimit then
+	if not Combat.heightOverlaps(cfg, ay, ty, side) then
 		return false, "height"
 	end
 	local dx, dz = tx - ax, tz - az
@@ -233,12 +256,22 @@ end
 --- A swing's edge, for drawing it: a ring of points around someone at the origin facing
 --- -Z. Each is the furthest a target's centre can be in that direction, found by asking
 --- inHitbox itself, so a drawing can't disagree with what really hits.
+---
+--- With `bare`, it's the attack volume on its own instead, the same rule with the hurtbox's radius taken
+--- out: a hit is then exactly that shape touching a hurtbox cylinder, which is how the debug display draws it.
 function Combat.hitboxOutline(
 	cfg: PunchSettings,
 	segments: number,
-	side: string?
+	side: string?,
+	bare: boolean?
 ): { { x: number, z: number } }
-	local reach = cfg.Range + cfg.TargetRadius
+	local rule = cfg
+	if bare then
+		rule = table.clone(cfg)
+		rule.TargetRadius = 0
+		rule.OverlapRadius = math.max(cfg.OverlapRadius - cfg.TargetRadius, 0)
+	end
+	local reach = rule.Range + rule.TargetRadius
 	local outline = {}
 	for index = 1, segments do
 		local angle = (index - 1) / segments * math.pi * 2
@@ -246,7 +279,7 @@ function Combat.hitboxOutline(
 		local low, high = 0, reach
 		for _ = 1, 14 do
 			local middle = (low + high) / 2
-			if Combat.inHitbox(cfg, 0, 0, 0, 0, -1, dirX * middle, 0, dirZ * middle, side) then
+			if Combat.inHitbox(rule, 0, 0, 0, 0, -1, dirX * middle, 0, dirZ * middle, side) then
 				low = middle
 			else
 				high = middle
@@ -255,6 +288,35 @@ function Combat.hitboxOutline(
 		outline[index] = { x = dirX * low, z = dirZ * low }
 	end
 	return outline
+end
+
+--- A flat facing as an angle, so a turn can be followed smoothly between two server frames. 0 is -Z, the way
+--- hitboxOutline draws, and positive turns toward +X.
+function Combat.yawOf(fx: number, fz: number): number
+	return math.atan2(fx, -fz)
+end
+
+function Combat.facingOf(yaw: number): (number, number)
+	return math.sin(yaw), -math.cos(yaw)
+end
+
+--- Partway from one angle to another, the short way round.
+function Combat.yawLerp(from: number, to: number, share: number): number
+	local turn = (to - from + math.pi) % (2 * math.pi) - math.pi
+	return from + turn * share
+end
+
+--- How many steps a stretch of the active swing between two server frames is checked in, so that nothing
+--- moves further than SweepStepStuds in one: not the attacker, not the target, and not the edge of the reach as
+--- the attacker turns. A fast crossing therefore can't pass between two checks, at any frame rate.
+function Combat.sweepSteps(
+	cfg: PunchSettings,
+	attackerMove: number,
+	targetMove: number,
+	turn: number
+): number
+	local travel = attackerMove + targetMove + math.abs(turn) * (cfg.Range + cfg.TargetRadius)
+	return math.clamp(math.ceil(travel / cfg.SweepStepStuds), 1, cfg.SweepMaxSteps)
 end
 
 --- The hitbox check for a punch pressed now, using where both will be when it lands, a

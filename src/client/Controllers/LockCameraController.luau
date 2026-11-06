@@ -7,7 +7,7 @@
 -- produced. The stock camera reads the camera back next frame, so it follows along, and letting go is just
 -- a blend back to what it's already producing. This step is only bound while it's in use.
 --
--- It never writes the mouse itself: ShiftLockController owns the mouse, the cursor and the Shift key, and is
+-- It never writes the mouse itself: ShiftLockController owns the mouse, the cursor and the shift lock key, and is
 -- told when the camera lock needs them.
 
 local CollectionService = game:GetService("CollectionService")

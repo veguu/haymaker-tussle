@@ -1,16 +1,17 @@
 --!strict
--- ShiftLockController - this game's own shift lock. Roblox's is switched off completely: the place's
--- StarterPlayer.EnableMouseLockOption is false, and its Shift action is held off here too in case that setting
--- is ever lost, since a script isn't allowed to change it. This one has its own Shift key and its
--- own on or off state, always starts off, keeps the camera straight behind the character and shows a white dot
--- just above the head in place of a cursor.
+-- ShiftLockController - this game's own shift lock, toggled with Left Ctrl (GameConfig.Controls.ShiftLock).
+-- Roblox's own shift lock is switched off completely: the place's StarterPlayer.EnableMouseLockOption is false,
+-- and its Shift action is held off here too in case that setting is ever lost, since a script isn't allowed
+-- to change it. Left Shift stays free for the nitro boost, which isn't built yet.
+-- This one has its own on or off state, always starts off, keeps the camera straight behind the character and
+-- shows a white dot just above the head in place of a cursor.
 --
 -- The stock camera still does the turning. It's told it's mouse locked through its own SetIsMouseLocked, which
--- is all it needs. That isn't a documented API, so if a Roblox update removes it, this warns and Shift does nothing.
+-- is all it needs. That isn't a documented API, so if a Roblox update removes it, this warns and Ctrl does nothing.
 --
--- This also owns the mouse and the cursor whenever the lock-on camera wants them, so the two can't fight. While
--- the camera is locked on it wins: Shift does nothing and the dot hides. Whatever shift lock was doing comes back
--- on letting go. Nothing here writes the mouse: the stock camera sets it every frame from its mouse-locked flag,
+-- This also owns the mouse and the cursor whenever the lock-on camera (Alt) wants them, so the two can't fight.
+-- While the camera is locked on it wins: Ctrl does nothing and the dot hides. Whatever shift lock was doing comes
+-- back on letting go. Nothing here writes the mouse: the stock camera sets it every frame from its mouse-locked flag,
 -- so both locks just set that flag. A direct write gets undone by it every frame, and it also remembers
 -- whatever it finds as "normal", which is how a mouse could end up stuck in the centre with shift lock off.
 
@@ -28,6 +29,7 @@ local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local cfg = GameConfig.ShiftLock
 local OFFSET = Vector3.new(cfg.CameraOffsetX, 0, 0)
 local ACTION = "HaymakerShiftLock"
+local TOGGLE_KEY = (Enum.KeyCode :: any)[GameConfig.Controls.ShiftLock.Key] :: Enum.KeyCode
 
 local ShiftLockController = Knit.CreateController({
 	Name = "ShiftLockController",
@@ -38,7 +40,7 @@ function ShiftLockController:IsLocked(): boolean
 	return self._locked == true
 end
 
---- For the lock-on camera, every frame it needs the mouse captured. Shift does nothing until ReleaseMouse.
+--- For the lock-on camera, every frame it needs the mouse captured. Ctrl does nothing until ReleaseMouse.
 function ShiftLockController:HoldMouse()
 	if not self._mouseHeld then
 		self._mouseHeld = true
@@ -132,24 +134,26 @@ function ShiftLockController:KnitStart()
 		warn("[Haymaker Tussle] the stock camera changed; shift lock won't work")
 	end
 
-	-- One press is one toggle. Roblox's own binding is off, so nothing else can flip it.
+	-- One press is one toggle, bound once here and nowhere else. Roblox's own binding is off, so nothing else can
+	-- flip it. While typing, in a menu, or with the lock-on camera holding the mouse, the key is passed on.
 	ContextActionService:BindActionAtPriority(
 		ACTION,
 		function(_name: string, state: Enum.UserInputState)
 			if
-				state == Enum.UserInputState.Begin
-				and not self._mouseHeld
-				and not GuiService.MenuIsOpen
+				state ~= Enum.UserInputState.Begin
+				or self._mouseHeld
+				or GuiService.MenuIsOpen
+				or UserInputService:GetFocusedTextBox() ~= nil
 			then
-				self._locked = not self._locked
-				tellCamera()
+				return Enum.ContextActionResult.Pass
 			end
+			self._locked = not self._locked
+			tellCamera()
 			return Enum.ContextActionResult.Sink
 		end,
 		false,
 		Enum.ContextActionPriority.High.Value,
-		Enum.KeyCode.LeftShift,
-		Enum.KeyCode.RightShift
+		TOGGLE_KEY
 	)
 
 	local iconHidden = false

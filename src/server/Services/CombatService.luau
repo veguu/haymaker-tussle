@@ -1,12 +1,19 @@
 --!strict
 -- CombatService - owns punches. A client only ever says "I pressed punch": no target,
 -- no strength, no position. The server rate limits it, checks the cooldown on its own
--- clock, then waits out the windup and keeps the swing live for a short active window,
--- checking it every frame, so a body crossing fast can't slip between checks. Each target
--- is reached once per swing, however many frames overlap it.
+-- clock, then waits out the windup and keeps the swing live for a short active window. The
+-- window is swept, not just looked at once a frame: between two server frames both bodies and
+-- the attacker's facing are followed in short steps (Combat.sweepSteps), so a fast crossing
+-- can't slip between checks, and exactly the active window is checked, never the windup or the
+-- recovery. The volume always follows the attacker's current position and facing. Each target
+-- is reached once per swing, however many steps overlap it.
 --
--- Lag compensation: targets are looked up where they were when the attacker saw them,
--- up to a capped rewind. Only targets rewind, never the attacker.
+-- Lag compensation, measured: a client sees everyone else about InterpolationSeconds behind
+-- the server, so targets are looked up where they were when the attacker saw them, up to a
+-- capped rewind. And the server sees a player's own body about AttackerLeadSeconds behind
+-- where that player sees it, so the attacker is led forward by that much along how the server
+-- has seen them moving and turning. Without the lead, a full-speed swing is judged from 6 or
+-- more studs behind the runner.
 --
 -- Punches are resolved together in the order they really strike, by the estimated moment
 -- each player's swing lands, never by which server callback came first. Two that strike
@@ -70,7 +77,14 @@ type Punch = {
 	repelled: boolean,
 	flat: Vector3?,
 	origin: Vector3?,
+	-- The attacker's pose at the last server frame, where the next sweep starts from.
+	lastAt: number,
+	lastOrigin: Vector3?,
+	lastYaw: number,
 }
+
+-- When a swing misses someone, the most telling reason across its whole sweep is the one reported.
+local REASON_RANK: { [string]: number } = { range = 1, height = 2, facing = 3, blocked = 4 }
 
 local CombatService = Knit.CreateService({
 	Name = "CombatService",
@@ -128,10 +142,29 @@ local function bodyInView(from: Vector3, to: Vector3, ignore: { Instance }): boo
 	return hasLineOfSight(from, to + side, ignore) or hasLineOfSight(from, to - side, ignore)
 end
 
-local function flatLook(root: BasePart): Vector3?
+-- Where a swing's thrower really is by now, and which way they face, as a yaw: the server's view of their
+-- root, led forward for a player by how the server has seen them moving and turning. A body the server runs
+-- itself isn't behind, so it isn't led. Nil if the facing can't be read.
+local function attackerPose(punch: Punch, root: BasePart): (Vector3?, number)
 	local look = root.CFrame.LookVector
-	local flat = Vector3.new(look.X, 0, look.Z)
-	return if flat.Magnitude > 0.001 then flat.Unit else nil
+	if Vector3.new(look.X, 0, look.Z).Magnitude < 0.001 then
+		return nil, 0
+	end
+	local yaw = Combat.yawOf(look.X, look.Z)
+	if not punch.player then
+		return root.Position, yaw
+	end
+	local offset, turn = Knit.GetService("SpeedAuditService"):Lead(
+		punch.attacker,
+		punchCfg.AttackerLeadSeconds,
+		punchCfg.AttackerLeadMaxSpeed
+	)
+	return root.Position + offset, yaw + turn
+end
+
+local function flatOf(yaw: number): Vector3
+	local x, z = Combat.facingOf(yaw)
+	return Vector3.new(x, 0, z)
 end
 
 -- Tells the one who threw it how it went, so their client can stop a swing the server has
@@ -162,7 +195,9 @@ local function sendDebug(self: any, punch: Punch, phase: string)
 		punch.origin,
 		punch.flat,
 		verdicts,
-		punch.hits
+		punch.hits,
+		-- How much of the active window is left, so the display shows it live for exactly that long.
+		math.max(punch.activeUntil - os.clock(), 0)
 	)
 end
 
@@ -258,14 +293,33 @@ local function reaches(
 	return true, nil
 end
 
--- One frame of a live swing: who has it just reached?
-local function sample(self: any, punch: Punch, root: BasePart)
-	local flat = flatLook(root)
-	if not flat then
+local function moreTelling(current: string?, candidate: string?): string?
+	if candidate == nil then
+		return current
+	elseif current == nil then
+		return candidate
+	end
+	return if (REASON_RANK[candidate] or 0) > (REASON_RANK[current] or 0) then candidate else current
+end
+
+-- One server frame of a swing. The attacker's pose is followed every frame from the press, so the active
+-- window's sweep can start exactly on time. The stretch since the last frame that lies inside the active
+-- window is checked in steps, with both bodies and the facing moving between the two frames: who has it
+-- reached? Nothing is checked before the window opens or after it closes.
+local function sweep(self: any, punch: Punch, root: BasePart, now: number)
+	local origin, yaw = attackerPose(punch, root)
+	if not origin then
 		return
 	end
-	punch.flat = flat
-	punch.origin = root.Position
+	local fromAt, fromOrigin, fromYaw = punch.lastAt, punch.lastOrigin or origin, punch.lastYaw
+	punch.lastAt, punch.lastOrigin, punch.lastYaw = now, origin, yaw
+	punch.origin, punch.flat = origin, flatOf(yaw)
+
+	local startAt = math.max(fromAt, punch.activeFrom)
+	local endAt = math.min(now, punch.activeUntil)
+	if now < punch.activeFrom or fromAt >= punch.activeUntil or endAt < startAt then
+		return
+	end
 	if not punch.sampled then
 		punch.sampled = true
 		sendDebug(self, punch, "active")
@@ -273,6 +327,18 @@ local function sample(self: any, punch: Punch, root: BasePart)
 	if punch.wild then
 		return
 	end
+
+	-- The attacker between the last frame and this one.
+	local span = now - fromAt
+	local function attackerAt(t: number): (Vector3, number)
+		local share = if span > 0 then math.clamp((t - fromAt) / span, 0, 1) else 1
+		return fromOrigin:Lerp(origin, share), Combat.yawLerp(fromYaw, yaw, share)
+	end
+	local startOrigin, startYaw = attackerAt(startAt)
+	local endOrigin, endYaw = attackerAt(endAt)
+	local turned = (endYaw - startYaw + math.pi) % (2 * math.pi) - math.pi
+	local reach = punchCfg.Range + punchCfg.TargetRadius
+
 	local audit = Knit.GetService("SpeedAuditService")
 	local clash = Knit.GetService("ClashService")
 	local everyone: { Instance } = CollectionService:GetTagged(Combatants.TAG)
@@ -286,16 +352,45 @@ local function sample(self: any, punch: Punch, root: BasePart)
 			continue
 		end
 		local targetPlayer = Combatants.playerOf(target)
-		local at = audit:PositionAt(target, punch.rewind)
-		if not at then
+		-- Where the attacker saw them, at both ends of this stretch.
+		local startTarget = audit:PositionAt(target, punch.rewind + (now - startAt))
+		local endTarget = audit:PositionAt(target, punch.rewind + (now - endAt))
+		if not startTarget or not endTarget then
 			continue
 		end
+		local targetMove = (endTarget - startTarget).Magnitude
+		local attackerMove = (endOrigin - startOrigin).Magnitude
+		punch.tested[target] = endTarget
+		-- Nowhere near at either end, even allowing for everything that moved: no need to step through it.
+		local slack = reach + targetMove + attackerMove + punchCfg.SweepStepStuds
+		if
+			(startTarget - startOrigin).Magnitude > slack
+			and (endTarget - endOrigin).Magnitude > slack
+		then
+			punch.reasons[target] = moreTelling(punch.reasons[target], "range") :: string
+			continue
+		end
+		local steps = Combat.sweepSteps(punchCfg, attackerMove, targetMove, turned)
+		local why: string? = nil
+		local hitAt: Vector3? = nil
+		for step = 0, steps do
+			local share = step / steps
+			local t = startAt + (endAt - startAt) * share
+			local stepOrigin, stepYaw = attackerAt(t)
+			local stepTarget = startTarget:Lerp(endTarget, share)
+			local inside, reason = reaches(punch, stepOrigin, flatOf(stepYaw), stepTarget, everyone)
+			if inside then
+				hitAt = stepTarget
+				break
+			end
+			why = moreTelling(why, reason)
+		end
+		if not hitAt then
+			punch.reasons[target] = moreTelling(punch.reasons[target], why) :: string
+			continue
+		end
+		local at = hitAt :: Vector3
 		punch.tested[target] = at
-		local inside, why = reaches(punch, root.Position, flat, at, everyone)
-		if not inside then
-			punch.reasons[target] = why :: string
-			continue
-		end
 		punch.reached[target] = true
 		punch.reasons[target] = "reached"
 		-- A validated attack on someone in a clash bounces off. It does nothing else.
@@ -331,13 +426,16 @@ local function tryClash(self: any, punch: Punch, target: Model): boolean
 		return false
 	end
 	local otherRoot = Combatants.rootOf(target)
-	local otherFlat = otherRoot and flatLook(otherRoot)
+	local otherOrigin, otherYaw = nil, 0
+	if otherRoot then
+		otherOrigin, otherYaw = attackerPose(other, otherRoot)
+	end
 	local at = Knit.GetService("SpeedAuditService"):PositionAt(punch.attacker, other.rewind)
-	if not otherRoot or not otherFlat or not at then
+	if not otherOrigin or not at then
 		return false
 	end
 	local everyone: { Instance } = CollectionService:GetTagged(Combatants.TAG)
-	local inside, why = reaches(other, otherRoot.Position, otherFlat, at, everyone)
+	local inside, why = reaches(other, otherOrigin, flatOf(otherYaw), at, everyone)
 	if not inside then
 		trace(
 			`{punch.attacker.Name} and {target.Name} no clash: {target.Name} doesn't reach back, {why}`
@@ -417,10 +515,8 @@ local function stepPunch(self: any, punch: Punch, now: number)
 		punches[attacker] = nil
 		return
 	end
-	-- A slow frame can't skip a swing: it always gets at least one look.
-	if now >= punch.activeFrom and (now <= punch.activeUntil or not punch.sampled) then
-		sample(self, punch, root)
-	end
+	-- A slow frame can't skip a swing: whatever stretch of the window it jumped over is swept.
+	sweep(self, punch, root, now)
 	if not settleContacts(self, punch, now) then
 		return
 	end
@@ -469,7 +565,7 @@ local function startPunch(
 		finishPunch(self, old)
 	end
 	local oneWay = math.clamp(ping / 2, 0, punchCfg.MaxRewindSeconds)
-	punches[attacker] = {
+	local punch: Punch = {
 		attacker = attacker,
 		player = player,
 		side = side,
@@ -491,7 +587,17 @@ local function startPunch(
 		awayX = 0,
 		awayZ = 0,
 		repelled = false,
+		lastAt = now,
+		lastOrigin = nil,
+		lastYaw = 0,
 	}
+	-- The pose at the press, so the first frame's sweep has somewhere to start from.
+	local root = Combatants.rootOf(attacker)
+	if root then
+		local origin, yaw = attackerPose(punch, root)
+		punch.lastOrigin, punch.lastYaw = origin, yaw
+	end
+	punches[attacker] = punch
 end
 
 --- Someone was just hit: any punch they're winding up is beaten, and a kick in progress ends.

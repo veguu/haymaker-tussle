@@ -1,10 +1,7 @@
 --!strict
--- GENERATED FILE - DO NOT EDIT BY HAND.
--- Source: design/game.json `config`
--- Regenerate: python ~/.claude/skills/create-roblox-game/scripts/gen_config.py --dir <game>
--- Every tunable in the game lives here, so a balance pass is a data edit to the
--- contract and never a code edit. `gen_config.py --check` fails if this file and
--- the contract have drifted apart.
+-- Every tunable in the game lives here, so a balance pass is a data edit and never a code edit.
+-- This was first generated from design/game.json by gen_config.py. That contract isn't part of this
+-- Rojo project, so this file is now the source: edit it directly.
 
 local GameConfig = {
 	SettingsGuide = "design/Settings Guide.md",
@@ -51,26 +48,50 @@ local GameConfig = {
 		Cooldown = 0.32,
 		MissRecovery = 0.1,
 		BufferSeconds = 0.1,
+		-- The swing goes live on the clips' Hit marker (0.08 s, the same in every punch clip) and stays live
+		-- while the fist sweeps across, until it reaches full extension at about 0.16 s.
 		Windup = 0.08,
-		ActiveSeconds = 0.05,
+		ActiveSeconds = 0.08,
+		-- Horizontal reach, centre to centre once TargetRadius is added. Forward reach is unchanged.
 		Range = 5,
 		TargetRadius = 1.5,
-		OverlapRadius = 2.5,
-		CloseRange = 2.7,
+		-- Bodies touching (two TargetRadius) always connect, whichever way you face.
+		OverlapRadius = 3,
+		CloseRange = 3,
 		CloseDegrees = 100,
 		HookOuterDegrees = 55,
-		HookInnerDegrees = 20,
+		HookInnerDegrees = 30,
 		UppercutDegrees = 20,
+		-- Heights, in studs from the root part. The receiving hurtbox is an upright capsule from HurtboxBelow
+		-- under the root (the feet) to HurtboxAbove over it (the top of the head), with no regard for
+		-- accessories. A hook's volume sits waist to shoulder; an uppercut's rises above the head with the fist.
+		-- A hit needs the hurtbox to touch the volume, so hooks reach 4.5 below and above, as they always
+		-- have, and an uppercut 4 below and 5.5 above.
+		HurtboxBelow = 3,
+		HurtboxAbove = 2.5,
+		HookBandLow = -2,
+		HookBandHigh = 1.5,
+		UppercutBandLow = -1.5,
+		UppercutBandHigh = 2.5,
+		-- Between two server frames the swing is swept in steps no longer than this, so a fast crossing
+		-- can't slip between checks.
+		SweepStepStuds = 0.5,
+		SweepMaxSteps = 12,
 		HitCancelsPunch = true,
 		ComboResetSeconds = 2,
 		MissSpeedKeep = 0.7,
 		HitRecoilSpeed = 20,
 		HitSpeedKeep = 0,
-		VerticalLimit = 4.5,
 		RequestsPerSecondLimit = 8,
 		CooldownTolerance = 0.06,
-		MaxRewindSeconds = 0.15,
-		InterpolationSeconds = 0.05,
+		-- Lag compensation, measured in Studio on 2026-11-05 (re-measure on a live server):
+		-- a client shows everyone else about 0.175 s behind the server, so targets rewind by ping plus that;
+		-- the server sees a player's own body about 0.18 s behind where that player sees it, so the
+		-- attacker is led forward along its server-measured movement by that much.
+		InterpolationSeconds = 0.175,
+		MaxRewindSeconds = 0.3,
+		AttackerLeadSeconds = 0.18,
+		AttackerLeadMaxSpeed = 90,
 	},
 	Clash = {
 		Enabled = true,
@@ -464,6 +485,13 @@ local GameConfig = {
 		MinAirSeconds = 0.1,
 		HitRecoilShare = 0.5,
 		PunchWhileLaunched = true,
+	},
+	-- Keyboard bindings that more than one script needs to agree on. Key is an Enum.KeyCode name, Label is
+	-- what the controls panel shows.
+	Controls = {
+		ShiftLock = { Key = "LeftControl", Label = "Ctrl" },
+		-- Reserved for the nitro boost. Nothing binds it yet: it only appears in the controls panel.
+		Nitro = { Key = "LeftShift", Label = "Shift", ComingSoon = true },
 	},
 	ShiftLock = {
 		CameraOffsetX = 0,
