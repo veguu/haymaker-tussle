@@ -40,6 +40,7 @@ export type EventName =
 	| "ClashEnded" -- server to all: this clash is over: winner (or nil), reason, and both final scores
 	| "ClashRepelled" -- server to all: this character's punch bounced off this clashing target
 	| "BodyReset" -- server to a player's client: you've been moved: drop all momentum, face this way, and why
+	| "AfkToggle" -- client to server: switch my AFK (sit out rounds) on or off. No arguments, ever.
 
 local Net = {}
 

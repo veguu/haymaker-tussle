@@ -118,6 +118,9 @@ local function applyBump(self: any, a: Model, b: Model, bump: Deferred)
 		bump.bz
 	)
 	local stagger = Knit.GetService("StaggerService")
+	local round = Knit.GetService("RoundService")
+	round:NoteHit(a, b)
+	round:NoteHit(b, a)
 	stagger:AddAmount(a, outcome.staggerA)
 	stagger:AddAmount(b, outcome.staggerB)
 	self:Launch(

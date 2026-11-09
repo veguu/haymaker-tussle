@@ -31,6 +31,12 @@ function HudPreviewService:KnitStart()
 	local ringOut: RemoteEvent? = nil
 
 	local function ensure(): (Folder, RemoteEvent)
+		-- The real round service's folder, when it's running: the preview drives that one, never a second.
+		local existing = ReplicatedStorage:FindFirstChild(FOLDER)
+		local existingRemote = existing and existing:FindFirstChild("RingOut")
+		if not folder and existing and existingRemote then
+			folder, ringOut = existing :: Folder, existingRemote :: RemoteEvent
+		end
 		if not folder then
 			local made = Instance.new("Folder")
 			made.Name = FOLDER

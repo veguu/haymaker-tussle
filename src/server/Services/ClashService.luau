@@ -201,6 +201,9 @@ local function tie(self: any, clash: Running)
 		local knockback = Knit.GetService("KnockbackService")
 		local strength = Clash.tieStrength(cfg, Combat.punchStrength(knockCfg, staggerCfg, 0, 0))
 		local up, airUp = Combat.upwardSpeeds(knockCfg, strength)
+		local round = Knit.GetService("RoundService")
+		round:NoteHit(clash.a, clash.b)
+		round:NoteHit(clash.b, clash.a)
 		knockback:Launch(clash.a, -dir.X * strength, -dir.Z * strength, up, airUp)
 		knockback:Launch(clash.b, dir.X * strength, dir.Z * strength, up, airUp)
 	end
@@ -233,6 +236,7 @@ local function landFinish(clash: Running)
 		Vector3.new(rootL.Position.X - rootW.Position.X, 0, rootL.Position.Z - rootW.Position.Z)
 	local away = if line.Magnitude > 0.01 then line.Unit else rootW.CFrame.LookVector
 	local up, airUp = Combat.upwardSpeeds(knockCfg, strength)
+	Knit.GetService("RoundService"):NoteHit(loser, winner)
 	knockback:Launch(loser, away.X * strength, away.Z * strength, up, airUp)
 	local pushX, pushZ, keep = Combat.punchAftermath(punchCfg, 1, away.X, away.Z, away.X, away.Z)
 	knockback:Launch(winner, pushX, pushZ, 0, 0, keep)
@@ -272,6 +276,7 @@ function ClashService:Repel(attacker: Model, target: Model): boolean
 	local line =
 		Vector3.new(rootA.Position.X - rootT.Position.X, 0, rootA.Position.Z - rootT.Position.Z)
 	local away = if line.Magnitude > 0.01 then line.Unit else -rootA.CFrame.LookVector
+	Knit.GetService("RoundService"):NoteHit(attacker, target)
 	Knit.GetService("KnockbackService")
 		:Launch(attacker, away.X * cfg.RepelSpeed, away.Z * cfg.RepelSpeed, 0, 0, 0)
 	self._repelled:FireAllClients(attacker, target)

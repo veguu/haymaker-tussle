@@ -279,6 +279,12 @@ function TrainingService:LeaveTraining(player: Player)
 	end
 end
 
+--- Counts someone as out of training at once, without moving them. For the round, which moves them itself.
+function TrainingService:Release(player: Player)
+	player:SetAttribute(IN_TRAINING, nil)
+	currentStation[player] = nil
+end
+
 local function enterTraining(player: Player)
 	player:SetAttribute(IN_TRAINING, true)
 	currentStation[player] = "Hub"
@@ -288,6 +294,12 @@ local function enterTraining(player: Player)
 	if character then
 		Knit.GetService("StaggerService"):Reset(character)
 	end
+end
+
+--- Puts someone in the training arena's hub. Until the lobby exists, this is where anyone waiting for a
+--- round, or out of one, goes.
+function TrainingService:EnterLobby(player: Player)
+	enterTraining(player)
 end
 
 local function resetStation(player: Player, key: string)

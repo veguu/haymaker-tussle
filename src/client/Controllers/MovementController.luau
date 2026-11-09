@@ -674,6 +674,7 @@ function MovementController:_bind(
 			and airRun == nil
 			and humanoid.Health > 0
 			and character:GetAttribute("HT_Stunned") == nil
+			and character:GetAttribute("HT_RoundHold") == nil
 			and character:GetAttribute("HT_ClashAt") == nil
 			and character:GetAttribute("HT_Clash") == nil
 		local wasBoosting = nitro.active
@@ -757,7 +758,9 @@ function MovementController:_bind(
 		local wantShare =
 			Combat.staggerSpeedShare(GameConfig.Stagger, character:GetAttribute("HT_Stagger") or 0)
 		speedShare += (wantShare - speedShare) * math.min(GameConfig.Stagger.SpeedShareEase * dt, 1)
+		-- A round's countdown holds you on your spawn the same way a stun does, without the stun's look.
 		local stunned = character:GetAttribute("HT_Stunned") ~= nil
+			or character:GetAttribute("HT_RoundHold") ~= nil
 		if stunned then
 			kickRequested, propelRequested, punchRequested = false, false, false
 			inputX, inputZ = 0, 0

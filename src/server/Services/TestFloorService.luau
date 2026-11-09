@@ -1,6 +1,7 @@
 --!strict
 -- TestFloorService - TEMPORARY. A plain floor to feel movement on, until the real
--- arena exists. Turned off by Debug.TestFloor. Only touches what it builds itself.
+-- arena exists. Turned off by Debug.TestFloor. Only touches what it builds itself. With rounds on
+-- (Round.Enabled), it's the arena rounds are fought on, and nobody spawns on it between rounds.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -93,6 +94,16 @@ end
 local function placeOnFloor(character: Model)
 	local player = Players:GetPlayerFromCharacter(character)
 	local training = Knit.GetService("TrainingService")
+	-- With rounds running, nobody waits on the arena: they wait in the lobby until a round puts them here.
+	local round = Knit.GetService("RoundService")
+	if player and round:IsEnabled() and not round:IsStanding(character) then
+		if training:IsIn(player) then
+			training:ReturnToStation(player)
+		else
+			round:SendToLobby(player)
+		end
+		return
+	end
 	if player and training:IsIn(player) then
 		training:ReturnToStation(player)
 		return
@@ -142,12 +153,13 @@ function TestFloorService:KnitStart()
 		for _, player in Players:GetPlayers() do
 			local character = player.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-			-- Training looks after its own falls.
+			-- Training looks after its own falls, and a round after its fighters'.
 			if
 				character
 				and root
 				and root.Position.Y < CENTER.Y - arena.EliminationDepth
 				and not Knit.GetService("TrainingService"):IsIn(player)
+				and not Knit.GetService("RoundService"):IsStanding(character)
 			then
 				root.AssemblyLinearVelocity = Vector3.zero
 				placeOnFloor(character)

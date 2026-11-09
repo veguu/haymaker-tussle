@@ -174,9 +174,9 @@ Two opponents whose punches land at effectively the same moment, and would each 
 | `CenterX` | 0 | Arena centre X. |
 | `CenterY` | 100 | Arena floor height. |
 | `CenterZ` | 0 | Arena centre Z. |
-| `StartRadius` | 75 | Radius at round start; about 4 seconds across at MaxSpeed. |
-| `SpawnRadius` | 52 | Radius of the 15-spawn ring; about 22 studs between neighbours. |
-| `SpawnCount` | 15 | Spawn points, and the round capacity they serve. |
+| `StartRadius` | 105 | Radius at round start, grown from 75 for 30 fighters: the same room each (about 1150 square studs). About 6 seconds across at MaxSpeed. |
+| `SpawnRadius` | 73 | Radius of the spawn ring. Fighters are spread evenly round it, as many points as fighters, so 30 are about 15 studs apart and 2 are on opposite sides. |
+| `SpawnCount` | 30 | Most spawn points on the ring, matching `Round.MaxPlayers`. |
 | `ShrinkFractionPerElimination` | 0.08 | Target radius lost per elimination, as a share of the current target. |
 | `ShrinkStudsPerSecond` | 5 | How fast the real edge moves toward its target. |
 | `EliminationBatchSeconds` | 0.5 | Eliminations this close together count as one batch, so the edge never jerks. |
@@ -192,11 +192,16 @@ Two opponents whose punches land at effectively the same moment, and would each 
 
 | Setting | Start | What it does |
 |---|---|---|
-| `MinPlayers` | 2 | Players needed to start. Testing default from the brief; 15 is capacity, not a minimum. |
-| `MaxPlayers` | 15 | Round capacity. |
-| `IntermissionSeconds` | 15 | Lobby countdown once enough players are present. |
-| `StartingSeconds` | 4 | Frozen, protected countdown on the spawn points. |
-| `RoundOverSeconds` | 6 | How long the result shows before returning to the lobby. |
+| `Enabled` | true | Rounds run (RoundService). Off, the arena is a free practice floor as before. |
+| `MinPlayers` | 2 | Fighters needed to count down. In Studio the test bot counts (see `StudioBotCounts`). |
+| `MaxPlayers` | 30 | Round capacity (USER 2026-11-09: a full arena of 30). Anyone past it waits for the next round. |
+| `IntermissionSeconds` | 15 | Lobby countdown once enough fighters are ready. Stops if they drop below `MinPlayers`. |
+| `StartingSeconds` | 4 | Everyone in the round is held still on their spawn (`HT_RoundHold`): no moving, punching or boost, and nobody can be hit. |
+| `RoundOverSeconds` | 6 | How long the result shows before everyone returns to the lobby. |
+| `CreditSeconds` | 4 | A ring-out goes to whoever last punched, kicked, bumped or clashed the fighter within this long before they went out; otherwise they "fell". |
+| `StudioBotCounts` | true | In Studio only, the 1v1 test bot (which exists when you're alone) counts as a fighter, so a round can be tested solo. Never in a live server. Bot fill for live rounds is the next round piece. |
+| `AfkEnabled` | true | The AFK button (top left), a lobby setting: on, you are not put in the next rounds until you switch it off. It never moves anyone, and it is locked while you are in a round. |
+| `AfkToggleSeconds` | 0.5 | Shortest time between two AFK switches, so mashing it does nothing odd. |
 
 ## Lobby
 

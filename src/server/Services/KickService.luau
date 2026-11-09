@@ -277,6 +277,7 @@ function KickService:_impact(player: Player, record: Record)
 				return
 			end
 			stunFor(target, cfg.FinisherStunSeconds)
+			Knit.GetService("RoundService"):NoteHit(target, character)
 			knockback:Launch(
 				target,
 				away.X * push,
@@ -306,6 +307,7 @@ function KickService:_impact(player: Player, record: Record)
 				end
 			end)
 		end
+		Knit.GetService("RoundService"):NoteHit(target, character)
 		knockback:Launch(target, away.X * push, away.Z * push, 0, -slam)
 		local started = os.clock()
 		local last = targetRoot.Position

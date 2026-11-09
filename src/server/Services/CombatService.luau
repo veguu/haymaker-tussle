@@ -118,6 +118,10 @@ end
 
 --- May these two fight each other right now? The round step adds its own rule for the 1v1 arena.
 function CombatService:CanFight(a: Model, b: Model): boolean
+	local round = Knit.GetService("RoundService"):AllowsFight(a, b)
+	if round ~= nil then
+		return round
+	end
 	return Knit.GetService("TrainingService"):AllowsFight(a, b)
 end
 
@@ -193,6 +197,7 @@ local function landHit(self: any, punch: Punch, target: Model, at: Vector3, from
 	stagger:AddHit(target)
 	self:MarkHit(target)
 	notePairHit(punch.attacker, target, os.clock())
+	Knit.GetService("RoundService"):NoteHit(target, punch.attacker)
 	-- Away from where the attacker was at the contact; inside each other, the way the punch was thrown.
 	local awayX, awayZ = Combat.punchAway(punchCfg, at.X - from.X, at.Z - from.Z, flat.X, flat.Z)
 	local away = Vector3.new(awayX, 0, awayZ)
@@ -650,6 +655,12 @@ function CombatService:KnitStart()
 		local attacker = player.Character
 		if not attacker or not Combatants.isAlive(attacker) then
 			trace(`{player.Name} refused: no living character`)
+			return
+		end
+		-- Held on a spawn through a round's countdown.
+		if attacker:GetAttribute("HT_RoundHold") then
+			trace(`{player.Name} refused: round countdown`)
+			self._punchResult:FireClient(player, attacker, "refused")
 			return
 		end
 		if Knit.GetService("KickService"):IsBusy(attacker) then

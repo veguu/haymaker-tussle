@@ -653,8 +653,10 @@ function HudController:KnitStart()
 	local target: Model? = nil
 	local nextTargetPick = 0
 
+	-- Training hides round info, except with rounds running: then training is the lobby, where people
+	-- wait for the next round and watch the one on, so the countdown, survivors and feed all show there.
 	local function inTraining(): boolean
-		return player:GetAttribute("HT_InTraining") == true
+		return player:GetAttribute("HT_InTraining") == true and not GameConfig.Round.Enabled
 	end
 
 	local function readRound(): HudLogic.RoundState
@@ -917,6 +919,10 @@ function HudController:KnitStart()
 		-- Nothing from a previous life carries over.
 		stagger, barFrom, barTo, barSince = 0, 0, 0, -math.huge
 		shownDigits, gaugeShown, overShown = 0, 0, 0
+		-- The digits are only redrawn when the speed changes, so a body that hasn't moved yet still
+		-- needs its 0 written once.
+		speedDigits.Text = "0"
+		speedDigits.TextColor3 = C.Text
 		setStagger((model:GetAttribute("HT_Stagger") or 0) :: number, false)
 		table.insert(
 			charConns,
@@ -1107,7 +1113,12 @@ function HudController:KnitStart()
 				local pick: Model? = lockOn:GetTarget()
 				local myRoot = model:FindFirstChild("HumanoidRootPart") :: BasePart?
 				local camera = workspace.CurrentCamera
-				if not pick and myRoot and camera and not inTraining() then
+				if
+					not pick
+					and myRoot
+					and camera
+					and player:GetAttribute("HT_InTraining") ~= true
+				then
 					local best = S.TargetRange
 					local look = camera.CFrame.LookVector
 					for _, other in CollectionService:GetTagged(COMBATANT_TAG) do

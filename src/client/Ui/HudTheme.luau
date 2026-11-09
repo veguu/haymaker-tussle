@@ -169,4 +169,15 @@ HudTheme.Guide = {
 	},
 }
 
+-- The AFK button, top left: sit out the next rounds. 52 tall, the touch-target minimum.
+HudTheme.Afk = {
+	Width = 132,
+	Height = 52,
+	Top = 8, -- below the safe area's top edge
+	Corner = 6,
+	PressScale = 0.96,
+	PressSeconds = 0.05,
+	ReleaseSeconds = 0.16,
+}
+
 return HudTheme

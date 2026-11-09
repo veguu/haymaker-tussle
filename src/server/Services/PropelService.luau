@@ -71,6 +71,7 @@ local function nitroAllowed(player: Player): boolean
 		and character:GetAttribute("HT_Air") ~= "hold"
 		and character:GetAttribute("HT_Clash") == nil
 		and character:GetAttribute("HT_Stunned") == nil
+		and character:GetAttribute("HT_RoundHold") == nil
 end
 
 --- True while the server's copy of this player's boost is running.

@@ -135,6 +135,7 @@ function CombatController:KnitStart()
 		return character:GetAttribute("HT_Skill") == nil
 			and (air == nil or (air == "float" and GameConfig.AirRecovery.PunchWhileLaunched))
 			and character:GetAttribute("HT_Stunned") == nil
+			and character:GetAttribute("HT_RoundHold") == nil
 			and character:GetAttribute("HT_Clash") == nil
 	end
 

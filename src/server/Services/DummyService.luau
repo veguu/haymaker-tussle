@@ -317,6 +317,19 @@ function DummyService:Spawn(spec: Spec): Model
 	return model
 end
 
+--- Puts a dummy somewhere at once, facing that way, with nothing left over from what it was doing. For a
+--- round putting the bot on a spawn. Its home doesn't change: falling or a reset still sends it home.
+function DummyService:PlaceAt(model: Model, spot: CFrame)
+	local dummy = dummies[model]
+	if not dummy then
+		return
+	end
+	local home = dummy.spec.home
+	dummy.spec.home = spot
+	sendHome(self, dummy)
+	dummy.spec.home = home
+end
+
 --- Asks a dummy to go home as soon as it safely can.
 function DummyService:RequestReset(model: Model)
 	local dummy = dummies[model]
@@ -498,8 +511,14 @@ local function stepDummy(
 )
 	local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
 	local air = dummy.model:GetAttribute("HT_Air")
-	local stunned = dummy.model:GetAttribute("HT_Stunned") ~= nil
-	local fighting = dummy.spec.fights == true and shouldFight()
+	-- Held on a round's spawn through the countdown, or out of the round: it stands still and leaves
+	-- everyone alone.
+	local held = dummy.model:GetAttribute("HT_RoundHold") ~= nil
+	local stunned = dummy.model:GetAttribute("HT_Stunned") ~= nil or held
+	local fighting = dummy.spec.fights == true
+		and shouldFight()
+		and not held
+		and dummy.model:GetAttribute("HT_Eliminated") == nil
 
 	-- In a clash: walks to the spot it was given and holds there, looking at the other fighter.
 	local clashAt = dummy.model:GetAttribute("HT_ClashAt") :: Vector3?
