@@ -84,13 +84,22 @@ return {
 		end
 	end,
 
-	["a bump is far weaker than the weakest punch"] = function()
+	-- Changed on purpose (2026-11-08): a punch on a fresh fighter is now a short shove so one step puts you
+	-- back in reach, while a bump keeps its old strength. So the hardest bump can out-shove a punch on
+	-- someone with no stagger, but never one on anyone a quarter of the way to full stagger.
+	["a bump is weaker than any punch once a fight is underway"] = function()
 		local out = bump(84, -84)
-		local punch = Combat.punchStrength(KNOCK, STAGGER, 0, 0)
+		local punch = Combat.punchStrength(KNOCK, STAGGER, 0, STAGGER.Max * 0.25)
 		assert(
 			out.knockA < punch * 0.75 and out.knockB < punch * 0.75,
 			`{out.knockA}, {out.knockB} against {punch}`
 		)
+	end,
+
+	["a finisher at full stagger is as strong as before the retune"] = function()
+		local full = Combat.punchStrength(KNOCK, STAGGER, 0, STAGGER.Max)
+		-- Before: 55 base at 2.5x.
+		assert(math.abs(full - 55 * 2.5) < 2, `full-stagger punch {full}`)
 	end,
 
 	["a soft bump is softer than a hard one, but still a nudge"] = function()

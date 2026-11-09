@@ -3,10 +3,12 @@
 -- no Roblox instances.
 --
 -- FALLING. Physics always applies full gravity. `fallVelocity` takes the vertical speed physics left
--- and hands back some of it, which is the only gravity adjustment any ordinary airborne body gets, so
--- nothing stacks. Going up, a body keeps the gravity its launch was designed around. From the top of
--- the arc it eases into the lighter falling gravity over `FallEaseSpeed`, and it can't fall faster than
--- `MaxFallSpeed`. It never stops falling, and no vertical speed is ever set to zero.
+-- and adjusts it, which is the only gravity adjustment any ordinary airborne body gets, so nothing
+-- stacks. Going up, a body keeps the gravity its launch was designed around, so launch heights don't
+-- change. From the top of the arc it eases into the falling gravity, `FallGravityScale`, over
+-- `FallEaseSpeed`: heavier than the rise, so a body hangs at the top for a readable moment and then
+-- drops with weight, up to `MaxFallSpeed`. It never stops falling, and no vertical speed is ever set
+-- to zero.
 --
 -- PUNCHING. Each accepted punch in the air gives one push, toward the movement keys, or where the body
 -- faces with no keys. There's no count, meter or fade per punch: what limits it is the punch cadence, how
@@ -43,7 +45,7 @@ function AirRecovery.gravityScale(cfg: Settings, risingScale: number, vy: number
 	if vy >= 0 then
 		return risingScale
 	end
-	local falling = math.min(risingScale, cfg.FallGravityScale)
+	local falling = cfg.FallGravityScale
 	local eased = smooth(math.clamp(-vy / math.max(cfg.FallEaseSpeed, 0.001), 0, 1))
 	return risingScale + (falling - risingScale) * eased
 end

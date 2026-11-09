@@ -39,7 +39,7 @@ About 13,500 lines of game code. Everything is `--!strict`.
 
 | Service | Job |
 |---|---|
-| **CombatService** | Punches. Rate limit (8/s token bucket), cooldown 0.32 s plus 0.1 s after a whiff, 0.1 s press buffer on the client. After the 0.08 s windup the swing is live for 0.08 s, swept between Heartbeats from the attacker's current position and facing. The attacker is led 0.18 s forward along server-measured motion, and targets are rewound by ping + 0.175 s (capped at 0.3 s). Punches resolve in strike order, and simultaneous ones that reach each other become a clash. A hit cancels the target's own wind-up. |
+| **CombatService** | Punches. Rate limit (8/s token bucket), cooldown 0.32 s plus 0.1 s after a whiff, 0.1 s press buffer on the client. Hit detection is the team's `contact-2` (merged 2026-11-08): it sweeps every moment since its last look, from `Punch.GraceSeconds` before the active frames, on server-observed positions of both bodies (target rewound, capped at `MaxRewindSeconds`), throws point-blank hits along the attacker's facing, and gives a landing punch priority over a bump. Punches resolve in strike order, and simultaneous ones that reach each other become a clash. A hit cancels the target's own wind-up. |
 | **ClashService** | Two simultaneous punches: both are pinned 3.4 studs apart and mash for up to 2.5 s. A 14-tap lead wins, a gap of 1 or less at the timeout is a tie. The winner's finisher goes through normal knockback, capped at 130. Outside punches bounce off ("repel"). |
 | **KickService** | Air kick. An uppercut marks the target `HT_Air="float"`. Jump (Space) → the server picks the target and holds it (`"hold"`, `HT_HoldUntil`) → snap → attach → timing ring → flip → impact, graded red, orange or green. Orange and green are finishers that launch the target away and up; red slams it down. 15 s cooldown. |
 | **KnockbackService** | Sends launches to the owning client (or to DummyService). Players don't collide (`HT_Characters` collision group). Bumps are decided by the server every 0.05 s from closing speed. |
@@ -77,6 +77,8 @@ Click/R2 punch (hold to repeat) · Q/B dash (A or D curves it) · Space/Y air ki
 `HT_Stagger`, `HT_Air` (`float`/`hold`), `HT_AirBy`, `HT_HoldFace`, `HT_Skill` (`chase`/`attach`/`flip`/`kick`), `HT_KickAt`, `HT_KickGrade`, `HT_Stunned`, `HT_Clash`, `HT_ClashAt`, `HT_ClashFace`, `HT_ClashScore`, `HT_Dummy`, `HT_Stationary`, `HT_Nitro`, `HT_HoldUntil`. On the player: `HT_InTraining`, `HT_ShiftLocked`, `HT_TutorialStep`. On workspace: `HaymakerCombatDebug` turns on server trace prints.
 
 ## The punch hitbox, precisely
+
+Superseded on 2026-11-08 by `contact-2` (see the CombatService row above, `HANDOFF.md` and `design/Settings Guide.md`). The description below is the 2026-11-05 version, kept for its measurements.
 
 `Combat.inHitbox` is a volume over three flat shapes unioned, against the target's hurtbox: an upright capsule of radius 1.5, from 3 under the root to 2.5 over it. The shapes are the swing's sector (reach 5 over the hook or uppercut arc), a close sector (3 over ±100°) and a 3-stud contact disc. Hooks span -2 to +1.5 from the root and uppercuts -1.5 to +2.5. Line of sight is checked with three rays. The swing is live from 0.08 s to 0.16 s and swept between server frames. The attacker is led forward by the server-measured physics delay, and targets are rewound by ping + 0.175 s. All the sizes, timings, the reasons and the test results are in [[Haymaker Tussle - Controls and Punch Hitbox]].
 

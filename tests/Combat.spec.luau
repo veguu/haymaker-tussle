@@ -15,19 +15,7 @@ local PUNCH: Combat.PunchSettings = {
 	UppercutDegrees = 20,
 	CloseRange = 2.7,
 	CloseDegrees = 100,
-	-- Height: a fixed hurtbox against each swing's band. Hooks reach 4.5 below and above, as the old
-	-- single VerticalLimit 4.5 did; an uppercut 4 below and 5 above.
-	HurtboxBelow = 3,
-	HurtboxAbove = 2.5,
-	HookBandLow = -2,
-	HookBandHigh = 1.5,
-	UppercutBandLow = -1.5,
-	UppercutBandHigh = 2.5,
-	SweepStepStuds = 0.5,
-	SweepMaxSteps = 12,
-	MissSpeedKeep = 0.7,
-	HitRecoilSpeed = 20,
-	HitSpeedKeep = 0,
+	VerticalLimit = 4.5,
 	BufferSeconds = 0.1,
 }
 local KNOCK: Combat.KnockbackSettings = {

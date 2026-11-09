@@ -22,17 +22,13 @@ export type PunchSettings = {
 	UppercutDegrees: number,
 	CloseRange: number,
 	CloseDegrees: number,
-	HurtboxBelow: number,
-	HurtboxAbove: number,
-	HookBandLow: number,
-	HookBandHigh: number,
-	UppercutBandLow: number,
-	UppercutBandHigh: number,
-	SweepStepStuds: number,
-	SweepMaxSteps: number,
+	VerticalLimit: number,
 	ActiveSeconds: number?,
 	MissRecovery: number?,
 	BufferSeconds: number?,
+	GraceSeconds: number?,
+	SweepStep: number?,
+	PointBlankRadius: number?,
 }
 
 export type KnockbackSettings = {
@@ -161,30 +157,14 @@ local function gapToSector(
 	return math.sqrt(distance * distance + along * along - 2 * distance * along * math.cos(turn))
 end
 
---- The heights a swing's volume covers, in studs from the attacker's root part: low, high. A hook sweeps across
---- at chest height; an uppercut's fist rises above the head.
-function Combat.swingBand(cfg: PunchSettings, side: string?): (number, number)
-	if side == "Uppercut" then
-		return cfg.UppercutBandLow, cfg.UppercutBandHigh
-	end
-	return cfg.HookBandLow, cfg.HookBandHigh
-end
-
---- Does the target's hurtbox, at root height `ty`, overlap the swing's height band from a root at `ay`?
-function Combat.heightOverlaps(cfg: PunchSettings, ay: number, ty: number, side: string?): boolean
-	local low, high = Combat.swingBand(cfg, side)
-	return ty - cfg.HurtboxBelow <= ay + high and ty + cfg.HurtboxAbove >= ay + low
-end
-
 --- Does this swing reach the target? Facing is a flat unit vector. Returns the answer and, when it's no,
 --- why. Line of sight is checked separately by the service.
 ---
---- The target is its hurtbox: an upright capsule of TargetRadius from HurtboxBelow under its root to
---- HurtboxAbove over it, with no regard for accessories or effects. The attack is a volume spanning the swing's
---- height band (swingBand) over three flat shapes together, and it connects when the hurtbox touches any of them:
+--- The target is its hurtbox: an upright capsule of TargetRadius, with no regard for accessories or effects.
+--- The attack is three shapes together, and it connects when the hurtbox touches any of them:
 --- - the swing's reach, a sector of Range over the arc from swingArc,
 --- - a close sector of CloseRange over CloseDegrees either way, for someone at your side,
---- - a contact disc of OverlapRadius, centre to centre, for bodies touching or inside each other.
+--- - a contact disc of OverlapRadius, centre to centre, for someone you're inside.
 --- These overlap, so the reach falls away smoothly toward the back rather than at a cliff.
 function Combat.inHitbox(
 	cfg: PunchSettings,
@@ -198,7 +178,7 @@ function Combat.inHitbox(
 	tz: number,
 	side: string?
 ): (boolean, string?)
-	if not Combat.heightOverlaps(cfg, ay, ty, side) then
+	if math.abs(ty - ay) > cfg.VerticalLimit then
 		return false, "height"
 	end
 	local dx, dz = tx - ax, tz - az
@@ -223,6 +203,100 @@ function Combat.inHitbox(
 		return true, nil
 	end
 	return false, "facing"
+end
+
+--- The way a landed punch throws its target, as a flat unit vector. Away from the attacker, except when
+--- the two are so far inside each other (`PointBlankRadius`) that the offset between them is only noise:
+--- then it's the way the punch was thrown, the attacker's facing `fx, fz`, so the shove is steady.
+function Combat.punchAway(
+	cfg: PunchSettings,
+	dx: number,
+	dz: number,
+	fx: number,
+	fz: number
+): (number, number)
+	local size = math.sqrt(dx * dx + dz * dz)
+	if size <= math.max(cfg.PointBlankRadius or 0, 0.001) then
+		return fx, fz
+	end
+	return dx / size, dz / size
+end
+
+--- The stretch of time a swing looks at for contact, on the server's clock, as (from, to). It starts
+--- `GraceSeconds` before the active frames, so bodies that crossed just before the swing went live still
+--- count, but never before the press was accepted: running past someone and then pressing is a miss.
+--- `checkedTo` is how far an earlier look got, so each moment is looked at once and contact that happens
+--- entirely between two server frames is still found. Nil when there's nothing new to look at.
+function Combat.contactWindow(
+	cfg: PunchSettings,
+	acceptedAt: number,
+	activeFrom: number,
+	activeUntil: number,
+	checkedTo: number?,
+	now: number
+): (number?, number?)
+	if now < activeFrom then
+		return nil, nil
+	end
+	local from = math.max(acceptedAt, activeFrom - (cfg.GraceSeconds or 0))
+	if checkedTo then
+		from = math.max(from, checkedTo)
+	end
+	local to = math.min(now, activeUntil)
+	-- Nothing new: each moment is looked at once.
+	if to < from or (checkedTo ~= nil and to <= from) then
+		return nil, nil
+	end
+	return from, to
+end
+
+--- Moments from `from` to `to`, at most `step` apart, always ending exactly on `to`.
+function Combat.sweepTimes(from: number, to: number, step: number): { number }
+	local times = {}
+	local span = to - from
+	local count = math.max(math.ceil(span / math.max(step, 0.001) - 1e-6), 0)
+	for index = 0, count do
+		times[index + 1] = if count == 0 then to else from + span * index / count
+	end
+	return times
+end
+
+export type SweepSample = {
+	ax: number,
+	ay: number,
+	az: number,
+	tx: number,
+	ty: number,
+	tz: number,
+}
+
+--- The first moment in a swept look where the swing reaches the target, as an index into `samples`
+--- (earliest first), or nil and the reason it missed at the latest moment. Each sample pairs where the
+--- attacker was with where the target was then, so height and walls are judged at that contact. `sight`,
+--- when given, is asked only about moments inside the hitbox, and a blocked one keeps looking.
+function Combat.sweepReach(
+	cfg: PunchSettings,
+	samples: { SweepSample },
+	fx: number,
+	fz: number,
+	side: string?,
+	sight: ((index: number) -> boolean)?
+): (number?, string?)
+	local why: string? = nil
+	local blocked = false
+	for index, s in samples do
+		local inside, reason =
+			Combat.inHitbox(cfg, s.ax, s.ay, s.az, fx, fz, s.tx, s.ty, s.tz, side)
+		if inside then
+			if not sight or sight(index) then
+				return index, nil
+			end
+			blocked = true
+		else
+			why = reason
+		end
+	end
+	return nil, if blocked then "blocked" else why
 end
 
 --- The swing after this one: left hook, right hook, uppercut, then round again.
@@ -256,22 +330,12 @@ end
 --- A swing's edge, for drawing it: a ring of points around someone at the origin facing
 --- -Z. Each is the furthest a target's centre can be in that direction, found by asking
 --- inHitbox itself, so a drawing can't disagree with what really hits.
----
---- With `bare`, it's the attack volume on its own instead, the same rule with the hurtbox's radius taken
---- out: a hit is then exactly that shape touching a hurtbox cylinder, which is how the debug display draws it.
 function Combat.hitboxOutline(
 	cfg: PunchSettings,
 	segments: number,
-	side: string?,
-	bare: boolean?
+	side: string?
 ): { { x: number, z: number } }
-	local rule = cfg
-	if bare then
-		rule = table.clone(cfg)
-		rule.TargetRadius = 0
-		rule.OverlapRadius = math.max(cfg.OverlapRadius - cfg.TargetRadius, 0)
-	end
-	local reach = rule.Range + rule.TargetRadius
+	local reach = cfg.Range + cfg.TargetRadius
 	local outline = {}
 	for index = 1, segments do
 		local angle = (index - 1) / segments * math.pi * 2
@@ -279,7 +343,7 @@ function Combat.hitboxOutline(
 		local low, high = 0, reach
 		for _ = 1, 14 do
 			local middle = (low + high) / 2
-			if Combat.inHitbox(rule, 0, 0, 0, 0, -1, dirX * middle, 0, dirZ * middle, side) then
+			if Combat.inHitbox(cfg, 0, 0, 0, 0, -1, dirX * middle, 0, dirZ * middle, side) then
 				low = middle
 			else
 				high = middle
@@ -288,35 +352,6 @@ function Combat.hitboxOutline(
 		outline[index] = { x = dirX * low, z = dirZ * low }
 	end
 	return outline
-end
-
---- A flat facing as an angle, so a turn can be followed smoothly between two server frames. 0 is -Z, the way
---- hitboxOutline draws, and positive turns toward +X.
-function Combat.yawOf(fx: number, fz: number): number
-	return math.atan2(fx, -fz)
-end
-
-function Combat.facingOf(yaw: number): (number, number)
-	return math.sin(yaw), -math.cos(yaw)
-end
-
---- Partway from one angle to another, the short way round.
-function Combat.yawLerp(from: number, to: number, share: number): number
-	local turn = (to - from + math.pi) % (2 * math.pi) - math.pi
-	return from + turn * share
-end
-
---- How many steps a stretch of the active swing between two server frames is checked in, so that nothing
---- moves further than SweepStepStuds in one: not the attacker, not the target, and not the edge of the reach as
---- the attacker turns. A fast crossing therefore can't pass between two checks, at any frame rate.
-function Combat.sweepSteps(
-	cfg: PunchSettings,
-	attackerMove: number,
-	targetMove: number,
-	turn: number
-): number
-	local travel = attackerMove + targetMove + math.abs(turn) * (cfg.Range + cfg.TargetRadius)
-	return math.clamp(math.ceil(travel / cfg.SweepStepStuds), 1, cfg.SweepMaxSteps)
 end
 
 --- The hitbox check for a punch pressed now, using where both will be when it lands, a
@@ -477,8 +512,8 @@ function Combat.bumpOutcome(
 	return {
 		knockA = base * shareOnA,
 		knockB = base * shareOnB,
-		staggerA = math.floor(stagger * shareOnA + 0.5),
-		staggerB = math.floor(stagger * shareOnB + 0.5),
+		staggerA = math.floor(stagger * shareOnA * 10 + 0.5) / 10,
+		staggerB = math.floor(stagger * shareOnB * 10 + 0.5) / 10,
 	}
 end
 
@@ -506,6 +541,122 @@ function Combat.bumpDirection(
 		return 1, 0
 	end
 	return x / size, z / size
+end
+
+export type BumpContactSettings = {
+	BumpDistance: number,
+	BumpMinClosingSpeed: number,
+	BumpPairCooldown: number,
+	BumpReleaseMargin: number,
+	BumpMaxSweep: number,
+}
+
+--- What the server remembers about one pair between bump checks.
+export type BumpPair = {
+	prevX: number?, -- the flat offset from A to B at the last check
+	prevZ: number?,
+	inContact: boolean,
+	lastBump: number?,
+}
+
+function Combat.newBumpPair(): BumpPair
+	return { prevX = nil, prevZ = nil, inContact = false, lastBump = nil }
+end
+
+-- The nearest the line from p to q passes to the origin.
+local function nearestOnSegment(px: number, pz: number, qx: number, qz: number): number
+	local sx, sz = qx - px, qz - pz
+	local length = sx * sx + sz * sz
+	local t = if length > 1e-9 then math.clamp(-(px * sx + pz * sz) / length, 0, 1) else 0
+	local x, z = px + sx * t, pz + sz * t
+	return math.sqrt(x * x + z * z)
+end
+
+--- One bump check for a pair. `dx, dz` is the flat offset from A to B now, `rvx, rvz` A's velocity minus
+--- B's, as the server measured them. Returns the pair's new state and, if a bump starts now, how hard
+--- they closed on each other (nil otherwise).
+---
+--- A bump is coming into contact, once: continuous contact never bumps again, and only separating past
+--- `BumpDistance + BumpReleaseMargin` ends it. Contact that happened entirely between two checks (a fast
+--- crossing) counts too. How hard they closed is judged along the line they approached on, the offset at
+--- the previous check, because by the moment of overlap the centres can coincide or already be past each
+--- other. One moving fighter is enough; matching speeds side by side, or idling inside each other, never
+--- bump. A pair bumps at most once per `BumpPairCooldown`.
+function Combat.stepBumpPair(
+	cfg: BumpContactSettings,
+	pair: BumpPair,
+	dx: number,
+	dz: number,
+	rvx: number,
+	rvz: number,
+	now: number
+): (BumpPair, number?)
+	local distance = math.sqrt(dx * dx + dz * dz)
+	local inside = distance <= cfg.BumpDistance
+	local px, pz = pair.prevX, pair.prevZ
+	local nextPair: BumpPair = {
+		prevX = dx,
+		prevZ = dz,
+		inContact = pair.inContact,
+		lastBump = pair.lastBump,
+	}
+	if pair.inContact then
+		if distance > cfg.BumpDistance + cfg.BumpReleaseMargin then
+			nextPair.inContact = false
+		end
+		return nextPair, nil
+	end
+	-- A jump between checks bigger than any running or knockback can make is a teleport (a respawn, a
+	-- reset), not a pass through each other.
+	if px ~= nil and pz ~= nil then
+		local sx, sz = dx - px, dz - pz
+		if math.sqrt(sx * sx + sz * sz) > cfg.BumpMaxSweep then
+			px, pz = nil, nil
+		end
+	end
+	local crossed = false
+	if not inside and px ~= nil and pz ~= nil then
+		crossed = nearestOnSegment(px, pz, dx, dz) <= cfg.BumpDistance
+	end
+	if not inside and not crossed then
+		return nextPair, nil
+	end
+	nextPair.inContact = inside
+	-- With nothing to compare against (a pair just seen for the first time), it isn't a run into anyone.
+	if px == nil or pz == nil then
+		return nextPair, nil
+	end
+	local lineX, lineZ = px, pz
+	local lineSize = math.sqrt(lineX * lineX + lineZ * lineZ)
+	if lineSize < 0.001 then
+		lineX, lineZ, lineSize = dx, dz, distance
+	end
+	local closing = if lineSize < 0.001
+		then math.sqrt(rvx * rvx + rvz * rvz)
+		else (rvx * lineX + rvz * lineZ) / lineSize
+	if closing < cfg.BumpMinClosingSpeed then
+		return nextPair, nil
+	end
+	if pair.lastBump ~= nil and now - pair.lastBump < cfg.BumpPairCooldown then
+		return nextPair, nil
+	end
+	nextPair.lastBump = now
+	return nextPair, closing
+end
+
+--- What to do with a bump that has qualified, given the punches between the same two fighters. A punch
+--- that lands on this pair is the whole impact, so the bump is dropped; while one is still being decided
+--- the bump waits; a punch that misses leaves the bump to happen. It only ever concerns this one pair.
+--- `pending` is whether either of the two is mid-swing, `hitSince` whether a punch between them landed
+--- close enough to this bump to be the same impact, and `held` whether the bump is still inside its short
+--- hold (`BumpHoldSeconds`), the moment a press made just before contact needs to reach the server.
+function Combat.bumpPriority(pending: boolean, hitSince: boolean, held: boolean?): string
+	if hitSince then
+		return "drop"
+	elseif pending or held then
+		return "wait"
+	end
+	return "bump"
 end
 
 return Combat

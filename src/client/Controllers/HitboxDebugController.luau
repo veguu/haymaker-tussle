@@ -1,43 +1,40 @@
 --!strict
--- HitboxDebugController - the hitbox display, which each player can switch on and off (the Hitboxes pads and the
--- testing panel's button), starting from Debug.ShowHitbox. It shows the swings the server actually ran, as it
--- tells us over PunchDebug, not swings this client imagines:
--- - blue cylinders: every fighter's hurtbox, the volume that can receive a hit, from HurtboxBelow under the
---   root to HurtboxAbove over it,
--- - each swing's attack volume, at its real height band and attached to the attacker: it follows their
---   position and their current facing the whole time it's shown. Bright white while the swing is live, for
---   exactly as long as the server keeps it live, then green if it landed or red if it didn't, fainter, as a
---   short after-image that is no longer live,
--- - a small ball at the position each target was really tested at, rewound for the attacker's view,
+-- HitboxDebugController - the hitbox display, which each player can switch on and off, starting from
+-- Debug.ShowHitbox. It draws what the server actually used, sent over PunchDebug, not what this client
+-- imagines:
+-- - blue cylinders: every fighter's hurtbox, the volume that can receive a hit,
+-- - the swing's attack volume on the floor, travelling with the attacker: white for its active frames,
+--   then green if it landed and red if it didn't,
+-- - a small ball at the position each target was really tested at, rewound for the attacker's ping,
 -- - a word over each target saying what the swing did to them: hit, facing, range, height, blocked,
 --   repelled.
--- A hit is that volume touching a hurtbox cylinder. The footprint comes from Combat.hitboxOutline in its bare
--- form and the heights from Combat.swingBand, the same definitions the server decides hits with, so the
--- drawing can't drift from what really hits. The pink rings painted around the station D target are a
--- separate floor guide, measured centre to centre.
+--
+-- The shape comes from Combat.hitboxOutline, which asks the same rule the server decides
+-- hits with, so the drawing can't drift from what really hits. A target connects when its CENTRE
+-- is inside the shape: the shape already includes the hurtbox's radius.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Typography = require(ReplicatedStorage.Shared.Typography)
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local Net = require(ReplicatedStorage.Shared.Net)
-local Typography = require(ReplicatedStorage.Shared.Typography)
 
 local punchCfg = GameConfig.Punch
 local COMBATANT_TAG = "HT_Combatant"
 local SEGMENTS = 48
+local THICKNESS = 0.05
+local LIFT = 0.15 -- above the floor markings, so the shape doesn't show through unevenly
+local HURT_HEIGHT = 5
 local ACTIVE = Color3.fromRGB(255, 255, 255)
 local LANDED = Color3.fromRGB(70, 255, 120)
 local WHIFFED = Color3.fromRGB(255, 50, 50)
 local HURT = Color3.fromRGB(70, 150, 255)
--- See-through enough that the swing inside it still reads.
-local ACTIVE_TRANSPARENCY = 0.6
-local RESULT_TRANSPARENCY = 0.82
-local MIN_LIVE_SECONDS = 0.05 -- a live window that's nearly over when the message arrives still shows
-local RESULT_SECONDS = 0.35
+local TRANSPARENCY = 0.55
+local LINGER_SECONDS = 0.45
 local WORD_SECONDS = 0.8
 local WORD_REACH = 25
 local PARK = CFrame.new(0, -1000, 0)
@@ -47,25 +44,17 @@ local HitboxDebugController = Knit.CreateController({
 })
 
 type Piece = { size: Vector3, offset: CFrame }
-type Shape = { pieces: { Piece }, middle: number }
+-- `shown`: on screen, and following its attacker every frame until it's parked.
 type Drawing = {
 	parts: { BasePart },
 	cframes: { CFrame },
-	attacker: Model,
-	side: string,
-	liveUntil: number,
-	showUntil: number,
-	faded: boolean,
+	shownAt: number,
+	pieces: { Piece },
+	shown: boolean,
 }
 
--- A flat triangle needs two wedges. `thickness` is how tall the slab is, so the triangle becomes a prism.
-local function addTriangle(
-	pieces: { Piece },
-	thickness: number,
-	first: Vector3,
-	second: Vector3,
-	third: Vector3
-)
+-- A flat triangle needs two wedges. Each piece is placed relative to the character.
+local function addTriangle(pieces: { Piece }, first: Vector3, second: Vector3, third: Vector3)
 	local a, b, c = first, second, third
 	local ab, ac, bc = b - a, c - a, c - b
 	local abd, acd, bcd = ab:Dot(ab), ac:Dot(ac), bc:Dot(bc)
@@ -83,36 +72,33 @@ local function addTriangle(
 	local back = bc.Unit
 	local height = math.abs(ab:Dot(up))
 	table.insert(pieces, {
-		size = Vector3.new(thickness, height, math.abs(ab:Dot(back))),
+		size = Vector3.new(THICKNESS, height, math.abs(ab:Dot(back))),
 		offset = CFrame.fromMatrix((a + b) / 2, right, up, back),
 	})
 	table.insert(pieces, {
-		size = Vector3.new(thickness, height, math.abs(ac:Dot(back))),
+		size = Vector3.new(THICKNESS, height, math.abs(ac:Dot(back))),
 		offset = CFrame.fromMatrix((a + c) / 2, -right, up, -back),
 	})
 end
 
--- The swing's attack volume around a root at the origin facing -Z: its bare footprint, as tall as its band.
-local function buildShape(side: string): Shape
-	local outline = Combat.hitboxOutline(punchCfg, SEGMENTS, side, true)
-	local low, high = Combat.swingBand(punchCfg, side)
+local function buildPieces(side: string): { Piece }
+	local outline = Combat.hitboxOutline(punchCfg, SEGMENTS, side)
 	local pieces: { Piece } = {}
 	for index, point in outline do
 		local following = outline[index % #outline + 1]
 		addTriangle(
 			pieces,
-			high - low,
 			Vector3.zero,
 			Vector3.new(point.x, 0, point.z),
 			Vector3.new(following.x, 0, following.z)
 		)
 	end
-	return { pieces = pieces, middle = (low + high) / 2 }
+	return pieces
 end
 
 local function debugPart(class: string, parent: Instance): Part
 	local part = Instance.new(class) :: Part
-	part.Transparency = ACTIVE_TRANSPARENCY
+	part.Transparency = TRANSPARENCY
 	part.Material = Enum.Material.SmoothPlastic
 	part.Anchored = true
 	part.CanCollide = false
@@ -124,17 +110,10 @@ local function debugPart(class: string, parent: Instance): Part
 	return part
 end
 
-local function makeDrawing(shape: Shape, parent: Instance, attacker: Model, side: string): Drawing
-	local drawing: Drawing = {
-		parts = {},
-		cframes = {},
-		attacker = attacker,
-		side = side,
-		liveUntil = 0,
-		showUntil = 0,
-		faded = false,
-	}
-	for index, piece in shape.pieces do
+local function makeDrawing(pieces: { Piece }, parent: Instance): Drawing
+	local drawing: Drawing =
+		{ parts = {}, cframes = {}, shownAt = 0, pieces = pieces, shown = false }
+	for index, piece in pieces do
 		local part = debugPart("WedgePart", parent)
 		part.Size = piece.size
 		drawing.parts[index] = part
@@ -143,38 +122,30 @@ local function makeDrawing(shape: Shape, parent: Instance, attacker: Model, side
 	return drawing
 end
 
-local function paint(drawing: Drawing, colour: Color3, transparency: number)
+local function paint(drawing: Drawing, colour: Color3)
 	for _, part in drawing.parts do
 		part.Color = colour
-		part.Transparency = transparency
 	end
 end
 
 local function park(drawing: Drawing)
+	drawing.shown = false
 	for index in drawing.cframes do
 		drawing.cframes[index] = PARK
 	end
 	workspace:BulkMoveTo(drawing.parts, drawing.cframes, Enum.BulkMoveMode.FireCFrameChanged)
 end
 
--- Puts a drawing on its attacker as they are right now on this screen: their position, their current facing.
-local function place(drawing: Drawing, shape: Shape): boolean
-	local root = drawing.attacker:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not root then
-		return false
-	end
-	local look = root.CFrame.LookVector
-	local flat = Vector3.new(look.X, 0, look.Z)
-	if flat.Magnitude < 0.001 then
-		return false
-	end
-	local centre = root.Position + Vector3.yAxis * shape.middle
-	local base = CFrame.lookAt(centre, centre + flat)
-	for index, piece in shape.pieces do
+-- Puts the swing's shape on the floor under the attacker, facing where it faces. Called every frame
+-- while it's shown, so the shape travels with the attacker, the same way the server tests the swing
+-- from wherever the attacker is on each step of it.
+local function place(drawing: Drawing, origin: Vector3, flat: Vector3)
+	local feet = origin - Vector3.yAxis * (GameConfig.Effects.FootDrop - LIFT)
+	local base = CFrame.lookAt(feet, feet + flat)
+	for index, piece in drawing.pieces do
 		drawing.cframes[index] = base * piece.offset
 	end
 	workspace:BulkMoveTo(drawing.parts, drawing.cframes, Enum.BulkMoveMode.FireCFrameChanged)
-	return true
 end
 
 local function showWord(parent: Instance, position: Vector3, text: string, colour: Color3)
@@ -182,7 +153,6 @@ local function showWord(parent: Instance, position: Vector3, text: string, colou
 	anchor.Size = Vector3.new(0.5, 0.5, 0.5)
 	anchor.Shape = Enum.PartType.Ball
 	anchor.Color = colour
-	anchor.Transparency = 0.2
 	anchor.CFrame = CFrame.new(position)
 	local board = Instance.new("BillboardGui")
 	board.Size = UDim2.fromOffset(120, 28)
@@ -226,15 +196,13 @@ function HitboxDebugController:KnitStart()
 	folder.Name = "HT_HitboxDebug"
 	folder.Parent = workspace
 
-	local shapes: { [string]: Shape } = {}
+	local shapes: { [string]: { Piece } } = {}
 	for _, side in { "Left", "Right", "Uppercut" } do
-		shapes[side] = buildShape(side)
+		shapes[side] = buildPieces(side)
 	end
 	-- One drawing per attacker and swing, made the first time it's needed.
 	local drawings: { [Model]: { [string]: Drawing } } = {}
 	local hurtboxes: { [Model]: Part } = {}
-	local hurtHeight = punchCfg.HurtboxBelow + punchCfg.HurtboxAbove
-	local hurtMiddle = (punchCfg.HurtboxAbove - punchCfg.HurtboxBelow) / 2
 
 	local remote = Net.client("PunchDebug")
 	if remote then
@@ -244,10 +212,9 @@ function HitboxDebugController:KnitStart()
 				phase: string,
 				side: string,
 				origin: Vector3,
-				_flat: Vector3,
+				flat: Vector3,
 				verdicts: { any },
-				hits: number,
-				seconds: number?
+				hits: number
 			)
 				if not attacker or not shapes[side] or not visible then
 					return
@@ -255,23 +222,24 @@ function HitboxDebugController:KnitStart()
 				drawings[attacker] = drawings[attacker] or {}
 				local drawing = drawings[attacker][side]
 				if not drawing then
-					drawing = makeDrawing(shapes[side], folder, attacker, side)
+					drawing = makeDrawing(shapes[side], folder)
 					drawings[attacker][side] = drawing
 				end
-				local now = os.clock()
 				if phase == "active" then
-					drawing.liveUntil = now + math.max(seconds or 0, MIN_LIVE_SECONDS)
-					drawing.showUntil = drawing.liveUntil + RESULT_SECONDS
-					drawing.faded = false
-					paint(drawing, ACTIVE, ACTIVE_TRANSPARENCY)
-					place(drawing, shapes[side])
+					paint(drawing, ACTIVE)
+					drawing.shown = true
+					drawing.shownAt = os.clock()
+					place(drawing, origin, flat)
 					return
 				end
-				-- The swing is over: what it did, shown as a fading after-image that is no longer live.
-				drawing.liveUntil = math.min(drawing.liveUntil, now)
-				drawing.faded = true
-				drawing.showUntil = now + RESULT_SECONDS
-				paint(drawing, if hits > 0 then LANDED else WHIFFED, RESULT_TRANSPARENCY)
+				paint(drawing, if hits > 0 then LANDED else WHIFFED)
+				local shownAt = os.clock()
+				drawing.shownAt = shownAt
+				task.delay(LINGER_SECONDS, function()
+					if drawing.shownAt == shownAt then
+						park(drawing)
+					end
+				end)
 				for _, verdict in verdicts do
 					-- Only those close enough to matter: a dummy on another station is simply out of range.
 					if verdict.at and (verdict.at - origin).Magnitude <= WORD_REACH then
@@ -288,7 +256,6 @@ function HitboxDebugController:KnitStart()
 		if not visible then
 			for _, forModel in drawings do
 				for _, drawing in forModel do
-					drawing.showUntil = 0
 					park(drawing)
 				end
 			end
@@ -298,28 +265,11 @@ function HitboxDebugController:KnitStart()
 		end
 	end
 
+	-- The hurtboxes follow their fighters.
 	RunService.RenderStepped:Connect(function()
 		if not visible then
 			return
 		end
-		local now = os.clock()
-		-- Every swing on show follows its attacker. Once live, it goes from white to its result colour.
-		for _, forModel in drawings do
-			for side, drawing in forModel do
-				if drawing.showUntil > 0 then
-					if now >= drawing.showUntil or not place(drawing, shapes[side]) then
-						drawing.showUntil = 0
-						park(drawing)
-					elseif not drawing.faded and now >= drawing.liveUntil then
-						-- The live window is over but the verdict hasn't arrived yet: no longer live, so no longer bright.
-						drawing.faded = true
-						paint(drawing, ACTIVE, RESULT_TRANSPARENCY)
-					end
-				end
-			end
-		end
-
-		-- The hurtboxes follow their fighters.
 		local seen: { [Model]: boolean } = {}
 		for _, instance in CollectionService:GetTagged(COMBATANT_TAG) do
 			if instance:IsA("Model") then
@@ -327,25 +277,36 @@ function HitboxDebugController:KnitStart()
 				local root = instance:FindFirstChild("HumanoidRootPart") :: BasePart?
 				local hurt = hurtboxes[instance]
 				if not hurt then
-					local made = debugPart("Part", folder)
+					hurt = debugPart("Part", folder)
+					local made = hurt :: Part
 					made.Shape = Enum.PartType.Cylinder
 					made.Size = Vector3.new(
-						hurtHeight,
+						HURT_HEIGHT,
 						punchCfg.TargetRadius * 2,
 						punchCfg.TargetRadius * 2
 					)
 					made.Color = HURT
 					made.Transparency = 0.8
 					hurtboxes[instance] = made
-					hurt = made
 				end
-				hurt.CFrame = if root
-					then CFrame.new(root.Position + Vector3.yAxis * hurtMiddle) * CFrame.Angles(
-						0,
-						0,
-						math.pi / 2
-					)
-					else PARK
+				if hurt then
+					hurt.CFrame = if root
+						then CFrame.new(root.Position) * CFrame.Angles(0, 0, math.pi / 2)
+						else PARK
+				end
+				-- Any swing shape on show travels with its attacker.
+				local forModel = drawings[instance]
+				if root and forModel then
+					local look = root.CFrame.LookVector
+					local flat = Vector3.new(look.X, 0, look.Z)
+					if flat.Magnitude > 0.001 then
+						for _, drawing in forModel do
+							if drawing.shown then
+								place(drawing, root.Position, flat.Unit)
+							end
+						end
+					end
+				end
 			end
 		end
 		for model, hurt in hurtboxes do

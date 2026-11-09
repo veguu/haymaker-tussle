@@ -27,6 +27,13 @@ Added 2026-11-06 (branch `feature/nitro-dash-finisher`):
 - **Recovery lift**: a punch thrown while falling with no floor within 14 studs below sets the vertical speed to 26 once, with half gravity for 0.25 s (about 3 studs of rise). At most 2 per fall, 1.2 s apart.
 - **Air kick follow-up**: the server picks the target (`DiveKick.pickFollowUp`: in range, clear path, distance weighted by facing), holds it from the moment it accepts (`HT_HoldUntil` deadline, 2.5 s at most), and tells the jumper (`KickAccepted`). The jumper snaps straight there in up to 0.65 s. An orange or green kick is a finisher: launched away and up, with a 0.45 s stun. Red still slams them down.
 
+> **SUPERSEDED (2026-11-08).** The punch hitbox below (attacker lead, target rewind, the swept 0.08-0.16 s
+> window, height bands, the attached display) was replaced in the merge with GitHub main by the team's
+> `contact-2` hit detection, which the user approved: see `HANDOFF.md` (builds contact-1/contact-2),
+> `design/Settings Guide.md` (Punch) and `tests/Contact.spec.luau`. Kept here for its measurements: the
+> server saw a player's own body about 0.18 s late in Studio. Re-check that on a live server against
+> contact-2, which judges both bodies on server-observed positions.
+
 ## What was wrong with the hitbox
 
 Reproduced in Studio Play, running at full speed past the stationary station D target:

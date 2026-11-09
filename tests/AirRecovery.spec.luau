@@ -68,18 +68,22 @@ return {
 		assert(near(y, designed, 1), `top of the arc {y}, designed {designed}`)
 	end,
 
-	["gravity eases in from the top of the arc, with no step"] = function()
-		local last = AirRecovery.gravityScale(AIR, 1, 0.001)
-		for vy = 0, -AIR.FallEaseSpeed - 1, -0.25 do
-			local scale = AirRecovery.gravityScale(AIR, 1, vy)
-			assert(math.abs(scale - last) < 0.06, `jump at vy {vy}: {last} to {scale}`)
-			assert(scale <= last + 1e-9, "gravity should only get lighter on the way down")
-			last = scale
+	["gravity eases from the top of the arc into a heavier fall, with no step"] = function()
+		assert(AIR.FallGravityScale > 1, "falling should be heavier than an ordinary rise")
+		for _, rising in { 1, KICK.AirGravityScale, KICK.MissGravityScale } do
+			local last = AirRecovery.gravityScale(AIR, rising, 0.001)
+			assert(near(last, rising), "still rising on the launch's own gravity")
+			for vy = 0, -AIR.FallEaseSpeed - 1, -0.25 do
+				local scale = AirRecovery.gravityScale(AIR, rising, vy)
+				assert(math.abs(scale - last) < 0.06, `jump at vy {vy}: {last} to {scale}`)
+				assert(scale >= last - 1e-9, "gravity should only get heavier on the way down")
+				last = scale
+			end
+			assert(near(last, AIR.FallGravityScale))
 		end
-		assert(near(last, AIR.FallGravityScale))
 	end,
 
-	["falling is much slower than before, but still falling"] = function()
+	["an uppercut comes down faster than it went up, and lands with weight"] = function()
 		for _, fps in FRAME_RATES do
 			local dt = 1 / fps
 			local vy, y, t = 0, 57, 0
@@ -89,10 +93,22 @@ return {
 				t += dt
 				assert(t < 10, "never got down")
 			end
-			-- The old fall from an uppercut's height took about 0.91 s.
-			assert(t > 1.3, `{fps} fps fall took {t}`)
-			assert(t < 2.5, `{fps} fps fall took {t}: that's floating`)
+			-- The rise to 57 takes 0.91 s; the old fall back down took about 2.1 s.
+			assert(t > 0.6, `{fps} fps fall took {t}: no time left to read the top`)
+			assert(t < 1.0, `{fps} fps fall took {t}: that's floating`)
+			assert(-vy > 60, `{fps} fps landed at {-vy}: not decisive`)
 		end
+	end,
+
+	["walking off a ledge reaches full falling speed within half a second"] = function()
+		local dt = 1 / 60
+		local vy, t = 0, 0
+		while vy > -AIR.MaxFallSpeed + 0.01 do
+			vy = fallStep(vy, 1, dt)
+			t += dt
+			assert(t < 2, "never reached its top speed")
+		end
+		assert(t < 0.5, `took {t} s to reach {AIR.MaxFallSpeed}`)
 	end,
 
 	["the fall has a top speed, reached smoothly"] = function()

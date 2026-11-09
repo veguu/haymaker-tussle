@@ -4,25 +4,17 @@
 -- Clients own their characters, so nothing they report is believed. This samples
 -- positions on a timer to get real speed and velocity, and keeps a short history so a
 -- punch can look back at where a target was when the attacker saw it (lag compensation).
--- It also gives the attacker's lead: the server sees a player's own body a little after that
--- player does, so a punch is judged from where its thrower really is by now, worked out from
--- how the server has seen them moving and turning, never from anything the client claims.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
-local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local Combatants = require(script.Parent.Parent.Combatants)
 
 local cfg = GameConfig.Security
 
--- How far back the attacker's lead looks to see how it's moving and turning: recent, but over more than one
--- sample, so a single uneven step doesn't throw it.
-local LEAD_WINDOW_SECONDS = 0.1
-
-type Sample = { t: number, pos: Vector3, yaw: number }
+type Sample = { t: number, pos: Vector3 }
 
 local SpeedAuditService = Knit.CreateService({
 	Name = "SpeedAuditService",
@@ -52,11 +44,7 @@ local function sampleAll()
 			then
 				table.clear(history)
 			end
-			local look = root.CFrame.LookVector
-			table.insert(
-				history,
-				{ t = now, pos = root.Position, yaw = Combat.yawOf(look.X, look.Z) }
-			)
+			table.insert(history, { t = now, pos = root.Position })
 			while #history > 1 and now - history[1].t > cfg.HistorySeconds do
 				table.remove(history, 1)
 			end
@@ -90,42 +78,28 @@ function SpeedAuditService:GetTrustedSpeed(model: Model): number
 	return math.min(math.sqrt(x * x + z * z), cfg.SpeedTrustCap)
 end
 
---- How far this body has moved and turned by `seconds` from now, if it carries on as the server has just
---- seen it: a flat offset and a yaw change. The speed is the server's own measurement, capped at
---- `maxSpeed`, so a client can't stretch it by claiming a velocity it isn't really moving at.
-function SpeedAuditService:Lead(model: Model, seconds: number, maxSpeed: number): (Vector3, number)
-	local history = histories[model]
-	if not history or #history < 2 or seconds <= 0 then
-		return Vector3.zero, 0
-	end
-	local last = history[#history]
-	local first = history[#history - 1]
-	for i = #history - 1, 1, -1 do
-		first = history[i]
-		if last.t - first.t >= LEAD_WINDOW_SECONDS then
-			break
-		end
-	end
-	local dt = last.t - first.t
-	if dt <= 0 then
-		return Vector3.zero, 0
-	end
-	local moved = Vector3.new(last.pos.X - first.pos.X, 0, last.pos.Z - first.pos.Z) / dt
-	if moved.Magnitude > maxSpeed then
-		moved = moved.Unit * maxSpeed
-	end
-	local turn = (last.yaw - first.yaw + math.pi) % (2 * math.pi) - math.pi
-	return moved * seconds, math.clamp(turn / dt * seconds, -math.pi, math.pi)
-end
-
---- Where the model was, this many seconds ago. Falls back to the oldest sample.
-function SpeedAuditService:PositionAt(model: Model, secondsAgo: number): Vector3?
+--- Where the model was at `when`, on os.clock(). The newest point is where it is right now, so a moment
+--- after the last stored sample is drawn between that sample and the live position, not held at the
+--- sample. Falls back to the oldest sample.
+function SpeedAuditService:PositionAtTime(model: Model, when: number): Vector3?
+	local root = Combatants.rootOf(model)
+	local live = root and root.Position or nil
 	local history = histories[model]
 	if not history or #history == 0 then
-		local root = Combatants.rootOf(model)
-		return root and root.Position or nil
+		return live
 	end
-	local target = os.clock() - secondsAgo
+	local last = history[#history]
+	if when >= last.t then
+		if not live then
+			return last.pos
+		end
+		local span = os.clock() - last.t
+		if span <= 0 then
+			return live
+		end
+		return last.pos:Lerp(live, math.clamp((when - last.t) / span, 0, 1))
+	end
+	local target = when
 	for i = #history, 1, -1 do
 		local sample = history[i]
 		if sample.t <= target then
@@ -139,6 +113,11 @@ function SpeedAuditService:PositionAt(model: Model, secondsAgo: number): Vector3
 		end
 	end
 	return history[1].pos
+end
+
+--- Where the model was, this many seconds ago.
+function SpeedAuditService:PositionAt(model: Model, secondsAgo: number): Vector3?
+	return self:PositionAtTime(model, os.clock() - secondsAgo)
 end
 
 function SpeedAuditService:KnitStart()

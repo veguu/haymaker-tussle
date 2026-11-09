@@ -17,14 +17,7 @@ local PUNCH: Combat.PunchSettings = {
 	UppercutDegrees = 55,
 	CloseRange = 2.7,
 	CloseDegrees = 100,
-	HurtboxBelow = 3,
-	HurtboxAbove = 2.5,
-	HookBandLow = -2,
-	HookBandHigh = 1.5,
-	UppercutBandLow = -1.5,
-	UppercutBandHigh = 2.5,
-	SweepStepStuds = 0.5,
-	SweepMaxSteps = 12,
+	VerticalLimit = 4.5,
 }
 local WINDUP = 0.12
 
