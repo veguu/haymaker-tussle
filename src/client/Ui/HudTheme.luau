@@ -139,8 +139,10 @@ HudTheme.Guide = {
 			key = "Click",
 			action = "Punch. Hold to keep punching. Three in a row end on an uppercut.",
 		},
-		{ key = "Q", action = "Dash. Hold A or D as you press it to curve. 3 s to recharge." },
-		{ key = "Shift", action = "Nitro while held: up to double speed until the bar runs out." },
+		{
+			key = "Q",
+			action = "Dash: a short burst the way you're going. Hard to steer. 3 s to recharge.",
+		},
 		{
 			key = "Space",
 			action = "Air Kick at someone launched. Press as the ring meets the key.",
@@ -151,8 +153,7 @@ HudTheme.Guide = {
 	},
 	gamepad = {
 		{ key = "R2", action = "Punch. Hold to keep punching. Three in a row end on an uppercut." },
-		{ key = "B", action = "Dash. Push the stick left or right as you press it to curve." },
-		{ key = "L3", action = "Nitro while held: up to double speed until the bar runs out." },
+		{ key = "B", action = "Dash: a short burst the way you're going. Hard to steer." },
 		{ key = "Y", action = "Air Kick at someone launched. Press as the ring meets the key." },
 		{ key = "L1", action = "Lock on to the nearest opponent." },
 		{ key = "Select", action = "Show or hide this guide." },
@@ -162,8 +163,7 @@ HudTheme.Guide = {
 			key = "Punch",
 			action = "Punch. Hold to keep punching. Three in a row end on an uppercut.",
 		},
-		{ key = "Propel", action = "Dash. 3 s to recharge." },
-		{ key = "Nitro", action = "Hold for up to double speed until the bar runs out." },
+		{ key = "Propel", action = "Dash: a short burst the way you're going. 3 s to recharge." },
 		{ key = "Kick", action = "Air Kick at someone launched. Tap as the ring meets the key." },
 		{ key = "Lock", action = "Lock on to the nearest opponent." },
 	},

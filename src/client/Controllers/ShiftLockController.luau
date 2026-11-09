@@ -2,7 +2,7 @@
 -- ShiftLockController - this game's own shift lock, toggled with Left Ctrl (GameConfig.Controls.ShiftLock).
 -- Roblox's own shift lock is switched off completely: the place's StarterPlayer.EnableMouseLockOption is false,
 -- and its Shift action is held off here too in case that setting is ever lost, since a script isn't allowed
--- to change it. Left Shift stays free for the nitro boost, which isn't built yet.
+-- to change it. Left Shift does nothing for now (it was the nitro boost, since removed).
 -- This one has its own on or off state, always starts off, keeps the camera straight behind the character and
 -- shows a white dot just above the head in place of a cursor.
 --

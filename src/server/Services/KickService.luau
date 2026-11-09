@@ -13,10 +13,11 @@
 -- (KickAccepted). The hold ends the moment the kick lands, misses, is cancelled or times out
 -- (HoldTimeout), whichever is first. A target held by one follow-up can't be taken by another.
 -- THE FINISHER. A kick graded in FinisherGrades launches the target hard away from the kicker and up,
--- with a short loss of control (FinisherStunSeconds). Red still slams them down.
--- HT_Stunned is the loss of control: a finisher's short one, or a green slam's (when green isn't a
--- finisher) from the moment it sends them down until they've landed from the bounce. Every path out
--- of it clears on a timer too.
+-- with a short loss of control (FinisherStunSeconds). Only a perfect (green) press is a finisher by
+-- default; anything else slams them down, a knockdown.
+-- HT_Stunned is the loss of control: a finisher's short one, a knockdown's from the slam until
+-- KnockdownSeconds after landing, or a green slam's (when green isn't a finisher) until they've landed
+-- from the bounce. Every path out of it clears on a timer too.
 --
 -- KNOWN GAP, the same as all movement here: the client owns its body, so a cheat could fly
 -- somewhere false during the chase, or ignore its own HT_Air. The clock limits for how long.
@@ -294,12 +295,14 @@ function KickService:_impact(player: Player, record: Record)
 		return
 	end
 	local bounces = record.grade == "green"
+	-- Any other slam is a knockdown: no control from the slam until KnockdownSeconds after landing.
+	local knockdown = not bounces and cfg.KnockdownSeconds > 0
 	task.delay(stop, function()
 		clearAir(target)
 		if target.Parent == nil then
 			return
 		end
-		if bounces then
+		if bounces or knockdown then
 			target:SetAttribute(STUN_ATTRIBUTE, true)
 			task.delay(cfg.StunMaxSeconds, function()
 				if target.Parent then
@@ -344,6 +347,9 @@ function KickService:_impact(player: Player, record: Record)
 					or touchingFloor(targetRoot)
 					or target:GetAttribute(STUN_ATTRIBUTE) == nil
 				task.wait(cfg.StunAfterLanding)
+			elseif knockdown then
+				trace(`{target.Name} was knocked down`)
+				task.wait(cfg.KnockdownSeconds)
 			end
 		end
 		if target.Parent then

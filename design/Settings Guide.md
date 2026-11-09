@@ -27,16 +27,13 @@ Every adjustable value in the game. All numbers are **starting guesses to tune b
 | `CoastFallSeconds` | 2 | Seconds from the end of the hold to a full stop. |
 | `CoastFallCurve` | 1.5 | Shape of the fall. 1 is a steady drop; higher starts gentler and ends sharper. |
 | `BrakeDeceleration` | 60 | Studs/s lost per second while holding S and moving. At 60, full speed stops in 0.6 s. |
-| `PropelSpeed` | 84 | Top speed of a dash (Q). It eases up to this, holds it, then eases back down to running speed. |
+| `PropelSpeed` | 84 | Top speed of a dash (Q), a short burst the way you are already going (from a standstill, the way the keys point). It eases up to this, holds it, then eases back down to running speed. |
 | `PropelSeconds` | 0.65 | How long the whole dash lasts, its ramp and ease-out included. |
 | `PropelRampSeconds` | 0.1 | Seconds of easing up to `PropelSpeed`. Lower = a harder start. It's eased, so speed never jumps from one frame to the next. |
 | `PropelCooldown` | 3 | Seconds from pressing propel until it can be pressed again. |
-| `PropelEaseOutSeconds` | 0.28 | Seconds at the end of the dash easing from `PropelSpeed` back to running speed, or to nitro's top speed if still boosting. |
-| `PropelSteerRate` | 20 | Degrees/s the keys can bend a dash while it runs. Low on purpose: a dash is committed, so the keys can't turn it round. |
-| `PropelControlReturnSeconds` | 0.25 | After a dash, normal steering fades back in over this long instead of all at once. |
-| `PropelArcDegrees` | 80 | How far a curved dash turns in all. A or D held as Q is pressed curves it that way; A and D together, or neither, is straight. The turn rate is a half sine: gentle at the ends, fastest in the middle. |
-| `PropelCurveInputThreshold` | 0.35 | How far the input must point to the side (0 to 1, from the camera) to curve the dash. |
-| `PropelCurveBodyLead` | 24 | Degrees the body leans ahead into a curved dash, most in the middle. Past `Effects.DriftPuffMinSlip` (20) it makes drift smoke. |
+| `PropelEaseOutSeconds` | 0.28 | Seconds at the end of the dash easing from `PropelSpeed` back to running speed. |
+| `PropelTurnScale` | 0.28 | Share of the normal turn rate (`TurnRateHighSpeed` at dash speed) the keys get during a dash: 0.28 is about 150°/s, so it bends but turning is hard. Input more than a right angle off the travel is ignored, so it can never be turned round. |
+| `PropelControlReturnSeconds` | 0.25 | After a dash, steering eases from `PropelTurnScale` back to normal over this long instead of all at once. |
 | `SideStopDeceleration` | 45 | Studs/s lost per second after releasing A, D or S. Only W earns the coast. |
 | `CoastMaxAngle` | 45 | When you let go of A or D, you only keep the long coast if you're heading within this many degrees of where the camera looks. Further off, you stop quickly at `SideStopDeceleration`. Letting go of W always coasts, wherever the camera turns afterward. |
 | `ForwardInputThreshold` | 0.3 | How much of the input must point along the camera to count as W (or against it, as S). W+D counts as W. |
@@ -380,7 +377,7 @@ The 1v1 arena's opponent, which chases and punches like a player. It only exists
 
 ## Kick
 
-The air kick. An uppercut launches someone, who can steer and propel in the air. Space squats, and the server picks who you follow up: anyone launched within `FollowUpOwnRange` (your own uppercut) or `FollowUpRange` (anyone else's), with nothing solid in between, by distance and by how far off where you face they are. It holds them still from that moment, and you snap straight to beside them. Once close, a ring closes; Space as it meets the key. You curl, spin forward, and whip your heel down on them. The kick always connects, and the timing sets its force. A grade in `FinisherGrades` (orange or green) is a finisher: they're launched hard away from you and up, with a moment's loss of control. A red still slams them down. You get a boost of running momentum backward and a small hop, and carry on running.
+The air kick. An uppercut launches someone, who can steer and propel in the air. Space squats, and the server picks who you follow up: anyone launched within `FollowUpOwnRange` (your own uppercut) or `FollowUpRange` (anyone else's), with nothing solid in between, by distance and by how far off where you face they are. It holds them still from that moment, and you snap straight to beside them. Once close, a ring closes; Space as it meets the key. You curl, spin forward, and whip your heel down on them. The kick always connects, and the timing sets its force. Only a grade in `FinisherGrades` (green, a perfect press) is a finisher: they're launched hard away from you and up, with a moment's loss of control. Anything else (orange or red) knocks them down: slammed to the floor, with no control until `KnockdownSeconds` after landing. You get a boost of running momentum backward and a small hop, and carry on running.
 
 | Setting | Value | What it does |
 |---|---|---|
@@ -434,11 +431,12 @@ The air kick. An uppercut launches someone, who can steer and propel in the air.
 | `ReboundSpeedMax` | 300 | Fastest a PERFECT! rebound can go to reach the platform. |
 | `ReboundGravityScale` | 0.85 | Share of normal gravity during the rebound. |
 | `StaggerAdded` | 18 | Stagger a kick adds at full force. A punch adds 12. Its outward push at full force is the same as a regular punch, from `Knockback.BaseSpeed` and stagger. |
-| `SlamSpeed` | 110 | Studs/s a grade outside `FinisherGrades` (red) drives them down at full force. |
+| `SlamSpeed` | 110 | Studs/s a grade outside `FinisherGrades` (orange, red) drives them down at full force. |
 | `BounceLift` | 75 | Studs/s a green kick bounces them up when they hit the floor, about 14 studs, only when green isn't in `FinisherGrades`. |
 | `StunMaxSeconds` | 2.5 | Longest a green kick's loss of control can last, whatever else happens. |
 | `StunAfterLanding` | 0.2 | Seconds of it left after landing from the bounce. |
-| `FinisherGrades` | green, orange | Grades that launch them away and up instead of slamming them down. Red is the failed timing. |
+| `KnockdownSeconds` | 0.5 | Seconds a knocked-down target (any slam but a green bounce) stays without control after landing. 0 gives control back on landing. |
+| `FinisherGrades` | green | Grades that launch them away and up instead of knocking them down. Green is the perfect press; orange and red are knockdowns. |
 | `FinisherPushScale` | 2 | Outward speed of a finisher, as a multiple of a punch's strength at their stagger times the grade's share. |
 | `FinisherMaxSpeed` | 220 | Most outward speed a finisher gives. |
 | `FinisherLift` | 45 | Studs/s a finisher sends them up. |
@@ -473,51 +471,6 @@ Getting back to the platform. Each accepted punch in the air gives a push and a 
 | `LiftFallingSpeed` | 2 | How fast you must already be falling, in studs/s. Rising, or the very top of an arc, gets no lift. |
 | `LiftFloorCheck` | 14 | Studs below the feet that must be clear of floor. Closer than this, the punch gets the ordinary small lift. |
 
-## Nitro
-
-Held Shift (L3 on a gamepad). Speed eases toward `SpeedMultiplier` times normal top speed on an S-curve, turning gets harder, the camera pulls in with a light shake, and a trail shows for everyone. Stamina drains while it runs, about 3 s from full, then refills after a delay. Run dry, it stays off until `ExhaustedRecharge` is back. It runs on the ground (or just off it) while moving forward or sideways, and anything that takes the body over ends it: braking, a launch, a hold, a clash, a stun, a kick. The server keeps its own copy of the stamina to decide whether everyone else sees the trail. Tested in `tests/Nitro.spec.luau`.
-
-| Setting | Value | What it does |
-|---|---|---|
-| `Enabled` | true | Whether Shift does anything. |
-| `SpeedMultiplier` | 2 | Top speed at full boost, as a multiple of `Movement.MaxSpeed`. |
-| `RampSeconds` | 0.9 | Seconds from no boost to full boost. |
-| `RampCurve` | 2 | Shape of the ramp. Above 1 is an S-curve: gentle start, strongest in the middle, settling into the top. |
-| `RampAcceleration` | 150 | Extra acceleration at full boost, on top of `Movement.Acceleration`, so speed can follow the ramp. |
-| `RampDownSeconds` | 0.35 | Seconds the boost level takes to fall back after it ends, for the turning and the camera. |
-| `StaminaMax` | 100 | A full bar. |
-| `DrainPerSecond` | 33 | Stamina spent per second of boost. 100 / 33 is about 3 s. |
-| `RechargeDelay` | 0.8 | Seconds after the last spend before it starts refilling. |
-| `RechargePerSecond` | 14 | Stamina back per second once refilling: about 7 s from empty. |
-| `ActivateMin` | 15 | Stamina needed to start a boost. |
-| `ExhaustedRecharge` | 40 | Once run dry, stamina needed before it can start again. |
-| `AirGraceSeconds` | 0.2 | Seconds off the ground a boost survives, so a bump doesn't end it. |
-| `TurnScale` | 0.28 | Share of the normal turn rate at full boost. Still steerable, never locked. |
-| `ReleaseDeceleration` | 18 | Studs/s per second the speed over normal top speed bleeds off after a boost. |
-| `DashSpeedMultiplier` | 1.35 | A dash pressed while boosting goes this many times faster. |
-| `DashDurationMultiplier` | 1.3 | And lasts this many times longer. |
-| `DashCooldown` | 3.5 | Its cooldown, instead of `Movement.PropelCooldown`. |
-| `DashStaminaCost` | 15 | Stamina a boosted dash costs. Without that much, it's a normal dash. |
-| `DashArcMultiplier` | 0.85 | A boosted curved dash turns this share of `Movement.PropelArcDegrees`. |
-| `CameraZoomStuds` | 3.5 | Studs the camera pulls in at full boost. |
-| `CameraMinDistance` | 6 | It never pulls in closer than this to the character. |
-| `CameraEaseIn` | 4 | How fast the pull and shake come in, per second. |
-| `CameraEaseOut` | 4 | How fast they go away after a boost. |
-| `ShakeStuds` | 0.06 | Size of the shake at full boost. |
-| `ShakeRollDegrees` | 0.35 | Roll of the shake at full boost. |
-| `ShakeFrequency` | 11 | How quickly the shake moves. |
-| `TrailLifetime` | 0.28 | Seconds the trail lingers behind. |
-| `TrailWidth` | 1.8 | Height of the trail ribbon, in studs. |
-| `TrailColor` | 8FD3FF | Trail and bar colour while boosting. |
-| `TrailTransparency` | 0.3 | Transparency where the trail starts; it fades to nothing. |
-| `TrailLightEmission` | 0.6 | How much the trail glows. |
-| `BarBottomOffset` | 100 | Pixels from the bottom of the screen to the stamina bar, just above the stagger and speed panel. |
-| `BarWidth` | 240 | Bar width in pixels. |
-| `BarHeight` | 10 | Bar height in pixels. |
-| `BarHideSeconds` | 1.2 | Seconds a full, unused bar stays before fading away. |
-| `ServerStaminaSlack` | 10 | Extra stamina the server's copy allows, for clock differences. |
-| `ServerToggleSeconds` | 0.08 | Shortest gap between two "I started" messages the server accepts. |
-
 ## Controls
 
 Keyboard bindings that more than one script needs to agree on. `Key` is an `Enum.KeyCode` name, `Label` what the guide shows.
@@ -525,7 +478,6 @@ Keyboard bindings that more than one script needs to agree on. `Key` is an `Enum
 | Setting | Value | What it does |
 |---|---|---|
 | `ShiftLock` | LeftControl, "Ctrl" | The game's own shift lock. Roblox's is off (`EnableMouseLockOption` false). |
-| `Nitro` | LeftShift, "Shift"; ButtonL3, "L3" | Held for the nitro boost, on keyboard and gamepad. |
 
 ## ShiftLock
 

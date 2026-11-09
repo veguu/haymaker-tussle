@@ -22,11 +22,8 @@ local CFG: Momentum.Settings = {
 	PropelRampSeconds = 0.15,
 	PropelCooldown = 3,
 	PropelEaseOutSeconds = 0.3,
-	PropelSteerRate = 20,
+	PropelTurnScale = 0.28,
 	PropelControlReturnSeconds = 0.25,
-	PropelArcDegrees = 80,
-	PropelCurveInputThreshold = 0.35,
-	PropelCurveBodyLead = 24,
 	ReverseDeceleration = 40,
 	TurnRateLowSpeed = 540,
 	TurnRateHighSpeed = 110,
@@ -396,58 +393,27 @@ return {
 		assert(state.propelCooldownLeft == nil, "a refused propel must not spend the cooldown")
 	end,
 
-	["a dash is committed: holding a key sideways only nudges it"] = function()
-		local state = run(propel(atSpeed(36), 0, -1), 1, 0, 1)
+	["a burst can be steered, but only at its own small share of the turn rate"] = function()
+		local state = run(propel(atSpeed(36), 0, -1), 1, 0, CFG.PropelSeconds - DT)
+		assert(state.propelLeft and state.propelLeft > 0, "the burst should still be running")
 		local angle = math.deg(math.atan2(state.headingX, -state.headingZ))
-		assert(
-			angle > 0 and angle <= CFG.PropelSteerRate + 0.5,
-			`expected a nudge of at most {CFG.PropelSteerRate} degrees, got {angle}`
-		)
+		local most = CFG.TurnRateHighSpeed * CFG.PropelTurnScale * CFG.PropelSeconds
+		assert(angle > 5, `holding D should bend the burst, got {angle} degrees`)
+		assert(angle <= most + 0.5, `expected at most {most} degrees, got {angle}`)
+		local running = run(atSpeed(36), 1, 0, CFG.PropelSeconds - DT)
+		local runAngle = math.deg(math.atan2(running.headingX, -running.headingZ))
+		assert(angle < runAngle, `a burst should turn less than running: {angle} vs {runAngle}`)
+	end,
+
+	["with nothing held, a burst goes straight the way you were going"] = function()
+		local state = run(propel(atSpeed(36), 0, -1), 0, 0, CFG.PropelSeconds / 2)
+		assert(state.headingX == 0 and state.headingZ == -1, "it must keep its heading")
+		assert(state.speed > 36, `it should still be bursting, got {state.speed}`)
 	end,
 
 	["a dash can't be turned round by holding the other way"] = function()
 		local state = run(propel(atSpeed(36), 0, -1), 0, 1, 1)
 		assert(state.headingZ < -0.9, `expected it still going forward, got {state.headingZ}`)
-	end,
-
-	["a curved dash turns through its whole arc, the way the key says"] = function()
-		for _, curve in { 1, -1 } do
-			local state = Momentum.tryPropel(atSpeed(36), CFG, 0, -1, "forward", { curve = curve })
-			assert(state, "the curved dash should start")
-			state = run(state, 0, 0, CFG.PropelSeconds + DT)
-			local angle = math.deg(math.atan2(state.headingX, -state.headingZ))
-			assert(
-				near(angle, curve * CFG.PropelArcDegrees, 1),
-				`expected {curve * CFG.PropelArcDegrees} degrees, got {angle}`
-			)
-		end
-	end,
-
-	["a curve turns smoothly: gently at the ends, fastest in the middle"] = function()
-		local state = Momentum.tryPropel(atSpeed(36), CFG, 0, -1, "forward", { curve = 1 })
-		assert(state, "the curved dash should start")
-		local frames = math.floor(CFG.PropelSeconds / DT)
-		local turns = {}
-		local before = 0
-		for index = 1, frames do
-			state = Momentum.step(state, CFG, 0, 0, true, DT)
-			local angle = math.atan2(state.headingX, -state.headingZ)
-			turns[index] = angle - before
-			before = angle
-		end
-		local middle = turns[math.floor(frames / 2)]
-		assert(turns[1] < middle * 0.1, `the start should be gentle: {turns[1]} vs {middle}`)
-		assert(turns[frames - 1] < middle * 0.1, `the end should be gentle: {turns[frames - 1]}`)
-		-- The fastest frame is the half-sine's peak: arc * pi / 2 spread over the dash.
-		local peak = math.rad(CFG.PropelArcDegrees) * math.pi / 2 / CFG.PropelSeconds * DT
-		assert(middle <= peak * 1.01, `no frame should snap: {middle} vs {peak}`)
-	end,
-
-	["A and D together, or neither, is a straight dash"] = function()
-		assert(Momentum.dashCurve(CFG, 0) == 0, "no side input is straight")
-		assert(Momentum.dashCurve(CFG, 0.2) == 0, "a slight lean is straight")
-		assert(Momentum.dashCurve(CFG, 0.8) == 1, "D curves right")
-		assert(Momentum.dashCurve(CFG, -0.8) == -1, "A curves left")
 	end,
 
 	["a dash's speed never jumps from one frame to the next"] = function()
@@ -462,25 +428,6 @@ return {
 		-- The eased ramp's steepest point is 1.5 times the average climb.
 		local steepest = 1.5 * (CFG.PropelSpeed - 36) / CFG.PropelRampSeconds * DT
 		assert(biggest <= steepest + 0.01, `largest change {biggest}, allowed {steepest}`)
-	end,
-
-	["the body leans into a curve, then lines up with travel again"] = function()
-		local state = Momentum.tryPropel(atSpeed(36), CFG, 0, -1, "forward", { curve = 1 })
-		assert(state, "the curved dash should start")
-		state = run(state, 0, 0, CFG.PropelSeconds / 2)
-		local bodyX, bodyZ = Momentum.facing(state)
-		local lean = math.deg(
-			math.atan2(
-				state.headingX * bodyZ - state.headingZ * bodyX,
-				state.headingX * bodyX + state.headingZ * bodyZ
-			)
-		)
-		assert(
-			near(lean, CFG.PropelCurveBodyLead, 1),
-			`expected the full lean mid-curve, got {lean}`
-		)
-		state = run(state, 0, 0, CFG.PropelSeconds / 2 + DT)
-		assert(state.bodyX == nil, "the body must line up with travel once it's over")
 	end,
 
 	["steering comes back gradually after a dash"] = function()
@@ -499,55 +446,10 @@ return {
 		assert(state.controlReturnLeft == nil, "control should be fully back")
 	end,
 
-	["a boosted dash is faster and longer, and still only one at a time"] = function()
-		local state = Momentum.tryPropel(atSpeed(36), CFG, 0, -1, "forward", {
-			speedScale = 1.35,
-			durationScale = 1.3,
-			cooldown = 3.5,
-		})
-		assert(state, "the boosted dash should start")
-		assert(near(state.dashPeak or 0, CFG.PropelSpeed * 1.35, 0.01), "peak should scale")
-		assert(near(state.dashSeconds or 0, CFG.PropelSeconds * 1.3, 0.01), "length should scale")
-		assert(state.propelCooldownLeft == 3.5, "its own cooldown")
-		assert(propel(state, 0, -1, "forward", true) == nil, "pressing again can't stack another")
-	end,
-
-	["a boost raises top speed and makes the heading harder to bend"] = function()
-		local boost: Momentum.Modifiers = { maxSpeed = 72, acceleration = 150, turnScale = 0.28 }
-		local state = atSpeed(36)
-		for _ = 1, 60 do
-			state = Momentum.step(state, CFG, 0, -1, true, DT, "forward", 0, boost)
-		end
-		assert(near(state.speed, 72, 0.5), `expected boosted top speed, got {state.speed}`)
-		local boosted = atSpeed(36)
-		local normal = atSpeed(36)
-		for _ = 1, 6 do
-			boosted = Momentum.step(boosted, CFG, 1, 0, true, DT, "side", 1, boost)
-			normal = Momentum.step(normal, CFG, 1, 0, true, DT, "side", 1)
-		end
-		assert(boosted.headingX < normal.headingX, "a boosted heading should turn less")
-		assert(boosted.headingX > 0, "but it should still turn")
-	end,
-
-	["speed past top speed bleeds off at the boost's own rate once it's over"] = function()
-		local carried = atSpeed(72)
-		local plain = atSpeed(72)
-		local after: Momentum.Modifiers = { overspeedDeceleration = 30 }
-		for _ = 1, 30 do
-			carried = Momentum.step(carried, CFG, 0, -1, true, DT, "forward", 0, after)
-			plain = Momentum.step(plain, CFG, 0, -1, true, DT, "forward", 0)
-		end
-		assert(near(carried.speed, 72 - 15, 0.5), `expected 57, got {carried.speed}`)
-		assert(near(plain.speed, 72 - CFG.CoastDeceleration * 0.5, 0.5), `got {plain.speed}`)
-	end,
-
 	["being hit ends a propel"] = function()
 		local state = run(propel(atSpeed(36), 0, -1), 1, 0, 0.3)
 		state = Momentum.applyKnock(state, CFG, 20, 0, 0)
-		assert(
-			state.propelLeft == nil and state.bodyX == nil and state.speed == 0,
-			"propel must stop"
-		)
+		assert(state.propelLeft == nil and state.speed == 0, "propel must stop")
 	end,
 
 	["the cooldown blocks a second propel until it runs out"] = function()

@@ -172,11 +172,8 @@
    "PropelRampSeconds": 0.1,
    "PropelEaseOutSeconds": 0.28,
    "PropelCooldown": 3,
-   "PropelSteerRate": 20,
+   "PropelTurnScale": 0.28,
    "PropelControlReturnSeconds": 0.25,
-   "PropelArcDegrees": 80,
-   "PropelCurveInputThreshold": 0.35,
-   "PropelCurveBodyLead": 24,
    "KnockbackAirDecay": 20,
    "KnockbackMaxSpeed": 250,
    "HitSpeedKeep": 0.3,
@@ -596,9 +593,9 @@
    "BounceLift": 75,
    "StunMaxSeconds": 2.5,
    "StunAfterLanding": 0.2,
+   "KnockdownSeconds": 0.5,
    "FinisherGrades": {
-    "green": true,
-    "orange": true
+    "green": true
    },
    "FinisherPushScale": 2,
    "FinisherMaxSpeed": 220,
@@ -629,56 +626,10 @@
    "LiftFallingSpeed": 2,
    "LiftFloorCheck": 14
   },
-  "Nitro": {
-   "Enabled": true,
-   "SpeedMultiplier": 2,
-   "RampSeconds": 0.9,
-   "RampCurve": 2,
-   "RampAcceleration": 150,
-   "RampDownSeconds": 0.35,
-   "StaminaMax": 100,
-   "DrainPerSecond": 33,
-   "RechargeDelay": 0.8,
-   "RechargePerSecond": 14,
-   "ActivateMin": 15,
-   "ExhaustedRecharge": 40,
-   "AirGraceSeconds": 0.2,
-   "TurnScale": 0.28,
-   "ReleaseDeceleration": 18,
-   "DashSpeedMultiplier": 1.35,
-   "DashDurationMultiplier": 1.3,
-   "DashCooldown": 3.5,
-   "DashStaminaCost": 15,
-   "DashArcMultiplier": 0.85,
-   "CameraZoomStuds": 3.5,
-   "CameraMinDistance": 6,
-   "CameraEaseIn": 4,
-   "CameraEaseOut": 4,
-   "ShakeStuds": 0.06,
-   "ShakeRollDegrees": 0.35,
-   "ShakeFrequency": 11,
-   "TrailLifetime": 0.28,
-   "TrailWidth": 1.8,
-   "TrailColor": "8FD3FF",
-   "TrailTransparency": 0.3,
-   "TrailLightEmission": 0.6,
-   "BarBottomOffset": 100,
-   "BarWidth": 240,
-   "BarHeight": 10,
-   "BarHideSeconds": 1.2,
-   "ServerStaminaSlack": 10,
-   "ServerToggleSeconds": 0.08
-  },
   "Controls": {
    "ShiftLock": {
     "Key": "LeftControl",
     "Label": "Ctrl"
-   },
-   "Nitro": {
-    "Key": "LeftShift",
-    "Label": "Shift",
-    "GamepadKey": "ButtonL3",
-    "GamepadLabel": "L3"
    }
   },
   "ShiftLock": {

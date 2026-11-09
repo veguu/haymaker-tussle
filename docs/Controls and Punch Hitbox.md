@@ -10,22 +10,21 @@ Changed 2026-11-05. Every number here lives in `GameConfig` (`Punch` and `Contro
 | Key | Does | Where |
 |---|---|---|
 | Left Ctrl | Shift lock on and off (same camera behaviour as before) | `ShiftLockController`, key from `Controls.ShiftLock` |
-| Left Shift, L3 (held) | Nitro: up to 2× speed on about 3 s of stamina, harder turning, camera pull-in and shake, a trail everyone sees | `MovementController` (`HaymakerNitro`), rules in `Core/Nitro`, tuning in `GameConfig.Nitro`, key from `Controls.Nitro` |
-| Q, B | Committed dash. Holding A or D as it starts curves it that way; during nitro it's faster and longer and costs stamina | `MovementController`, rules in `Core/Momentum`, tuning `Movement.Propel*` and `Nitro.Dash*` |
+| Q, B | Dash: a short burst the way you are already going. The keys steer it at 0.28 of the normal turn rate, so it bends but turning is hard | `MovementController`, rules in `Core/Momentum`, tuning `Movement.Propel*` |
 | Click, R2 (held) | Holding repeats punches at the normal cooldown; a tap is still one punch | `CombatController` |
 | Alt (E in Studio), L1 | Lock on, unchanged | `LockOnController` |
 
 - Ctrl is bound once (`HaymakerShiftLock`, High priority). It's passed on untouched while typing in a text box, while a menu is open, and while the lock-on camera holds the mouse.
-- Roblox's own shift lock stays off: `StarterPlayer.EnableMouseLockOption = false` (now also set in `default.project.json`), and the stock `MouseLockSwitchAction` is disabled every frame. Left Shift is the game's nitro, bound by `MovementController` at High priority.
+- Roblox's own shift lock stays off: `StarterPlayer.EnableMouseLockOption = false` (now also set in `default.project.json`), and the stock `MouseLockSwitchAction` is disabled every frame. Left Shift is unbound (it was nitro until 2026-11-09).
 - The controls panel now hides rows that belong to another device (the gamepad list used to leave the keyboard's last row showing) and is 300 px wide.
 - There's no shift-lock wording in the tutorial (it's off) or the kick prompt, so nothing else needed changing.
 
 Added 2026-11-06 (branch `feature/nitro-dash-finisher`):
 
-- **Nitro** runs only on the ground (0.2 s of grace off it), moving forward or sideways, never braking, launched, held, clashing, stunned or kicking. It stops when stamina runs out and stays off until 40 of 100 is back. The server keeps its own copy of the stamina (`PropelService`) and sets `HT_Nitro` on the character, which is what draws the trail on other clients.
-- **Dash**: ramp 0.1 s to 84, hold, ease out over 0.28 s, 0.65 s in all, 3 s cooldown. The keys can only nudge it (20°/s); steering returns over 0.25 s after. A curve is 80° on a half-sine turn rate. A and D together are a straight dash. Boosted: 1.35× speed, 1.3× length, 0.85× arc, 3.5 s cooldown, 15 stamina.
+- **Nitro** was removed on 2026-11-09 (Core/Nitro, the stamina bar and the server copy are gone).
+- **Dash** (changed 2026-11-09): a burst along the current travel (from a standstill, toward the keys). Ramp 0.1 s to 84, hold, ease out over 0.28 s, 0.65 s in all, 3 s cooldown. The keys steer it at `PropelTurnScale` (0.28) of the turn rate, about 150°/s; input more than 90° off travel is ignored. Steering eases back to full over 0.25 s after. The fixed curve and the boosted dash are gone.
 - **Recovery lift**: a punch thrown while falling with no floor within 14 studs below sets the vertical speed to 26 once, with half gravity for 0.25 s (about 3 studs of rise). At most 2 per fall, 1.2 s apart.
-- **Air kick follow-up**: the server picks the target (`DiveKick.pickFollowUp`: in range, clear path, distance weighted by facing), holds it from the moment it accepts (`HT_HoldUntil` deadline, 2.5 s at most), and tells the jumper (`KickAccepted`). The jumper snaps straight there in up to 0.65 s. An orange or green kick is a finisher: launched away and up, with a 0.45 s stun. Red still slams them down.
+- **Air kick follow-up**: the server picks the target (`DiveKick.pickFollowUp`: in range, clear path, distance weighted by facing), holds it from the moment it accepts (`HT_HoldUntil` deadline, 2.5 s at most), and tells the jumper (`KickAccepted`). The jumper snaps straight there in up to 0.65 s. Only a green (perfect) kick is a finisher: launched away and up, with a 0.45 s stun. Orange and red knock them down: slammed to the floor, no control until 0.5 s after landing (`Kick.KnockdownSeconds`, since 2026-11-09).
 
 > **SUPERSEDED (2026-11-08).** The punch hitbox below (attacker lead, target rewind, the swept 0.08-0.16 s
 > window, height bands, the attached display) was replaced in the merge with GitHub main by the team's
