@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local Typography = require(ReplicatedStorage.Shared.Typography)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Clash = require(ReplicatedStorage.Shared.Core.Clash)
 
@@ -23,7 +24,7 @@ local function makeLabel(parent: Instance, name: string): TextLabel
 	local label = Instance.new("TextLabel")
 	label.Name = name
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBold
+	Typography.apply(label, "Announce")
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.TextScaled = true
 	local limit = Instance.new("UITextSizeConstraint")

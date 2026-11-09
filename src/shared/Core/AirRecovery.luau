@@ -27,15 +27,6 @@ export type Settings = {
 	MaxFallSpeed: number,
 	FallDrag: number,
 	MinAirSeconds: number,
-	LiftEnabled: boolean,
-	LiftSpeed: number,
-	LiftSeconds: number,
-	LiftGravityScale: number,
-	LiftForwardSpeed: number,
-	LiftCooldown: number,
-	LiftsPerFall: number,
-	LiftFallingSpeed: number,
-	LiftFloorCheck: number,
 }
 
 -- How finely `predictRise` and `timeToDrop` walk the fall. Coarse is fine: they plan a jump.
@@ -145,7 +136,6 @@ end
 
 --- The flat push one punch gives, given how fast the body is already going. It adds up to the cap along
 --- its own direction and no further. Speed the other way doesn't count against it.
---- `boost` is the most it adds, BoostSpeed if left out (the recovery lift uses LiftForwardSpeed).
 function AirRecovery.push(
 	cfg: Settings,
 	vx: number,
@@ -165,30 +155,66 @@ function AirRecovery.lift(cfg: Settings, vy: number): number
 	return math.clamp(cfg.UpAssistCeiling - vy, 0, cfg.UpAssist)
 end
 
---- The recovery lift. Does a punch thrown in the air right now earn one? Only falling (`vy` at most
---- -LiftFallingSpeed), with no floor close below (`floorBelow` false, which is the caller's raycast), not
---- slammed, at least LiftCooldown since the last (`sinceLast`), and fewer than LiftsPerFall already this
---- fall (`used`). Rising bodies and ordinary punches never get it.
-function AirRecovery.earnsLift(
-	cfg: Settings,
-	vy: number,
-	floorBelow: boolean,
-	slammed: boolean,
-	sinceLast: number,
-	used: number
-): boolean
-	return cfg.LiftEnabled
-		and not slammed
-		and not floorBelow
-		and vy <= -cfg.LiftFallingSpeed
-		and sinceLast >= cfg.LiftCooldown
-		and used < cfg.LiftsPerFall
+-- THE FALLING LIFT. A punch thrown while falling with no floor close below sets the vertical speed to
+-- `LiftSpeed` once, and gravity is lighter for `LiftSeconds`, for a small hop (about 3 studs). It takes
+-- the place of `lift` for that punch, so the two never stack. A fall allows `LiftsPerFall` of them,
+-- `LiftCooldown` apart, and landing resets the count. Rising, slammed or near the floor: no lift.
+
+export type LiftSettings = {
+	LiftEnabled: boolean,
+	LiftSpeed: number,
+	LiftSeconds: number,
+	LiftGravityScale: number,
+	LiftCooldown: number,
+	LiftsPerFall: number,
+	LiftFallingSpeed: number,
+	LiftFloorCheck: number,
+}
+
+export type Lifts = { count: number, lastAt: number }
+
+function AirRecovery.newLifts(): Lifts
+	return { count = 0, lastAt = -math.huge }
 end
 
---- One step of the fall while a recovery lift is running. It replaces whatever fall rule the body was on
---- for those LiftSeconds, so the two never stack: `vy` is what physics left after a whole `dt` of full
---- `gravity`, and this hands back all but LiftGravityScale of it.
-function AirRecovery.liftFall(cfg: Settings, gravity: number, vy: number, dt: number): number
+--- Whether a punch thrown now gets the falling lift. `floorBelow` is the distance down to the nearest
+--- floor from the feet, or nil when there's none within the check.
+function AirRecovery.canLift(
+	cfg: LiftSettings,
+	lifts: Lifts,
+	vy: number,
+	floorBelow: number?,
+	slammed: boolean,
+	now: number
+): boolean
+	if not cfg.LiftEnabled or slammed then
+		return false
+	end
+	if vy > -cfg.LiftFallingSpeed then
+		return false
+	end
+	if floorBelow ~= nil and floorBelow <= cfg.LiftFloorCheck then
+		return false
+	end
+	if lifts.count >= cfg.LiftsPerFall then
+		return false
+	end
+	return now - lifts.lastAt >= cfg.LiftCooldown
+end
+
+--- The count after a lift is used.
+function AirRecovery.usedLift(lifts: Lifts, now: number): Lifts
+	return { count = lifts.count + 1, lastAt = now }
+end
+
+--- One step during the lift's lighter gravity. `vy` is what physics left after a whole `dt` of full
+--- `gravity`; this hands back the share the lift takes away.
+function AirRecovery.liftVelocity(
+	cfg: LiftSettings,
+	gravity: number,
+	vy: number,
+	dt: number
+): number
 	return vy + gravity * (1 - cfg.LiftGravityScale) * dt
 end
 

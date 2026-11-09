@@ -1,0 +1,46 @@
+{
+ "name": "Haymaker Tussle",
+ "roles": [
+  {
+   "name": "punch_swing",
+   "query": "whoosh punch swing",
+   "kind": "SoundEffect",
+   "min_len": 0.1,
+   "max_len": 0.8,
+   "volume": 0.5
+  },
+  {
+   "name": "punch_hit",
+   "query": "heavy punch impact",
+   "kind": "SoundEffect",
+   "min_len": 0.1,
+   "max_len": 1.2,
+   "volume": 0.7
+  },
+  {
+   "name": "bump",
+   "query": "soft body bump thud",
+   "kind": "SoundEffect",
+   "min_len": 0.1,
+   "max_len": 1.0,
+   "volume": 0.4
+  },
+  {
+   "name": "launch",
+   "query": "cartoon launch whoosh",
+   "kind": "SoundEffect",
+   "min_len": 0.2,
+   "max_len": 2.0,
+   "volume": 0.6
+  },
+  {
+   "name": "dash",
+   "query": "dash whoosh",
+   "kind": "SoundEffect",
+   "min_len": 0.2,
+   "max_len": 1.0,
+   "volume": 0.8
+  }
+ ],
+ "note": "roblox-sfx. One role per thing the game needs a sound for. Nothing in this pipeline can hear, so a person must listen."
+}

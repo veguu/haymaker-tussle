@@ -1,4 +1,10 @@
 # Studio stores scripts with LF line endings; keep them that way on Windows too.
 * text=auto eol=lf
-*.rbxl binary
+*.png binary
+*.jpg binary
 *.rbxm binary
+*.rbxl binary
+*.fbx binary
+*.blend binary
+*.ogg binary
+*.mp3 binary

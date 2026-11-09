@@ -19,6 +19,7 @@ export type Settings = {
 	AlignDeadband: number,
 	FinishShare: number,
 	FinishMaxSpeed: number,
+	TieShare: number,
 	RepelCooldown: number,
 }
 
@@ -94,6 +95,12 @@ end
 --- cap keeps a long fight's stagger from turning one clash into an instant ring-out.
 function Clash.finishStrength(cfg: Settings, standingStrength: number): number
 	return math.min(standingStrength * cfg.FinishShare, cfg.FinishMaxSpeed)
+end
+
+--- A tie's knockback: the same for both, whatever either's stagger, so neither comes out of a tie
+--- worse. `standingStrength` is a standing punch at no stagger; the finish cap still applies.
+function Clash.tieStrength(cfg: Settings, standingStrength: number): number
+	return math.min(standingStrength * cfg.TieShare, cfg.FinishMaxSpeed)
 end
 
 --- Where the two stand and which way the line between them runs. They meet around their midpoint, each

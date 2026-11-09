@@ -2,6 +2,9 @@
 -- TrainingPanel - the optional testing display: a small list of readings at the side of the screen, in
 -- its own ScreenGui, kept apart from the combat UI. It only shows what it's handed, and decides nothing.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Typography = require(ReplicatedStorage.Shared.Typography)
+
 local TrainingPanel = {}
 TrainingPanel.__index = TrainingPanel
 
@@ -22,7 +25,7 @@ local function makeButton(parent: Instance, text: string, x: number, width: numb
 	button.Position = UDim2.fromOffset(x, 0)
 	button.BackgroundColor3 = Color3.fromRGB(50, 58, 78)
 	button.TextColor3 = Color3.new(1, 1, 1)
-	button.Font = Enum.Font.GothamBold
+	Typography.apply(button, "Button")
 	button.TextSize = 14
 	button.Text = text
 	button.AutoButtonColor = true
@@ -60,7 +63,7 @@ function TrainingPanel.new(parent: Instance): Panel
 		row.BackgroundTransparency = 1
 		row.Position = UDim2.fromOffset(PAD, PAD + (index - 1) * ROW_HEIGHT)
 		row.Size = UDim2.fromOffset(WIDTH - PAD * 2, ROW_HEIGHT)
-		row.Font = Enum.Font.GothamMedium
+		Typography.apply(row, "Body")
 		row.TextSize = 14
 		row.TextXAlignment = Enum.TextXAlignment.Left
 		row.TextColor3 = Color3.new(1, 1, 1)
@@ -88,7 +91,7 @@ function TrainingPanel.new(parent: Instance): Panel
 	tab.BackgroundColor3 = INK
 	tab.BackgroundTransparency = 0.22
 	tab.TextColor3 = ACCENT
-	tab.Font = Enum.Font.GothamBold
+	Typography.apply(tab, "Button")
 	tab.TextSize = 14
 	tab.Text = "Testing display"
 	tab.Visible = false

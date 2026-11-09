@@ -1,0 +1,1174 @@
+{
+ "title": "Haymaker Tussle",
+ "slug": "HaymakerTussle",
+ "pitch": "Run like a human bumper car, build momentum, and punch up to 14 rivals off a shrinking floating arena until one is left.",
+ "core_loop": [
+  "Wait in the lobby and practise movement and punching",
+  "Spawn on the arena and build momentum",
+  "Punch rivals to raise their stagger and launch them off the edge",
+  "Survive as the arena shrinks until one player is left",
+  "Return to the lobby for the next round"
+ ],
+ "win_condition": "Be the last player on the arena. If the last players go out together, the round announces no winner and restarts (editable default).",
+ "lose_condition": "Fall off the arena or leave the play area. There is no health and no time limit.",
+ "players": {
+  "min": 2,
+  "max": 15
+ },
+ "session_minutes": 8,
+ "out_of_scope": [
+  "progression",
+  "shop",
+  "datastore",
+  "monetisation",
+  "teams",
+  "multiple arenas",
+  "abilities, combos or dodges beyond the alternating punch and the shared propel",
+  "jumping (off by default, editable)",
+  "custom meshes",
+  "publishing without the user's say"
+ ],
+ "stages": {
+  "map": {
+   "spec": "design/map.json",
+   "status": "todo"
+  },
+  "ui": {
+   "spec": "design/ui.json",
+   "status": "todo"
+  },
+  "animation": {
+   "spec": "design/animations.json",
+   "status": "todo"
+  },
+  "vfx": {
+   "spec": "design/vfx.json",
+   "status": "todo"
+  },
+  "sfx": {
+   "spec": "design/sfx.json",
+   "status": "todo"
+  }
+ },
+ "systems": [
+  {
+   "name": "RoundService",
+   "side": "server",
+   "owns": "Round state, eligibility, active roster, eliminations and the result"
+  },
+  {
+   "name": "ArenaService",
+   "side": "server",
+   "owns": "Target and current arena radius, and the floor that matches them"
+  },
+  {
+   "name": "SpeedAuditService",
+   "side": "server",
+   "owns": "Each character's speed as measured by the server from its position"
+  },
+  {
+   "name": "CombatService",
+   "side": "server",
+   "owns": "Punch cooldowns, impact scheduling, hit validation and line of sight"
+  },
+  {
+   "name": "StaggerService",
+   "side": "server",
+   "owns": "Each player's stagger and its recovery"
+  },
+  {
+   "name": "KnockbackService",
+   "side": "server",
+   "owns": "The knockback decision for punches and bumps, sent to the owning client, and the no-collide group"
+  },
+  {
+   "name": "TrainingService",
+   "side": "server",
+   "owns": "The training arena, its stations and controls, who is in it, and training combat eligibility"
+  },
+  {
+   "name": "MovementController",
+   "side": "client",
+   "owns": "The local character's momentum, steering and applied knockback"
+  },
+  {
+   "name": "CombatController",
+   "side": "client",
+   "owns": "Punch input, one request per press, and combat feedback shown from server results"
+  },
+  {
+   "name": "AnimationController",
+   "side": "client",
+   "owns": "Animation tracks, blending and speed-based playback"
+  },
+  {
+   "name": "HudController",
+   "side": "client",
+   "owns": "What the HUD shows, always from server-sent values"
+  },
+  {
+   "name": "DummyService",
+   "side": "server",
+   "owns": "Passive training dummies: their knockback, marked paths and going home. They never attack"
+  },
+  {
+   "name": "FxController",
+   "side": "client",
+   "owns": "Wind puffs and combat sounds, all decoration on this client"
+  },
+  {
+   "name": "PropelService",
+   "side": "server",
+   "owns": "Relaying propeles to other players, with its own cooldown"
+  }
+ ],
+ "decisions": {
+  "kick": "USER REQUEST 2026-11-04: a shared skill on Space, gamepad Y or a touch button. Leap up, hang and aim a ring on the floor, front flip at it, then kick down. A small quick-time ring grades the second press; the server does the grading. The user's comic picture is the reference only for the round front flip, nothing else from it. The server decides every hit.",
+  "stagger_timing": "A punch uses the target's stagger from before that hit, then adds to it. The first punch on a fresh player is always the same strength, which makes hits easy to read.",
+  "network_model": "Each client owns and simulates its own character for responsiveness. The server never trusts a reported speed: it measures position over time and caps the result (Security settings).",
+  "knockback": "The server decides knockback and the owning client applies it, per the vault's Combat Systems Architecture note. Trade-off: a cheating client could ignore it; to be checked in step 3.",
+  "player_collisions": "Players do not solid-collide with each other. The server detects two players closing fast and knocks both along the line they collided on. USER 2026-11-03, replacing an equal split asked for earlier the same day: whoever was driving faster along that line recoils less and keeps some speed, the other is shoved further and loses theirs, which gives the faster runner a chance to punish with a punch. Always weaker than a punch; an even head-on splits evenly. Solid collisions between client-owned characters are the known route to accidental launches and fling exploits. To be judged by feel in step 3. USER 2026-11-04, replacing the rules before: a bump is two punches at once, for both sides, with real knockback and stagger; the faster one makes the other stagger a little more, and the difference stays small.",
+  "final_stage": "The arena keeps shrinking to radius 0, so no safe minimum exists. Below FinalStageRadius it never pauses and every remaining player must eventually fall.",
+  "no_survivor": "Eliminations are batched. If a batch removes every remaining player, nobody is picked by list order: the game announces no winner and restarts.",
+  "no_meshes_stage": "Removed the mesh stage: the brief asks for simple geometry and placeholder materials, so no asset is planned for it.",
+  "propel": "USER DECISION 2026-11-03, overrides the brief's 'no dodge ability or swerve cooldown': every player gets the same ability, Q or gamepad B or a touch button. It began as a dash. USER REQUEST 2026-11-03 replaced that with a propel, using a Red Bull drift video as the reference: a burst of speed along travel during which turning makes a car-style drift, with the body angled into the turn while travel slides wide and smoke trails. It never goes backward. Normal running keeps its sharp grip; the drift happens only during a propel.",
+  "propel_security": "The propel runs on the owning client, like all movement. The combat step must make the server measure it too: SpeedTrustCap already stops a propel raising punch strength beyond the cap, and the speed check must allow for propeles.",
+  "lag_compensation": "Punches are decided on the server at impact, with targets rewound by the attacker's ping, capped at MaxRewindSeconds. The vault lists a server decision with no rewind as a mistake. Only targets rewind.",
+  "test_bot": "USER 2026-11-05: the attacking test bot is back, on the 1v1 arena only, after being removed for the training arena earlier the same day. It exists only when exactly one player is in the server, chases and punches like a player on the same movement and punch rules, has a slower punch and a reaction delay so it can be out-played, and doesn't propel. TestBot.Fights false makes it stand still. Training dummies stay passive: only the bot's spec has a brain. Its brain was rebuilt from its settings, not restored.",
+  "tutorial_repeats": "Nothing persists (no datastore in scope), so the tutorial shows on every join rather than only the first. Showing it once per person needs saved data, which is the user's call.",
+  "wind_look": "USER 2026-11-03: propel shows a gust on both sides of the feet that fades, inspired by the user's propel-puff picture, not copied. The user's message also called it what combat should look like, so hits use the same style. Built from pooled, decorative parts instead of a harvested particle pack, because the user asked for this specific look.",
+  "training_arena": "USER 2026-11-05: a dedicated training arena beside the 1v1 arena with stations for M1s, uppercut and kick, stagger comparison, close range and hitboxes, a moving target and offstage recovery. Dummies use the real combat rules and stay out of competitive lists."
+ },
+ "config": {
+  "SettingsGuide": "design/Settings Guide.md",
+  "Movement": {
+   "Acceleration": 42,
+   "MaxSpeed": 36,
+   "CoastDeceleration": 7,
+   "ReverseDeceleration": 50,
+   "TurnRateLowSpeed": 720,
+   "TurnRateHighSpeed": 540,
+   "TurnBlendLowSpeed": 8,
+   "AirControl": 0.25,
+   "KnockbackResist": 0.2,
+   "KnockbackDecay": 60,
+   "LeanMaxDegrees": 18,
+   "JumpEnabled": false,
+   "InputDeadzone": 0.05,
+   "RestSnapSpeed": 1,
+   "FacingResponsiveness": 60,
+   "LeanResponsiveness": 10,
+   "WallSpeedMargin": 6,
+   "CoastHoldSeconds": 0.4,
+   "CoastFallSeconds": 2,
+   "CoastFallCurve": 1.5,
+   "SideStopDeceleration": 45,
+   "CoastMaxAngle": 45,
+   "ForwardInputThreshold": 0.3,
+   "BrakeDeceleration": 60,
+   "PropelSpeed": 84,
+   "PropelSeconds": 0.65,
+   "PropelRampSeconds": 0.1,
+   "PropelEaseOutSeconds": 0.28,
+   "PropelCooldown": 3,
+   "PropelSteerRate": 20,
+   "PropelControlReturnSeconds": 0.25,
+   "PropelArcDegrees": 80,
+   "PropelCurveInputThreshold": 0.35,
+   "PropelCurveBodyLead": 24,
+   "KnockbackAirDecay": 20,
+   "KnockbackMaxSpeed": 250,
+   "HitSpeedKeep": 0.3,
+   "KnockbackGraceSeconds": 0.2
+  },
+  "Punch": {
+   "Cooldown": 0.32,
+   "MissRecovery": 0.1,
+   "BufferSeconds": 0.1,
+   "Windup": 0.08,
+   "ActiveSeconds": 0.08,
+   "Range": 5,
+   "TargetRadius": 1.5,
+   "OverlapRadius": 3,
+   "CloseRange": 3,
+   "CloseDegrees": 100,
+   "HookOuterDegrees": 55,
+   "HookInnerDegrees": 30,
+   "UppercutDegrees": 20,
+   "HurtboxBelow": 3,
+   "HurtboxAbove": 2.5,
+   "HookBandLow": -2,
+   "HookBandHigh": 1.5,
+   "UppercutBandLow": -1.5,
+   "UppercutBandHigh": 2.5,
+   "SweepStepStuds": 0.5,
+   "SweepMaxSteps": 12,
+   "HitCancelsPunch": true,
+   "ComboResetSeconds": 2,
+   "MissSpeedKeep": 0.7,
+   "HitRecoilSpeed": 20,
+   "HitSpeedKeep": 0,
+   "RequestsPerSecondLimit": 8,
+   "CooldownTolerance": 0.06,
+   "InterpolationSeconds": 0.175,
+   "MaxRewindSeconds": 0.3,
+   "AttackerLeadSeconds": 0.18,
+   "AttackerLeadMaxSpeed": 90
+  },
+  "Clash": {
+   "Enabled": true,
+   "Window": 0.05,
+   "LatencyMax": 0.03,
+   "HoldMax": 0.1,
+   "Seconds": 2.5,
+   "WinLead": 14,
+   "TieMargin": 1,
+   "MaxTapsPerSecond": 14,
+   "TapBurst": 3,
+   "Standoff": 3.4,
+   "AlignSpeed": 40,
+   "AlignGain": 6,
+   "AlignDeadband": 0.2,
+   "FinishShare": 1.3,
+   "FinishMaxSpeed": 130,
+   "FinishStagger": 18,
+   "TieShare": 1,
+   "PairCooldown": 1,
+   "RepelSpeed": 35,
+   "RepelCooldown": 0.75,
+   "ResultSeconds": 1.2,
+   "PulseSeconds": 0.14,
+   "BarScreenY": 0.86,
+   "BarWidthShare": 0.42,
+   "BarHeightShare": 0.1,
+   "BarEase": 14
+  },
+  "Knockback": {
+   "BaseSpeed": 55,
+   "SpeedBonusPerStud": 0.9,
+   "UpwardFraction": 0.18,
+   "UpwardMax": 16,
+   "AirborneUpwardFraction": 0,
+   "UppercutLift": 125,
+   "BumpPropelShare": 0.4,
+   "BumpFullClosing": 36,
+   "BumpSoftShare": 0.4,
+   "BumpSpeedKeep": 0.6,
+   "BumpStaggerShare": 0.5,
+   "BumpFullAdvantage": 30,
+   "BumpEdgeShare": 0.15,
+   "BumpMinClosingSpeed": 10,
+   "BumpPairCooldown": 0.5,
+   "BumpDistance": 3.5,
+   "BumpVerticalLimit": 4
+  },
+  "Stagger": {
+   "Max": 100,
+   "PerHit": 12,
+   "HitRelief": 6,
+   "MaxKnockbackMultiplier": 2.5,
+   "UsesValueBeforeHit": true,
+   "RecoveryEnabled": true,
+   "RecoveryDelay": 3,
+   "RecoveryPerSecond": 10,
+   "SpeedPenaltyMax": 0.15,
+   "SpeedPenaltyCurve": 1.32,
+   "SpeedShareEase": 5
+  },
+  "Arena": {
+   "CenterX": 0,
+   "CenterY": 100,
+   "CenterZ": 0,
+   "StartRadius": 75,
+   "SpawnRadius": 52,
+   "SpawnCount": 15,
+   "ShrinkFractionPerElimination": 0.08,
+   "ShrinkStudsPerSecond": 5,
+   "EliminationBatchSeconds": 0.5,
+   "InactivitySeconds": 20,
+   "InactivityShrinkPerSecond": 1,
+   "FinalStageRadius": 18,
+   "FinalStageShrinkPerSecond": 2,
+   "EliminationDepth": 30,
+   "PlayAreaMargin": 60,
+   "SimultaneousFinalPolicy": "NoWinner"
+  },
+  "Round": {
+   "MinPlayers": 2,
+   "MaxPlayers": 15,
+   "IntermissionSeconds": 15,
+   "StartingSeconds": 4,
+   "RoundOverSeconds": 6
+  },
+  "Lobby": {
+   "CenterX": 0,
+   "CenterY": 100,
+   "CenterZ": 240,
+   "Radius": 55
+  },
+  "Training": {
+   "Enabled": true,
+   "SparringEnabled": true,
+   "DummiesEnabled": true,
+   "CenterX": 370,
+   "CenterY": 100,
+   "CenterZ": 0,
+   "HubRadius": 34,
+   "RingDistance": 180,
+   "BridgeWidth": 14,
+   "RimWidth": 1.2,
+   "FallDepth": 20,
+   "ReturnInset": 8,
+   "GateInset": 10,
+   "PadRadius": 4,
+   "SignDistance": 260,
+   "MarkerStep": 10,
+   "ManualResetGrace": 1,
+   "ForceResetSeconds": 20,
+   "PanelStartsOpen": true,
+   "HitboxStationKey": "D",
+   "Patrol": {
+    "StationKey": "E",
+    "Length": 70,
+    "ResumeSeconds": 1.5,
+    "StartIndex": 2,
+    "Speeds": [
+     {
+      "Name": "Slow",
+      "Speed": 12
+     },
+     {
+      "Name": "Medium",
+      "Speed": 26
+     },
+     {
+      "Name": "Fast",
+      "Speed": 48
+     }
+    ]
+   },
+   "Recovery": {
+    "StationKey": "F",
+    "PadInset": 7,
+    "Pads": [
+     {
+      "Name": "Close uppercut",
+      "FanDegrees": -40,
+      "GapStuds": 5,
+      "HeightStuds": 0,
+      "OutwardSpeed": 105,
+      "UpSpeed": 125,
+      "StaggerShare": 0.32,
+      "Launched": true
+     },
+     {
+      "Name": "Far uppercut",
+      "FanDegrees": -20,
+      "GapStuds": 6,
+      "HeightStuds": 0,
+      "OutwardSpeed": 130,
+      "UpSpeed": 125,
+      "StaggerShare": 0.6,
+      "Launched": true
+     },
+     {
+      "Name": "Very far uppercut",
+      "FanDegrees": 0,
+      "GapStuds": 8,
+      "HeightStuds": 0,
+      "OutwardSpeed": 205,
+      "UpSpeed": 125,
+      "StaggerShare": 0.96,
+      "Launched": true
+     },
+     {
+      "Name": "Close drift",
+      "FanDegrees": 20,
+      "GapStuds": 6,
+      "HeightStuds": 30,
+      "OutwardSpeed": 24,
+      "UpSpeed": 0,
+      "StaggerShare": 0,
+      "Launched": false
+     },
+     {
+      "Name": "Far drift",
+      "FanDegrees": 40,
+      "GapStuds": 6,
+      "HeightStuds": 30,
+      "OutwardSpeed": 42,
+      "UpSpeed": 0,
+      "StaggerShare": 0,
+      "Launched": false
+     }
+    ]
+   },
+   "Stations": [
+    {
+     "Key": "A",
+     "Title": "STANDARD M1",
+     "Purpose": "Single punches and left, right, uppercut",
+     "AngleDegrees": 150,
+     "Radius": 50,
+     "ResetSeconds": 5,
+     "Dummies": [
+      {
+       "Name": "M1 Dummy 1",
+       "Forward": 10,
+       "Right": -16
+      },
+      {
+       "Name": "M1 Dummy 2",
+       "Forward": 10,
+       "Right": 0
+      },
+      {
+       "Name": "M1 Dummy 3",
+       "Forward": 10,
+       "Right": 16
+      }
+     ]
+    },
+    {
+     "Key": "B",
+     "Title": "UPPERCUT AND KICK",
+     "Purpose": "Uppercut it, jump at it, time the kick",
+     "AngleDegrees": 210,
+     "Radius": 78,
+     "ResetSeconds": 6,
+     "Dummies": [
+      {
+       "Name": "Kick Dummy",
+       "Forward": -30,
+       "Right": 0
+      }
+     ]
+    },
+    {
+     "Key": "C",
+     "Title": "STAGGER COMPARISON",
+     "Purpose": "The same attack on each one",
+     "AngleDegrees": 90,
+     "Radius": 50,
+     "ResetSeconds": 6,
+     "Dummies": [
+      {
+       "Name": "Low stagger",
+       "Forward": 8,
+       "Right": -16,
+       "StartStaggerShare": 0.1
+      },
+      {
+       "Name": "Medium stagger",
+       "Forward": 8,
+       "Right": 0,
+       "StartStaggerShare": 0.5
+      },
+      {
+       "Name": "Max stagger",
+       "Forward": 8,
+       "Right": 16,
+       "StartStaggerShare": 1
+      }
+     ]
+    },
+    {
+     "Key": "D",
+     "Title": "CLOSE RANGE AND HITBOX",
+     "Purpose": "Stand on a mark and punch, with hitboxes on",
+     "AngleDegrees": 270,
+     "Radius": 45,
+     "ResetSeconds": 5,
+     "Dummies": [
+      {
+       "Name": "Hitbox Target",
+       "Forward": 6,
+       "Right": 0,
+       "Stationary": true
+      }
+     ]
+    },
+    {
+     "Key": "E",
+     "Title": "MOVING TARGET",
+     "Purpose": "Walks the marked line and never attacks",
+     "AngleDegrees": 30,
+     "Radius": 55,
+     "ResetSeconds": 5,
+     "Dummies": [
+      {
+       "Name": "Moving Dummy",
+       "Forward": 8,
+       "Right": 0,
+       "Patrols": true
+      }
+     ]
+    },
+    {
+     "Key": "F",
+     "Title": "OFFSTAGE RECOVERY",
+     "Purpose": "Pick a launch, then steer and punch back",
+     "AngleDegrees": 330,
+     "Radius": 45,
+     "ResetSeconds": 5,
+     "Dummies": []
+    }
+   ]
+  },
+  "Security": {
+   "SpeedSampleSeconds": 0.05,
+   "SpeedSampleWindow": 4,
+   "SpeedTrustCap": 40,
+   "HistorySeconds": 1,
+   "TeleportSpeed": 300
+  },
+  "AnimationIds": {
+   "Idle": "",
+   "MoveStart": "",
+   "RunLow": "",
+   "RunHigh": "",
+   "LeanLeft": "",
+   "LeanRight": "",
+   "Coast": "",
+   "PunchLeft": "",
+   "PunchRight": "",
+   "HitReact": "",
+   "KnockbackFall": "",
+   "Victory": ""
+  },
+  "Kick": {
+   "Cooldown": 15,
+   "AirGravityScale": 0.7,
+   "JumpSquatSeconds": 0.067,
+   "ApproachSpeed": 260,
+   "ApproachMinSeconds": 0.08,
+   "ApproachMaxSeconds": 0.65,
+   "ApproachMaxSpeed": 280,
+   "AcceptWaitSeconds": 0.6,
+   "FollowUpRange": 80,
+   "FollowUpOwnRange": 170,
+   "FollowUpAimWeight": 0.6,
+   "FollowUpOwnShare": 0.8,
+   "HoldTimeout": 2.5,
+   "JumpMissGrace": 0.15,
+   "MissCarryKeep": 18,
+   "MissGravityScale": 0.3,
+   "MissLift": 12,
+   "MissMaxFall": 52,
+   "KickAimRate": 720,
+   "LaunchSteerSpeed": 26,
+   "LaunchSteerAcceleration": 90,
+   "LaunchSteerStaggerLoss": 0.5,
+   "ChaseSeconds": 1.2,
+   "TouchFlat": 8,
+   "TouchTall": 10,
+   "AttachAbove": 0.5,
+   "AttachSide": 3,
+   "FlipAbove": 4.5,
+   "FlipSide": 1.5,
+   "FollowRate": 16,
+   "QteEarliest": 0.25,
+   "QteLatest": 0.45,
+   "GreenWindow": 0.05,
+   "OrangeWindow": 0.12,
+   "RedShare": 0.5,
+   "OrangeShare": 0.85,
+   "GreenShare": 1.3,
+   "RedStop": 0.05,
+   "OrangeStop": 0.083,
+   "GreenStop": 0.117,
+   "FlipSeconds": 0.28,
+   "RecoverSeconds": 0.45,
+   "ReboundRiseRed": 14,
+   "ReboundRiseOrange": 30,
+   "ReboundRiseGreen": 46,
+   "ReboundLandNear": 15,
+   "ReboundLandFar": 55,
+   "ReboundSpeedMax": 300,
+   "ReboundGravityScale": 0.85,
+   "StaggerAdded": 18,
+   "SlamSpeed": 110,
+   "BounceLift": 75,
+   "StunMaxSeconds": 2.5,
+   "StunAfterLanding": 0.2,
+   "FinisherGrades": {
+    "green": true,
+    "orange": true
+   },
+   "FinisherPushScale": 2,
+   "FinisherMaxSpeed": 220,
+   "FinisherLift": 45,
+   "FinisherStunSeconds": 0.45,
+   "FinisherShake": 1.3
+  },
+  "AirRecovery": {
+   "BoostSpeed": 17,
+   "BoostFade": 24,
+   "MaxSpeed": 60,
+   "UpAssist": 5,
+   "UpAssistCeiling": 6,
+   "FallGravityScale": 0.24,
+   "FallEaseSpeed": 16,
+   "MaxFallSpeed": 30,
+   "FallDrag": 120,
+   "MinAirSeconds": 0.1,
+   "HitRecoilShare": 0.5,
+   "PunchWhileLaunched": true,
+   "LiftEnabled": true,
+   "LiftSpeed": 42,
+   "LiftSeconds": 0.33,
+   "LiftGravityScale": 0.65,
+   "LiftForwardSpeed": 0,
+   "LiftCooldown": 1.2,
+   "LiftsPerFall": 2,
+   "LiftFallingSpeed": 2,
+   "LiftFloorCheck": 14
+  },
+  "Nitro": {
+   "Enabled": true,
+   "SpeedMultiplier": 2,
+   "RampSeconds": 0.9,
+   "RampCurve": 2,
+   "RampAcceleration": 150,
+   "RampDownSeconds": 0.35,
+   "StaminaMax": 100,
+   "DrainPerSecond": 33,
+   "RechargeDelay": 0.8,
+   "RechargePerSecond": 14,
+   "ActivateMin": 15,
+   "ExhaustedRecharge": 40,
+   "AirGraceSeconds": 0.2,
+   "TurnScale": 0.28,
+   "ReleaseDeceleration": 18,
+   "DashSpeedMultiplier": 1.35,
+   "DashDurationMultiplier": 1.3,
+   "DashCooldown": 3.5,
+   "DashStaminaCost": 15,
+   "DashArcMultiplier": 0.85,
+   "CameraZoomStuds": 3.5,
+   "CameraMinDistance": 6,
+   "CameraEaseIn": 4,
+   "CameraEaseOut": 4,
+   "ShakeStuds": 0.06,
+   "ShakeRollDegrees": 0.35,
+   "ShakeFrequency": 11,
+   "TrailLifetime": 0.28,
+   "TrailWidth": 1.8,
+   "TrailColor": "8FD3FF",
+   "TrailTransparency": 0.3,
+   "TrailLightEmission": 0.6,
+   "BarBottomOffset": 100,
+   "BarWidth": 240,
+   "BarHeight": 10,
+   "BarHideSeconds": 1.2,
+   "ServerStaminaSlack": 10,
+   "ServerToggleSeconds": 0.08
+  },
+  "Controls": {
+   "ShiftLock": {
+    "Key": "LeftControl",
+    "Label": "Ctrl"
+   },
+   "Nitro": {
+    "Key": "LeftShift",
+    "Label": "Shift",
+    "GamepadKey": "ButtonL3",
+    "GamepadLabel": "L3"
+   }
+  },
+  "ShiftLock": {
+   "CameraOffsetX": 0,
+   "DotSize": 7,
+   "DotAboveHead": 0.9
+  },
+  "LockOn": {
+   "Range": 70,
+   "ReleaseRange": 85,
+   "LookDegrees": 12,
+   "LookReleaseDegrees": 18,
+   "LookStuds": 2.5,
+   "LostSightSeconds": 0.75,
+   "CheckSeconds": 0.1,
+   "MarkerPixels": 128,
+   "ReferenceHeight": 1080,
+   "MinMarkerPixels": 80,
+   "ImageOuter": "rbxassetid://121401131701430",
+   "ImageOuterOutline": "rbxassetid://113189944194119",
+   "ImageInner": "rbxassetid://95458982515281",
+   "ImageInnerOutline": "rbxassetid://100906215439905",
+   "ImageDiamond": "rbxassetid://124570584891756",
+   "ImageDiamondOutline": "rbxassetid://138318166561145",
+   "ImageDiamondFilled": "rbxassetid://81874421475799",
+   "ImageDiamondFilledOutline": "rbxassetid://132430841264905",
+   "ImagePulse": "rbxassetid://111016219487105",
+   "ImagePulseOutline": "rbxassetid://128855556960666",
+   "MarkerColor": "FFFFFF",
+   "LockedColor": "FFCA54",
+   "OutlineColor": "0B1320",
+   "OutlineOpacity": 1,
+   "OuterSpinSeconds": 5,
+   "InnerSpinSeconds": 7,
+   "InnerOpacity": 1,
+   "DiamondOpacity": 1,
+   "DiamondScale": 0.85,
+   "PopSeconds": 0.26,
+   "PopStart": 0.88,
+   "PopPeak": 1.06,
+   "PopPeakAt": 0.65,
+   "SqueezeSeconds": 0.24,
+   "SqueezeStart": 1.04,
+   "SqueezeLow": 0.82,
+   "SqueezeLowAt": 0.55,
+   "LockedScale": 0.88,
+   "PulseSeconds": 0.65,
+   "PulseRepeats": 2,
+   "PulseStart": 0.94,
+   "PulseEnd": 1.14,
+   "PulseOpacity": 0.9,
+   "SettleSeconds": 0.18,
+   "DiamondSeconds": 0.15,
+   "FadeSeconds": 0.15,
+   "FadeRiseUnits": 8
+  },
+  "LockCamera": {
+   "FocusHeight": 6,
+   "BaseDistance": 13,
+   "DistancePerStud": 0.12,
+   "MinDistance": 11,
+   "MaxDistance": 24,
+   "FocusRate": 28,
+   "TargetRate": 20,
+   "YawRate": 13,
+   "PitchRate": 13,
+   "YawMaxDegrees": 420,
+   "PitchMaxDegrees": 300,
+   "ZoomRate": 3.5,
+   "EnterSeconds": 0.25,
+   "ExitSeconds": 0.35,
+   "PitchUpMax": 55,
+   "PitchDownMax": 45,
+   "HoldFlat": 3,
+   "FullFlat": 10,
+   "OrbitYawMax": 30,
+   "OrbitPitchMax": 18,
+   "MouseDegreesPerPixel": 0.18,
+   "OrbitReturnDelay": 1.5,
+   "OrbitReturnRate": 1.2,
+   "CollisionRadius": 0.6,
+   "CollisionMargin": 0.4,
+   "PullOutRate": 6,
+   "MinPull": 3
+  },
+  "KickText": {
+   "ScreenX": 0.5,
+   "ScreenY": 0.85,
+   "WidthShare": 0.7,
+   "HeightShare": 0.1,
+   "MinTextSize": 28,
+   "MaxTextSize": 60,
+   "StrokeThickness": 3,
+   "StartScale": 0.4,
+   "PeakScale": 1.16,
+   "DipScale": 0.97,
+   "PerfectPeakScale": 1.34,
+   "PerfectDipScale": 0.93,
+   "RiseSeconds": 0.08,
+   "DipSeconds": 0.07,
+   "SettleSeconds": 0.08,
+   "HoldSeconds": 0.55,
+   "PerfectHoldSeconds": 0.65,
+   "FadeSeconds": 0.25
+  },
+  "Animation": {
+   "FadeSeconds": 0.12,
+   "StanceMaxSpeed": 1.5,
+   "SprintBlendLow": 6,
+   "SprintBlendHigh": 22,
+   "RunVariantSpeed": 18,
+   "RunRampMinShare": 0.7,
+   "RunRampSeconds": 3,
+   "RunRampFallRate": 3,
+   "RunRampStart": 1.05,
+   "RunRampEnd": 1.5,
+   "RunPaceMin": 0.45,
+   "RunPaceMax": 1.2,
+   "BrakeDeceleration": 52,
+   "BrakeMinSpeed": 8,
+   "BrakeHoldSeconds": 0.12,
+   "BrakeFadeIn": 0.04,
+   "BrakeFadeOut": 0.07,
+   "BrakeWeightMin": 0.55,
+   "BrakeSettleMinShare": 0.25,
+   "SwingEndFade": 0.09,
+   "HitStopMin": 0.05,
+   "HitStopMax": 0.09,
+   "HitStopFullStrength": 140,
+   "UppercutHitStopExtra": 0.03,
+   "HitStopCreep": 0.06,
+   "AttackerShakeStuds": 0.05,
+   "VictimShakeStuds": 0.28,
+   "VictimShakeShare": 1.7,
+   "FlinchFade": 0.066,
+   "RecentHitSeconds": 2.5,
+   "SlammedFallSpeed": 45,
+   "LandMinFallSpeed": 34,
+   "LandFullStillSpeed": 24,
+   "LandWeightMin": 0.25,
+   "HeavyHitShare": 0.45,
+   "HitTiltDegrees": 30,
+   "HitTiltStiffness": 280,
+   "HitTiltDamping": 14,
+   "SkidMinSpeed": 16,
+   "SkidHoldSeconds": 1
+  },
+  "Debug": {
+   "MoveReadout": false,
+   "TestFloor": true,
+   "ShowHitbox": true
+  },
+  "Tutorial": {
+   "Enabled": false,
+   "HitsToLearn": 3,
+   "FastHitSpeed": 25,
+   "BumpPunishSeconds": 1.5,
+   "HintSeconds": 6,
+   "MissSeconds": 0.8,
+   "EndSeconds": 4
+  },
+  "TestBot": {
+   "Enabled": true,
+   "Fights": true,
+   "AirSteers": true,
+   "AirSteerShare": 0.3,
+   "StopDistance": 4.5,
+   "CloseInput": 0.1,
+   "EdgeMargin": 14,
+   "ReactionSeconds": 0.4,
+   "PunchCooldown": 1.1,
+   "NoticeDistance": 14,
+   "TrackingLag": 0.2,
+   "MisjudgeStuds": 3,
+   "ExtraWindup": 0.15,
+   "WildSwingChance": 0.35,
+   "ClashTapsPerSecond": 5.5,
+   "ReturnSeconds": 3
+  },
+  "Effects": {
+   "GustSeconds": 0.6,
+   "GustSideOffset": 1.1,
+   "FootDrop": 2.6,
+   "KickImpactSeconds": 0.6,
+   "KickShakeSeconds": 0.42,
+   "KickShakeStuds": 0.8,
+   "KickShakeRange": 45,
+   "KickFovPunch": 7,
+   "DriftPuffEvery": 0.05,
+   "DriftPuffMinSlip": 20,
+   "DriftPuffMinSpeed": 24,
+   "DriftPuffSeconds": 0.7,
+   "JumpSmokeSeconds": 0.7,
+   "JumpSmokePuffs": 10,
+   "JumpSmokeRadius": 1.8,
+   "JumpSmokeSpread": 5.5,
+   "JumpSmokeSize": 5,
+   "GroundBreakSeconds": 2.6,
+   "GroundFadeSeconds": 0.5,
+   "GroundBreakOwnReach": 6,
+   "GroundBreakWatchReach": 20,
+   "GroundBreakShake": 0.25,
+   "GroundChunks": 16,
+   "GroundChunkSizeMin": 0.7,
+   "GroundChunkSizeMax": 2.4,
+   "GroundChunkOutMin": 8,
+   "GroundChunkOutMax": 26,
+   "GroundChunkUpMin": 26,
+   "GroundChunkUpMax": 80,
+   "GroundChunkGravity": 120,
+   "GroundChunkBounce": 0.28,
+   "GroundSlabs": 9,
+   "GroundSlabRing": 3.4,
+   "GroundSlabLengthMin": 3,
+   "GroundSlabLengthMax": 5,
+   "GroundSlabWidthMin": 2.2,
+   "GroundSlabWidthMax": 3.8,
+   "GroundSlabThickness": 0.9,
+   "GroundSlabTiltMin": 20,
+   "GroundSlabTiltMax": 50,
+   "GroundSlabRiseSeconds": 0.07,
+   "GroundSlabSinkSeconds": 0.35,
+   "GroundCracks": 7,
+   "GroundCrackLengthMin": 5,
+   "GroundCrackLengthMax": 11,
+   "GroundCrackWidth": 0.45,
+   "GroundCrackBend": 28,
+   "GroundPits": 4,
+   "GroundPitSize": 6,
+   "HitBurstSeconds": 0.3,
+   "StrongHitSpeed": 100,
+   "StrongHitScale": 1.4,
+   "TrailPuffs": 4,
+   "TrailPuffSeconds": 0.07,
+   "PoolLimit": 80
+  }
+ },
+ "plan": {
+  "overview": "Haymaker Tussle. Round-based PvP ring-out brawler, up to 15 players, for PC, phone, tablet and gamepad. Target age is not set by the brief; content is cartoon punching with no blood or damage numbers.",
+  "pitch_and_usp": "A human bumper-car brawl: momentum is the weapon. Unlike glove-collecting slap games, everyone has one identical punch, and speed plus stagger decide how far it launches.",
+  "core_concept": "0 min: run, feel the coasting, punch a dummy. 5 min: curve around rivals and hit at speed. 30 min: pick fights near the edge and time the shrink. Tomorrow: nothing persists in this prototype, so returning relies only on the fun of the fight.",
+  "player_experience": "Exaggerated, chaotic and weighty but controllable. The first win lands within seconds, when a first punch visibly shoves someone in training or at the round's start.",
+  "audience": "Casual and social players who want quick, funny fights with friends; easy to read, with skill in steering and timing.",
+  "market": "Slap Battles is the closest Roblox game: gloves and abilities, knock rivals off platforms. Sources found were low-quality pages, so treat those details as unverified. Super Smash Bros is the model for damage raising launch distance (SmashWiki). This game's gap is one shared move with momentum as the depth. Roblox DevForum threads confirm client-owned characters can fling others through collisions. See design/Research Notes.md.",
+  "mechanics": "Momentum steering with arcs and coasting; one shared propel; one alternating punch; speed and stagger-scaled knockback; small bumps; shrinking arena; last survivor wins; lobby and training with dummies. No economy.",
+  "progression": {
+   "declined": "Brief's first version has rounds only; nothing carries between rounds."
+  },
+  "content": "One arena with 15 spawns, one lobby, one training area with 3 dummies. No enemies, items or collectibles.",
+  "world": "Arena: floating circle for the round, shrinks to nothing. Lobby: safe floor where punches animate but do nothing. Training area: marked zone in the lobby where punches work between eligible players and dummies.",
+  "story": {
+   "declined": "A brawl needs no story; the brief defines none."
+  },
+  "ui_ux": "One HUD: round state, countdowns, survivors, speed, own stagger, punch cooldown, instructions, shrink warning, training status, result banner. Stagger bars over opponents. Mobile punch button. Punching is one press. No round timer.",
+  "tutorial": "USER 2026-11-03, replacing no forced tutorial: a skippable tutorial on every join, because nothing saves yet. Five steps taught by doing: run to the dummy, punch on the live CLICK NOW prompt (3 hits), hit at speed, bump then punish, propel. The prompt uses the server's hitbox rule at the moment a punch would land. USER 2026-11-03: it is mainly for practising on other players. The target is the nearest other player, or the test bot when alone. The bot stays calm until the tutorial ends. For now it runs on the test floor; it moves to the training area with the lobby step.",
+  "art_direction": "Prototype look: simple geometry, placeholder materials, a strong clear edge and readable ground rings. Characters are players' own R6 avatars. All animation follows the top-heavy, wide-armed energy of the reference.",
+  "audio": "SFX roles: punch swing, punch hit, bump, launch, elimination, shrink warning, countdown tick, round start and victory. Lobby and fight music are optional and only if a suitable track is found.",
+  "technical_architecture": "Rojo project with Knit services and controllers and plain RemoteEvents. Pure rules (knockback, stagger, shrink, punch checks) live in shared Core modules with headless Lune tests. All tunables come from GameConfig, generated from design/game.json.",
+  "data_saving": {
+   "declined": "Nothing persists in the first version, so there is no datastore."
+  },
+  "security": "The server owns round state, cooldowns, impact timing, hit checks, stagger, knockback, training eligibility and results. Clients send only a punch intent, with no targets or strength. Remotes are rate limited, and malformed or non-finite values are dropped. Speed is measured by the server and capped.",
+  "multiplayer": "Up to 15 per round. Disconnects, deaths and resets count as eliminations with accurate counts. Late joiners and respawned players wait in the lobby. A countdown cancels if too few players remain.",
+  "monetisation": {
+   "declined": "Not in the brief; first version is the core loop only."
+  },
+  "economy": {
+   "declined": "No currency in the first version."
+  },
+  "retention": {
+   "declined": "No progression or rewards in the first version; test whether the fight is fun alone first."
+  },
+  "social": {
+   "declined": "No parties, trading or leaderboards in the first version. Sparring in training is the only social feature."
+  }
+ },
+ "asset_plan": [
+  {
+   "entity": "Player character (R6)",
+   "needs": [
+    {
+     "stage": "animation",
+     "name": "Idle",
+     "why": "Boxing guard, fists high and wide, top-heavy sway."
+    },
+    {
+     "stage": "animation",
+     "name": "MoveStart",
+     "why": "Lurch forward, chest first, arms thrown back."
+    },
+    {
+     "stage": "animation",
+     "name": "RunLow",
+     "why": "Heavy stomping run, rigid limbs, fists bobbing at chest height."
+    },
+    {
+     "stage": "animation",
+     "name": "RunHigh",
+     "why": "Reckless sprint, torso far forward, arms windmilling wide like the GIF's swing."
+    },
+    {
+     "stage": "animation",
+     "name": "LeanLeft",
+     "why": "Body tipped into a left curve, outside arm flung wide."
+    },
+    {
+     "stage": "animation",
+     "name": "LeanRight",
+     "why": "Body tipped into a right curve, outside arm flung wide."
+    },
+    {
+     "stage": "animation",
+     "name": "Coast",
+     "why": "Legs slow and feet skid, torso rocks back against its own weight."
+    },
+    {
+     "stage": "animation",
+     "name": "PunchLeft",
+     "why": "Left fist leads a big torso twist, strike at 0.12 s, whole clip about 0.30 s."
+    },
+    {
+     "stage": "animation",
+     "name": "PunchRight",
+     "why": "Mirror of PunchLeft so alternating punches read clearly."
+    },
+    {
+     "stage": "animation",
+     "name": "HitReact",
+     "why": "Quick head and torso snap on the upper body only, so steering stays readable."
+    },
+    {
+     "stage": "animation",
+     "name": "KnockbackFall",
+     "why": "Arms and legs flailing, body tumbling back, loops until landing or elimination."
+    },
+    {
+     "stage": "animation",
+     "name": "Victory",
+     "why": "Spin with both arms wide, the GIF's windmill turned into a celebration."
+    },
+    {
+     "stage": "animation",
+     "name": "Propel",
+     "why": "Lunge with fists leading, so a propel reads as a deliberate move"
+    }
+   ]
+  },
+  {
+   "entity": "Punch",
+   "needs": [
+    {
+     "stage": "vfx",
+     "name": "PunchImpact",
+     "why": "Shows a confirmed hit, only after the server confirms it"
+    },
+    {
+     "stage": "vfx",
+     "name": "KnockbackTrail",
+     "why": "Makes a launch readable from across the arena"
+    },
+    {
+     "stage": "sfx",
+     "name": "punch_swing",
+     "why": "Immediate feedback that a press registered"
+    },
+    {
+     "stage": "sfx",
+     "name": "punch_hit",
+     "why": "Confirms the hit; a silent hit feels weightless"
+    },
+    {
+     "stage": "sfx",
+     "name": "launch",
+     "why": "Sells the big launches at high stagger"
+    }
+   ]
+  },
+  {
+   "entity": "Bump",
+   "needs": [
+    {
+     "stage": "vfx",
+     "name": "BumpPuff",
+     "why": "Shows why a player was nudged"
+    },
+    {
+     "stage": "sfx",
+     "name": "bump",
+     "why": "Separates a bump from a punch by ear"
+    }
+   ]
+  },
+  {
+   "entity": "Arena",
+   "needs": [
+    {
+     "stage": "map",
+     "name": "ArenaFloor",
+     "why": "The fight's surface, with visible edge and collision kept matched"
+    },
+    {
+     "stage": "vfx",
+     "name": "ShrinkEdgeWarning",
+     "why": "Shows where the edge is going before it moves"
+    },
+    {
+     "stage": "sfx",
+     "name": "shrink_warning",
+     "why": "Warns players not looking at the edge"
+    },
+    {
+     "stage": "sfx",
+     "name": "elimination",
+     "why": "Tells everyone someone just went out"
+    }
+   ]
+  },
+  {
+   "entity": "Lobby and training",
+   "needs": [
+    {
+     "stage": "map",
+     "name": "LobbyFloor",
+     "why": "Where players wait and practise movement"
+    },
+    {
+     "stage": "map",
+     "name": "TrainingArea",
+     "why": "The marked zone where punches work outside a round"
+    }
+   ]
+  },
+  {
+   "entity": "Round flow",
+   "needs": [
+    {
+     "stage": "sfx",
+     "name": "countdown_tick",
+     "why": "Lets players feel the countdown without reading it"
+    },
+    {
+     "stage": "sfx",
+     "name": "round_start",
+     "why": "A fair, unmissable release signal"
+    },
+    {
+     "stage": "sfx",
+     "name": "victory",
+     "why": "Rewards the winner and ends the round clearly"
+    },
+    {
+     "stage": "ui",
+     "name": "HUD",
+     "why": "Round state, counts, speed, stagger and cooldown"
+    },
+    {
+     "stage": "ui",
+     "name": "TutorialPanel",
+     "why": "One instruction at a time, the live CLICK NOW prompt and a skip button"
+    },
+    {
+     "stage": "ui",
+     "name": "PunchButton",
+     "why": "Touch players have no other way to punch"
+    },
+    {
+     "stage": "ui",
+     "name": "OpponentStagger",
+     "why": "Shows who is one hit from a big launch"
+    },
+    {
+     "stage": "ui",
+     "name": "PropelButton",
+     "why": "Phone players need a propel button and everyone needs to see its cooldown"
+    }
+   ]
+  },
+  {
+   "entity": "Propel",
+   "needs": [
+    {
+     "stage": "vfx",
+     "name": "PropelTrail",
+     "why": "Shows rivals where someone went in a quarter of a second"
+    },
+    {
+     "stage": "sfx",
+     "name": "propel",
+     "why": "Confirms the press, and warns nearby players"
+    }
+   ]
+  }
+ ],
+ "publish": {
+  "universe_id": null,
+  "place_id": null
+ }
+}

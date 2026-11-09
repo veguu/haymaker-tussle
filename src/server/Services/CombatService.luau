@@ -93,6 +93,8 @@ local CombatService = Knit.CreateService({
 local records: { [Player]: PunchRecord } = {}
 local lastHitAt: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
 local punches: { [Model]: Punch } = {}
+local botSides: { [Model]: string } = setmetatable({}, { __mode = "k" }) :: any
+local botLastSwing: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
 
 local function trace(message: string)
 	if workspace:GetAttribute("HaymakerCombatDebug") then
@@ -154,11 +156,9 @@ local function attackerPose(punch: Punch, root: BasePart): (Vector3?, number)
 	if not punch.player then
 		return root.Position, yaw
 	end
-	local offset, turn = Knit.GetService("SpeedAuditService"):Lead(
-		punch.attacker,
-		punchCfg.AttackerLeadSeconds,
-		punchCfg.AttackerLeadMaxSpeed
-	)
+	local offset, turn =
+		Knit.GetService("SpeedAuditService")
+			:Lead(punch.attacker, punchCfg.AttackerLeadSeconds, punchCfg.AttackerLeadMaxSpeed)
 	return root.Position + offset, yaw + turn
 end
 
@@ -299,7 +299,9 @@ local function moreTelling(current: string?, candidate: string?): string?
 	elseif current == nil then
 		return candidate
 	end
-	return if (REASON_RANK[candidate] or 0) > (REASON_RANK[current] or 0) then candidate else current
+	return if (REASON_RANK[candidate] or 0) > (REASON_RANK[current] or 0)
+		then candidate
+		else current
 end
 
 -- One server frame of a swing. The attacker's pose is followed every frame from the press, so the active
@@ -352,6 +354,14 @@ local function sweep(self: any, punch: Punch, root: BasePart, now: number)
 			continue
 		end
 		local targetPlayer = Combatants.playerOf(target)
+		-- The bot leaves players alone until they finish the tutorial.
+		if
+			not punch.player
+			and targetPlayer
+			and not Knit.GetService("TutorialService"):IsReady(targetPlayer)
+		then
+			continue
+		end
 		-- Where the attacker saw them, at both ends of this stretch.
 		local startTarget = audit:PositionAt(target, punch.rewind + (now - startAt))
 		local endTarget = audit:PositionAt(target, punch.rewind + (now - endAt))
@@ -616,11 +626,33 @@ function CombatService:PunchLockout(model: Model)
 		record.lastPunch = now
 		record.recovery = 0
 	end
+	botLastSwing[model] = now
 end
 
 --- Tells everyone a hit landed, for the things only clients draw.
 function CombatService:ConfirmHit(attacker: Model, target: Model, strength: number)
 	self._hitConfirmed:FireAllClients(attacker, target, math.floor(strength))
+end
+
+--- A punch by the test bot, which its own brain decides to throw. The same hit rules as a player's,
+--- but slower to land so it can be dodged. A `wild` swing goes wide and hits nobody, and pays for the
+--- miss like anyone else.
+function CombatService:PunchAs(model: Model, wild: boolean?)
+	local now = os.clock()
+	local side = Combat.comboSwing(punchCfg, botSides[model] or "Left", now, botLastSwing[model])
+	botLastSwing[model] = now
+	botSides[model] = Combat.nextSwing(side)
+	self._punchStarted:FireAllClients(model, side)
+	startPunch(
+		self,
+		model,
+		nil,
+		side,
+		now,
+		punchCfg.Windup + GameConfig.TestBot.ExtraWindup,
+		0,
+		wild == true
+	)
 end
 
 function CombatService:KnitInit()
@@ -684,6 +716,29 @@ function CombatService:KnitStart()
 	RunService.Heartbeat:Connect(function()
 		stepAll(self)
 	end)
+
+	-- Studio only: how work/test-harness throws the bot's punch, or starts a clash, on cue.
+	if RunService:IsStudio() then
+		workspace:GetAttributeChangedSignal("HT_TestPunch"):Connect(function()
+			local name = workspace:GetAttribute("HT_TestPunch")
+			local model = name and workspace:FindFirstChild(name)
+			if model and model:IsA("Model") then
+				self:PunchAs(model)
+			end
+		end)
+		workspace:GetAttributeChangedSignal("HT_TestClash"):Connect(function()
+			local names = workspace:GetAttribute("HT_TestClash")
+			if not names then
+				return
+			end
+			local first, second = string.match(names, "^(.+)|(.+)$")
+			local a = first and workspace:FindFirstChild(first)
+			local b = second and workspace:FindFirstChild(second)
+			if a and b then
+				Knit.GetService("ClashService"):Begin(a, b)
+			end
+		end)
+	end
 
 	Players.PlayerRemoving:Connect(function(player)
 		records[player] = nil

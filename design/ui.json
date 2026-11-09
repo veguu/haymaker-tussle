@@ -1,0 +1,38 @@
+{
+ "screens": [
+  {
+   "name": "HUD",
+   "elements": [
+    "RoundState",
+    "Countdown",
+    "Survivors",
+    "SpeedMeter",
+    "StaggerMeter",
+    "PunchCooldown",
+    "Instructions",
+    "ShrinkWarning",
+    "TrainingStatus",
+    "ResultBanner"
+   ]
+  },
+  {
+   "name": "PunchButton",
+   "elements": [
+    "TouchButton, clear of the thumbstick"
+   ]
+  },
+  {
+   "name": "OpponentStagger",
+   "elements": [
+    "Small stagger bar above each opponent during combat"
+   ]
+  },
+  {
+   "name": "PropelButton",
+   "elements": [
+    "Touch button with a cooldown display, clear of the thumbstick and punch button"
+   ]
+  }
+ ],
+ "note": "roblox-ui spec. Every value comes from the server. No round timer. Keep phone controls unobstructed."
+}

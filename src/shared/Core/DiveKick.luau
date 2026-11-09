@@ -86,6 +86,9 @@ export type ReboundFrom = {
 	radius: number,
 	speed: number,
 	gravity: number,
+	-- Seconds from leaving at vertical speed `up` to dropping `height`, when the fall isn't plain
+	-- `gravity` (the game's lighter falling gravity). Nil works it out from `gravity` alone.
+	fallTime: ((up: number, height: number) -> number)?,
 }
 
 export type ReboundPlan = {
@@ -467,7 +470,9 @@ function DiveKick.planRebound(cfg: Settings, grade: Grade, at: ReboundFrom): Reb
 		else cfg.ReboundRiseRed
 	local gravity = at.gravity
 	local up = math.sqrt(2 * gravity * rise)
-	local air = (up + math.sqrt(up * up + 2 * gravity * math.max(at.height, 0))) / gravity
+	local air = if at.fallTime
+		then at.fallTime(up, math.max(at.height, 0))
+		else (up + math.sqrt(up * up + 2 * gravity * math.max(at.height, 0))) / gravity
 
 	local px, pz = at.x - at.centerX, at.z - at.centerZ
 	local fromCentre = math.sqrt(px * px + pz * pz)

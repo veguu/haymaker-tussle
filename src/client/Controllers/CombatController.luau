@@ -13,7 +13,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local Typography = require(ReplicatedStorage.Shared.Typography)
 local Knit = require(ReplicatedStorage.Packages.Knit)
+local Signal = require(ReplicatedStorage.Packages.Signal)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -25,6 +27,9 @@ local FLASH_SECONDS = 0.12
 
 local CombatController = Knit.CreateController({
 	Name = "CombatController",
+	-- For the HUD: "thrown" (a swing left the hand), "blocked" (a press that couldn't punch and wasn't
+	-- remembered), then the server's word on it, "hit" or "miss", or "refused".
+	PunchEvent = Signal.new(),
 })
 
 local function flash(target: Model)
@@ -44,11 +49,9 @@ local function addStaggerLabel(model: Instance)
 	if not model:IsA("Model") then
 		return
 	end
-	if not GameConfig.Debug.MoveReadout and model:GetAttribute("HT_Dummy") ~= true then
-		return
-	end
-	-- Your own stagger is on the readout at the top of the screen.
-	if model == Players.LocalPlayer.Character then
+	-- Only training dummies carry a permanent label. Opponents get the HUD's one target chip, and
+	-- your own stagger is on your panel.
+	if model:GetAttribute("HT_Dummy") ~= true or model:GetAttribute("HT_Bot") == true then
 		return
 	end
 	local head = model:WaitForChild("Head", 5)
@@ -66,7 +69,7 @@ local function addStaggerLabel(model: Instance)
 	label.BackgroundTransparency = 1
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.TextStrokeTransparency = 0.3
-	label.Font = Enum.Font.GothamBold
+	Typography.apply(label, "World")
 	label.TextSize = 15
 	label.Parent = board
 	local function refresh()
@@ -141,15 +144,26 @@ function CombatController:KnitStart()
 		lastPress = now
 		recovery = 0
 		buffered = nil
-		anim:PlaySwing(character, nextSide)
+		local swing = nextSide
+		anim:PlaySwing(character, swing)
 		fx:Swing(character)
 		nextSide = Combat.nextSwing(nextSide)
-		movement:PunchThrown()
+		movement:PunchThrown(swing)
 		request:FireServer()
+		self.PunchEvent:Fire("thrown")
+	end
+
+	-- The HUD's view of the punch: when it can swing again, the whole wait that started, and whether
+	-- the body is in a state to swing at all.
+	self._timing = function(): (number, number, boolean)
+		return lastPress + punchCfg.Cooldown + recovery,
+			punchCfg.Cooldown + recovery,
+			canPunch(player.Character)
 	end
 
 	-- A press is one punch, thrown at once. Pressed a moment too early, it's remembered once, and thrown
-	-- as soon as it can be. It's not a queue: a second early press just replaces the first.
+	-- as soon as it can be. It's not a queue: a second early press just replaces the first. A press that
+	-- can't punch tells the HUD it was blocked.
 	-- Holding the button after that throws the next punch each time the cooldown allows, through the same
 	-- gates as a press, so a hold is never faster than clicking and keeps the same combo. Letting go stops
 	-- it at once. A clash still takes one tap per press: holding never mashes.
@@ -168,6 +182,7 @@ function CombatController:KnitStart()
 					buffered = nil
 					held = true
 					heldBy = inputObject.UserInputType
+					self.PunchEvent:Fire("blocked")
 				else
 					held = true
 					heldBy = inputObject.UserInputType
@@ -176,6 +191,8 @@ function CombatController:KnitStart()
 						throw(now, character)
 					elseif Combat.pressBuffers(punchCfg, now, readyAt) then
 						buffered = now
+					else
+						self.PunchEvent:Fire("blocked")
 					end
 				end
 			elseif
@@ -235,6 +252,9 @@ function CombatController:KnitStart()
 	if result then
 		result.OnClientEvent:Connect(function(attacker: Model, kind: string)
 			if attacker == player.Character then
+				if kind == "hit" or kind == "miss" or kind == "refused" or kind == "cancelled" then
+					self.PunchEvent:Fire(kind)
+				end
 				if kind == "miss" then
 					recovery = punchCfg.MissRecovery
 				elseif kind == "refused" then
@@ -307,6 +327,15 @@ function CombatController:KnitStart()
 	for _, model in CollectionService:GetTagged(COMBATANT_TAG) do
 		task.spawn(addStaggerLabel, model)
 	end
+end
+
+--- When the next punch can be thrown, the whole cooldown that started (with any miss recovery), and
+--- whether the body can punch at all right now. Before start, everything is ready.
+function CombatController:GetPunchTiming(): (number, number, boolean)
+	if self._timing then
+		return self._timing()
+	end
+	return 0, punchCfg.Cooldown, true
 end
 
 return CombatController

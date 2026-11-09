@@ -1,7 +1,10 @@
 --!strict
--- Every tunable in the game lives here, so a balance pass is a data edit and never a code edit.
--- This was first generated from design/game.json by gen_config.py. That contract isn't part of this
--- Rojo project, so this file is now the source: edit it directly.
+-- GENERATED FILE - DO NOT EDIT BY HAND.
+-- Source: design/game.json `config`
+-- Regenerate: python ~/.claude/skills/create-roblox-game/scripts/gen_config.py --dir <game>
+-- Every tunable in the game lives here, so a balance pass is a data edit to the
+-- contract and never a code edit. `gen_config.py --check` fails if this file and
+-- the contract have drifted apart.
 
 local GameConfig = {
 	SettingsGuide = "design/Settings Guide.md",
@@ -30,11 +33,6 @@ local GameConfig = {
 		CoastMaxAngle = 45,
 		ForwardInputThreshold = 0.3,
 		BrakeDeceleration = 60,
-		-- Q: a committed dash. It eases up to PropelSpeed over PropelRampSeconds, holds it, then eases back
-		-- down to running speed over the last PropelEaseOutSeconds of PropelSeconds. While it runs the keys
-		-- can only nudge it (PropelSteerRate, degrees per second); afterwards steering comes back over
-		-- PropelControlReturnSeconds. Holding A or D as Q is pressed bends it into an arc of PropelArcDegrees,
-		-- left or right. A and D together, or neither, is a straight dash.
 		PropelSpeed = 84,
 		PropelSeconds = 0.65,
 		PropelRampSeconds = 0.1,
@@ -44,7 +42,6 @@ local GameConfig = {
 		PropelControlReturnSeconds = 0.25,
 		PropelArcDegrees = 80,
 		PropelCurveInputThreshold = 0.35,
-		-- How far the body leans ahead into a curved dash, in degrees. Past 20 it makes drift smoke.
 		PropelCurveBodyLead = 24,
 		KnockbackAirDecay = 20,
 		KnockbackMaxSpeed = 250,
@@ -55,33 +52,22 @@ local GameConfig = {
 		Cooldown = 0.32,
 		MissRecovery = 0.1,
 		BufferSeconds = 0.1,
-		-- The swing goes live on the clips' Hit marker (0.08 s, the same in every punch clip) and stays live
-		-- while the fist sweeps across, until it reaches full extension at about 0.16 s.
 		Windup = 0.08,
 		ActiveSeconds = 0.08,
-		-- Horizontal reach, centre to centre once TargetRadius is added. Forward reach is unchanged.
 		Range = 5,
 		TargetRadius = 1.5,
-		-- Bodies touching (two TargetRadius) always connect, whichever way you face.
 		OverlapRadius = 3,
 		CloseRange = 3,
 		CloseDegrees = 100,
 		HookOuterDegrees = 55,
 		HookInnerDegrees = 30,
 		UppercutDegrees = 20,
-		-- Heights, in studs from the root part. The receiving hurtbox is an upright capsule from HurtboxBelow
-		-- under the root (the feet) to HurtboxAbove over it (the top of the head), with no regard for
-		-- accessories. A hook's volume sits waist to shoulder; an uppercut's rises above the head with the fist.
-		-- A hit needs the hurtbox to touch the volume, so hooks reach 4.5 below and above, as they always
-		-- have, and an uppercut 4 below and 5.5 above.
 		HurtboxBelow = 3,
 		HurtboxAbove = 2.5,
 		HookBandLow = -2,
 		HookBandHigh = 1.5,
 		UppercutBandLow = -1.5,
 		UppercutBandHigh = 2.5,
-		-- Between two server frames the swing is swept in steps no longer than this, so a fast crossing
-		-- can't slip between checks.
 		SweepStepStuds = 0.5,
 		SweepMaxSteps = 12,
 		HitCancelsPunch = true,
@@ -91,10 +77,6 @@ local GameConfig = {
 		HitSpeedKeep = 0,
 		RequestsPerSecondLimit = 8,
 		CooldownTolerance = 0.06,
-		-- Lag compensation, measured in Studio on 2026-11-05 (re-measure on a live server):
-		-- a client shows everyone else about 0.175 s behind the server, so targets rewind by ping plus that;
-		-- the server sees a player's own body about 0.18 s behind where that player sees it, so the
-		-- attacker is led forward along its server-measured movement by that much.
 		InterpolationSeconds = 0.175,
 		MaxRewindSeconds = 0.3,
 		AttackerLeadSeconds = 0.18,
@@ -117,7 +99,7 @@ local GameConfig = {
 		FinishShare = 1.3,
 		FinishMaxSpeed = 130,
 		FinishStagger = 18,
-		TiePush = 28,
+		TieShare = 1,
 		PairCooldown = 1,
 		RepelSpeed = 35,
 		RepelCooldown = 0.75,
@@ -425,26 +407,15 @@ local GameConfig = {
 		Cooldown = 15,
 		AirGravityScale = 0.7,
 		JumpSquatSeconds = 0.067,
-		-- The follow-up approach: once the server accepts it, a straight snap to beside the target, taking
-		-- distance / ApproachSpeed seconds, kept between ApproachMinSeconds and ApproachMaxSeconds. It
-		-- re-aims every frame, so a target that drifts a little is still reached. JumpMissGrace past that,
-		-- not touching them, it has missed. ApproachMaxSpeed must stay under Security.TeleportSpeed.
 		ApproachSpeed = 260,
 		ApproachMinSeconds = 0.08,
 		ApproachMaxSeconds = 0.65,
 		ApproachMaxSpeed = 280,
 		AcceptWaitSeconds = 0.6,
-		-- Who can be followed up: anyone launched with nothing solid between, within FollowUpOwnRange studs
-		-- for your own uppercut (a strong one throws them 150 studs within a second) or FollowUpRange for
-		-- someone else's. The pick is the lowest of distance * (1 + FollowUpAimWeight * (1 - cos) / 2),
-		-- where cos compares where you face with the way to them, times FollowUpOwnShare for your own
-		-- launch. Client and server use the same rule, and the server's pick is the one that counts.
 		FollowUpRange = 80,
 		FollowUpOwnRange = 170,
 		FollowUpAimWeight = 0.6,
 		FollowUpOwnShare = 0.8,
-		-- The target is held still, by the server, from the moment the follow-up is accepted until it
-		-- resolves, and never for longer than HoldTimeout.
 		HoldTimeout = 2.5,
 		JumpMissGrace = 0.15,
 		MissCarryKeep = 18,
@@ -487,11 +458,10 @@ local GameConfig = {
 		BounceLift = 75,
 		StunMaxSeconds = 2.5,
 		StunAfterLanding = 0.2,
-		-- The finisher: a kick graded in FinisherGrades launches the target hard away from the kicker and
-		-- upward, instead of slamming it down. Outward speed is a punch's strength (so stagger counts) times
-		-- the grade's share times FinisherPushScale, at most FinisherMaxSpeed. They lose control for
-		-- FinisherStunSeconds, then can punch to recover as usual. Red still slams.
-		FinisherGrades = { green = true, orange = true },
+		FinisherGrades = {
+			green = true,
+			orange = true,
+		},
 		FinisherPushScale = 2,
 		FinisherMaxSpeed = 220,
 		FinisherLift = 45,
@@ -499,38 +469,28 @@ local GameConfig = {
 		FinisherShake = 1.3,
 	},
 	AirRecovery = {
-		BoostSpeed = 24,
+		BoostSpeed = 17,
 		BoostFade = 24,
 		MaxSpeed = 60,
 		UpAssist = 5,
 		UpAssistCeiling = 6,
-		FallGravityScale = 0.32,
+		FallGravityScale = 0.24,
 		FallEaseSpeed = 16,
-		MaxFallSpeed = 40,
+		MaxFallSpeed = 30,
 		FallDrag = 120,
 		MinAirSeconds = 0.1,
 		HitRecoilShare = 0.5,
 		PunchWhileLaunched = true,
-		-- The recovery lift: a punch thrown while falling with no floor close below (off the edge) also
-		-- sets the vertical speed to LiftSpeed, once, and for LiftSeconds gravity is LiftGravityScale of
-		-- normal, so it rises a few studs and arcs over. Its forward push is LiftForwardSpeed instead of
-		-- BoostSpeed. At most LiftsPerFall per fall, and LiftCooldown apart, so it can't be used to fly.
 		LiftEnabled = true,
-		LiftSpeed = 26,
-		LiftSeconds = 0.25,
-		LiftGravityScale = 0.5,
-		LiftForwardSpeed = 24,
+		LiftSpeed = 42,
+		LiftSeconds = 0.33,
+		LiftGravityScale = 0.65,
+		LiftForwardSpeed = 0,
 		LiftCooldown = 1.2,
 		LiftsPerFall = 2,
-		LiftFallingSpeed = 2, -- falling at least this fast (studs/s) counts as falling
-		LiftFloorCheck = 14, -- a floor within this many studs below means it isn't off the edge
+		LiftFallingSpeed = 2,
+		LiftFloorCheck = 14,
 	},
-	-- Shift: nitro. Speed eases toward SpeedMultiplier times normal top speed over RampSeconds, on an
-	-- S-curve (RampCurve above 1: gentle start, strongest in the middle, settling into the top), with up to
-	-- RampAcceleration extra acceleration to follow it. Stamina drains while it runs (about 3 s from full),
-	-- then refills after RechargeDelay. Run dry, it stays off until ExhaustedRecharge is back. It runs on
-	-- the ground while moving forward or sideways, never braking, held, clashing, stunned or in the air
-	-- (past AirGraceSeconds).
 	Nitro = {
 		Enabled = true,
 		SpeedMultiplier = 2,
@@ -545,17 +505,13 @@ local GameConfig = {
 		ActivateMin = 15,
 		ExhaustedRecharge = 40,
 		AirGraceSeconds = 0.2,
-		-- Handling: at full boost the heading turns at TurnScale of the normal rate.
 		TurnScale = 0.28,
-		-- Speed above normal top speed, once nitro ends, bleeds off at this rate (studs/s per second).
 		ReleaseDeceleration = 18,
-		-- Q while boosted: faster and longer, a longer cooldown, and it costs stamina.
 		DashSpeedMultiplier = 1.35,
 		DashDurationMultiplier = 1.3,
 		DashCooldown = 3.5,
 		DashStaminaCost = 15,
 		DashArcMultiplier = 0.85,
-		-- Camera: pulled in toward the character, with a light shake, both eased in and out.
 		CameraZoomStuds = 3.5,
 		CameraMinDistance = 6,
 		CameraEaseIn = 4,
@@ -563,27 +519,29 @@ local GameConfig = {
 		ShakeStuds = 0.06,
 		ShakeRollDegrees = 0.35,
 		ShakeFrequency = 11,
-		-- Trail behind the root part, seen by everyone.
 		TrailLifetime = 0.28,
 		TrailWidth = 1.8,
 		TrailColor = "8FD3FF",
 		TrailTransparency = 0.3,
 		TrailLightEmission = 0.6,
-		-- Stamina bar, bottom middle.
-		BarScreenY = 0.95,
+		BarBottomOffset = 100,
 		BarWidth = 240,
 		BarHeight = 10,
 		BarHideSeconds = 1.2,
-		-- Server mirror of stamina: this much slack for clock differences.
 		ServerStaminaSlack = 10,
 		ServerToggleSeconds = 0.08,
 	},
-	-- Keyboard bindings that more than one script needs to agree on. Key is an Enum.KeyCode name, Label is
-	-- what the controls panel shows.
 	Controls = {
-		ShiftLock = { Key = "LeftControl", Label = "Ctrl" },
-		-- Held for the nitro boost. GamepadKey is the controller button for it.
-		Nitro = { Key = "LeftShift", Label = "Shift", GamepadKey = "ButtonL3", GamepadLabel = "L3" },
+		ShiftLock = {
+			Key = "LeftControl",
+			Label = "Ctrl",
+		},
+		Nitro = {
+			Key = "LeftShift",
+			Label = "Shift",
+			GamepadKey = "ButtonL3",
+			GamepadLabel = "L3",
+		},
 	},
 	ShiftLock = {
 		CameraOffsetX = 0,
@@ -731,7 +689,7 @@ local GameConfig = {
 		SkidHoldSeconds = 1,
 	},
 	Debug = {
-		MoveReadout = true,
+		MoveReadout = false,
 		TestFloor = true,
 		ShowHitbox = true,
 	},
@@ -743,6 +701,24 @@ local GameConfig = {
 		HintSeconds = 6,
 		MissSeconds = 0.8,
 		EndSeconds = 4,
+	},
+	TestBot = {
+		Enabled = true,
+		Fights = true,
+		AirSteers = true,
+		AirSteerShare = 0.3,
+		StopDistance = 4.5,
+		CloseInput = 0.1,
+		EdgeMargin = 14,
+		ReactionSeconds = 0.4,
+		PunchCooldown = 1.1,
+		NoticeDistance = 14,
+		TrackingLag = 0.2,
+		MisjudgeStuds = 3,
+		ExtraWindup = 0.15,
+		WildSwingChance = 0.35,
+		ClashTapsPerSecond = 5.5,
+		ReturnSeconds = 3,
 	},
 	Effects = {
 		GustSeconds = 0.6,

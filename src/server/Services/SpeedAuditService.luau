@@ -53,7 +53,10 @@ local function sampleAll()
 				table.clear(history)
 			end
 			local look = root.CFrame.LookVector
-			table.insert(history, { t = now, pos = root.Position, yaw = Combat.yawOf(look.X, look.Z) })
+			table.insert(
+				history,
+				{ t = now, pos = root.Position, yaw = Combat.yawOf(look.X, look.Z) }
+			)
 			while #history > 1 and now - history[1].t > cfg.HistorySeconds do
 				table.remove(history, 1)
 			end

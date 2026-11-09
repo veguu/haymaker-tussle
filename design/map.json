@@ -1,0 +1,10 @@
+{
+ "name": "Haymaker Arena",
+ "theme": "Floating circular platform with a lobby and training area nearby; simple geometry and placeholder materials",
+ "pieces": [
+  "ArenaFloor",
+  "LobbyFloor",
+  "TrainingArea"
+ ],
+ "note": "roblox-map spec. All sizes come from GameConfig. The floor shrinks at runtime, so collision and the visible edge are one thing, with no invisible floor outside it."
+}

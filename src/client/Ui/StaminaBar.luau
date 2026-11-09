@@ -1,6 +1,6 @@
 --!strict
--- StaminaBar - the nitro bar, bottom middle. It shows while the boost runs or the bar isn't full, and
--- fades away a moment after it fills. Bright while boosting, dim while refilling, red while run dry and
+-- StaminaBar - the nitro bar, bottom middle, just above the HUD's stagger and speed panel. It shows
+-- while the boost runs or the bar isn't full, and fades away a moment after it fills. Bright while boosting, dim while refilling, red while run dry and
 -- not yet usable again. Nothing here decides anything: MovementController hands it the numbers.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -33,7 +33,7 @@ function StaminaBar.new(parent: Instance): Bar
 	local root = Instance.new("CanvasGroup")
 	root.Name = "StaminaBar"
 	root.AnchorPoint = Vector2.new(0.5, 1)
-	root.Position = UDim2.fromScale(0.5, cfg.BarScreenY)
+	root.Position = UDim2.new(0.5, 0, 1, -cfg.BarBottomOffset)
 	root.Size = UDim2.fromOffset(cfg.BarWidth, cfg.BarHeight)
 	root.BackgroundColor3 = INK
 	root.BackgroundTransparency = 0.35

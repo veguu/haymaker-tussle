@@ -24,6 +24,7 @@ local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local Net = require(ReplicatedStorage.Shared.Net)
+local Typography = require(ReplicatedStorage.Shared.Typography)
 
 local punchCfg = GameConfig.Punch
 local COMBATANT_TAG = "HT_Combatant"
@@ -191,7 +192,7 @@ local function showWord(parent: Instance, position: Vector3, text: string, colou
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBold
+	Typography.apply(label, "World")
 	label.TextSize = 18
 	label.TextColor3 = colour
 	label.TextStrokeTransparency = 0.2
@@ -328,16 +329,22 @@ function HitboxDebugController:KnitStart()
 				if not hurt then
 					local made = debugPart("Part", folder)
 					made.Shape = Enum.PartType.Cylinder
-					made.Size =
-						Vector3.new(hurtHeight, punchCfg.TargetRadius * 2, punchCfg.TargetRadius * 2)
+					made.Size = Vector3.new(
+						hurtHeight,
+						punchCfg.TargetRadius * 2,
+						punchCfg.TargetRadius * 2
+					)
 					made.Color = HURT
 					made.Transparency = 0.8
 					hurtboxes[instance] = made
 					hurt = made
 				end
 				hurt.CFrame = if root
-					then CFrame.new(root.Position + Vector3.yAxis * hurtMiddle)
-						* CFrame.Angles(0, 0, math.pi / 2)
+					then CFrame.new(root.Position + Vector3.yAxis * hurtMiddle) * CFrame.Angles(
+						0,
+						0,
+						math.pi / 2
+					)
 					else PARK
 			end
 		end

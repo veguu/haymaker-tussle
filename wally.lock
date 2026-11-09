@@ -8,6 +8,11 @@ version = "4.0.0"
 dependencies = []
 
 [[package]]
+name = "joncodea/haymaker-tussle"
+version = "0.1.0"
+dependencies = [["Knit", "sleitnick/knit@1.7.0"], ["Promise", "evaera/promise@4.0.0"], ["Signal", "sleitnick/signal@2.0.3"], ["Trove", "sleitnick/trove@1.8.0"]]
+
+[[package]]
 name = "sleitnick/comm"
 version = "1.0.1"
 dependencies = [["Option", "sleitnick/option@1.0.5"], ["Promise", "evaera/promise@4.0.0"], ["Signal", "sleitnick/signal@2.0.3"]]
@@ -31,8 +36,3 @@ dependencies = []
 name = "sleitnick/trove"
 version = "1.8.0"
 dependencies = []
-
-[[package]]
-name = "spicy/haymaker-tussle"
-version = "0.1.0"
-dependencies = [["Knit", "sleitnick/knit@1.7.0"], ["Promise", "evaera/promise@4.0.0"], ["Signal", "sleitnick/signal@2.0.3"], ["Trove", "sleitnick/trove@1.8.0"]]

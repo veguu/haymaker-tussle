@@ -55,6 +55,9 @@ function LockOnController:KnitStart()
 	local player = Players.LocalPlayer
 	local candidate: Model? = nil
 	local selected: Model? = nil
+	self._target = function(): Model?
+		return selected
+	end
 	local lastSeen = 0
 	local inSight = true
 
@@ -232,6 +235,11 @@ function LockOnController:KnitStart()
 			refresh()
 		end
 	end)
+end
+
+--- Who's locked on to, if anyone.
+function LockOnController:GetTarget(): Model?
+	return if self._target then self._target() else nil
 end
 
 return LockOnController

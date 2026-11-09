@@ -1,10 +1,9 @@
 [package]
-name = "spicy/haymaker-tussle"
+name = "joncodea/haymaker-tussle"
 version = "0.1.0"
 registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
 
-# The same versions the place already uses (ReplicatedStorage.Packages._Index).
 [dependencies]
 Knit = "sleitnick/knit@1.7.0"
 Promise = "evaera/promise@4.0.0"

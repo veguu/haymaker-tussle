@@ -1,0 +1,112 @@
+{
+ "rig": "R6",
+ "reference": "Broozer GIF, studied 2026-11-03: 13 frames, 80 ms each, spins about twice a loop with arms wide, squat and wobbly. Energy only, not its look.",
+ "clips": [
+  {
+   "name": "Idle",
+   "priority": "Idle",
+   "looped": true,
+   "_intent": "Boxing guard, fists high and wide, top-heavy sway.",
+   "in_place": true,
+   "reference": "Broozer GIF, studied 2026-11-03: 13 frames, 80 ms each, spins about twice a loop with arms wide, squat and wobbly. Energy only, not its look."
+  },
+  {
+   "name": "MoveStart",
+   "priority": "Movement",
+   "looped": false,
+   "_intent": "Lurch forward, chest first, arms thrown back.",
+   "in_place": true,
+   "reference": "Broozer GIF, studied 2026-11-03: 13 frames, 80 ms each, spins about twice a loop with arms wide, squat and wobbly. Energy only, not its look."
+  },
+  {
+   "name": "RunLow",
+   "priority": "Movement",
+   "looped": true,
+   "_intent": "Heavy stomping run, rigid limbs, fists bobbing at chest height.",
+   "in_place": true,
+   "reference": "Broozer GIF, studied 2026-11-03: 13 frames, 80 ms each, spins about twice a loop with arms wide, squat and wobbly. Energy only, not its look."
+  },
+  {
+   "name": "RunHigh",
+   "priority": "Movement",
+   "looped": true,
+   "_intent": "Reckless sprint, torso far forward, arms windmilling wide like the GIF's swing.",
+   "in_place": true,
+   "reference": "Broozer GIF, studied 2026-11-03: 13 frames, 80 ms each, spins about twice a loop with arms wide, squat and wobbly. Energy only, not its look."
+  },
+  {
+   "name": "LeanLeft",
+   "priority": "Movement",
+   "looped": true,
+   "_intent": "Body tipped into a left curve, outside arm flung wide.",
+   "in_place": true,
+   "reference": "Broozer GIF, studied 2026-11-03: 13 frames, 80 ms each, spins about twice a loop with arms wide, squat and wobbly. Energy only, not its look."
+  },
+  {
+   "name": "LeanRight",
+   "priority": "Movement",
+   "looped": true,
+   "_intent": "Body tipped into a right curve, outside arm flung wide.",
+   "in_place": true,
+   "reference": "Broozer GIF, studied 2026-11-03: 13 frames, 80 ms each, spins about twice a loop with arms wide, squat and wobbly. Energy only, not its look."
+  },
+  {
+   "name": "Coast",
+   "priority": "Movement",
+   "looped": true,
+   "_intent": "Legs slow and feet skid, torso rocks back against its own weight.",
+   "in_place": true,
+   "reference": "Broozer GIF, studied 2026-11-03: 13 frames, 80 ms each, spins about twice a loop with arms wide, squat and wobbly. Energy only, not its look."
+  },
+  {
+   "name": "PunchLeft",
+   "priority": "Action",
+   "looped": false,
+   "_intent": "Left fist leads a big torso twist, strike at 0.12 s, whole clip about 0.30 s.",
+   "in_place": true,
+   "reference": "Broozer GIF, studied 2026-11-03: 13 frames, 80 ms each, spins about twice a loop with arms wide, squat and wobbly. Energy only, not its look."
+  },
+  {
+   "name": "PunchRight",
+   "priority": "Action",
+   "looped": false,
+   "_intent": "Mirror of PunchLeft so alternating punches read clearly.",
+   "in_place": true,
+   "reference": "Broozer GIF, studied 2026-11-03: 13 frames, 80 ms each, spins about twice a loop with arms wide, squat and wobbly. Energy only, not its look."
+  },
+  {
+   "name": "HitReact",
+   "priority": "Action2",
+   "looped": false,
+   "_intent": "Quick head and torso snap on the upper body only, so steering stays readable.",
+   "in_place": true,
+   "reference": "Broozer GIF, studied 2026-11-03: 13 frames, 80 ms each, spins about twice a loop with arms wide, squat and wobbly. Energy only, not its look."
+  },
+  {
+   "name": "KnockbackFall",
+   "priority": "Action3",
+   "looped": true,
+   "_intent": "Arms and legs flailing, body tumbling back, loops until landing or elimination.",
+   "in_place": true,
+   "reference": "Broozer GIF, studied 2026-11-03: 13 frames, 80 ms each, spins about twice a loop with arms wide, squat and wobbly. Energy only, not its look."
+  },
+  {
+   "name": "Victory",
+   "priority": "Action4",
+   "looped": true,
+   "_intent": "Spin with both arms wide, the GIF's windmill turned into a celebration.",
+   "in_place": true,
+   "reference": "Broozer GIF, studied 2026-11-03: 13 frames, 80 ms each, spins about twice a loop with arms wide, squat and wobbly. Energy only, not its look."
+  },
+  {
+   "name": "Propel",
+   "priority": "Action",
+   "looped": false,
+   "_intent": "Body thrown forward low, fists leading, about 0.25 s, in place.",
+   "in_place": true,
+   "reference": "Broozer GIF, studied 2026-11-03: 13 frames, 80 ms each, spins about twice a loop with arms wide, squat and wobbly. Energy only, not its look."
+  }
+ ],
+ "gameplay_map": "Idle: below 1 stud/s. MoveStart: leaving idle. RunLow to RunHigh: blended by speed. LeanLeft/LeanRight: weight follows the steering curve. Coast: moving with no input. PunchLeft/PunchRight: alternate over everything below Action. HitReact: confirmed hit. KnockbackFall: while knockback is strong. Victory: round winner. Propel: during the propel burst.",
+ "note": "roblox-animation. Standard R6 joints only, no root motion, and gameplay code owns all movement. Punch strike time must equal Punch.Windup."
+}

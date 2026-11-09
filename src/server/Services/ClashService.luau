@@ -38,6 +38,8 @@ type Running = {
 	startedAt: number,
 	bucketA: Clash.TapBucket,
 	bucketB: Clash.TapBucket,
+	botTapAtA: number,
+	botTapAtB: number,
 	winner: Model?,
 	finishAt: number?,
 }
@@ -62,6 +64,11 @@ local function floorUnder(position: Vector3): boolean
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = CollectionService:GetTagged(Combatants.TAG)
 	return workspace:Raycast(position, Vector3.new(0, -FLOOR_REACH, 0), params) ~= nil
+end
+
+local function nextBotTap(now: number): number
+	local rate = math.max(GameConfig.TestBot.ClashTapsPerSecond, 0.1)
+	return now + (0.7 + math.random() * 0.6) / rate
 end
 
 local function clearMarks(model: Model)
@@ -145,6 +152,8 @@ function ClashService:Begin(a: Model, b: Model)
 		startedAt = now,
 		bucketA = { tokens = cfg.TapBurst, at = now },
 		bucketB = { tokens = cfg.TapBurst, at = now },
+		botTapAtA = nextBotTap(now),
+		botTapAtB = nextBotTap(now),
 	}
 	table.insert(clashes, clash)
 	byModel[a] = clash
@@ -180,7 +189,8 @@ local function endWithoutWinner(self: any, clash: Running, reason: string)
 	trace(`clash over: {reason}, {clash.scoreA} to {clash.scoreB}`)
 end
 
--- A tie: nobody wins, and both are pushed away from each other.
+-- A tie: nobody wins, and both are knocked back away from each other with exactly the same
+-- strength, a standing punch's, whatever either's stagger. No stagger is added to either.
 local function tie(self: any, clash: Running)
 	local rootA, rootB = Combatants.rootOf(clash.a), Combatants.rootOf(clash.b)
 	endWithoutWinner(self, clash, "tie")
@@ -189,8 +199,10 @@ local function tie(self: any, clash: Running)
 			Vector3.new(rootB.Position.X - rootA.Position.X, 0, rootB.Position.Z - rootA.Position.Z)
 		local dir = if line.Magnitude > 0.01 then line.Unit else rootA.CFrame.LookVector
 		local knockback = Knit.GetService("KnockbackService")
-		knockback:Launch(clash.a, -dir.X * cfg.TiePush, -dir.Z * cfg.TiePush, 0, 0, 0)
-		knockback:Launch(clash.b, dir.X * cfg.TiePush, dir.Z * cfg.TiePush, 0, 0, 0)
+		local strength = Clash.tieStrength(cfg, Combat.punchStrength(knockCfg, staggerCfg, 0, 0))
+		local up, airUp = Combat.upwardSpeeds(knockCfg, strength)
+		knockback:Launch(clash.a, -dir.X * strength, -dir.Z * strength, up, airUp)
+		knockback:Launch(clash.b, dir.X * strength, dir.Z * strength, up, airUp)
 	end
 end
 
@@ -297,6 +309,15 @@ local function tick(self: any, clash: Running, now: number)
 			landFinish(clash)
 		end
 		return
+	end
+	-- The bot taps at a set pace, a bit unevenly, like a person.
+	if not Players:GetPlayerFromCharacter(clash.a) and now >= clash.botTapAtA then
+		clash.botTapAtA = nextBotTap(now)
+		score(clash, clash.a)
+	end
+	if not Players:GetPlayerFromCharacter(clash.b) and now >= clash.botTapAtB then
+		clash.botTapAtB = nextBotTap(now)
+		score(clash, clash.b)
 	end
 	local result = Clash.outcome(cfg, clash.scoreA, clash.scoreB, now - clash.startedAt)
 	if result == "tie" then

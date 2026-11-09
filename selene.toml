@@ -1,2 +1,6 @@
 std = "roblox"
-exclude = ["Packages/*"]
+
+[rules]
+unused_variable = "warn"
+deprecated = "deny"
+shadowing = "warn"

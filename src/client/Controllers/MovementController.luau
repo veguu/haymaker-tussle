@@ -64,6 +64,18 @@ local MovementController = Knit.CreateController({
 	Name = "MovementController",
 	-- Fires when the local player starts a propel.
 	Propelled = Signal.new(),
+	-- A propel press that the rules turned down (still cooling down, stunned, held). The HUD shows it
+	-- without touching the cooldown it's already drawing.
+	PropelBlocked = Signal.new(),
+	-- What the HUD reads, written once per movement step from the real state. Never read back by
+	-- movement itself. Times are os.clock().
+	Hud = {
+		speed = 0, -- real flat speed, studs/s, from the root's velocity
+		propelLeft = 0, -- seconds of propel cooldown left
+		kickReadyAt = 0,
+		kickTarget = false, -- someone in the air this body could jump at right now
+		kicking = false,
+	},
 })
 
 type Input = { move: Vector3, cameraRelative: boolean, at: number }
@@ -245,21 +257,23 @@ function MovementController:_bind(
 	local steerX, steerZ = 0, 0 -- a launched body's own steering, on top of its push
 	local speedShare = 1 -- how much of running speed stagger leaves
 	-- After a missed jump or a kick's rebound: ordinary movement, but in the air.
-	local airRun: { t: number, gravityScale: number, maxFall: number?, keep: number? }? = nil
+	local airRun: { t: number, gravityScale: number, keep: number? }? = nil
 	local wasSideSteering = false
 	local airSeconds = 0 -- how long since the floor
 	local pushX, pushZ = 0, 0 -- what punches thrown in the air are still pushing with
 	local pushGraceUntil = 0
 	local lift = 0 -- a punch's small lift, waiting for this step's velocity
 	local punchRequested = false
-	local lastPush: { x: number, z: number, up: number, at: number, lifted: boolean }? = nil
+	local punchIsUppercut = false -- only an uppercut gives the falling lift
+	local lastPush: { x: number, z: number, up: number, at: number, lifted: boolean? }? = nil
 	local slammed = false -- driven down by a kick, so its fall isn't lightened
-	-- The recovery lift: the vertical speed it sets this step, how long its lighter gravity has left, and
-	-- how many this fall has had.
-	local liftTo: number? = nil
-	local liftLeft = 0
-	local liftsThisFall = 0
-	local lastLiftAt = -math.huge
+	-- The falling lift: how many this fall, and until when its lighter gravity lasts.
+	local lifts = AirRecovery.newLifts()
+	local liftUntil = 0
+	local liftSet = false -- this step sets the vertical speed to the lift's
+	local floorParams = RaycastParams.new()
+	floorParams.FilterType = Enum.RaycastFilterType.Exclude
+	floorParams.FilterDescendantsInstances = { character }
 	-- Nitro: held is the key; the stamina and ramp are Core/Nitro's. `carrying` is speed over normal top
 	-- speed left from a boost that has ended, which bleeds off at its own rate.
 	local nitro = Nitro.new(nitroCfg)
@@ -337,12 +351,6 @@ function MovementController:_bind(
 		return if index then models[index] else nil
 	end
 
-	-- Is there a floor close below? Then a punch in the air isn't off the edge.
-	local function floorBelow(): boolean
-		local reach = airCfg.LiftFloorCheck + humanoid.HipHeight + root.Size.Y / 2
-		return workspace:Raycast(root.Position, Vector3.new(0, -reach, 0), solidParams()) ~= nil
-	end
-
 	-- Tells the server when the boost starts and stops, so everyone else sees the trail.
 	local function showNitro(on: boolean)
 		if on == nitroShown then
@@ -408,6 +416,17 @@ function MovementController:_bind(
 							radius = arena.radius,
 							speed = cfg.PropelSpeed,
 							gravity = workspace.Gravity * kickCfg.ReboundGravityScale,
+							-- The rebound falls on the same lighter gravity as everything else, so
+							-- the landing is planned on that fall.
+							fallTime = function(up: number, height: number): number
+								return AirRecovery.timeToDrop(
+									airCfg,
+									workspace.Gravity,
+									kickCfg.ReboundGravityScale,
+									up,
+									height
+								)
+							end,
 						}
 					)
 					kick = nil
@@ -460,7 +479,7 @@ function MovementController:_bind(
 		end
 		endKick()
 		-- A hit's own lift and fall take over from any recovery lift still running.
-		liftTo, liftLeft = nil, 0
+		liftUntil, liftSet = 0, false
 		state = Momentum.applyKnock(state, cfg, velocity.X, velocity.Z, speedKeep)
 		knockGraceUntil = os.clock() + cfg.KnockbackGraceSeconds
 		local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
@@ -495,7 +514,7 @@ function MovementController:_bind(
 		steerX, steerZ, pushX, pushZ, lift = 0, 0, 0, 0, 0
 		punchRequested, propelRequested, kickRequested = false, false, false
 		lastPush = nil
-		liftTo, liftLeft, liftsThisFall = nil, 0, 0
+		lifts, liftUntil, liftSet = AirRecovery.newLifts(), 0, false
 		nitro = Nitro.stop(nitro)
 		carrying = false
 		state = if face and face.Magnitude > 0.01
@@ -507,8 +526,9 @@ function MovementController:_bind(
 
 	-- An accepted punch, from CombatController. The push is worked out at the next step, from the keys
 	-- at that moment. This is the only place one starts, so there's one per punch thrown.
-	self._punchThrown = function()
+	self._punchThrown = function(swing: string?)
 		punchRequested = true
+		punchIsUppercut = swing == "Uppercut"
 	end
 	-- The server refused that punch, so it never happened: its push goes back too.
 	self._punchRefused = function()
@@ -520,11 +540,13 @@ function MovementController:_bind(
 			pushZ -= pushed.z
 			lift -= pushed.up
 			if pushed.lifted then
-				-- The rise it already gave can't be taken back, but the rest of it stops, and it doesn't
-				-- count against the fall's allowance.
-				liftTo, liftLeft = nil, 0
-				liftsThisFall = math.max(liftsThisFall - 1, 0)
-				lastLiftAt = -math.huge
+				-- The rise it already gave can't be taken back, but its lighter gravity stops, and it
+				-- doesn't count against the fall's allowance.
+				liftUntil, liftSet = 0, false
+				lifts = {
+					count = math.max(lifts.count - 1, 0),
+					lastAt = -math.huge,
+				}
 			end
 		end
 	end
@@ -613,6 +635,13 @@ function MovementController:_bind(
 
 	trove:BindToRenderStep(STEP_NAME, STEP_PRIORITY, function(dt: number)
 		local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
+		local hud = self.Hud
+		local flatVelocity = root.AssemblyLinearVelocity
+		hud.speed = Vector3.new(flatVelocity.X, 0, flatVelocity.Z).Magnitude
+		hud.propelLeft = state.propelCooldownLeft or 0
+		hud.kickReadyAt = kickReadyAt
+		hud.kicking = kick ~= nil
+		hud.kickTarget = false
 		local inputX, inputZ = worldInput(input)
 		local drive, side = driveOf(inputX, inputZ)
 
@@ -626,10 +655,8 @@ function MovementController:_bind(
 		airSeconds = if grounded then 0 else airSeconds + dt
 		if grounded then
 			slammed = false
-			liftsThisFall = 0
-			liftLeft = 0
+			lifts, liftUntil, liftSet = AirRecovery.newLifts(), 0, false
 		end
-		liftLeft = math.max(liftLeft - dt, 0)
 
 		-- Nitro: held, on the ground (or only just off it), moving forward or sideways, with nothing
 		-- else in charge of the body. Anything that takes the body over ends it, through this same check.
@@ -753,6 +780,7 @@ function MovementController:_bind(
 		if not kick then
 			local canJump = grounded and not floating and kickRemotes.request ~= nil
 			local target = if canJump and now >= kickReadyAt then jumpTarget(root.Position) else nil
+			hud.kickTarget = target ~= nil
 			if target then
 				if pressed then
 					kickReadyAt = now + kickCfg.Cooldown
@@ -807,7 +835,6 @@ function MovementController:_bind(
 				airRun = {
 					t = 0,
 					gravityScale = kickCfg.MissGravityScale,
-					maxFall = kickCfg.MissMaxFall,
 				}
 				root.AssemblyLinearVelocity =
 					Vector3.new(flight.X, math.max(flight.Y, kickCfg.MissLift), flight.Z)
@@ -980,38 +1007,36 @@ function MovementController:_bind(
 				local faceX, faceZ = Momentum.facing(state)
 				local dirX, dirZ =
 					AirRecovery.direction(inputX, inputZ, faceX, faceZ, cfg.InputDeadzone)
-				-- Falling off the edge, the punch's dash also lifts: once, and only so many per fall.
-				local recovering = AirRecovery.earnsLift(
-					airCfg,
-					airMoving.Y,
-					floorBelow(),
-					slammed,
-					now - lastLiftAt,
-					liftsThisFall
+				-- Distance from the feet down to anything solid, or nil with none in reach.
+				local feet = root.Position.Y - (root.Size.Y / 2 + humanoid.HipHeight)
+				local hit = workspace:Raycast(
+					root.Position,
+					Vector3.new(0, -(root.Position.Y - feet + airCfg.LiftFloorCheck), 0),
+					floorParams
 				)
+				local floorBelow = if hit then math.max(feet - hit.Position.Y, 0) else nil
+				local lifted = punchIsUppercut
+					and (floating or freeAir or airRun ~= nil)
+					and AirRecovery.canLift(airCfg, lifts, airMoving.Y, floorBelow, slammed, now)
 				local addX, addZ = AirRecovery.push(
 					airCfg,
 					airMoving.X,
 					airMoving.Z,
 					dirX,
 					dirZ,
-					if recovering then airCfg.LiftForwardSpeed else nil
+					if lifted then airCfg.LiftForwardSpeed else nil
 				)
-				-- The lift replaces the small top-up rather than adding to it.
-				local up = if slammed or recovering
-					then 0
-					else AirRecovery.lift(airCfg, airMoving.Y)
-				if recovering then
-					liftTo = airCfg.LiftSpeed
-					liftLeft = airCfg.LiftSeconds
-					liftsThisFall += 1
-					lastLiftAt = now
+				local up = if slammed or lifted then 0 else AirRecovery.lift(airCfg, airMoving.Y)
+				if lifted then
+					lifts = AirRecovery.usedLift(lifts, now)
+					liftUntil = now + airCfg.LiftSeconds
+					liftSet = true
 				end
 				pushX += addX
 				pushZ += addZ
 				lift += up
 				pushGraceUntil = now + PUSH_GRACE_SECONDS
-				lastPush = { x = addX, z = addZ, up = up, at = now, lifted = recovering }
+				lastPush = { x = addX, z = addZ, up = up, at = now, lifted = lifted }
 				fx:AirPunchGust(character, Vector3.new(dirX, 0, dirZ))
 			end
 		end
@@ -1040,6 +1065,9 @@ function MovementController:_bind(
 				}
 				else { curve = curve }
 			local propelled = Momentum.tryPropel(state, cfg, aimX, aimZ, drive, options)
+			if not propelled then
+				self.PropelBlocked:Fire()
+			end
 			if propelled then
 				state = propelled
 				if boosted then
@@ -1139,6 +1167,15 @@ function MovementController:_bind(
 		-- further than the character is actually moving. It's the whole velocity that counts, so
 		-- steering or punching against a launch isn't taken for a wall.
 		local velocity = root.AssemblyLinearVelocity
+		-- The falling lift sets the vertical speed once, then lightens gravity for a moment.
+		local function liftedFall(fall: number): number
+			if liftSet then
+				return airCfg.LiftSpeed
+			elseif now < liftUntil then
+				return AirRecovery.liftVelocity(airCfg, workspace.Gravity, velocity.Y, dt)
+			end
+			return fall
+		end
 		local realSpeed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 		-- Stagger doesn't shorten a rebound: where it lands was worked out at full speed.
 		local travelShare = if airRun and airRun.keep then 1 else speedShare
@@ -1166,16 +1203,6 @@ function MovementController:_bind(
 			wanted = math.sqrt(totalX * totalX + totalZ * totalZ)
 		end
 
-		-- A recovery lift sets the vertical speed once, then for its few moments its own lighter gravity
-		-- stands in for whichever fall rule the body is on, so the two never stack or fight.
-		local function withLift(fall: number): number
-			if liftTo then
-				return math.max(velocity.Y, liftTo)
-			elseif liftLeft > 0 then
-				return AirRecovery.liftFall(airCfg, workspace.Gravity, velocity.Y, dt)
-			end
-			return fall + lift
-		end
 		if floating then
 			-- Rises on the launch's own lighter gravity, falls on the general rule, and the flat speed is
 			-- exactly what the knock says.
@@ -1186,23 +1213,27 @@ function MovementController:_bind(
 				velocity.Y,
 				dt
 			)
-			root.AssemblyLinearVelocity = Vector3.new(totalX, withLift(fall), totalZ)
+			root.AssemblyLinearVelocity = Vector3.new(totalX, liftedFall(fall) + lift, totalZ)
 		elseif airRun then
-			-- The Humanoid barely moves itself in the air, so the speed is set exactly.
-			local fall = velocity.Y + workspace.Gravity * (1 - airRun.gravityScale) * dt
-			if airRun.maxFall then
-				fall = math.max(fall, -airRun.maxFall)
-			end
-			root.AssemblyLinearVelocity = Vector3.new(totalX, withLift(fall), totalZ)
+			-- The Humanoid barely moves itself in the air, so the speed is set exactly. Up on its own
+			-- gravity, down on the general falling rule like every other body in the air.
+			local fall = AirRecovery.fallVelocity(
+				airCfg,
+				workspace.Gravity,
+				airRun.gravityScale,
+				velocity.Y,
+				dt
+			)
+			root.AssemblyLinearVelocity = Vector3.new(totalX, liftedFall(fall) + lift, totalZ)
 		elseif freeAir then
 			-- A slam keeps all its gravity, so a kick still drives them down as hard as it meant to.
 			local fall = if slammed
 				then velocity.Y
 				else AirRecovery.fallVelocity(airCfg, workspace.Gravity, 1, velocity.Y, dt)
-			root.AssemblyLinearVelocity = Vector3.new(totalX, withLift(fall), totalZ)
+			root.AssemblyLinearVelocity = Vector3.new(totalX, liftedFall(fall) + lift, totalZ)
 		end
 		lift = 0
-		liftTo = nil
+		liftSet = false
 
 		local faceX, faceZ = Momentum.facing(state)
 		local heading = Vector3.new(faceX, 0, faceZ)
@@ -1235,10 +1266,11 @@ function MovementController:_bind(
 	end)
 end
 
---- A punch has just been thrown. In the air it pushes the body, once.
-function MovementController:PunchThrown()
+--- A punch has just been thrown. In the air it pushes the body, once. `swing` is Left, Right or
+--- Uppercut; only an uppercut can give the falling lift.
+function MovementController:PunchThrown(swing: string?)
 	if self._punchThrown then
-		self._punchThrown()
+		self._punchThrown(swing)
 	end
 end
 

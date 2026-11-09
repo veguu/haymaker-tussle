@@ -8,6 +8,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
+local Typography = require(ReplicatedStorage.Shared.Typography)
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local DiveKick = require(ReplicatedStorage.Shared.Core.DiveKick)
@@ -35,6 +36,7 @@ end
 function KickPromptController:KnitStart()
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "HT_KickPrompt"
+	gui.DisplayOrder = 9 -- the timed cue is never under the HUD
 	gui.ResetOnSpawn = false
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
@@ -52,8 +54,7 @@ function KickPromptController:KnitStart()
 	key.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
 	key.BackgroundTransparency = 0.25
 	key.TextColor3 = IDLE
-	key.Font = Enum.Font.GothamBold
-	key.TextSize = 11
+	Typography.apply(key, "Key")
 	key.Parent = holder
 	round(key)
 
@@ -77,8 +78,7 @@ function KickPromptController:KnitStart()
 	word.BackgroundTransparency = 1
 	word.TextColor3 = IDLE
 	word.TextStrokeTransparency = 0.5
-	word.Font = Enum.Font.GothamBold
-	word.TextSize = 13
+	Typography.apply(word, "Action")
 	word.Parent = holder
 
 	self._holder = holder
@@ -138,6 +138,11 @@ function KickPromptController:ShowResult(grade: string)
 	if self._resultText then
 		self._resultText:Show(grade)
 	end
+end
+
+--- Whether a kick cue is on screen. While it is, the HUD steps back.
+function KickPromptController:IsActive(): boolean
+	return self._holder ~= nil and self._holder.Visible
 end
 
 return KickPromptController

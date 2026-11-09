@@ -15,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local Typography = require(ReplicatedStorage.Shared.Typography)
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local Trove = require(ReplicatedStorage.Packages.Trove)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
@@ -67,7 +68,7 @@ local function makeLabel(parent: Instance, name: string): TextLabel
 	label.BackgroundTransparency = 1
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.TextStrokeTransparency = 0.4
-	label.Font = Enum.Font.GothamBold
+	Typography.apply(label, "Announce")
 	label.TextWrapped = true
 	label.Text = ""
 	label.Parent = parent
@@ -121,7 +122,7 @@ local function makeScreen(parent: Instance): Screen
 	hint.Position = UDim2.fromOffset(14, 60)
 	hint.Size = UDim2.new(1, -28, 0, 40)
 	hint.TextSize = 15
-	hint.Font = Enum.Font.Gotham
+	Typography.apply(hint, "Body")
 	hint.TextXAlignment = Enum.TextXAlignment.Left
 	hint.TextYAlignment = Enum.TextYAlignment.Top
 
@@ -132,7 +133,7 @@ local function makeScreen(parent: Instance): Screen
 	skip.Size = UDim2.fromOffset(84, 24)
 	skip.BackgroundColor3 = Color3.fromRGB(70, 76, 92)
 	skip.TextColor3 = Color3.new(1, 1, 1)
-	skip.Font = Enum.Font.GothamBold
+	Typography.apply(skip, "Button")
 	skip.TextSize = 14
 	skip.Text = "Skip"
 	skip.Parent = panel

@@ -88,7 +88,7 @@ local function build()
 	folder.Parent = workspace
 end
 
--- Alone, the middle of the floor. With others, a random spot around the middle facing inward, so players
+-- Alone, the middle of the floor, facing the test bot. With others, a random spot around the middle facing inward, so players
 -- don't all start inside each other. Someone in training stays there.
 local function placeOnFloor(character: Model)
 	local player = Players:GetPlayerFromCharacter(character)

@@ -13,6 +13,8 @@ Combatants.DUMMY_ATTRIBUTE = "HT_Dummy"
 -- A dummy pinned in place for inspecting reach. Punches land on it, but nothing can move it, so it can't
 -- be bumped or launched, and standing inside it to test overlap doesn't throw you out.
 Combatants.STATIONARY_ATTRIBUTE = "HT_Stationary"
+-- The 1v1 arena's test bot. It's a dummy too, so it never counts for rounds, but it fights on that arena.
+Combatants.BOT_ATTRIBUTE = "HT_Bot"
 
 function Combatants.rootOf(model: Model): BasePart?
 	return model:FindFirstChild("HumanoidRootPart") :: BasePart?

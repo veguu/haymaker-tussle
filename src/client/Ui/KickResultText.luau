@@ -6,6 +6,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Typography = require(ReplicatedStorage.Shared.Typography)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local ResultPop = require(ReplicatedStorage.Shared.Core.ResultPop)
 
@@ -28,7 +29,7 @@ function KickResultText.new(parent: Instance)
 	label.Position = UDim2.fromScale(cfg.ScreenX, cfg.ScreenY)
 	label.Size = UDim2.fromScale(cfg.WidthShare, cfg.HeightShare)
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBold
+	Typography.apply(label, "Announce")
 	label.TextScaled = true
 	label.TextTransparency = 1
 	label.Visible = false

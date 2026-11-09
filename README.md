@@ -1,28 +1,56 @@
 # Haymaker Tussle
 
-Rojo project for the Studio place "title" (placeId 136102156542862). How the game works is in [Haymaker Tussle - System Overview.md](Haymaker%20Tussle%20-%20System%20Overview.md).
+<!-- tldr:start -->
+> [!tldr] TL;DR
+> - Disk is the only source of truth. Studio connects via `rojo serve`.
+> - Pure logic lives in `src/shared/Core/`, Instances live at the edges.
+> - Gameplay and cross-client paths use `src/shared/Net.luau` (plain
+>
+> Cost: TL;DR ~90 tok · whole note ~420 tok. Read more: ## The five standing rules · ## Layout
+<!-- tldr:end -->
 
-## Toolchain (installed 2026-11-05)
+## The five standing rules
 
-Rokit 1.2.0 manages the tools pinned in `rokit.toml`: Rojo 7.7.1, Wally 0.3.2, Selene 0.32.0, StyLua 2.6.0 and luau-lsp 1.70.1. The Rojo Studio plugin is in `%LOCALAPPDATA%\Roblox\Plugins`. Git is installed too.
+1. **Disk is the only source of truth.** Studio connects via `rojo serve`. Never
+   edit scripts inside Studio, never `set_script_source` over MCP. MCP is for
+   building geometry, inspection and screenshots only.
+2. **Pure logic lives in `src/shared/Core/`, Instances live at the edges.** If a
+   function can be written without touching an Instance, it must be. That is
+   what makes it testable when play mode cannot be inspected.
+3. **Gameplay and cross-client paths use `src/shared/Net.luau`** (plain
+   RemoteEvents). Knit is lifecycle and DI scaffolding, not transport.
+4. **Cosmetics can never break gameplay.** Effects resolve async, fail inert,
+   and every one is pcall-isolated.
+5. **Every tunable lives in `src/shared/Config/`.** Never hardcode a number in a
+   Service or Controller.
 
-On a new machine: `rokit install`, then `wally install`.
-
-## How the code got onto disk (2026-11-05)
-
-The place was downloaded from Studio (File > Download a Copy) as `game32342.rbxl`, then pulled out with:
+## Layout
 
 ```
-rojo syncback default.project.json --input game32342.rbxl
+src/shared/Core/        pure Luau, headless-tested   - no Instances
+src/shared/Config/      every design tunable         - data only
+src/shared/Net.luau     the one networking module    - plain RemoteEvents
+src/server/Services/    server-authoritative logic   - Knit Services
+src/client/Controllers/ input, camera, rendering     - Knit Controllers
+tests/                  *.spec.luau, headless        - `lune run test`
 ```
 
-All 50 scripts in `src/` were checked against Studio and match exactly. Packages are skipped, because Wally provides them. To pull again after changes made in Studio, download a fresh copy and run the same command.
+## Commands
 
-## Daily use
+```sh
+aftman install                 # pinned tools
+wally install                  # Knit, Promise, Signal, Trove -> Packages/
+rojo serve                     # live-sync to Studio (the ONLY sync path)
+lune run test                  # headless test suite
+selene src                     # lint
+stylua src lune                # format
+python check.py                # all gates in order
+```
 
-- `rojo serve` and connect in Studio. Edit the files here, not in Studio, or the sync overwrites your Studio edits.
-- `selene src` checks for code problems. `stylua src` formats the code.
-- Open this folder in VS Code. The Luau, Selene and StyLua extensions are installed, and `.vscode/settings.json` points the Luau extension at this Rojo project, so autocomplete and type errors understand the game's requires. It keeps `sourcemap.json` up to date by itself.
-- Formatting on save is off, because StyLua would add a final newline to every file it touches. Format a file by hand (Shift+Alt+F) when you want to.
+## Working from a Rokit machine
 
-The project only manages `ReplicatedStorage.Shared`, `ReplicatedStorage.Packages`, `ServerScriptService.Server` and `StarterPlayer.StarterPlayerScripts.Client`. Everything else in the place (the map, sounds, settings) stays as it is in Studio.
+One machine uses Rokit instead of Aftman. `rokit.toml` pins its tools (Rojo 7.7.1, Wally 0.3.2,
+Selene 0.32.0, StyLua 2.6.0, luau-lsp 1.70.1): run `rokit install`, then `wally install`. Its Rojo
+Studio plugin must match its own Rojo version. `.vscode/settings.json` points the Luau extension at this
+Rojo project. How the systems fit together is in `Haymaker Tussle - System Overview.md`, and the
+controls and punch hitbox in `docs/Controls and Punch Hitbox.md`.

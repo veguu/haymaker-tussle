@@ -15,6 +15,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Typography = require(ReplicatedStorage.Shared.Typography)
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local TrainingLayout = require(ReplicatedStorage.Shared.Core.TrainingLayout)
@@ -135,7 +136,7 @@ local function floorText(
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBold
+	Typography.apply(label, "World")
 	label.TextColor3 = colour
 	label.TextScaled = true
 	label.TextWrapped = true
@@ -234,7 +235,13 @@ function TrainingService:AllowsFight(a: Model, b: Model): boolean
 		return false
 	end
 	if not playerA or not playerB then
-		return self:IsIn((playerA or playerB) :: Player) and cfg.DummiesEnabled
+		local dummy = if playerA then b else a
+		local inside = self:IsIn((playerA or playerB) :: Player)
+		-- The bot belongs to the 1v1 arena, and training dummies to training.
+		if dummy:GetAttribute(Combatants.BOT_ATTRIBUTE) then
+			return not inside and GameConfig.Debug.TestFloor
+		end
+		return inside and cfg.DummiesEnabled
 	end
 	local inA, inB = self:IsIn(playerA), self:IsIn(playerB)
 	if inA ~= inB then
