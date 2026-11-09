@@ -1,0 +1,478 @@
+{
+ "name": "HudLayout",
+ "theme": "default",
+ "resolution": [
+  1280,
+  720
+ ],
+ "kind": "hud",
+ "children": [
+  {
+   "type": "panel",
+   "name": "Actions",
+   "colour": "panel",
+   "size": [
+    0,
+    268,
+    0,
+    114
+   ],
+   "pos": [
+    1,
+    -16,
+    1,
+    -16
+   ],
+   "anchor": [
+    1,
+    1
+   ],
+   "transparent": false,
+   "children": [
+    {
+     "type": "frame",
+     "name": "PunchIcon",
+     "size": [
+      0,
+      18,
+      0,
+      18
+     ],
+     "pos": [
+      0,
+      14,
+      0,
+      18
+     ],
+     "colour": "gold"
+    },
+    {
+     "type": "label",
+     "name": "PunchName",
+     "text": "Punch",
+     "size": [
+      0,
+      82,
+      0,
+      26
+     ],
+     "pos": [
+      0,
+      42,
+      0,
+      14
+     ],
+     "textColour": "onDark",
+     "align": "left",
+     "textScale": 0.5,
+     "textStroke": 0
+    },
+    {
+     "type": "label",
+     "name": "PunchKey",
+     "text": "M1",
+     "size": [
+      0,
+      58,
+      0,
+      22
+     ],
+     "pos": [
+      0,
+      132,
+      0,
+      16
+     ],
+     "textColour": "onDark",
+     "align": "center",
+     "textScale": 0.68,
+     "textStroke": 0
+    },
+    {
+     "type": "label",
+     "name": "PunchStatus",
+     "text": "<unbound>",
+     "size": [
+      0,
+      58,
+      0,
+      26
+     ],
+     "pos": [
+      0,
+      198,
+      0,
+      14
+     ],
+     "textColour": "onDark",
+     "align": "right",
+     "textScale": 0.44,
+     "textStroke": 0,
+     "samples": [
+      "15.0s",
+      "HIT",
+      "MISS",
+      "NOW"
+     ]
+    },
+    {
+     "type": "frame",
+     "name": "PropelIcon",
+     "size": [
+      0,
+      18,
+      0,
+      18
+     ],
+     "pos": [
+      0,
+      14,
+      0,
+      52
+     ],
+     "colour": "gold"
+    },
+    {
+     "type": "label",
+     "name": "PropelName",
+     "text": "Propel",
+     "size": [
+      0,
+      82,
+      0,
+      26
+     ],
+     "pos": [
+      0,
+      42,
+      0,
+      48
+     ],
+     "textColour": "onDark",
+     "align": "left",
+     "textScale": 0.5,
+     "textStroke": 0
+    },
+    {
+     "type": "label",
+     "name": "PropelKey",
+     "text": "Q",
+     "size": [
+      0,
+      58,
+      0,
+      22
+     ],
+     "pos": [
+      0,
+      132,
+      0,
+      50
+     ],
+     "textColour": "onDark",
+     "align": "center",
+     "textScale": 0.68,
+     "textStroke": 0
+    },
+    {
+     "type": "label",
+     "name": "PropelStatus",
+     "text": "<unbound>",
+     "size": [
+      0,
+      58,
+      0,
+      26
+     ],
+     "pos": [
+      0,
+      198,
+      0,
+      48
+     ],
+     "textColour": "onDark",
+     "align": "right",
+     "textScale": 0.44,
+     "textStroke": 0,
+     "samples": [
+      "15.0s",
+      "HIT",
+      "MISS",
+      "NOW"
+     ]
+    },
+    {
+     "type": "frame",
+     "name": "AirKickIcon",
+     "size": [
+      0,
+      18,
+      0,
+      18
+     ],
+     "pos": [
+      0,
+      14,
+      0,
+      86
+     ],
+     "colour": "gold"
+    },
+    {
+     "type": "label",
+     "name": "AirKickName",
+     "text": "Air Kick",
+     "size": [
+      0,
+      82,
+      0,
+      26
+     ],
+     "pos": [
+      0,
+      42,
+      0,
+      82
+     ],
+     "textColour": "onDark",
+     "align": "left",
+     "textScale": 0.5,
+     "textStroke": 0
+    },
+    {
+     "type": "label",
+     "name": "AirKickKey",
+     "text": "SPACE",
+     "size": [
+      0,
+      58,
+      0,
+      22
+     ],
+     "pos": [
+      0,
+      132,
+      0,
+      84
+     ],
+     "textColour": "onDark",
+     "align": "center",
+     "textScale": 0.68,
+     "textStroke": 0
+    },
+    {
+     "type": "label",
+     "name": "AirKickStatus",
+     "text": "<unbound>",
+     "size": [
+      0,
+      58,
+      0,
+      26
+     ],
+     "pos": [
+      0,
+      198,
+      0,
+      82
+     ],
+     "textColour": "onDark",
+     "align": "right",
+     "textScale": 0.44,
+     "textStroke": 0,
+     "samples": [
+      "15.0s",
+      "HIT",
+      "MISS",
+      "NOW"
+     ]
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "name": "Vitals",
+   "colour": "panel",
+   "size": [
+    0,
+    380,
+    0,
+    72
+   ],
+   "pos": [
+    0.5,
+    0,
+    1,
+    -16
+   ],
+   "anchor": [
+    0.5,
+    1
+   ],
+   "children": [
+    {
+     "type": "label",
+     "name": "StaggerLabel",
+     "text": "STAGGER",
+     "size": [
+      0,
+      80,
+      0,
+      16
+     ],
+     "pos": [
+      0,
+      14,
+      0,
+      6
+     ],
+     "textColour": "onDark",
+     "align": "left",
+     "textScale": 0.94,
+     "textStroke": 0
+    },
+    {
+     "type": "frame",
+     "name": "StaggerTrack",
+     "size": [
+      0,
+      246,
+      0,
+      10
+     ],
+     "pos": [
+      0,
+      14,
+      0,
+      30
+     ],
+     "colour": "inkSoft"
+    },
+    {
+     "type": "label",
+     "name": "StaggerNumber",
+     "text": "<unbound>",
+     "size": [
+      0,
+      92,
+      0,
+      44
+     ],
+     "pos": [
+      0,
+      272,
+      0,
+      6
+     ],
+     "textColour": "onDark",
+     "align": "right",
+     "textScale": 0.77,
+     "textStroke": 0,
+     "samples": [
+      "100%"
+     ]
+    },
+    {
+     "type": "label",
+     "name": "SpeedLabel",
+     "text": "SPEED",
+     "size": [
+      0,
+      56,
+      0,
+      16
+     ],
+     "pos": [
+      0,
+      14,
+      0,
+      48
+     ],
+     "textColour": "onDark",
+     "align": "left",
+     "textScale": 0.94,
+     "textStroke": 0
+    },
+    {
+     "type": "label",
+     "name": "SpeedDigits",
+     "text": "<unbound>",
+     "size": [
+      0,
+      30,
+      0,
+      16
+     ],
+     "pos": [
+      0,
+      78,
+      0,
+      48
+     ],
+     "textColour": "onDark",
+     "align": "right",
+     "textScale": 0.94,
+     "textStroke": 0,
+     "samples": [
+      "120"
+     ]
+    },
+    {
+     "type": "label",
+     "name": "SpeedMax",
+     "text": "/ 36",
+     "size": [
+      0,
+      36,
+      0,
+      16
+     ],
+     "pos": [
+      0,
+      116,
+      0,
+      48
+     ],
+     "textColour": "onDark",
+     "align": "left",
+     "textScale": 0.94,
+     "textStroke": 0
+    },
+    {
+     "type": "frame",
+     "name": "GaugeBase",
+     "size": [
+      0,
+      62,
+      0,
+      4
+     ],
+     "pos": [
+      0,
+      160,
+      0,
+      54
+     ],
+     "colour": "inkSoft"
+    },
+    {
+     "type": "frame",
+     "name": "GaugeOver",
+     "size": [
+      0,
+      30,
+      0,
+      4
+     ],
+     "pos": [
+      0,
+      230,
+      0,
+      54
+     ],
+     "colour": "inkSoft"
+    }
+   ]
+  }
+ ]
+}

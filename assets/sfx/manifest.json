@@ -1,0 +1,94 @@
+{
+ "name": "Haymaker Tussle",
+ "sounds": [
+  {
+   "role": "punch_swing",
+   "id": 132239386768492,
+   "name": "Punch Swing Special",
+   "creator": "FooledPulse",
+   "length": 0.416,
+   "volume": 0.5,
+   "looped": false,
+   "kind": "SoundEffect",
+   "source": "Roblox Creator Store, free, inserted by id. No upload.",
+   "listing_was_wrong": "listing said 0.0s, Studio measured 0.416s"
+  },
+  {
+   "role": "punch_hit",
+   "id": 82235785832022,
+   "name": "Heavy_punch_impact_#3-1770242809040",
+   "creator": "MegaBloxxy",
+   "length": 1.0,
+   "volume": 0.7,
+   "looped": false,
+   "kind": "SoundEffect",
+   "source": "Roblox Creator Store, free, inserted by id. No upload."
+  },
+  {
+   "role": "bump",
+   "id": 9119323910,
+   "name": "Soccer Ball Kicks On Surfaces 4 (SFX)",
+   "creator": "ProSoundEffects",
+   "length": 0.708,
+   "volume": 0.4,
+   "looped": false,
+   "kind": "SoundEffect",
+   "source": "Roblox Creator Store, free, inserted by id. No upload.",
+   "listing_was_wrong": "listing said 1.0s, Studio measured 0.708s"
+  },
+  {
+   "role": "launch",
+   "id": 80454497832356,
+   "name": "Whoosh_8",
+   "creator": "NexusN51",
+   "length": 1.522,
+   "volume": 0.6,
+   "looped": false,
+   "kind": "SoundEffect",
+   "source": "Roblox Creator Store, free, inserted by id. No upload."
+  },
+  {
+   "role": "dash",
+   "id": 120777847710409,
+   "name": "momentum dash whoosh",
+   "creator": "Drexiit",
+   "length": 0.866,
+   "volume": 0.8,
+   "looped": false,
+   "kind": "SoundEffect",
+   "source": "Roblox Creator Store, free, inserted by id. No upload."
+  },
+  {
+   "role": "ground_break",
+   "id": 115163143171771,
+   "name": "Ground Rocks Impact Small Slam",
+   "creator": "GleonoffG",
+   "length": 1.122,
+   "volume": 0.8,
+   "looped": false,
+   "kind": "SoundEffect",
+   "source": "Roblox Creator Store, free, inserted by id. No upload."
+  }
+ ],
+ "unfilled": [],
+ "rejected": [
+  {
+   "role": "bump",
+   "id": 9120395943,
+   "name": "Vehicle Seat Grab 15 (SFX)",
+   "reason": "length 1.675s outside the 0.1-1.0s band for this role"
+  },
+  {
+   "role": "dash",
+   "id": 98988586485880,
+   "name": "Wind - Whoosh - Dense Air - Strong (Short) 01",
+   "reason": "length 3.344s outside the 0.5-3.2s band for this role"
+  },
+  {
+   "role": "dash",
+   "id": 9113069670,
+   "name": "Air Fingers Short Swooshing Bursts Sucking 2 (SFX)",
+   "reason": "replaced 2026-11-03: the user asked for a dash whoosh; 2.57 s clip faded out in 0.6 s"
+  }
+ ]
+}

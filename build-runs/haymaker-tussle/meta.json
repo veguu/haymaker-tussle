@@ -1,0 +1,58 @@
+{
+  "run": "haymaker-tussle",
+  "mode": "solo",
+  "started": "2026-11-03T18:00:08-08:00",
+  "plan": [
+    {
+      "stage": "market-research",
+      "budget_min": 45,
+      "parallelisable": true
+    },
+    {
+      "stage": "design-spec",
+      "budget_min": 45,
+      "parallelisable": false
+    },
+    {
+      "stage": "code",
+      "budget_min": 120,
+      "parallelisable": false
+    },
+    {
+      "stage": "3d-meshes",
+      "budget_min": 50,
+      "parallelisable": true
+    },
+    {
+      "stage": "materials",
+      "budget_min": 15,
+      "parallelisable": true
+    },
+    {
+      "stage": "ui",
+      "budget_min": 25,
+      "parallelisable": true
+    },
+    {
+      "stage": "animation",
+      "budget_min": 60,
+      "parallelisable": true
+    },
+    {
+      "stage": "sfx",
+      "budget_min": 45,
+      "parallelisable": true
+    },
+    {
+      "stage": "assembly-playtest",
+      "budget_min": 60,
+      "parallelisable": false
+    },
+    {
+      "stage": "publish",
+      "budget_min": 15,
+      "parallelisable": false
+    }
+  ],
+  "stall_minutes": 30
+}

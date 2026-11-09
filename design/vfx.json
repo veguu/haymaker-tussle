@@ -1,0 +1,25 @@
+{
+ "effects": [
+  {
+   "name": "PunchImpact",
+   "from": "FxController: pooled soft wind blobs and streaks, in the look the user asked for"
+  },
+  {
+   "name": "KnockbackTrail",
+   "from": "FxController: pooled soft wind blobs and streaks, in the look the user asked for"
+  },
+  {
+   "name": "BumpPuff",
+   "from": "FxController: pooled soft wind blobs and streaks, in the look the user asked for"
+  },
+  {
+   "name": "ShrinkEdgeWarning",
+   "from": "a recipe from the roblox-vfx library if one fits, otherwise a simple effect, logged as a fallback"
+  },
+  {
+   "name": "PropelTrail",
+   "from": "FxController: pooled soft wind blobs and streaks, in the look the user asked for"
+  }
+ ],
+ "note": "roblox-vfx. Brief asks for simple effects; none of them may change gameplay."
+}

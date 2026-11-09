@@ -1,0 +1,6 @@
+std = "roblox"
+
+[rules]
+unused_variable = "warn"
+deprecated = "deny"
+shadowing = "warn"

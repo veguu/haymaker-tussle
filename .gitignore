@@ -1,0 +1,13 @@
+Packages/
+ServerPackages/
+DevPackages/
+*.rbxlx.lock
+sourcemap.json
+
+# Python caches and local-only files
+__pycache__/
+*.pyc
+.env
+*.env
+.DS_Store
+Thumbs.db
