@@ -1,0 +1,232 @@
+{
+ "map": "gnomon",
+ "units": "1 Blender unit = 1 stud; fighting surface top at y = 0",
+ "meshes": [
+  {
+   "name": "Meadow",
+   "triangles": 508,
+   "texture": "gnomon_Meadow.png",
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Rim_Stone",
+   "triangles": 1024,
+   "texture": "gnomon_Rim_Stone.png",
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Cream",
+   "triangles": 584,
+   "texture": "gnomon_Strata_Cream.png",
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Sand",
+   "triangles": 152,
+   "texture": "gnomon_Strata_Sand.png",
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_BlueGrey",
+   "triangles": 182,
+   "texture": "gnomon_Strata_BlueGrey.png",
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Islands_Grass",
+   "triangles": 364,
+   "texture": "gnomon_Islands_Grass.png",
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Islands_Stone",
+   "triangles": 252,
+   "texture": "gnomon_Islands_Stone.png",
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Trees_Trunks",
+   "triangles": 360,
+   "texture": "gnomon_Gnomon_Trunk.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Trees_Canopies",
+   "triangles": 1728,
+   "texture": "gnomon_Gnomon_Canopy.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sundial_Island_Grass",
+   "triangles": 76,
+   "texture": "gnomon_Sundial_Island_Grass.png",
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sundial_Island_Stone",
+   "triangles": 44,
+   "texture": "gnomon_Sundial_Island_Stone.png",
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sundial_Dial",
+   "triangles": 156,
+   "texture": "gnomon_Sundial_Dial.png",
+   "texture_size": 512,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sundial_Marks",
+   "triangles": 144,
+   "texture": "gnomon_Gnomon_DialMarks.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sundial_Gnomon",
+   "triangles": 8,
+   "texture": "gnomon_Sundial_Gnomon.png",
+   "texture_size": 512,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sundial_GildedEdge",
+   "triangles": 20,
+   "texture": "gnomon_Gnomon_Gilt.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Low_1",
+   "triangles": 4480,
+   "texture": "gnomon_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Low_2",
+   "triangles": 4480,
+   "texture": "gnomon_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Low_3",
+   "triangles": 4480,
+   "texture": "gnomon_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Low_4",
+   "triangles": 3360,
+   "texture": "gnomon_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Sea_1",
+   "triangles": 4480,
+   "texture": "gnomon_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Sea_2",
+   "triangles": 4480,
+   "texture": "gnomon_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Sea_3",
+   "triangles": 4480,
+   "texture": "gnomon_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Sea_4",
+   "triangles": 4480,
+   "texture": "gnomon_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Sea_5",
+   "triangles": 4480,
+   "texture": "gnomon_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Sea_6",
+   "triangles": 4480,
+   "texture": "gnomon_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Sea_7",
+   "triangles": 4480,
+   "texture": "gnomon_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Horizon_1",
+   "triangles": 4480,
+   "texture": "gnomon_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Horizon_2",
+   "triangles": 2240,
+   "texture": "gnomon_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  }
+ ],
+ "glb": "gnomon.glb",
+ "all_within_limits": true
+}

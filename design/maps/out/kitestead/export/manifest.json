@@ -1,0 +1,240 @@
+{
+ "map": "kitestead",
+ "units": "1 Blender unit = 1 stud; fighting surface top at y = 0",
+ "meshes": [
+  {
+   "name": "Deck",
+   "triangles": 508,
+   "texture": "kitestead_Deck.png",
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Rim_PaintedEnds",
+   "triangles": 1024,
+   "texture": "kitestead_Rim_PaintedEnds.png",
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Underside_Beams",
+   "triangles": 528,
+   "texture": "kitestead_Underside_Beams.png",
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Underside_EndsRed",
+   "triangles": 336,
+   "texture": "kitestead_Kitestead_PaintRed.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Underside_EndsMustard",
+   "triangles": 336,
+   "texture": "kitestead_Kitestead_PaintMustard.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Underside_EndsGreen",
+   "triangles": 336,
+   "texture": "kitestead_Kitestead_PaintGreen.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Underside_RopeWraps",
+   "triangles": 896,
+   "texture": "kitestead_Kitestead_Rope.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Kites_Red",
+   "triangles": 364,
+   "texture": "kitestead_Kite_Red.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Kites_Mustard",
+   "triangles": 208,
+   "texture": "kitestead_Kite_Mustard.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Kites_Green",
+   "triangles": 208,
+   "texture": "kitestead_Kite_Green.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Kites_Cream",
+   "triangles": 364,
+   "texture": "kitestead_Kite_Cream.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Kites_Rigging",
+   "triangles": 396,
+   "texture": "kitestead_Kitestead_Rigging.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Near_1",
+   "triangles": 4480,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Near_2",
+   "triangles": 4480,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Near_3",
+   "triangles": 3360,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Mid_1",
+   "triangles": 4480,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Mid_2",
+   "triangles": 4480,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Mid_3",
+   "triangles": 4480,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Mid_4",
+   "triangles": 4480,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Sea_1",
+   "triangles": 4480,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Sea_2",
+   "triangles": 4480,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Sea_3",
+   "triangles": 4480,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Sea_4",
+   "triangles": 4480,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Sea_5",
+   "triangles": 4480,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Sea_6",
+   "triangles": 4480,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Sea_7",
+   "triangles": 4480,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Sea_8",
+   "triangles": 4480,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Horizon_1",
+   "triangles": 4480,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Horizon_2",
+   "triangles": 3360,
+   "texture": "kitestead_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  }
+ ],
+ "glb": "kitestead.glb",
+ "all_within_limits": true
+}

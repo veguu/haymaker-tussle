@@ -1,0 +1,192 @@
+{
+ "map": "saltcrest",
+ "units": "1 Blender unit = 1 stud; fighting surface top at y = 0",
+ "meshes": [
+  {
+   "name": "Plaza_Tiles",
+   "triangles": 508,
+   "texture": "saltcrest_Plaza_Tiles.png",
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Rim_Terracotta",
+   "triangles": 1024,
+   "texture": "saltcrest_Rim_Terracotta.png",
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Eaves_RoofTiles",
+   "triangles": 9568,
+   "texture": "saltcrest_Eaves_RoofTiles.png",
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Underside_Brick",
+   "triangles": 1782,
+   "texture": "saltcrest_Underside_Brick.png",
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Underside_TileLips",
+   "triangles": 3072,
+   "texture": "saltcrest_Saltcrest_GlazeLip.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Underside_CopperPipes",
+   "triangles": 588,
+   "texture": "saltcrest_Saltcrest_Copper.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Underside_Planters",
+   "triangles": 72,
+   "texture": "saltcrest_Underside_Planters.png",
+   "texture_size": 512,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Underside_PlanterBushes",
+   "triangles": 120,
+   "texture": "saltcrest_Saltcrest_Bush.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Below_Sea",
+   "triangles": 252,
+   "texture": "saltcrest_Below_Sea.png",
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Below_Land",
+   "triangles": 12800,
+   "texture": "saltcrest_Below_Land.png",
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Below_Village_Walls",
+   "triangles": 552,
+   "texture": "saltcrest_Saltcrest_Whitewash.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Below_Village_Roofs",
+   "triangles": 276,
+   "texture": "saltcrest_Below_Village_Roofs.png",
+   "texture_size": 512,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Below_Road",
+   "triangles": 720,
+   "texture": "saltcrest_Saltcrest_Road.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Below_Lighthouse_Red",
+   "triangles": 154,
+   "texture": "saltcrest_Saltcrest_LighthouseRed.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Below_Lighthouse_White",
+   "triangles": 176,
+   "texture": "saltcrest_Saltcrest_LighthouseWhite.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Below_Boat_Hulls",
+   "triangles": 108,
+   "texture": "saltcrest_Saltcrest_Hull.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Below_Boat_Sails",
+   "triangles": 36,
+   "texture": "saltcrest_Saltcrest_Sail.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Low_1",
+   "triangles": 4480,
+   "texture": "saltcrest_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Low_2",
+   "triangles": 3360,
+   "texture": "saltcrest_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Near_1",
+   "triangles": 4480,
+   "texture": "saltcrest_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Near_2",
+   "triangles": 1120,
+   "texture": "saltcrest_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Horizon_1",
+   "triangles": 4480,
+   "texture": "saltcrest_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Clouds_Horizon_2",
+   "triangles": 3360,
+   "texture": "saltcrest_Cloud.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  }
+ ],
+ "glb": "saltcrest.glb",
+ "all_within_limits": true
+}

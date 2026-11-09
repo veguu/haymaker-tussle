@@ -8,3 +8,4 @@
 *.blend binary
 *.ogg binary
 *.mp3 binary
+*.glb binary
