@@ -78,14 +78,28 @@ function SpeedAuditService:GetTrustedSpeed(model: Model): number
 	return math.min(math.sqrt(x * x + z * z), cfg.SpeedTrustCap)
 end
 
---- Where the model was, this many seconds ago. Falls back to the oldest sample.
-function SpeedAuditService:PositionAt(model: Model, secondsAgo: number): Vector3?
+--- Where the model was at `when`, on os.clock(). The newest point is where it is right now, so a moment
+--- after the last stored sample is drawn between that sample and the live position, not held at the
+--- sample. Falls back to the oldest sample.
+function SpeedAuditService:PositionAtTime(model: Model, when: number): Vector3?
+	local root = Combatants.rootOf(model)
+	local live = root and root.Position or nil
 	local history = histories[model]
 	if not history or #history == 0 then
-		local root = Combatants.rootOf(model)
-		return root and root.Position or nil
+		return live
 	end
-	local target = os.clock() - secondsAgo
+	local last = history[#history]
+	if when >= last.t then
+		if not live then
+			return last.pos
+		end
+		local span = os.clock() - last.t
+		if span <= 0 then
+			return live
+		end
+		return last.pos:Lerp(live, math.clamp((when - last.t) / span, 0, 1))
+	end
+	local target = when
 	for i = #history, 1, -1 do
 		local sample = history[i]
 		if sample.t <= target then
@@ -99,6 +113,11 @@ function SpeedAuditService:PositionAt(model: Model, secondsAgo: number): Vector3
 		end
 	end
 	return history[1].pos
+end
+
+--- Where the model was, this many seconds ago.
+function SpeedAuditService:PositionAt(model: Model, secondsAgo: number): Vector3?
+	return self:PositionAtTime(model, os.clock() - secondsAgo)
 end
 
 function SpeedAuditService:KnitStart()

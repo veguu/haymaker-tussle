@@ -23,14 +23,28 @@ local Combatants = require(script.Parent.Parent.Combatants)
 local cfg = GameConfig.Knockback
 local staggerCfg = GameConfig.Stagger
 local COLLISION_GROUP = "HT_Characters"
--- Short enough that two full-speed runners can't pass through the bump distance unseen.
+-- How often pairs are checked. A crossing too fast to be seen inside the bump distance is still caught,
+-- because each check also looks along the path since the last one (Combat.stepBumpPair).
 local BUMP_CHECK_SECONDS = 0.05
 
 local KnockbackService = Knit.CreateService({
 	Name = "KnockbackService",
 })
 
-local bumpTimes: { [Model]: { [Model]: number } } = {}
+-- Per pair, what the last check saw (Combat.BumpPair), keyed by the pair in a fixed order.
+local bumpPairs: { [Model]: { [Model]: Combat.BumpPair } } = {}
+-- A bump that qualified while one of the pair was mid-swing waits here for the swing to be decided.
+type Deferred = {
+	at: number,
+	closing: number,
+	lineX: number,
+	lineZ: number,
+	ax: number,
+	az: number,
+	bx: number,
+	bz: number,
+}
+local deferred: { [Model]: { [Model]: Deferred } } = {}
 
 local function setGroup(part: Instance)
 	if part:IsA("BasePart") then
@@ -67,17 +81,98 @@ function KnockbackService:Launch(
 	end
 end
 
-local function pairOnCooldown(a: Model, b: Model, now: number): boolean
-	local forA = bumpTimes[a]
-	local last = forA and forA[b]
-	return last ~= nil and now - last < cfg.BumpPairCooldown
+local function pairState(a: Model, b: Model): Combat.BumpPair
+	bumpPairs[a] = bumpPairs[a] or {}
+	local state = bumpPairs[a][b]
+	if not state then
+		state = Combat.newBumpPair()
+		bumpPairs[a][b] = state
+	end
+	return state
 end
 
-local function markPair(a: Model, b: Model, now: number)
-	bumpTimes[a] = bumpTimes[a] or {}
-	bumpTimes[b] = bumpTimes[b] or {}
-	bumpTimes[a][b] = now
-	bumpTimes[b][a] = now
+-- Can these two bump at all right now? A stationary training target, anyone in a skill, in the air or in
+-- a clash never does.
+local function eligible(combat: any, a: Model, b: Model): boolean
+	return combat:CanFight(a, b)
+		and not a:GetAttribute("HT_Skill")
+		and not b:GetAttribute("HT_Skill")
+		and not a:GetAttribute("HT_Air")
+		and not b:GetAttribute("HT_Air")
+		and not a:GetAttribute("HT_Clash")
+		and not b:GetAttribute("HT_Clash")
+		and not a:GetAttribute(Combatants.STATIONARY_ATTRIBUTE)
+		and not b:GetAttribute(Combatants.STATIONARY_ATTRIBUTE)
+end
+
+-- Both take the shove, along the line A was travelling relative to B.
+local function applyBump(self: any, a: Model, b: Model, bump: Deferred)
+	local outcome = Combat.bumpOutcome(
+		cfg,
+		staggerCfg,
+		GameConfig.Movement.PropelSpeed,
+		bump.closing,
+		bump.ax,
+		bump.az,
+		bump.bx,
+		bump.bz
+	)
+	local stagger = Knit.GetService("StaggerService")
+	stagger:AddAmount(a, outcome.staggerA)
+	stagger:AddAmount(b, outcome.staggerB)
+	self:Launch(
+		a,
+		-bump.lineX * outcome.knockA,
+		-bump.lineZ * outcome.knockA,
+		0,
+		0,
+		cfg.BumpSpeedKeep
+	)
+	self:Launch(
+		b,
+		bump.lineX * outcome.knockB,
+		bump.lineZ * outcome.knockB,
+		0,
+		0,
+		cfg.BumpSpeedKeep
+	)
+	self._bumpHappened:FireAllClients(a, b, math.floor(outcome.knockA), math.floor(outcome.knockB))
+	if workspace:GetAttribute("HaymakerCombatDebug") then
+		print(
+			`[Combat] bump {a.Name} and {b.Name}, closing {math.floor(bump.closing)}, knocks {math.floor(
+				outcome.knockA
+			)} and {math.floor(outcome.knockB)}, stagger {outcome.staggerA} and {outcome.staggerB}`
+		)
+	end
+end
+
+-- Decides a qualified bump against the punches between the same two. Returns true once it's settled
+-- (bumped or dropped), false while it has to wait.
+local function settleBump(
+	self: any,
+	combat: any,
+	a: Model,
+	b: Model,
+	bump: Deferred,
+	now: number
+): boolean
+	local verdict = Combat.bumpPriority(
+		combat:PunchPendingBetween(a, b),
+		combat:HitBetweenSince(a, b, bump.at - cfg.BumpPunchGuard),
+		now - bump.at < cfg.BumpHoldSeconds
+	)
+	if verdict == "wait" then
+		return now - bump.at > cfg.BumpDeferMax
+	elseif verdict == "drop" then
+		if workspace:GetAttribute("HaymakerCombatDebug") then
+			print(`[Combat] bump {a.Name} and {b.Name} dropped: a punch landed on the same impact`)
+		end
+		return true
+	end
+	if eligible(combat, a, b) then
+		applyBump(self, a, b, bump)
+	end
+	return true
 end
 
 function KnockbackService:_checkBumps()
@@ -85,106 +180,86 @@ function KnockbackService:_checkBumps()
 	local combat = Knit.GetService("CombatService")
 	local list = Combatants.all()
 	local now = os.clock()
+	local alive: { [Model]: boolean } = {}
+	for _, model in list do
+		alive[model] = true
+	end
 	for i = 1, #list do
-		local a = list[i]
-		local rootA = Combatants.rootOf(a)
+		local first = list[i]
 		for j = i + 1, #list do
-			local b = list[j]
-			local rootB = Combatants.rootOf(b)
+			local second = list[j]
+			-- A fixed order per pair, so its remembered state is found from either side.
+			local a, b = first, second
+			if bumpPairs[second] and bumpPairs[second][first] then
+				a, b = second, first
+			end
+			local rootA, rootB = Combatants.rootOf(a), Combatants.rootOf(b)
+			if not rootA or not rootB then
+				continue
+			end
+			local offset = rootB.Position - rootA.Position
+			local ax, az = audit:GetVelocity(a)
+			local bx, bz = audit:GetVelocity(b)
+			local state = pairState(a, b)
+			local nextState, closing =
+				Combat.stepBumpPair(cfg, state, offset.X, offset.Z, ax - bx, az - bz, now)
+			bumpPairs[a][b] = nextState
 			if
-				rootA
-				and rootB
-				and combat:CanFight(a, b)
-				and not pairOnCooldown(a, b, now)
-				and not a:GetAttribute("HT_Skill")
-				and not b:GetAttribute("HT_Skill")
-				and not a:GetAttribute("HT_Air")
-				and not b:GetAttribute("HT_Air")
-				and not a:GetAttribute("HT_Clash")
-				and not b:GetAttribute("HT_Clash")
-				and not a:GetAttribute(Combatants.STATIONARY_ATTRIBUTE)
-				and not b:GetAttribute(Combatants.STATIONARY_ATTRIBUTE)
+				closing
+				and math.abs(offset.Y) <= cfg.BumpVerticalLimit
+				and eligible(combat, a, b)
 			then
-				local offset = rootB.Position - rootA.Position
-				local flat = Vector3.new(offset.X, 0, offset.Z)
-				if
-					flat.Magnitude <= cfg.BumpDistance
-					and math.abs(offset.Y) <= cfg.BumpVerticalLimit
-				then
-					local ax, az = audit:GetVelocity(a)
-					local bx, bz = audit:GetVelocity(b)
-					local closing = Combat.closingSpeed(
-						rootA.Position.X,
-						rootA.Position.Z,
-						ax,
-						az,
-						rootB.Position.X,
-						rootB.Position.Z,
-						bx,
-						bz
-					)
-					if closing >= cfg.BumpMinClosingSpeed then
-						markPair(a, b, now)
-						local lineX, lineZ = Combat.bumpDirection(
-							rootA.Position.X,
-							rootA.Position.Z,
-							ax,
-							az,
-							rootB.Position.X,
-							rootB.Position.Z,
-							bx,
-							bz
-						)
-						local stagger = Knit.GetService("StaggerService")
-						local outcome = Combat.bumpOutcome(
-							cfg,
-							staggerCfg,
-							GameConfig.Movement.PropelSpeed,
-							closing,
-							ax,
-							az,
-							bx,
-							bz
-						)
-						stagger:AddAmount(a, outcome.staggerA)
-						stagger:AddAmount(b, outcome.staggerB)
-						self:Launch(
-							a,
-							-lineX * outcome.knockA,
-							-lineZ * outcome.knockA,
-							0,
-							0,
-							cfg.BumpSpeedKeep
-						)
-						self:Launch(
-							b,
-							lineX * outcome.knockB,
-							lineZ * outcome.knockB,
-							0,
-							0,
-							cfg.BumpSpeedKeep
-						)
-						self._bumpHappened:FireAllClients(
-							a,
-							b,
-							math.floor(outcome.knockA),
-							math.floor(outcome.knockB)
-						)
-						if workspace:GetAttribute("HaymakerCombatDebug") then
-							print(
-								`[Combat] bump {a.Name} and {b.Name}, closing {math.floor(closing)}, knocks {math.floor(
-									outcome.knockA
-								)} and {math.floor(outcome.knockB)}, stagger {outcome.staggerA} and {outcome.staggerB}`
-							)
-						end
-					end
+				local lineX, lineZ = Combat.bumpDirection(
+					rootA.Position.X,
+					rootA.Position.Z,
+					ax,
+					az,
+					rootB.Position.X,
+					rootB.Position.Z,
+					bx,
+					bz
+				)
+				local bump: Deferred = {
+					at = now,
+					closing = closing,
+					lineX = lineX,
+					lineZ = lineZ,
+					ax = ax,
+					az = az,
+					bx = bx,
+					bz = bz,
+				}
+				if not settleBump(self, combat, a, b, bump, now) then
+					deferred[a] = deferred[a] or {}
+					deferred[a][b] = bump
 				end
+			elseif closing then
+				-- Came into contact while unable to bump: that contact is spent, as if it had bumped.
+				nextState.lastBump = state.lastBump
 			end
 		end
 	end
-	for model in bumpTimes do
-		if model.Parent == nil then
-			bumpTimes[model] = nil
+	-- Bumps waiting on a swing between the same two.
+	for a, waiting in deferred do
+		for b, bump in waiting do
+			if not alive[a] or not alive[b] or settleBump(self, combat, a, b, bump, now) then
+				waiting[b] = nil
+			end
+		end
+		if next(waiting) == nil then
+			deferred[a] = nil
+		end
+	end
+	for model in bumpPairs do
+		if not alive[model] and model.Parent == nil then
+			bumpPairs[model] = nil
+		end
+	end
+	for _, forModel in bumpPairs do
+		for other in forModel do
+			if other.Parent == nil then
+				forModel[other] = nil
+			end
 		end
 	end
 end

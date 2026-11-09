@@ -43,7 +43,8 @@ type PunchRecord = {
 -- Someone a swing has reached, waiting on whether it's a hit or a clash.
 type Contact = {
 	target: Model,
-	at: Vector3,
+	at: Vector3, -- where the target was at the moment of contact
+	from: Vector3, -- where the attacker was at that same moment
 	decideAt: number,
 }
 
@@ -54,8 +55,10 @@ type Punch = {
 	side: string,
 	pressedAt: number, -- when they really pressed, as best the server can tell
 	impactAt: number, -- when their swing really strikes, on the same estimate
+	acceptedAt: number, -- when the server accepted the press; no contact before this counts
 	activeFrom: number,
 	activeUntil: number,
+	checkedTo: number?, -- how far the swept contact check has looked
 	ping: number,
 	rewind: number,
 	wild: boolean,
@@ -81,6 +84,16 @@ local lastHitAt: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
 local punches: { [Model]: Punch } = {}
 local botSides: { [Model]: string } = setmetatable({}, { __mode = "k" }) :: any
 local botLastSwing: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
+-- When a punch last landed between two fighters, either way round. A bump on the same pair at the same
+-- impact gives way to it (KnockbackService).
+local pairHits: { [Model]: { [Model]: number } } = setmetatable({}, { __mode = "k" }) :: any
+
+local function notePairHit(a: Model, b: Model, now: number)
+	pairHits[a] = pairHits[a] or setmetatable({}, { __mode = "k" }) :: any
+	pairHits[b] = pairHits[b] or setmetatable({}, { __mode = "k" }) :: any
+	pairHits[a][b] = now
+	pairHits[b][a] = now
+end
 
 local function trace(message: string)
 	if workspace:GetAttribute("HaymakerCombatDebug") then
@@ -169,19 +182,20 @@ local function sendDebug(self: any, punch: Punch, phase: string)
 end
 
 -- A swing lands on someone. Only ever runs once per target per swing.
-local function landHit(self: any, punch: Punch, target: Model, at: Vector3)
+local function landHit(self: any, punch: Punch, target: Model, at: Vector3, from: Vector3)
 	local audit = Knit.GetService("SpeedAuditService")
 	local stagger = Knit.GetService("StaggerService")
 	local knockback = Knit.GetService("KnockbackService")
 	local flat = punch.flat :: Vector3
-	local origin = punch.origin :: Vector3
 	local attackerSpeed = audit:GetTrustedSpeed(punch.attacker)
 	local before = stagger:Get(target)
 	local strength = Combat.punchStrength(knockCfg, staggerCfg, attackerSpeed, before)
 	stagger:AddHit(target)
 	self:MarkHit(target)
-	local away = Vector3.new(at.X - origin.X, 0, at.Z - origin.Z)
-	away = if away.Magnitude > 0.001 then away.Unit else flat
+	notePairHit(punch.attacker, target, os.clock())
+	-- Away from where the attacker was at the contact; inside each other, the way the punch was thrown.
+	local awayX, awayZ = Combat.punchAway(punchCfg, at.X - from.X, at.Z - from.Z, flat.X, flat.Z)
+	local away = Vector3.new(awayX, 0, awayZ)
 	punch.awayX += away.X
 	punch.awayZ += away.Z
 	local up, airUp = Combat.swingLift(knockCfg, punch.side, strength)
@@ -260,8 +274,11 @@ local function reaches(
 	return true, nil
 end
 
--- One frame of a live swing: who has it just reached?
-local function sample(self: any, punch: Punch, root: BasePart)
+-- One frame of a live swing: who has it just reached? It looks back over every moment since the last
+-- look (Combat.contactWindow), not only this frame, using where the server saw both bodies at each of
+-- those moments: the attacker as it was, the target rewound for what the attacker saw. So contact
+-- between two server frames counts, and so does a crossing in the short grace before the active frames.
+local function sample(self: any, punch: Punch, root: BasePart, now: number)
 	local flat = flatLook(root)
 	if not flat then
 		return
@@ -275,9 +292,26 @@ local function sample(self: any, punch: Punch, root: BasePart)
 	if punch.wild then
 		return
 	end
+	local from, to = Combat.contactWindow(
+		punchCfg,
+		punch.acceptedAt,
+		punch.activeFrom,
+		punch.activeUntil,
+		punch.checkedTo,
+		now
+	)
+	if not from or not to then
+		return
+	end
+	punch.checkedTo = to
 	local audit = Knit.GetService("SpeedAuditService")
 	local clash = Knit.GetService("ClashService")
 	local everyone: { Instance } = CollectionService:GetTagged(Combatants.TAG)
+	local times = Combat.sweepTimes(from, to, punchCfg.SweepStep)
+	local attackerAt: { Vector3? } = {}
+	for index, moment in times do
+		attackerAt[index] = audit:PositionAtTime(punch.attacker, moment)
+	end
 	-- The list holds each target once, and `reached` keeps it to once across the whole window.
 	for _, target in Combatants.all() do
 		if
@@ -296,16 +330,38 @@ local function sample(self: any, punch: Punch, root: BasePart)
 		then
 			continue
 		end
-		local at = audit:PositionAt(target, punch.rewind)
-		if not at then
+		local samples: { Combat.SweepSample } = {}
+		local seen: { { Vector3 } } = {}
+		for index, moment in times do
+			local a = attackerAt[index]
+			local b = audit:PositionAtTime(target, moment - punch.rewind)
+			if a and b then
+				table.insert(
+					samples,
+					{ ax = a.X, ay = a.Y, az = a.Z, tx = b.X, ty = b.Y, tz = b.Z }
+				)
+				table.insert(seen, { a, b })
+			end
+		end
+		if #samples == 0 then
 			continue
 		end
-		punch.tested[target] = at
-		local inside, why = reaches(punch, root.Position, flat, at, everyone)
-		if not inside then
-			punch.reasons[target] = why :: string
+		punch.tested[target] = seen[#seen][2]
+		local found, why = Combat.sweepReach(
+			punchCfg,
+			samples,
+			flat.X,
+			flat.Z,
+			punch.side,
+			function(index: number): boolean
+				return bodyInView(seen[index][1], seen[index][2], everyone)
+			end
+		)
+		if not found then
+			punch.reasons[target] = why or "range"
 			continue
 		end
+		local hitFrom, at = seen[found][1], seen[found][2]
 		punch.reached[target] = true
 		punch.reasons[target] = "reached"
 		-- A validated attack on someone in a clash bounces off. It does nothing else.
@@ -320,6 +376,7 @@ local function sample(self: any, punch: Punch, root: BasePart)
 		table.insert(punch.contacts, {
 			target = target,
 			at = at,
+			from = hitFrom,
 			decideAt = os.clock()
 				+ Clash.holdSeconds(clashCfg, punchCfg.Windup, punch.ping, targetPing),
 		})
@@ -393,7 +450,7 @@ local function settleContacts(self: any, punch: Punch, now: number): boolean
 					punch.repelled = true
 				end
 			elseif Combatants.isAlive(target) then
-				landHit(self, punch, target, contact.at)
+				landHit(self, punch, target, contact.at, contact.from)
 			end
 		end
 	end
@@ -427,9 +484,13 @@ local function stepPunch(self: any, punch: Punch, now: number)
 		punches[attacker] = nil
 		return
 	end
-	-- A slow frame can't skip a swing: it always gets at least one look.
-	if now >= punch.activeFrom and (now <= punch.activeUntil or not punch.sampled) then
-		sample(self, punch, root)
+	-- A slow frame can't skip a swing, or the end of one: looking continues until the whole window has
+	-- been looked at, however late the frame.
+	if
+		now >= punch.activeFrom
+		and (not punch.sampled or (punch.checkedTo or -math.huge) < punch.activeUntil)
+	then
+		sample(self, punch, root, now)
 	end
 	if not settleContacts(self, punch, now) then
 		return
@@ -485,6 +546,7 @@ local function startPunch(
 		side = side,
 		pressedAt = now - oneWay,
 		impactAt = now - oneWay + windup,
+		acceptedAt = now,
 		activeFrom = now + windup,
 		activeUntil = now + windup + punchCfg.ActiveSeconds,
 		ping = ping,
@@ -505,6 +567,19 @@ local function startPunch(
 end
 
 --- Someone was just hit: any punch they're winding up is beaten, and a kick in progress ends.
+--- Is either of these two mid-swing, with the swing still to be decided? A bump between them waits on it.
+function CombatService:PunchPendingBetween(a: Model, b: Model): boolean
+	local pa, pb = punches[a], punches[b]
+	return (pa ~= nil and not pa.wild) or (pb ~= nil and not pb.wild)
+end
+
+--- Did a punch land between these two, either way round, at or after `since` (os.clock())?
+function CombatService:HitBetweenSince(a: Model, b: Model, since: number): boolean
+	local forA = pairHits[a]
+	local at = forA and forA[b]
+	return at ~= nil and at >= since
+end
+
 function CombatService:MarkHit(target: Model)
 	lastHitAt[target] = os.clock()
 	Knit.GetService("KickService"):Cancel(target)

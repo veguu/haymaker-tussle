@@ -85,6 +85,9 @@ Every adjustable value in the game. All numbers are **starting guesses to tune b
 | `CooldownTolerance` | 0.06 | Forgives honest presses arriving bunched by a network hiccup. |
 | `MaxRewindSeconds` | 0.15 | Most the server will look back for a high-ping attacker. |
 | `InterpolationSeconds` | 0.05 | Added to the attacker's round-trip ping when looking back, for how far behind other players are drawn on their screen. An estimate: check it in real multiplayer. |
+| `GraceSeconds` | 0.05 | **Punch forgiveness.** How far before the active frames a swing still looks for contact, so bodies that crossed just before it went live count as a hit (resolved at the normal impact time). Never reaches back before the press was accepted. 0 turns it off. The test "the grace ends where it says" shows the boundary. |
+| `SweepStep` | 0.008 | Seconds between the moments a swing checks, back to the last check, using where the server saw both bodies. Catches contact that happens entirely between two server frames. Smaller is finer and costs more. |
+| `PointBlankRadius` | 0.75 | Closer than this, centre to centre, a landed punch throws the target the way the attacker faces instead of along their (noisy) offset, so exact overlap gets a steady shove. |
 | `RequestsPerSecondLimit` | 8 | Server rate limit on punch requests; extras are dropped. |
 
 ## Clash
@@ -124,32 +127,37 @@ Two opponents whose punches land at effectively the same moment, and would each 
 
 | Setting | Start | What it does |
 |---|---|---|
-| `BaseSpeed` | 55 | Launch speed in studs/s of a punch from a standing attacker on a target with no stagger. |
-| `SpeedBonusPerStud` | 0.9 | Extra launch speed per stud/s of the attacker's server-measured speed. |
+| `BaseSpeed` | 23 | Launch speed in studs/s of a punch from a standing attacker on a target with no stagger: about 4.6 studs of slide (measured), so one step puts you back in reach. Was 55 (26 studs of slide) until build contact-1. |
+| `SpeedBonusPerStud` | 0.38 | Extra launch speed per stud/s of the attacker's server-measured speed. Scaled down with `BaseSpeed` (was 0.9). |
 | `UpwardFraction` | 0.18 | Share of launch speed added upward on a grounded target. |
 | `UpwardMax` | 16 | Hard cap on upward launch speed. |
 | `AirborneUpwardFraction` | 0 | Share added upward if the target is already airborne; 0 stops punches juggling anyone into the sky. |
-| `UppercutLift` | 125 | Studs/s upward from an uppercut, on top of its normal punch push. With `Kick.AirGravityScale` that's about 57 studs high, and about 2.5 s in the air with the falling rule in `AirRecovery`. |
+| `UppercutLift` | 125 | Studs/s upward from an uppercut, on top of its normal punch push. With `Kick.AirGravityScale` that's about 57 studs high (measured +56 to +57), and about 1.7 s in the air with the falling rule in `AirRecovery`: 0.9 s up, 0.8 s down. |
 | `BumpPropelShare` | 0.4 | A bump's shove at its hardest, as a share of `Movement.PropelSpeed`: 34 studs/s, about 10 studs of slide. Stagger doesn't add to it. A test checks that it stays under half a propel, even with the faster player's edge. |
 | `BumpFullClosing` | 36 | Collision speed for a full shove. Softer collisions shove less. |
 | `BumpSoftShare` | 0.4 | The softest a bump can be, as a share of the full shove. |
 | `BumpSpeedKeep` | 0.6 | Share of running speed both keep through a bump. |
-| `BumpStaggerShare` | 0.5 | A bump's stagger as a share of a punch's: 6, or 7 and 5 with the full edge below. |
+| `BumpStaggerShare` | 0.25 | A bump's stagger as a share of a punch's: 1.8, or 2.1 and 1.5 with the full edge below (rounded to a tenth). If a punch lands on the same impact, only the punch counts. |
 | `BumpFullAdvantage` | 30 | How much faster one player must be moving, in studs/s, to get the whole edge below. Less gets part of it, and level speeds get none. |
 | `BumpEdgeShare` | 0.15 | The faster player's whole edge: they shove 15% harder and add 15% more stagger, and take 15% less of both. |
 | `BumpMinClosingSpeed` | 10 | Two players must close at this speed or more to bump. Softer collisions than this do nothing at all. |
 | `BumpDistance` | 3.5 | Two characters this close can bump. |
 | `BumpVerticalLimit` | 4 | Largest height difference that can still bump. |
 | `BumpPairCooldown` | 0.5 | Seconds before the same two players can bump again. |
+| `BumpReleaseMargin` | 0.5 | A bump is coming into contact, once. Contact ends only when the two are this much further apart than `BumpDistance`, so leaning on someone never bumps twice. |
+| `BumpPunchGuard` | 0.25 | A punch between the same two that landed up to this long before a bump counts as the same impact, and the bump is dropped. |
+| `BumpHoldSeconds` | 0.1 | A bump waits this long before it happens, so an M1 pressed just before contact can reach the server and take the impact instead. Bumps arrive this much later. 0 makes bumps instant. |
+| `BumpDeferMax` | 0.35 | Longest a bump waits on a swing between the same two before it's given up. |
+| `BumpMaxSweep` | 25 | A jump in the gap between two checks bigger than this, in studs, is a teleport (respawn), not a fast crossing, so it never bumps. |
 
 ## Stagger
 
 | Setting | Start | What it does |
 |---|---|---|
 | `Max` | 100 | Stagger cap. Stagger is knockback vulnerability, not health. |
-| `PerHit` | 12 | Stagger added per punch. |
-| `HitRelief` | 6 | Stagger the puncher loses when they land a hit, so winning exchanges is a way back from behind. |
-| `MaxKnockbackMultiplier` | 2.5 | Knockback multiplier at full stagger; 1 at none, linear between. |
+| `PerHit` | 7.2 | Stagger added per punch: 14 punches take a fresh fighter to full (a test checks it). Was 12 (9 punches). |
+| `HitRelief` | 3.6 | Stagger the puncher loses when they land a hit, so winning exchanges is a way back from behind. Half a punch, as before (was 6). |
+| `MaxKnockbackMultiplier` | 6 | Knockback multiplier at full stagger; 1 at none, linear between. Raised from 2.5 with the lower `BaseSpeed`, so a full-stagger finisher is as strong as before (about 138, a test checks it) while early hits are short shoves. |
 | `UsesValueBeforeHit` | true | A punch uses the target's stagger from BEFORE that hit, then adds PerHit. Keep this one rule everywhere. |
 | `RecoveryEnabled` | true | PROVISIONAL DEFAULT from the brief: stagger recovers after a period without being hit. |
 | `RecoveryDelay` | 3 | Seconds without being hit before recovery starts. A new confirmed hit restarts it; misses and being chased don't. |
@@ -438,9 +446,9 @@ Getting back to the platform. Each accepted punch in the air gives a push and a 
 | `MaxSpeed` | 60 | Fastest punches can carry you. A launch can still be faster, and pushing against one still gets all of it. |
 | `UpAssist` | 5 | Most lift one punch gives, in studs/s. Under 0.1 stud of height on its own. |
 | `UpAssistCeiling` | 6 | A punch only tops your vertical speed up to this, so it can't add to a rise. |
-| `FallGravityScale` | 0.24 | Share of normal gravity while falling. Lower hangs longer, and makes every recovery easier. The tests fail if punching could ever hold you up. |
-| `FallEaseSpeed` | 16 | Falling speed over which gravity eases from a launch's own to `FallGravityScale`. Higher makes the top of the arc softer. |
-| `MaxFallSpeed` | 30 | Fastest an ordinary fall gets. A kick's slam isn't limited by this. |
+| `FallGravityScale` | 1.3 | **Fall weight.** Share of normal gravity while falling, for everyone and everything (jumps, ledges, launches, kick rebounds and misses, dummies, and every prediction). Above 1 it's heavier than the rise, so launch heights don't change but the way down is quicker. An uppercut now comes down in about 0.81 s (was 1.96 s at 0.24). Lower hangs longer and makes recovery easier. |
+| `FallEaseSpeed` | 12 | Falling speed over which gravity eases from a launch's own to `FallGravityScale`. Higher makes the top of the arc softer and more readable. |
+| `MaxFallSpeed` | 90 | Fastest an ordinary fall gets, reached about 0.36 s into a drop. A kick's slam isn't limited by this. Keep `Animation.LandMinFallSpeed` below it. |
 | `FallDrag` | 120 | How fast anything falling faster than `MaxFallSpeed` slows back to it, in studs/s per second. A slam doesn't slow. |
 | `MinAirSeconds` | 0.1 | How long off the floor before a punch counts as airborne. Stops a stumble on the floor giving a push. |
 | `HitRecoilShare` | 0.5 | Share of `Punch.HitRecoilSpeed` a landed punch pushes you back with in the air. |
