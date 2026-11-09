@@ -1,9 +1,11 @@
-# Haymaker Tussle toolchain. Run `rokit install` after cloning.
-# Versions from the vault's External Tooling note (current as of October 2026).
+# Haymaker Tussle toolchain for machines that use Rokit. Run `rokit install` after cloning.
+# These versions MUST match aftman.toml, which the rest of the team uses: the Rojo Studio plugin has to
+# match the Rojo server, and StyLua/Selene versions decide what the format and lint checks accept.
+# Change both files together. luau-lsp is only here (editor type checking); Aftman machines don't need it.
 [tools]
-rojo = "rojo-rbx/rojo@7.7.1"
+rojo = "rojo-rbx/rojo@7.4.1"
 wally = "UpliftGames/wally@0.3.2"
-selene = "Kampfkarren/selene@0.32.0"
-stylua = "JohnnyMorganz/StyLua@2.6.0"
-luau-lsp = "JohnnyMorganz/luau-lsp@1.70.1"
+selene = "Kampfkarren/selene@0.28.0"
+stylua = "JohnnyMorganz/StyLua@0.20.0"
 lune = "lune-org/lune@0.8.9"
+luau-lsp = "JohnnyMorganz/luau-lsp@1.70.1"
