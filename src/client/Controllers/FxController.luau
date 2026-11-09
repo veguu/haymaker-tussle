@@ -189,7 +189,10 @@ function FxController:PropelGust(character: Model, direction: Vector3?, seconds:
 	local feet = root.Position - Vector3.yAxis * cfg.FootDrop
 	gustSide(feet, right, -forward, 1)
 	gustSide(feet, right, -forward, -1)
-	Sfx.play("propel", root, PITCH_VARY)
+	-- Three layers: a low push-off, the whoosh-and-thud, and a soft air tail.
+	Sfx.play("boom_low", root, 0, { pitch = 1.25, volume = 0.45, cut = 0.35 })
+	Sfx.play("dash", root, PITCH_VARY, { volume = 0.65 })
+	Sfx.play("propel", root, PITCH_VARY, { volume = 0.5 })
 end
 
 --- A puff of the propel's wind behind a punch thrown in the air, level with the body. It has no sound of
@@ -256,8 +259,11 @@ function FxController:HitBurst(target: Model, attacker: Model?, strength: number
 	streak(center - up * 0.6 + right * 0.4, away, 2.2 * scale, seconds * 0.6)
 	streak(center + right * -0.7, away, 1.8 * scale, seconds * 0.55)
 
-	Sfx.play("punch_hit", root, PITCH_VARY)
+	-- The crack on top, the old impact as its body, and on a strong hit a deep boom for weight.
+	Sfx.play("punch_crack", root, PITCH_VARY, { volume = 1.25 })
+	Sfx.play("punch_hit", root, PITCH_VARY, { volume = 0.55 })
 	if strong then
+		Sfx.play("boom_low", root, 0, { pitch = 1.1, volume = 0.8, cut = 0.5 })
 		Sfx.play("launch", root, PITCH_VARY)
 		-- Puffs left along the flight path, so a big launch is readable across the arena.
 		for index = 1, cfg.TrailPuffs do
@@ -339,7 +345,8 @@ function FxController:ClashRepel(target: Model, attacker: Model)
 	streak(center + right * 0.6, back, 2.8, cfg.HitBurstSeconds * 0.6)
 	streak(center - right * 0.6, back, 2.8, cfg.HitBurstSeconds * 0.6)
 	streak(center + Vector3.yAxis * 0.7, back, 2.2, cfg.HitBurstSeconds * 0.55)
-	Sfx.play("punch_hit", rootT, PITCH_VARY)
+	Sfx.play("punch_crack", rootT, PITCH_VARY, { volume = 0.8 })
+	Sfx.play("punch_hit", rootT, PITCH_VARY, { volume = 0.55 })
 end
 
 -- A camera hit that fades to exactly nothing: a shake and a quick widen of the view. This is the only
@@ -374,14 +381,16 @@ function FxController:CameraKick(size: number)
 end
 
 --- The kick landing, and the body it sent reaching the floor. Rings, a blast, debris streaks,
---- sound and camera.
+--- sound and camera. `landing` is the second of those: the slammed body hitting the floor, which
+--- gets the ground slam's sound at the body instead of the kick's crack.
 function FxController:KickImpact(
 	attacker: Model,
 	target: Model?,
 	position: Vector3,
 	hit: boolean,
 	share: number,
-	finisher: boolean?
+	finisher: boolean?,
+	landing: boolean?
 )
 	local up = Vector3.yAxis
 	local power = (if hit then 1 else 0.55) * share
@@ -463,17 +472,22 @@ function FxController:KickImpact(
 		)
 	end
 
+	-- One sound per moment: the kick's crack where it connects, then the ground slam where the body
+	-- lands. The two used to play the same thump and whoosh, which sounded like one sound twice.
 	local root = attacker:FindFirstChild("HumanoidRootPart")
-	local thump = Sfx.play("punch_hit", root, 0)
-	if thump then
-		thump.PlaybackSpeed = 0.72
-	end
-	local thud = Sfx.play("bump", root, 0)
-	if thud then
-		thud.PlaybackSpeed = 0.6
-	end
-	if hit then
-		Sfx.play("launch", root, PITCH_VARY)
+	if landing then
+		local body = target and target:FindFirstChild("HumanoidRootPart") or root
+		Sfx.play("ground_break", body, PITCH_VARY, { volume = 1.1 })
+		Sfx.play("boom_mid", body, 0, { pitch = 0.9, cut = 1 })
+		Sfx.play("punch_hit", body, 0, { pitch = 0.7, volume = 0.7 })
+	else
+		-- The crack itself comes from HitBurst on the target (the kick is a confirmed hit too), so this
+		-- adds only the kick's weight: a deeper body and a boom.
+		Sfx.play("punch_hit", root, 0, { pitch = 0.8, volume = 0.6 })
+		Sfx.play("boom_low", root, 0, { volume = 0.9, cut = 0.7 })
+		if hit then
+			Sfx.play("launch", root, PITCH_VARY)
+		end
 	end
 
 	-- Everyone feels it a little; whoever kicked or got kicked feels all of it.
@@ -679,13 +693,10 @@ function FxController:JumpBreak(character: Model, floorReach: number)
 			colour = if index % 2 == 0 then dust else nil,
 		})
 	end
-	local thump = Sfx.play("bump", root, PITCH_VARY)
-	if thump then
-		thump.PlaybackSpeed = if floor then 0.8 else 1.3
-		if not floor then
-			thump.Volume *= 0.5
-		end
-	end
+	Sfx.play("bump", root, 0, {
+		pitch = if floor then 0.8 else 1.3,
+		volume = if floor then 1 else 0.5,
+	})
 	if floor then
 		Sfx.play("ground_break", root, PITCH_VARY)
 	end
@@ -757,7 +768,15 @@ function FxController:KnitStart()
 				finisher: boolean?
 			)
 				if attacker and attacker.Parent then
-					self:KickImpact(attacker, target, position, hit, share, finisher == true)
+					self:KickImpact(
+						attacker,
+						target,
+						position,
+						hit,
+						share,
+						finisher == true,
+						stop <= 0
+					)
 					local anim = Knit.GetController("AnimController")
 					if stop > 0 then
 						anim:KickLanded(attacker, target, stop, share)
