@@ -1,13 +1,14 @@
 --!strict
 -- ImpactFx - the spark of a punch: a white star flash, thin spikes shooting out of it and a scatter of
--- small shards, all particles. A small one marks where a swing cuts the air, a big one where a punch
--- lands. Decoration on this client only: nothing here can collide, block a ray or affect gameplay.
+-- small shards, all particles, where a punch lands. A swing that hits nothing shows only a thin streak
+-- behind the fist (fistTrail). Decoration on this client only: nothing here can collide, block a ray or affect gameplay.
 --
 -- HOW IT'S BUILT. A few invisible anchored parts, each with its own set of emitters, made once and
 -- used in turn: a burst moves the next one to the spot and tells its emitters to throw a fixed number
 -- of particles. Nothing is created per punch. The textures are Roblox's own built-in ones, so there is
 -- nothing to upload.
 
+local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local ImpactFx = {}
@@ -157,6 +158,295 @@ function ImpactFx.burst(position: Vector3, direction: Vector3?, scale: number)
 		NumberSequenceKeypoint.new(1, 0.15 * scale),
 	})
 	kit.shards:Emit(count(10))
+end
+
+local fistTrails: { [BasePart]: Trail } = setmetatable({}, { __mode = "k" }) :: any
+local fistTokens: { [Trail]: number } = setmetatable({}, { __mode = "k" }) :: any
+
+--- A thin streak behind the fist of `arm` for `seconds`: the after-image of a swing. `width` is how
+--- thick it is in studs and `life` how long each bit of it lasts, so it stays short and close to the
+--- hand. One Trail per arm, made the first time that arm swings and reused.
+function ImpactFx.fistTrail(arm: BasePart, seconds: number, width: number, life: number)
+	local trail = fistTrails[arm]
+	if not trail or trail.Parent ~= arm then
+		local drop = arm.Size.Y / 2 - 0.15
+		local top = Instance.new("Attachment")
+		top.Name = "HT_FistTrailA"
+		top.Position = Vector3.new(0, -drop, width / 2)
+		top.Parent = arm
+		local bottom = Instance.new("Attachment")
+		bottom.Name = "HT_FistTrailB"
+		bottom.Position = Vector3.new(0, -drop, -width / 2)
+		bottom.Parent = arm
+		local made = Instance.new("Trail")
+		made.Name = "HT_FistTrail"
+		made.Attachment0 = top
+		made.Attachment1 = bottom
+		made.FaceCamera = true
+		made.MinLength = 0.05
+		made.Color = ColorSequence.new(WHITE, EDGE)
+		made.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.25),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		made.WidthScale = NumberSequence.new(1, 0.2)
+		made.LightEmission = 1
+		made.LightInfluence = 0
+		made.Enabled = false
+		made.Parent = arm
+		fistTrails[arm] = made
+		trail = made
+	end
+	local shown = trail :: Trail
+	shown.Lifetime = life
+	shown:Clear()
+	shown.Enabled = true
+	local token = (fistTokens[shown] or 0) + 1
+	fistTokens[shown] = token
+	task.delay(seconds, function()
+		if fistTokens[shown] == token then
+			shown.Enabled = false
+		end
+	end)
+end
+
+-- THE GROUND BLAST: what a body slamming into the floor throws up. A flash and spikes going up and out,
+-- a ring of light racing outward along the floor, a short pillar of light, embers drifting up and a
+-- skirt of dust. Its parts are made once and reused, like the bursts.
+local GOLD = Color3.fromRGB(255, 214, 120)
+local EMBER = Color3.fromRGB(255, 150, 50)
+local DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
+local BLASTS = 3
+
+type Blast = {
+	part: Part,
+	flash: ParticleEmitter,
+	spikes: ParticleEmitter,
+	embers: ParticleEmitter,
+	dust: ParticleEmitter,
+	ring: Part,
+	pillar: Part,
+}
+
+local blasts: { Blast } = {}
+local nextBlast = 1
+local blastHolder: Folder? = nil
+
+local function glowPart(parent: Instance, name: string): Part
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Shape = Enum.PartType.Cylinder
+	part.Material = Enum.Material.Neon
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Transparency = 1
+	part.Size = Vector3.new(0.2, 1, 1)
+	part.CFrame = PARK
+	part.Parent = parent
+	return part
+end
+
+local function buildBlast(parent: Instance): Blast
+	local part = Instance.new("Part")
+	part.Name = "HT_GroundBlast"
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Transparency = 1
+	part.Size = Vector3.new(0.2, 0.2, 0.2)
+	part.CFrame = PARK
+	local at = Instance.new("Attachment")
+	-- Emitters throw along the attachment's front, which here points straight up.
+	at.CFrame = CFrame.lookAt(Vector3.zero, Vector3.yAxis, Vector3.zAxis)
+	at.Parent = part
+
+	local flash = emitter(at, "Flash")
+	flash.Lifetime = NumberRange.new(0.12, 0.18)
+	flash.Speed = NumberRange.new(0)
+	flash.Rotation = NumberRange.new(0, 360)
+	flash.Brightness = 7
+	flash.ZOffset = 2
+	flash.Color = ColorSequence.new(WHITE, GOLD)
+	flash.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.6, 0.15),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+
+	local spikes = emitter(at, "Spikes")
+	spikes.Orientation = Enum.ParticleOrientation.VelocityParallel
+	spikes.Lifetime = NumberRange.new(0.14, 0.28)
+	spikes.SpreadAngle = Vector2.new(80, 80)
+	spikes.Drag = 6
+	spikes.Squash = NumberSequence.new(-3.4)
+	spikes.Brightness = 5
+	spikes.Color = ColorSequence.new(WHITE, GOLD)
+	spikes.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.7, 0.2),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+
+	-- Embers: small sparks thrown up that slow, hang and drift higher as they go out.
+	local embers = emitter(at, "Embers")
+	embers.Lifetime = NumberRange.new(0.7, 1.4)
+	embers.SpreadAngle = Vector2.new(55, 55)
+	embers.Drag = 3
+	embers.Acceleration = Vector3.new(0, 9, 0)
+	embers.Rotation = NumberRange.new(0, 360)
+	embers.Brightness = 4
+	embers.Color = ColorSequence.new(GOLD, EMBER)
+	embers.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.75, 0.15),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+
+	-- Dust: thrown out low all round, swelling as it fades. Lit by the scene, so it reads as dirt.
+	local dust = Instance.new("ParticleEmitter")
+	dust.Name = "Dust"
+	dust.Texture = DUST_TEXTURE
+	dust.Rate = 0
+	dust.Enabled = false
+	dust.Lifetime = NumberRange.new(0.6, 1.1)
+	dust.SpreadAngle = Vector2.new(88, 88)
+	dust.Drag = 4
+	dust.Rotation = NumberRange.new(0, 360)
+	dust.RotSpeed = NumberRange.new(-50, 50)
+	dust.Color = ColorSequence.new(Color3.fromRGB(214, 200, 180))
+	dust.LightEmission = 0.15
+	dust.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.45),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	dust.Parent = at
+
+	part.Parent = parent
+	return {
+		part = part,
+		flash = flash,
+		spikes = spikes,
+		embers = embers,
+		dust = dust,
+		ring = glowPart(parent, "HT_GroundRing"),
+		pillar = glowPart(parent, "HT_GroundPillar"),
+	}
+end
+
+local function takeBlast(): Blast
+	local parent = blastHolder
+	if not parent or parent.Parent == nil then
+		local made = Instance.new("Folder")
+		made.Name = "HT_GroundBlastFx"
+		made.Parent = workspace
+		blastHolder = made
+		parent = made
+		blasts = {}
+		nextBlast = 1
+	end
+	local blast = blasts[nextBlast]
+	if not blast then
+		blast = buildBlast(parent :: Folder)
+		blasts[nextBlast] = blast
+	end
+	nextBlast = nextBlast % BLASTS + 1
+	return blast
+end
+
+-- A flat glowing disc or an upright column: a cylinder grown and faded out. A cylinder's length runs
+-- along its X axis, so it is turned to point that up. `upright` keeps its foot on the floor as it grows.
+local function glow(
+	part: Part,
+	at: Vector3,
+	upright: boolean,
+	from: Vector3,
+	to: Vector3,
+	colour: Color3,
+	startTransparency: number,
+	seconds: number
+)
+	local stand = CFrame.new(at) * CFrame.Angles(0, 0, math.pi / 2)
+	part.Color = colour
+	part.Size = from
+	part.Transparency = startTransparency
+	part.CFrame = if upright then stand * CFrame.new(from.X / 2, 0, 0) else stand
+	local goal: { [string]: any } = { Size = to, Transparency = 1 }
+	if upright then
+		goal.CFrame = stand * CFrame.new(to.X / 2, 0, 0)
+	end
+	local tween = TweenService:Create(
+		part,
+		TweenInfo.new(seconds, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		goal
+	)
+	tween.Completed:Connect(function()
+		if part.Transparency >= 1 then
+			part.CFrame = PARK
+		end
+	end)
+	tween:Play()
+end
+
+--- An explosion on the floor at `position` (a point on the floor's surface), `scale` times the size of
+--- an ordinary slam landing.
+function ImpactFx.groundBlast(position: Vector3, scale: number)
+	local blast = takeBlast()
+	local at = position + Vector3.yAxis * 0.25
+	blast.part.CFrame = CFrame.new(at)
+
+	blast.flash.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 4 * scale),
+		NumberSequenceKeypoint.new(0.35, 11 * scale),
+		NumberSequenceKeypoint.new(1, 7 * scale),
+	})
+	blast.flash:Emit(2)
+
+	blast.spikes.Speed = NumberRange.new(70 * scale, 150 * scale)
+	blast.spikes.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 3.4 * scale),
+		NumberSequenceKeypoint.new(1, 0.9 * scale),
+	})
+	blast.spikes:Emit(count(22))
+
+	blast.embers.Speed = NumberRange.new(18 * scale, 52 * scale)
+	blast.embers.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.55 * scale),
+		NumberSequenceKeypoint.new(1, 0.1 * scale),
+	})
+	blast.embers:Emit(count(34))
+
+	blast.dust.Speed = NumberRange.new(16 * scale, 34 * scale)
+	blast.dust.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 2.5 * scale),
+		NumberSequenceKeypoint.new(1, 8 * scale),
+	})
+	blast.dust:Emit(count(16))
+
+	glow(
+		blast.ring,
+		at,
+		false,
+		Vector3.new(0.15, 3 * scale, 3 * scale),
+		Vector3.new(0.15, 34 * scale, 34 * scale),
+		GOLD,
+		0.35,
+		0.4
+	)
+	glow(
+		blast.pillar,
+		at,
+		true,
+		Vector3.new(14 * scale, 2.4 * scale, 2.4 * scale),
+		Vector3.new(26 * scale, 0.3 * scale, 0.3 * scale),
+		WHITE,
+		0.3,
+		0.3
+	)
 end
 
 return ImpactFx

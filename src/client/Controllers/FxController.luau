@@ -50,6 +50,17 @@ local pool: { Part } = {}
 local rockPool: { Part } = {}
 -- When each character's propel ends, which is the only time they make drift smoke.
 local propelEnds: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
+-- What each effect is adding to the field of view right now, so a kick's punch and a dash's zoom stack
+-- instead of overwriting each other.
+local kickFov = 0
+local dashFov = 0
+local DASH_ZOOM_IN_SECONDS = 0.1
+-- The charge: its sound (sped up as it builds), how far along it is, and whether the view is trembling.
+local chargeSound: Sound? = nil
+local chargePower = 0
+local chargeShaking = false
+local CHARGE_PITCH_LOW = 0.5
+local CHARGE_PITCH_HIGH = 0.95
 
 local function takePart(): Part
 	local part = table.remove(pool)
@@ -193,6 +204,72 @@ end
 --- charging sees this.
 function FxController:PropelCharge(character: Model, power: number?)
 	DashFx.charge(character, power)
+	local name = "HT_ChargeShake"
+	if power == nil then
+		Sfx.stop(chargeSound)
+		chargeSound = nil
+		if chargeShaking then
+			chargeShaking = false
+			RunService:UnbindFromRenderStep(name)
+		end
+		return
+	end
+	chargePower = math.clamp(power, 0, 1)
+	-- A swell of air that rises in pitch as the charge builds.
+	if not chargeSound then
+		local root = character:FindFirstChild("HumanoidRootPart")
+		chargeSound = Sfx.play("dash_charge", root, 0, { pitch = CHARGE_PITCH_LOW })
+	end
+	if chargeSound then
+		chargeSound.PlaybackSpeed = CHARGE_PITCH_LOW
+			+ (CHARGE_PITCH_HIGH - CHARGE_PITCH_LOW) * chargePower
+	end
+	-- A slight tremble of the view, growing with the charge.
+	if not chargeShaking then
+		chargeShaking = true
+		RunService:BindToRenderStep(name, Enum.RenderPriority.Camera.Value + 2, function()
+			local camera = workspace.CurrentCamera
+			if camera then
+				local wobble = os.clock() * 55
+				local size = cfg.ChargeShakeStuds * chargePower
+				camera.CFrame *= CFrame.new(
+					math.sin(wobble) * size,
+					math.cos(wobble * 1.3) * size,
+					0
+				)
+			end
+		end)
+	end
+end
+
+--- Your own dash pulls the view wider for as long as it runs, and wider still the more it was charged:
+--- the field of view eases out fast, then back in as the dash fades. `power` is 0 to 1.
+function FxController:DashZoom(seconds: number, power: number?)
+	local camera = workspace.CurrentCamera
+	if not camera or seconds <= 0 then
+		return
+	end
+	local name = "HT_DashZoom"
+	RunService:UnbindFromRenderStep(name)
+	local baseFov = self._baseFov or (camera.FieldOfView - kickFov - dashFov)
+	self._baseFov = baseFov
+	local started = os.clock()
+	local peak = cfg.DashFovPunch * (1 + cfg.DashFovChargeBonus * math.clamp(power or 0, 0, 1))
+	local function ease(share: number): number
+		local x = math.clamp(share, 0, 1)
+		return x * x * (3 - 2 * x)
+	end
+	RunService:BindToRenderStep(name, Enum.RenderPriority.Camera.Value + 2, function()
+		local t = os.clock() - started
+		if t >= seconds then
+			dashFov = 0
+			camera.FieldOfView = baseFov + kickFov
+			RunService:UnbindFromRenderStep(name)
+			return
+		end
+		dashFov = peak * ease(t / DASH_ZOOM_IN_SECONDS) * ease((seconds - t) / (seconds * 0.6))
+		camera.FieldOfView = baseFov + kickFov + dashFov
+	end)
 end
 
 --- A puff of the propel's wind behind a punch thrown in the air, level with the body. It has no sound of
@@ -360,14 +437,15 @@ function FxController:CameraKick(size: number)
 	end
 	local name = "HT_CameraKick"
 	RunService:UnbindFromRenderStep(name)
-	local baseFov = self._baseFov or camera.FieldOfView
+	local baseFov = self._baseFov or (camera.FieldOfView - kickFov - dashFov)
 	self._baseFov = baseFov
 	local started = os.clock()
 	-- After the lock-on camera, which replaces the stock camera's view at Camera + 1.
 	RunService:BindToRenderStep(name, Enum.RenderPriority.Camera.Value + 2, function()
 		local share = (os.clock() - started) / cfg.KickShakeSeconds
 		if share >= 1 then
-			camera.FieldOfView = baseFov
+			kickFov = 0
+			camera.FieldOfView = baseFov + dashFov
 			RunService:UnbindFromRenderStep(name)
 			return
 		end
@@ -378,7 +456,8 @@ function FxController:CameraKick(size: number)
 			math.cos(wobble * 1.3) * size * left * cfg.KickShakeStuds,
 			0
 		)
-		camera.FieldOfView = baseFov + cfg.KickFovPunch * size * left
+		kickFov = cfg.KickFovPunch * size * left
+		camera.FieldOfView = baseFov + kickFov + dashFov
 	end)
 end
 
@@ -479,6 +558,10 @@ function FxController:KickImpact(
 	local root = attacker:FindFirstChild("HumanoidRootPart")
 	if landing then
 		local body = target and target:FindFirstChild("HumanoidRootPart") or root
+		-- The floor breaks and blows up where they hit it, whatever kind of kick sent them there.
+		if target and body and body:IsA("BasePart") then
+			self:GroundBlast(target, body, power)
+		end
 		Sfx.play("ground_break", body, PITCH_VARY, { volume = 1.1 })
 		Sfx.play("boom_mid", body, 0, { pitch = 0.9, cut = 1 })
 		Sfx.play("punch_hit", body, 0, { pitch = 0.7, volume = 0.7 })
@@ -662,6 +745,17 @@ end
 
 --- The spring of a jump: the floor breaks under the feet, and smoke and dust burst out around them in a
 --- ring, drifting up and fading. With no floor within `floorReach`, it's only the smoke.
+--- A kicked body hitting the floor: the floor under it breaks up (the same rocks and cracks as a jump's
+--- push-off) and an explosion goes off on it (ImpactFx.groundBlast). Nothing happens with no floor in
+--- reach, such as past the platform's edge. `power` is the kick's strength, about 0.5 to 1.3.
+function FxController:GroundBlast(body: Model, root: BasePart, power: number)
+	local floor = findFloor(body, root, cfg.GroundBlastReach)
+	if floor then
+		breakFloor(floor)
+		ImpactFx.groundBlast(floor.Position, cfg.GroundBlastScale * math.max(power, 0.6))
+	end
+end
+
 function FxController:JumpBreak(character: Model, floorReach: number)
 	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked on the next line)
 	if not root then
@@ -704,18 +798,21 @@ function FxController:JumpBreak(character: Model, floorReach: number)
 	end
 end
 
---- A swing: its sound, played as soon as the punch starts, and a small spark where the fist cuts the
---- air as it goes live, which marks how far the punch reaches.
+--- A swing: its sound, played as soon as the punch starts, and a thin streak behind the fist, the
+--- after-image of the arm going through. The spark is kept for punches that land (HitBurst).
 function FxController:Swing(character: Model)
+	local arm = Knit.GetController("AnimController"):SwingArm(character)
+	if arm then
+		local punch = GameConfig.Punch
+		ImpactFx.fistTrail(
+			arm,
+			punch.Windup + punch.ActiveSeconds + cfg.FistTrailSeconds,
+			cfg.FistTrailWidth,
+			cfg.FistTrailSeconds
+		)
+	end
 	local root = character:FindFirstChild("HumanoidRootPart")
-	if root and root:IsA("BasePart") then
-		task.delay(GameConfig.Punch.Windup, function()
-			if root.Parent then
-				local look = root.CFrame.LookVector
-				local reach = root.Position + look * GameConfig.Punch.Range + Vector3.yAxis * 0.6
-				ImpactFx.burst(reach, look, cfg.SwingSparkScale)
-			end
-		end)
+	if root then
 		-- Heavy: a low whoosh with a thud in it that peaks as the punch goes active, over the old
 		-- swing's air, pitched down.
 		Sfx.play("swing_heavy", root, PITCH_VARY, { pitch = 0.88, volume = 0.5 })
@@ -768,6 +865,16 @@ local function driftSmoke(character: Model)
 end
 
 function FxController:KnitStart()
+	-- Someone was dashed into: shown as a hit, at the body, sized by how hard.
+	local dashHit = Net.client("DashHit")
+	if dashHit then
+		dashHit.OnClientEvent:Connect(function(dasher: Model, target: Model, strength: number)
+			if dasher and target and dasher.Parent and target.Parent then
+				Knit.GetController("AnimController"):HitLanded(dasher, target, strength)
+				self:HitBurst(target, dasher, strength)
+			end
+		end)
+	end
 	local impact = Net.client("KickImpact")
 	if impact then
 		impact.OnClientEvent:Connect(

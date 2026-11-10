@@ -55,6 +55,17 @@ local SoundBank: { [string]: Entry } = {
 		name = "Doppler Whooshes Crackly Airy Bursts (SFX)",
 		creator = "ProSoundEffects",
 	},
+	-- A dash being charged: the same gusts as `dash` from their quiet start, played slow (FxController
+	-- sets the speed, rising with the charge), so it is a swell of air that builds for about a second.
+	["dash_charge"] = {
+		takes = {
+			{ id = 9114157694, length = 2.29, start = 0.05, volume = 1.6 },
+			{ id = 9114157695, length = 2.29, start = 0.05, volume = 1.6 },
+		},
+		looped = false,
+		name = "Doppler Whooshes Crackly Airy Bursts (SFX)",
+		creator = "ProSoundEffects",
+	},
 	-- The weight of a punch being thrown: a whoosh with a whipping thud in it (it was the dash in
 	-- move-2). Each take starts so its peak lands about 0.08 s after the press, as the punch goes active.
 	["swing_heavy"] = {

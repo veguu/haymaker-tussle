@@ -27,6 +27,8 @@ local CFG: Momentum.Settings = {
 	PropelChargeSeconds = 1,
 	PropelChargedSpeed = 110,
 	PropelChargedTurnScale = 0.08,
+	PropelChargeMoveSpeed = 7,
+	PropelChargeBrake = 140,
 	ReverseDeceleration = 40,
 	TurnRateLowSpeed = 540,
 	TurnRateHighSpeed = 110,
@@ -741,5 +743,21 @@ return {
 		local tap, full = bend(0), bend(1)
 		assert(full > 0, "a full charge can't be steered at all")
 		assert(full < tap * 0.5, `full bent {full}, tap {tap}`)
+	end,
+
+	["charging a dash slows you to a creep, and you can still creep"] = function()
+		local state = atSpeed(36)
+		for _ = 1, 60 do
+			state = Momentum.step(state, CFG, 0, -1, true, DT)
+			state = Momentum.chargeSlow(state, CFG, DT)
+		end
+		assert(state.speed == CFG.PropelChargeMoveSpeed, `still doing {state.speed}`)
+		assert(CFG.PropelChargeMoveSpeed < CFG.MaxSpeed / 3, "the creep isn't slow")
+		-- already slower: left alone
+		local slow = atSpeed(2)
+		assert(Momentum.chargeSlow(slow, CFG, DT) == slow)
+		-- it's a brake, not a wall: one frame doesn't stop a runner dead
+		local once = Momentum.chargeSlow(atSpeed(36), CFG, DT)
+		assert(once.speed < 36 and once.speed > CFG.PropelChargeMoveSpeed)
 	end,
 }

@@ -37,6 +37,8 @@ Every adjustable value in the game. All numbers are **starting guesses to tune b
 | `PropelChargeSeconds` | 1 | Holding the dash key charges it. This is the longest hold that counts: at this many seconds it is fully charged and goes by itself. Letting go earlier dashes at whatever it has built. |
 | `PropelChargedSpeed` | 140 | Top speed of a fully charged dash. A tap is `PropelSpeed`; a part charge sits in between. |
 | `PropelChargedTurnScale` | 0.08 | Share of the normal turn rate the keys get during a fully charged dash. A tap is `PropelTurnScale`; the more charge, the harder it is to steer. |
+| `PropelChargeMoveSpeed` | 7 | Fastest you can move while holding the dash key to charge it. Running speed is `MaxSpeed`, so this is a creep. |
+| `PropelChargeBrake` | 140 | How hard you are braked down to `PropelChargeMoveSpeed` when you start charging, in studs/s per second. |
 | `SideStopDeceleration` | 45 | Studs/s lost per second after releasing A, D or S. Only W earns the coast. |
 | `CoastMaxAngle` | 45 | When you let go of A or D, you only keep the long coast if you're heading within this many degrees of where the camera looks. Further off, you stop quickly at `SideStopDeceleration`. Letting go of W always coasts, wherever the camera turns afterward. |
 | `ForwardInputThreshold` | 0.3 | How much of the input must point along the camera to count as W (or against it, as S). W+D counts as W. |
@@ -135,6 +137,16 @@ Two opponents whose punches land at effectively the same moment, and would each 
 | `AirborneUpwardFraction` | 0 | Share added upward if the target is already airborne; 0 stops punches juggling anyone into the sky. |
 | `UppercutLift` | 125 | Studs/s upward from an uppercut, on top of its normal punch push. With `Kick.AirGravityScale` that's about 57 studs high (measured +56 to +57), and about 1.7 s in the air with the falling rule in `AirRecovery`: 0.9 s up, 0.8 s down. |
 | `BumpPropelShare` | 0.4 | A bump's shove at its hardest, as a share of `Movement.PropelSpeed`: 34 studs/s, about 10 studs of slide. Stagger doesn't add to it. A test checks that it stays under half a propel, even with the faster player's edge. |
+| `DashHitMinCharge` | 0.6 | Running into someone while dashing is a hit, not a bump, only if the dash was charged at least this much (0 is a tap, 1 a full second). Below it, it is the ordinary bump. |
+| `DashHitMinSpeed` | 90 | The server must also have measured the dasher at least this fast. Keep it above `Movement.PropelSpeed` (a tap dash), so claiming a charge that was not held gets nothing; a test checks it. |
+| `DashHitPushShare` | 0.9 | The push a dash hit gives, as a share of the dasher's measured speed: about 106 at the lowest charge that hits, 126 at full. They are thrown the way the dasher was going, and slide further than the dasher's whole dash; a test checks that. |
+| `DashHitMaxPush` | 130 | A dash hit never pushes harder than this. |
+| `DashHitFullSpeed` | 140 | Speed counted as a full dash. Anything measured above it counts as this. |
+| `DashHitLift` | 16 | Upward speed a dash hit gives someone standing on the floor. |
+| `DashHitStagger` | 12 | Stagger a dash hit at `DashHitFullSpeed` adds. Slower hits add a share of it. |
+| `DashHitReach` | 6 | A dash hit lands on anyone this many studs ahead along the dasher's path, plus `DashHitLeadSeconds` of travel. A bump only notices at `BumpDistance` (3.5), by which time a dasher is already through them. |
+| `DashHitLeadSeconds` | 0.12 | Extra reach, as seconds of the dasher's speed (about 17 studs at a full 140). It makes up for the server seeing bodies late and the push taking a moment to arrive. Raise it if hits still feel late, lower it if they land before contact. |
+| `DashHitWidth` | 4.5 | How far to either side of the dasher's path still counts. |
 | `BumpFullClosing` | 36 | Collision speed for a full shove. Softer collisions shove less. |
 | `BumpSoftShare` | 0.4 | The softest a bump can be, as a share of the full shove. |
 | `BumpSpeedKeep` | 0.6 | Share of running speed both keep through a bump. |
@@ -342,7 +354,13 @@ The training arena beside the 1v1 arena: a hub, six station platforms joined to 
 | `DashStreakSquash` | 3 | How thin and long each streak is stretched along its flight. 0 is a round sparkle. |
 | `DashDustCount` | 10 | Dust puffs kicked back from the feet when a dash starts on the ground. |
 | `DashChargeRate` | 14 | Sparks per second at the feet when a dash starts charging. It rises to four times this at a full charge. The dash and its sparks are white for a tap, through yellow, to fiery orange at full. |
-| `SwingSparkScale` | 0.4 | Size of the small spark where a swing cuts the air, as a share of a landed punch's spark. It sits at `Punch.Range` in front of the puncher, so it shows how far the punch reaches. |
+| `FistTrailWidth` | 0.45 | Thickness in studs of the thin streak behind the fist on every swing. The spark only shows on a punch that lands. |
+| `FistTrailSeconds` | 0.13 | How long each bit of the fist streak lasts, which sets its length. Keep it short: it is an after-image, not a ribbon. |
+| `ChargeShakeStuds` | 0.07 | How far the view trembles at a full dash charge. It grows from nothing as the charge builds. 0 turns it off. |
+| `DashFovPunch` | 8 | Degrees the field of view widens during your own tap dash. |
+| `DashFovChargeBonus` | 1 | Extra widening at a full charge, as a share of `DashFovPunch`: 1 means a full dash widens twice as much as a tap. |
+| `GroundBlastReach` | 12 | When a kicked player hits the floor, the floor is looked for this many studs below their middle. With none in reach (past the edge) there is no explosion and no broken ground. |
+| `GroundBlastScale` | 1 | Size of the explosion where a kicked player hits the floor: flash, spikes, embers, dust, a ring along the floor and a pillar of light. It also grows with how well the kick was timed. |
 
 ## Debug
 
@@ -429,6 +447,7 @@ The air kick. An uppercut launches someone, who can steer and propel in the air.
 | `FollowUpOwnRange` | 170 | The same for your own uppercut's launch. A strong uppercut throws them 150 studs within a second. |
 | `FollowUpAimWeight` | 0.6 | How much where you face counts in the pick: distance times (1 + this x (1 - cos)/2), so directly behind counts 1.6 times as far. |
 | `FollowUpOwnShare` | 0.8 | Your own launch counts this share as far, so it wins a close call. |
+| `FollowUpOthers` | false | Whether you can air-kick someone another player launched. Off: only the one whose uppercut put them in the air can follow it up, so nobody takes someone else's launch. `FollowUpRange` only matters when this is on. |
 | `HoldTimeout` | 2.5 | Longest the target is ever held still, whatever goes wrong. Its own client lets go at this deadline too (`HT_HoldUntil`). |
 | `JumpMissGrace` | 0.15 | Seconds past the snap's end that it counts as missed if it hasn't reached them, say because a wall was in the way. |
 | `MissCarryKeep` | 18 | After a miss you go back to normal movement in the air, travelling at no more than this speed. Higher carries you further the way you were going. |
@@ -478,6 +497,12 @@ The air kick. An uppercut launches someone, who can steer and propel in the air.
 | `FinisherLift` | 45 | Studs/s a finisher sends them up. |
 | `FinisherStunSeconds` | 0.45 | Seconds they can't act after a finisher, then they can punch to recover as usual. |
 | `FinisherShake` | 1.3 | Camera shake for the kicker and the kicked on a finisher, as a multiple of a normal kick's. |
+| `CrashSeconds` | 1.2 | For this long after an air kick sends someone flying, their body hits anyone it flies into (not the kicker). 0 turns crashes off. |
+| `CrashDistance` | 5 | How close the flying body has to pass to someone to hit them, in studs. |
+| `CrashMinSpeed` | 30 | The flying body must still be moving at least this fast, measured by the server. |
+| `CrashPush` | 90 | How hard the one crashed into is thrown, the way the body was going. A regular punch at full run is about 55. |
+| `CrashLift` | 22 | Upward speed the crash gives someone standing on the floor. |
+| `CrashStagger` | 15 | Stagger the crash adds. Each flying body hits each player once. The kicker gets the credit. |
 
 ## AirRecovery
 

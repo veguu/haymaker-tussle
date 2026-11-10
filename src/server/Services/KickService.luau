@@ -15,6 +15,13 @@
 -- THE FINISHER. A kick graded in FinisherGrades launches the target hard away from the kicker and up,
 -- with a short loss of control (FinisherStunSeconds). Only a perfect (green) press is a finisher by
 -- default; anything else slams them down, a knockdown.
+-- WHOSE LAUNCH. Only the one whose uppercut put a target in the air can follow it up (FollowUpOthers
+-- off): nobody takes someone else's launch.
+-- THE AIM. A perfect (green) kick sends them toward where the kicker's cursor points instead of straight
+-- away from the kicker. The press carries that direction, and it's only ever a direction: it's
+-- flattened and made a unit vector here, and used for nothing but which way a green kick throws them.
+-- THE CRASH. A body an air kick has sent flying is dangerous to whoever it flies into for a moment
+-- (CrashSeconds): they're thrown the way it was going and staggered, once, and the kicker is credited.
 -- HT_Stunned is the loss of control: a finisher's short one, a knockdown's from the slam until
 -- KnockdownSeconds after landing, or a green slam's (when green isn't a finisher) until they've landed
 -- from the bounce. Every path out of it clears on a timer too.
@@ -60,6 +67,7 @@ local JUMP_ALLOWANCE = 15 -- a jump's message arrives after the body has already
 local AIR_LIMIT_SECONDS = 8 -- nothing floats for longer than this, whatever went wrong
 local TELEPORT_STUDS = 30 -- further than this in one frame, a body was moved rather than travelling
 local SLAM_WATCH_SECONDS = 3 -- gives up waiting for a kicked body to reach the floor
+local FLIGHT_WATCH_SECONDS = 6 -- gives up waiting for a body a finisher threw to come down
 
 local KickService = Knit.CreateService({
 	Name = "KickService",
@@ -79,6 +87,7 @@ type Record = {
 	facedAt: number,
 	grade: DiveKick.Grade,
 	stopUntil: number,
+	aim: Vector3?, -- where the kicker's cursor pointed at the press, flat and unit
 }
 
 local active: { [Player]: Record } = {}
@@ -211,6 +220,80 @@ function KickService:Release(model: Model)
 	self:Cancel(model)
 end
 
+-- Bodies an air kick has just sent flying: who kicked them, until when they're dangerous, where they were
+-- last frame (their speed is measured here, not taken from their client), and who they've hit already.
+type Flight = {
+	kicker: Model,
+	untilAt: number,
+	last: Vector3?,
+	lastAt: number,
+	struck: { [Model]: boolean },
+}
+local flights: { [Model]: Flight } = setmetatable({}, { __mode = "k" }) :: any
+
+local function startFlight(target: Model, kicker: Model)
+	if cfg.CrashSeconds > 0 then
+		flights[target] = {
+			kicker = kicker,
+			untilAt = os.clock() + cfg.CrashSeconds,
+			last = nil,
+			lastAt = os.clock(),
+			struck = {},
+		}
+	end
+end
+
+-- One frame of every flight: anyone the flying body reaches while it's still moving fast is hit.
+local function stepFlights(self: any, now: number)
+	for body, flight in flights do
+		local root = Combatants.rootOf(body)
+		if now >= flight.untilAt or not root or body.Parent == nil then
+			flights[body] = nil
+			continue
+		end
+		local at = root.Position
+		local last = flight.last
+		local dt = now - flight.lastAt
+		flight.last, flight.lastAt = at, now
+		if not last or dt <= 0 then
+			continue
+		end
+		local travel = at - last
+		local speed = travel.Magnitude / dt
+		if speed < cfg.CrashMinSpeed or speed > TELEPORT_STUDS / dt then
+			continue
+		end
+		local combat = Knit.GetService("CombatService")
+		for _, other in Combatants.all() do
+			local otherRoot = other ~= body
+				and other ~= flight.kicker
+				and not flight.struck[other]
+				and Combatants.rootOf(other)
+			if
+				otherRoot
+				and (otherRoot.Position - at).Magnitude <= cfg.CrashDistance
+				and Combatants.isAlive(other)
+				and other:GetAttribute(AIR_ATTRIBUTE) ~= "hold"
+				and combat:CanFight(body, other)
+			then
+				flight.struck[other] = true
+				local flat = Vector3.new(travel.X, 0, travel.Z)
+				if flat.Magnitude < 0.05 then
+					flat = Vector3.new(otherRoot.Position.X - at.X, 0, otherRoot.Position.Z - at.Z)
+				end
+				local way = if flat.Magnitude > 0.001 then flat.Unit else Vector3.new(0, 0, -1)
+				trace(`{body.Name} crashed into {other.Name} at {math.floor(speed)}`)
+				Knit.GetService("StaggerService"):AddAmount(other, cfg.CrashStagger)
+				combat:MarkHit(other)
+				Knit.GetService("RoundService"):NoteHit(other, flight.kicker)
+				Knit.GetService("KnockbackService")
+					:Launch(other, way.X * cfg.CrashPush, way.Z * cfg.CrashPush, cfg.CrashLift, 0)
+				self._crash:FireAllClients(body, other, cfg.CrashPush)
+			end
+		end
+	end
+end
+
 -- The kick connects, and the timing decides how hard: outward away from the kicker, down, and in
 -- stagger, all together. Full force is the same push as a regular punch, so that a good kick wins
 -- the arena's edge the way any other hit does. A green kick bounces them off the floor when they
@@ -251,6 +334,10 @@ function KickService:_impact(player: Player, record: Record)
 	local away = if flat.Magnitude > 0.01
 		then flat.Unit
 		else Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
+	-- A perfect kick goes where the kicker pointed.
+	if record.grade == "green" and record.aim then
+		away = record.aim
+	end
 	local slam = if finisher then 0 else cfg.SlamSpeed * share
 	trace(
 		`{player.Name} kicked {target.Name}: {record.grade}{if finisher then " finisher" else ""}, {math.floor(
@@ -290,6 +377,32 @@ function KickService:_impact(player: Player, record: Record)
 				cfg.FinisherLift,
 				cfg.FinisherLift
 			)
+			startFlight(target, character)
+			-- Wherever they come down, the floor takes it: the same landing a slam gets, so every kicked
+			-- body breaks the ground it hits. Past the edge there is no floor, and nothing happens.
+			local started = os.clock()
+			local last = targetRoot.Position
+			local moved = false
+			task.wait(LIFTOFF_SECONDS)
+			repeat
+				task.wait()
+				moved = (targetRoot.Position - last).Magnitude > TELEPORT_STUDS
+				last = targetRoot.Position
+			until target.Parent == nil
+				or moved
+				or touchingFloor(targetRoot)
+				or os.clock() - started >= FLIGHT_WATCH_SECONDS
+			if target.Parent and not moved and touchingFloor(targetRoot) and character.Parent then
+				trace(`{target.Name} hit the floor after a finisher`)
+				self._impactEvent:FireAllClients(
+					character,
+					target,
+					targetRoot.Position,
+					true,
+					share,
+					0
+				)
+			end
 		end)
 		task.delay(cfg.RecoverSeconds, function()
 			if active[player] == record then
@@ -316,6 +429,7 @@ function KickService:_impact(player: Player, record: Record)
 		end
 		Knit.GetService("RoundService"):NoteHit(target, character)
 		knockback:Launch(target, away.X * push, away.Z * push, 0, -slam)
+		startFlight(target, character)
 		local started = os.clock()
 		local last = targetRoot.Position
 		local moved = false -- sent somewhere else, such as home after falling off
@@ -397,6 +511,7 @@ local function jumpTarget(player: Player, character: Model, root: BasePart): (Mo
 			other
 			and target ~= character
 			and target:GetAttribute(AIR_ATTRIBUTE) == "float"
+			and (cfg.FollowUpOthers or target:GetAttribute(AIR_BY_ATTRIBUTE) == player.UserId)
 			and Combatants.isAlive(target)
 			and combat:CanFight(character, target)
 			and clearPath(root.Position, other.Position)
@@ -446,6 +561,7 @@ function KickService:KnitInit()
 	self._hitConfirmed = Net.server("HitConfirmed")
 	self._accepted = Net.server("KickAccepted")
 	self._lockOn = Net.server("LockOnState")
+	self._crash = Net.server("DashHit")
 end
 
 function KickService:KnitStart()
@@ -564,8 +680,15 @@ function KickService:KnitStart()
 
 	self._commit.OnServerEvent:Connect(function(player: Player, ...)
 		local record = active[player]
-		if select("#", ...) ~= 0 or not record or record.phase ~= "attach" then
+		if select("#", ...) > 1 or not record or record.phase ~= "attach" then
 			return
+		end
+		local aim = ...
+		if typeof(aim) == "Vector3" then
+			local x, z = DiveKick.aimDirection(aim.X, aim.Z)
+			if x and z then
+				record.aim = Vector3.new(x, 0, z)
+			end
 		end
 		-- Both messages are delayed by the same trip, so the gap between them is the real timing.
 		local since = os.clock() - record.phaseAt
@@ -581,6 +704,7 @@ function KickService:KnitStart()
 
 	RunService.Heartbeat:Connect(function()
 		local now = os.clock()
+		stepFlights(self, now)
 		for target, since in launched do
 			-- Whatever interrupted it, nobody stays held in the air without someone holding them.
 			if target:GetAttribute(AIR_ATTRIBUTE) == "hold" then

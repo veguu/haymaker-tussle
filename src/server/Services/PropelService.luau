@@ -20,6 +20,20 @@ local PropelService = Knit.CreateService({
 })
 
 local lastPropel: { [Player]: number } = {}
+local lastPower: { [Player]: number } = {}
+local DASH_SLACK = 0.15 -- a dash counts this much past its length, for what the server sees late
+
+--- How charged this body's dash is (0 to 1) if it is in one right now, as far as the server knows, or
+--- nil if it isn't. Only a player who asked for a dash within the last PropelSeconds is in one. The
+--- charge is what the client said, so whoever uses it must also check the speed the server measured.
+function PropelService:DashPower(model: Model): number?
+	local player = Combatants.playerOf(model)
+	local last = player and lastPropel[player]
+	if player and last and os.clock() - last <= cfg.PropelSeconds + DASH_SLACK then
+		return lastPower[player] or 0
+	end
+	return nil
+end
 
 function PropelService:KnitInit()
 	self._request = Net.server("PropelRequest")
@@ -46,6 +60,7 @@ function PropelService:KnitStart()
 			return
 		end
 		lastPropel[player] = now
+		lastPower[player] = power
 		for _, other in Players:GetPlayers() do
 			if other ~= player then
 				self._started:FireClient(other, player, power)
@@ -54,6 +69,7 @@ function PropelService:KnitStart()
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		lastPropel[player] = nil
+		lastPower[player] = nil
 	end)
 end
 

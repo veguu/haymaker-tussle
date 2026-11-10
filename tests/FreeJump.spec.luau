@@ -97,4 +97,28 @@ return {
 			assert(top <= KICK.LeapGuideMaxSpeed + 0.001, `too fast: {top}`)
 		end
 	end,
+
+	["a kick's aim from a client is only ever a flat unit direction, or nothing"] = function()
+		local x, z = DiveKick.aimDirection(3, -4)
+		assert(x and z and math.abs(x - 0.6) < 1e-9 and math.abs(z + 0.8) < 1e-9)
+		local hx, hz = DiveKick.aimDirection(1e9, 0)
+		assert(hx == 1 and hz == 0, "a huge vector should still be one stud long")
+		assert(DiveKick.aimDirection(0, 0) == nil, "no direction pointed somewhere")
+		assert(DiveKick.aimDirection(0 / 0, 1) == nil, "NaN got through")
+		assert(DiveKick.aimDirection(math.huge, 1) == nil, "infinity got through")
+	end,
+
+	["nobody follows up someone else's launch"] = function()
+		assert(KICK.FollowUpOthers == false, "follow-ups on other players' launches are on")
+	end,
+
+	["a kicked body that crashes into someone hits hard, but under a finisher"] = function()
+		assert(KICK.CrashPush >= 60, "the crash is hardly a hit")
+		assert(KICK.CrashPush < KICK.FinisherMaxSpeed, "a crash throws harder than the kick itself")
+		assert(KICK.CrashStagger > 0, "a crash adds no stagger")
+		assert(
+			KICK.CrashMinSpeed < KICK.SlamSpeed * KICK.RedShare,
+			"a weak slam is too slow to crash"
+		)
+	end,
 }

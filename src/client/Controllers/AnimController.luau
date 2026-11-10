@@ -541,6 +541,13 @@ function AnimController:AtStrike(model: Model?, callback: () -> ())
 end
 
 --- Where the fist was at the strike, if that was just now.
+--- The arm this fighter's current (or last) swing is thrown with, for effects that ride the fist.
+function AnimController:SwingArm(model: Model?): BasePart?
+	local fighter = model and fighters[model]
+	local arm = fighter and fighter.strikeArm and (model :: Model):FindFirstChild(fighter.strikeArm)
+	return if arm and arm:IsA("BasePart") then arm else nil
+end
+
 function AnimController:StrikeTip(model: Model?): Vector3?
 	local fighter = model and fighters[model]
 	if fighter and fighter.strikeTip and os.clock() - fighter.strikeAt <= TIP_LIFE then

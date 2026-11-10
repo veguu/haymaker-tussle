@@ -40,6 +40,8 @@ export type Settings = {
 	PropelChargeSeconds: number,
 	PropelChargedSpeed: number,
 	PropelChargedTurnScale: number,
+	PropelChargeMoveSpeed: number,
+	PropelChargeBrake: number,
 	ReverseDeceleration: number,
 	TurnRateLowSpeed: number,
 	TurnRateHighSpeed: number,
@@ -596,6 +598,17 @@ function Momentum.chargePower(cfg: Settings, heldSeconds: number): number
 		return 0
 	end
 	return math.clamp(heldSeconds / cfg.PropelChargeSeconds, 0, 1)
+end
+
+--- While a burst is being charged you can only creep: anything faster than PropelChargeMoveSpeed is
+--- braked down to it at PropelChargeBrake. Call it after the ordinary step, for as long as the key is held.
+function Momentum.chargeSlow(state: State, cfg: Settings, dt: number): State
+	if not isFinite(dt) or dt <= 0 or state.speed <= cfg.PropelChargeMoveSpeed then
+		return state
+	end
+	local nextState = table.clone(state)
+	nextState.speed = math.max(state.speed - cfg.PropelChargeBrake * dt, cfg.PropelChargeMoveSpeed)
+	return nextState
 end
 
 --- Top speed of a burst this charged: PropelSpeed for a tap, up to PropelChargedSpeed at full.

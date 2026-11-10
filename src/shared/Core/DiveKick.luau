@@ -367,6 +367,19 @@ function DiveKick.grade(cfg: Settings, since: number, qteAt: number): Grade
 	return "red"
 end
 
+--- A direction a client sent, made safe: flat, and exactly one stud long. Nil for anything that isn't a
+--- usable direction (not finite, or too short to point anywhere).
+function DiveKick.aimDirection(x: number, z: number): (number?, number?)
+	if x ~= x or z ~= z or math.abs(x) == math.huge or math.abs(z) == math.huge then
+		return nil, nil
+	end
+	local size = math.sqrt(x * x + z * z)
+	if size < 0.001 then
+		return nil, nil
+	end
+	return x / size, z / size
+end
+
 --- How much of the kick's full force this grade gets, for the outward push, the slam and stagger.
 function DiveKick.gradeShare(cfg: Settings, grade: Grade): number
 	if grade == "green" then

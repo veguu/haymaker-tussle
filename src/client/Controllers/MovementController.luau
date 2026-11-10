@@ -23,6 +23,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ContextActionService = game:GetService("ContextActionService")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local StarterPlayer = game:GetService("StarterPlayer")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
@@ -314,7 +315,8 @@ function MovementController:_bind(
 				local own = other:GetAttribute("HT_AirBy") == myId
 				local range = if own then kickCfg.FollowUpOwnRange else kickCfg.FollowUpRange
 				if
-					(at - position).Magnitude <= range
+					(own or kickCfg.FollowUpOthers)
+					and (at - position).Magnitude <= range
 					and workspace:Raycast(position, at - position, params) == nil
 				then
 					table.insert(models, other :: Model)
@@ -338,6 +340,33 @@ function MovementController:_bind(
 			candidates
 		)
 		return if index then models[index] else nil
+	end
+
+	-- Where a perfect kick should send them: toward the spot on the floor under the cursor, as a flat
+	-- direction from the target. Without a mouse (touch, gamepad), or with the cursor on the sky, it's
+	-- the way the camera looks.
+	local function kickAim(targetRoot: BasePart?): Vector3?
+		local camera = workspace.CurrentCamera
+		if not camera or not targetRoot then
+			return nil
+		end
+		local from = targetRoot.Position
+		if UserInputService.MouseEnabled then
+			local mouse = UserInputService:GetMouseLocation()
+			local ray = camera:ViewportPointToRay(mouse.X, mouse.Y)
+			local floorY = GameConfig.Arena.CenterY
+			if ray.Direction.Y < -0.01 then
+				local reach = (floorY - ray.Origin.Y) / ray.Direction.Y
+				local spot = ray.Origin + ray.Direction * reach
+				local toSpot = Vector3.new(spot.X - from.X, 0, spot.Z - from.Z)
+				if reach > 0 and toSpot.Magnitude > 1 then
+					return toSpot.Unit
+				end
+			end
+		end
+		local viewing = camera.CFrame.LookVector
+		local level = Vector3.new(viewing.X, 0, viewing.Z)
+		return if level.Magnitude > 0.01 then level.Unit else nil
 	end
 
 	-- The server's pick for the follow-up. It only counts for a squat waiting on it, so a late answer
@@ -710,7 +739,10 @@ function MovementController:_bind(
 			end
 		elseif pressed and kick.phase == "attach" then
 			if kickRemotes.commit then
-				kickRemotes.commit:FireServer()
+				local aimAt = kickTarget and kickTarget:FindFirstChild("HumanoidRootPart")
+				kickRemotes.commit:FireServer(
+					kickAim(if aimAt and aimAt:IsA("BasePart") then aimAt else nil)
+				)
 			end
 			kick = DiveKick.press(kick)
 			kickAwaiting = true
@@ -985,6 +1017,7 @@ function MovementController:_bind(
 					state = propelled
 					self.Propelled:Fire()
 					fx:PropelGust(character, state.dashSeconds, power)
+					fx:DashZoom(state.dashSeconds or cfg.PropelSeconds, power)
 					if propelRemote then
 						propelRemote:FireServer(power)
 					end
@@ -1046,6 +1079,10 @@ function MovementController:_bind(
 				drive,
 				side
 			)
+			-- Charging a dash roots you to a creep.
+			if chargeAt then
+				state = Momentum.chargeSlow(state, cfg, dt)
+			end
 			if airRun and airRun.keep then
 				state, airRun.keep = Momentum.airKeep(state, airRun.keep, inputX, inputZ)
 			end

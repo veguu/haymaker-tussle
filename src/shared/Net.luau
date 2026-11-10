@@ -25,11 +25,12 @@ export type EventName =
 	| "BumpHappened" -- server to all: these two characters bumped
 	| "PropelRequest" -- client to server: I propelled, and how charged it was (0 to 1, only for how it looks)
 	| "PropelStarted" -- server to other clients: this player propelled, this charged (0 to 1)
+	| "DashHit" -- server to all: this character's body hit this target this hard (a charged dash, or a kicked body crashing into someone)
 	| "KickRequest" -- client to server: I jumped at someone in the air. No arguments, ever.
 	| "KickAccepted" -- server to the jumper's client: your follow-up is on, at this target, and whether it's the locked-on snap
 	| "LockOnState" -- client to server: who I'm locked onto now (a Model), or nil
 	| "KickAttach" -- client to server: I reached them. No arguments, ever.
-	| "KickCommit" -- client to server: I pressed the timing key. No arguments, ever.
+	| "KickCommit" -- client to server: I pressed the timing key, and the flat direction my cursor points (used only for which way a perfect kick throws them)
 	| "KickImpact" -- server to all: this character's kick landed, on this target, here
 	| "TutorialDone" -- client to server: I finished or skipped the tutorial. No arguments, ever.
 	| "PunchResult" -- server to client(s): this character's swing was hit, miss, cancelled, refused or clash
