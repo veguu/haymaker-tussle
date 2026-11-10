@@ -11,7 +11,7 @@
 -- evens the takes out: every take of a role peaks at about the same loudness.
 --
 -- Measured 2026-11-09 in a Studio client (PlaybackLoudness sampled every frame at Volume 0.05):
--- onset, peak and where it fades out are in the move-2 entry of HANDOFF.md. Edited by hand since then;
+-- onset, peak and where it fades out are in the move-2 and move-3 entries of HANDOFF.md. Edited by hand;
 -- design/sfx.json only lists the original search queries.
 
 export type Take = {
@@ -42,10 +42,24 @@ local SoundBank: { [string]: Entry } = {
 		name = "Ground Rocks Impact Small Slam",
 		creator = "GleonoffG",
 	},
-	-- The dash's main layer: a fast whoosh with a whipping thud in it.
+	-- The dash: a sharp, hissing gust of air. Each file swells from 0.1 s to its peak at about 0.45 s
+	-- and is gone by 0.9 s, so it starts 0.3 s in, already more than half way up: a sharp start that
+	-- peaks about 0.13 s after the press.
 	["dash"] = {
 		takes = {
-			{ id = 9126229267, length = 0.6, start = 0.04, volume = 0.88 },
+			{ id = 9114157694, length = 2.29, start = 0.3, volume = 2.3 },
+			{ id = 9114157695, length = 2.29, start = 0.3, volume = 2.3 },
+			{ id = 9114157793, length = 2.25, start = 0.3, volume = 2.5 },
+		},
+		looped = false,
+		name = "Doppler Whooshes Crackly Airy Bursts (SFX)",
+		creator = "ProSoundEffects",
+	},
+	-- The weight of a punch being thrown: a whoosh with a whipping thud in it (it was the dash in
+	-- move-2). Each take starts so its peak lands about 0.08 s after the press, as the punch goes active.
+	["swing_heavy"] = {
+		takes = {
+			{ id = 9126229267, length = 0.6, start = 0.1, volume = 0.88 },
 			{ id = 9126229715, length = 0.91, start = 0.07, volume = 0.81 },
 			{ id = 9126229710, length = 0.86, start = 0.12, volume = 0.87 },
 		},
@@ -85,6 +99,7 @@ local SoundBank: { [string]: Entry } = {
 		name = "Heavy_punch_impact_#3-1770242809040",
 		creator = "MegaBloxxy",
 	},
+	-- The light air of a swing, under `swing_heavy`.
 	["punch_swing"] = {
 		takes = { { id = 132239386768492, length = 0.416, start = 0.05, volume = 0.5 } },
 		looped = false,

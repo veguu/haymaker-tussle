@@ -100,7 +100,8 @@ end
 
 --- Play `role`. `parent` may be a BasePart or Attachment for 3D sound, or nil
 --- for a flat 2D sound. `pitchVary` is a half-range, so 0.1 gives 0.9x - 1.1x;
---- `options.pitch` replaces it. Returns the playing Sound, or nil if anything at all went wrong.
+--- `options.pitch` is the speed it varies around. Returns the playing Sound, or nil if anything at
+--- all went wrong.
 function Sfx.play(role: string, parent: Instance?, pitchVary: number?, options: Options?): Sound?
 	local ok, result = pcall(function(): Sound?
 		local entry = SoundBank[role]
@@ -115,11 +116,11 @@ function Sfx.play(role: string, parent: Instance?, pitchVary: number?, options: 
 		end
 		local take = entry.takes[index]
 		local clone = source:Clone()
-		if options and options.pitch then
-			clone.PlaybackSpeed = options.pitch
-		elseif pitchVary and pitchVary > 0 then
-			clone.PlaybackSpeed = 1 + (math.random() * 2 - 1) * pitchVary
+		local pitch = if options and options.pitch then options.pitch else 1
+		if pitchVary and pitchVary > 0 then
+			pitch *= 1 + (math.random() * 2 - 1) * pitchVary
 		end
+		clone.PlaybackSpeed = pitch
 		if options and options.volume then
 			clone.Volume *= options.volume
 		end

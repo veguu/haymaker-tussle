@@ -904,11 +904,7 @@ function MovementController:_bind(
 			if propelled then
 				state = propelled
 				self.Propelled:Fire()
-				fx:PropelGust(
-					character,
-					Vector3.new(state.headingX, 0, state.headingZ),
-					state.dashSeconds
-				)
+				fx:PropelGust(character, state.dashSeconds)
 				if propelRemote then
 					propelRemote:FireServer()
 				end
@@ -1137,8 +1133,7 @@ function MovementController:KnitStart()
 	if propelStarted then
 		propelStarted.OnClientEvent:Connect(function(other: Player)
 			if other and other.Character then
-				Knit.GetController("FxController")
-					:PropelGust(other.Character, nil, cfg.PropelSeconds)
+				Knit.GetController("FxController"):PropelGust(other.Character, cfg.PropelSeconds)
 			end
 		end)
 	end

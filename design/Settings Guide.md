@@ -257,8 +257,8 @@ The training arena beside the 1v1 arena: a hub, six station platforms joined to 
 
 | Setting | Start | What it does |
 |---|---|---|
-| `GustSeconds` | 0.6 | How long the dash gust takes to fade out. |
-| `GustSideOffset` | 1.1 | How far each gust starts from the character's centre. |
+| `GustSeconds` | 0.6 | How long the gust behind a punch thrown in the air takes to fade out. (The dash has its own effect now: the `Dash*` settings below.) |
+| `GustSideOffset` | 1.1 | How far each side of that gust starts from the character's centre. |
 | `KickImpactSeconds` | 0.6 | How long the kick's blast and rings last. |
 | `KickShakeSeconds` | 0.42 | How long the camera shake from a kick lasts. |
 | `KickShakeStuds` | 0.8 | How far the camera shakes at its strongest. |
@@ -312,6 +312,18 @@ The training arena beside the 1v1 arena: a hub, six station platforms joined to 
 | `TrailPuffs` | 4 | Puffs left along a big launch's path. |
 | `TrailPuffSeconds` | 0.07 | Time between those puffs. |
 | `PoolLimit` | 80 | Most effect parts kept for reuse. |
+| `DashFxRange` | 220 | Studs from the camera past which a dash shows nothing at all. |
+| `DashGhostRange` | 150 | Studs from the camera past which a dash leaves no after-images (lines and streaks still show). |
+| `DashGhostEvery` | 0.07 | Seconds between after-images. At dash speed (84) that is one every 6 studs. Lower = more of them, closer together. |
+| `DashGhostSeconds` | 0.34 | How long each after-image takes to fade out. About `DashGhostSeconds / DashGhostEvery` show at once (5). |
+| `DashGhostTransparency` | 0.6 | How see-through an after-image starts (0 solid, 1 invisible). Lower is bolder, but from behind your own after-images sit between the camera and your character, so too low hides it. It fades to 1, turning from pale blue to a deeper blue. |
+| `DashGhostMaxParts` | 24 | Most body parts copied into one after-image (a body here is 6, the rest is hair and hats). Touch devices use 60% of this. |
+| `DashLineCount` | 10 | Speed lines trailing off the body, spread from feet to head. Touch devices use 60%. |
+| `DashLineSeconds` | 0.2 | How long a speed line lasts, so how long it is: each is 0.55 to 1.45 times this, about 9 to 24 studs at dash speed. |
+| `DashLineWidth` | 0.1 | Thickness of a speed line in studs (each is 0.6 to 1.5 times this). |
+| `DashStreakRate` | 45 | Wind streaks thrown off the body per second while the dash runs. |
+| `DashStreakSquash` | 3 | How thin and long each streak is stretched along its flight. 0 is a round sparkle. |
+| `DashDustCount` | 10 | Dust puffs kicked back from the feet when a dash starts on the ground. |
 
 ## Debug
 

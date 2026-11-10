@@ -731,6 +731,18 @@ local GameConfig = {
 		TrailPuffs = 4,
 		TrailPuffSeconds = 0.07,
 		PoolLimit = 80,
+		DashFxRange = 220,
+		DashGhostRange = 150,
+		DashGhostEvery = 0.07,
+		DashGhostSeconds = 0.34,
+		DashGhostTransparency = 0.6,
+		DashGhostMaxParts = 24,
+		DashLineCount = 10,
+		DashLineSeconds = 0.2,
+		DashLineWidth = 0.1,
+		DashStreakRate = 45,
+		DashStreakSquash = 3,
+		DashDustCount = 10,
 	},
 }
 

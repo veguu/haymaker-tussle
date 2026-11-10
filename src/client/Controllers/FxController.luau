@@ -17,6 +17,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Sfx = require(ReplicatedStorage.Shared.Sfx)
 local GroundBreak = require(ReplicatedStorage.Shared.Core.GroundBreak)
+local DashFx = require(script.Parent.Parent.Fx.DashFx)
 
 local cfg = GameConfig.Effects
 local LIGHT = Color3.fromRGB(226, 238, 252)
@@ -165,40 +166,25 @@ local function gustSide(feet: Vector3, right: Vector3, back: Vector3, side: numb
 	})
 end
 
---- A gust on both sides of the feet, trailing behind the propel direction. `seconds` is how long that
---- dash runs, for its drift smoke.
-function FxController:PropelGust(character: Model, direction: Vector3?, seconds: number?)
-	propelEnds[character] = os.clock() + (seconds or GameConfig.Movement.PropelSeconds)
-	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+--- A dash starting: after-images, speed lines, wind streaks and dust (Fx/DashFx), and its gust of
+--- wind. `seconds` is how long that dash runs.
+function FxController:PropelGust(character: Model, seconds: number?)
+	local length = seconds or GameConfig.Movement.PropelSeconds
+	propelEnds[character] = os.clock() + length
+	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked on the next line)
 	if not root then
 		return
 	end
-	local flat = direction
-	if not flat or flat.Magnitude < 0.01 then
-		local velocity = root.AssemblyLinearVelocity
-		flat = Vector3.new(velocity.X, 0, velocity.Z)
-		if flat.Magnitude < 1 then
-			flat = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
-		end
-	end
-	if flat.Magnitude < 0.01 then
-		return
-	end
-	local forward = flat.Unit
-	local right = Vector3.new(-forward.Z, 0, forward.X)
-	local feet = root.Position - Vector3.yAxis * cfg.FootDrop
-	gustSide(feet, right, -forward, 1)
-	gustSide(feet, right, -forward, -1)
-	-- Three layers: a low push-off, the whoosh-and-thud, and a soft air tail.
-	Sfx.play("boom_low", root, 0, { pitch = 1.25, volume = 0.45, cut = 0.35 })
-	Sfx.play("dash", root, PITCH_VARY, { volume = 0.65 })
-	Sfx.play("propel", root, PITCH_VARY, { volume = 0.5 })
+	DashFx.play(character, length)
+	-- A sharp gust of air, pitched up a little, over the old whoosh as a soft tail.
+	Sfx.play("dash", root, PITCH_VARY, { pitch = 1.15, volume = 0.8, cut = 0.5 })
+	Sfx.play("propel", root, PITCH_VARY, { volume = 0.4 })
 end
 
 --- A puff of the propel's wind behind a punch thrown in the air, level with the body. It has no sound of
 --- its own, because the swing has one. Only the one who threw it sees this.
 function FxController:AirPunchGust(character: Model, direction: Vector3)
-	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked on the next line)
 	if not root or direction.Magnitude < 0.01 then
 		return
 	end
@@ -661,7 +647,7 @@ end
 --- The spring of a jump: the floor breaks under the feet, and smoke and dust burst out around them in a
 --- ring, drifting up and fading. With no floor within `floorReach`, it's only the smoke.
 function FxController:JumpBreak(character: Model, floorReach: number)
-	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked on the next line)
 	if not root then
 		return
 	end
@@ -706,7 +692,10 @@ end
 function FxController:Swing(character: Model)
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if root then
-		Sfx.play("punch_swing", root, PITCH_VARY)
+		-- Heavy: a low whoosh with a thud in it that peaks as the punch goes active, over the old
+		-- swing's air, pitched down.
+		Sfx.play("swing_heavy", root, PITCH_VARY, { pitch = 0.88, volume = 0.5 })
+		Sfx.play("punch_swing", root, PITCH_VARY, { pitch = 0.85, volume = 0.55 })
 	end
 end
 
@@ -725,7 +714,7 @@ local function driftSmoke(character: Model)
 	if os.clock() >= (propelEnds[character] or 0) then
 		return
 	end
-	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked on the next line)
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if not root or not humanoid or humanoid:GetState() == Enum.HumanoidStateType.Freefall then
 		return
