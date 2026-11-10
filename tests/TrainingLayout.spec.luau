@@ -160,7 +160,7 @@ return {
 	end,
 
 	["platformAt finds the arena, the hub and each station"] = function()
-		assert(TrainingLayout.platformAt(CFG, ARENA, 0, 0).key == "Arena")
+		assert(TrainingLayout.platformAt(CFG, ARENA, ARENA.CenterX, ARENA.CenterZ).key == "Arena")
 		assert(TrainingLayout.platformAt(CFG, ARENA, CFG.CenterX, CFG.CenterZ).key == "Hub")
 		for _, station in CFG.Stations do
 			local x, z = TrainingLayout.stationCenter(CFG, station)

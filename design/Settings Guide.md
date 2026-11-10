@@ -171,7 +171,7 @@ Two opponents whose punches land at effectively the same moment, and would each 
 
 | Setting | Start | What it does |
 |---|---|---|
-| `CenterX` | 0 | Arena centre X. |
+| `CenterX` | 3000 | Arena centre X. TEMPORARY: moved from 0 (with `Lobby.CenterX`) so the stand-in arena and lobby sit clear of the Gnomon map preview at the origin. Put both back to 0 when the real map takes over. |
 | `CenterY` | 100 | Arena floor height. |
 | `CenterZ` | 0 | Arena centre Z. |
 | `StartRadius` | 105 | Radius at round start, grown from 75 for 30 fighters: the same room each (about 1150 square studs). About 6 seconds across at MaxSpeed. |
@@ -210,7 +210,7 @@ The open-air lobby beside the arena: one level rectangle with no visible walls, 
 | Setting | Start | What it does |
 |---|---|---|
 | `Enabled` | true | The lobby exists and waiting players are sent to it. Off: they go to the training arena, if that's on. |
-| `CenterX` | 0 | Centre of the viewing edge, across the arena's long axis. |
+| `CenterX` | 3000 | TEMPORARY, see `Arena.CenterX`. Centre of the viewing edge, across the arena's long axis. |
 | `FloorY` | 101 | Floor height: 1 above the arena, so feet on the arena show but the lobby's own edge doesn't hide it. |
 | `ViewEdgeZ` | 170 | The arena-facing edge. Past the round's out line (165), so its invisible wall never helps a fighter. |
 | `Width` | 180 | Length of the viewing edge. |

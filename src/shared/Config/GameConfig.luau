@@ -142,7 +142,7 @@ local GameConfig = {
 		SpeedShareEase = 5,
 	},
 	Arena = {
-		CenterX = 0,
+		CenterX = 3000,
 		CenterY = 100,
 		CenterZ = 0,
 		StartRadius = 105,
@@ -173,7 +173,7 @@ local GameConfig = {
 	},
 	Lobby = {
 		Enabled = true,
-		CenterX = 0,
+		CenterX = 3000,
 		FloorY = 101,
 		ViewEdgeZ = 170,
 		Width = 180,
