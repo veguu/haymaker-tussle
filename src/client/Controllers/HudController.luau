@@ -90,6 +90,17 @@ local function text(parent: Instance, role: string, props: { [string]: any }): T
 	return label
 end
 
+-- A thin dark edge round light text, so it reads over the sky, the floor or anything else without a panel.
+local function outline(label: TextLabel | TextButton): TextLabel | TextButton
+	make("UIStroke", label, {
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
+		Color = C.Panel,
+		Thickness = 1.5,
+		Transparency = HudTheme.Transparency.Outline,
+	})
+	return label
+end
+
 -- A panel body with its bottom-right corner cut on the angle, and the yellow edge on the left. The cut
 -- is a square with a hard-stepped gradient, so it costs no image.
 local function body(parent: Instance, accent: boolean)
@@ -224,9 +235,11 @@ local function makeRow(parent: Instance, action: any, index: number): Row
 		Size = UDim2.new(0, S.ActionNameWidth, 1, -2),
 		Text = action.name,
 	})
+	outline(name)
 	local cap = make("Frame", frame, {
 		Name = "Cap",
-		BackgroundColor3 = C.PanelRaised,
+		BackgroundColor3 = C.Panel,
+		BackgroundTransparency = HudTheme.Transparency.CapTag,
 		BorderSizePixel = 0,
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, S.ActionKeyX, 0.5, -1),
@@ -239,6 +252,7 @@ local function makeRow(parent: Instance, action: any, index: number): Row
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextColor3 = C.Text,
 	})
+	outline(capText)
 	local mouse = mouseGlyph(cap)
 	local status = text(frame, "Value", {
 		AnchorPoint = Vector2.new(1, 0),
@@ -248,6 +262,7 @@ local function makeRow(parent: Instance, action: any, index: number): Row
 		TextColor3 = C.Muted,
 		Text = "",
 	})
+	outline(status)
 	local line = make("Frame", frame, {
 		Name = "Line",
 		BackgroundColor3 = C.Track,
@@ -466,7 +481,7 @@ function HudController:KnitStart()
 	local actionsHeight = S.ActionPad * 2 + S.ActionRow * #HudTheme.Actions
 	local actions = group(gui, "Actions", S.ActionsWidth, actionsHeight)
 	actions.holder.AnchorPoint = Vector2.new(1, 1)
-	body(actions.fade, true)
+	-- No panel: the controls are only a reminder, so they float as outlined text (user, 2026-11-09).
 	local rows: { [string]: Row } = {}
 	for index, action in HudTheme.Actions do
 		rows[action.id] = makeRow(actions.fade, action, index)
@@ -484,13 +499,15 @@ function HudController:KnitStart()
 		Name = "Chip",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = C.Panel,
-		BackgroundTransparency = HudTheme.Transparency.Panel,
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		AutoButtonColor = true,
-		TextColor3 = C.Text,
+		AutoButtonColor = false,
+		TextColor3 = C.Muted,
+		TextXAlignment = Enum.TextXAlignment.Right,
 		Text = "",
 	})
 	Typography.apply(helpChip, "Key")
+	outline(helpChip)
 	make("UICorner", helpChip, { CornerRadius = UDim.new(0, 4) })
 	local guide = make("Frame", help, {
 		Name = "Guide",
@@ -612,10 +629,13 @@ function HudController:KnitStart()
 			HudTheme.Scale.Min,
 			HudTheme.Scale.Max
 		)
-		for _, g in { strip, vitals, actions, feed, spectate } do
+		for _, g in { strip, feed, spectate } do
 			g.scale.Scale = scale
 		end
-		helpScale.Scale = scale
+		local bottom = scale * HudTheme.Scale.Bottom
+		vitals.scale.Scale = bottom
+		actions.scale.Scale = bottom
+		helpScale.Scale = bottom
 		local edge = S.Edge
 		strip.holder.Position = UDim2.new(0.5, 0, 0, S.StripTop)
 		feed.holder.Position = UDim2.new(1, -edge, 0, S.StripTop)
@@ -630,7 +650,7 @@ function HudController:KnitStart()
 			guide.Position = UDim2.new(1, 0, 1, 6)
 		else
 			help.AnchorPoint = Vector2.new(1, 1)
-			help.Position = UDim2.new(1, -edge, 1, -(edge + (actionsHeight + 6) * scale))
+			help.Position = UDim2.new(1, -edge, 1, -(edge + (actionsHeight + 6) * bottom))
 			guide.AnchorPoint = Vector2.new(1, 1)
 			guide.Position = UDim2.new(1, 0, 0, -6)
 		end

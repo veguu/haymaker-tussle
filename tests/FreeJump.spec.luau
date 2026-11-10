@@ -1,0 +1,63 @@
+--!strict
+-- Spec files are required BY the runner, so this path is relative to tests/.
+-- The follow-up when you AREN'T locked on: a jump worked out once, that only the keys steer. The fast
+-- snap is for a locked-on target only.
+local DiveKick = require("../src/shared/Core/DiveKick")
+local GameConfig = require("../src/shared/Config/GameConfig")
+
+local KICK: any = GameConfig.Kick
+local GRAVITY = 196.2 * KICK.AirGravityScale
+
+return {
+	["the free jump is slower than the locked-on snap"] = function()
+		assert(
+			KICK.JumpCarryMax < KICK.ApproachSpeed,
+			"the free jump would carry as fast as the snap"
+		)
+		assert(KICK.LeapChaseSeconds > KICK.ChaseSeconds, "the free jump needs longer to get there")
+	end,
+
+	["a target straight ahead and above is reachable, and the plan points at them"] = function()
+		local plan = DiveKick.planJump(KICK, 30, 40, 0, 0, 20, 0, 60, GRAVITY)
+		assert(plan.reachable)
+		assert(plan.towardX > 0.99 and math.abs(plan.towardZ) < 0.01)
+		assert(plan.leap >= KICK.LeapMin and plan.leap <= KICK.LeapMax)
+		assert(plan.carry > 0 and plan.carry <= KICK.JumpCarryMax)
+	end,
+
+	["it comes up a little short, so it takes a small correction to finish"] = function()
+		local plan = DiveKick.planJump(KICK, 60, 40, 0, 0, 20, 0, 60, GRAVITY)
+		assert(plan.carry * plan.meet < 60)
+	end,
+
+	["too far is not reachable, and the jump never exceeds its limits"] = function()
+		local plan = DiveKick.planJump(KICK, 900, 40, 0, 0, 20, 0, 60, GRAVITY)
+		assert(not plan.reachable)
+		assert(plan.carry <= KICK.JumpCarryMax and plan.leap <= KICK.LeapMax)
+	end,
+
+	["a nearly right aim is forgiven, a wrong one is kept"] = function()
+		local near = math.rad(KICK.AimForgiveDegrees - 2)
+		local x, z = DiveKick.aimJump(KICK, math.cos(near), math.sin(near), 1, 0)
+		assert(x == 1 and z == 0)
+		local wide = math.rad(KICK.AimForgiveDegrees + 20)
+		local wx, wz = DiveKick.aimJump(KICK, math.cos(wide), math.sin(wide), 1, 0)
+		assert(math.abs(wx - math.cos(wide)) < 1e-6 and math.abs(wz - math.sin(wide)) < 1e-6)
+		-- no aim at all goes where the plan points
+		local nx, nz = DiveKick.aimJump(KICK, 0, 0, 0, 1)
+		assert(nx == 0 and nz == 1)
+	end,
+
+	["the free jump falls under gravity and the keys steer it; the snap ignores them"] = function()
+		local free = DiveKick.spring(DiveKick.start(), 50, 100, 0, 1)
+		local stepped = DiveKick.step(free, KICK, 0.1, GRAVITY, 0, 1) :: DiveKick.State
+		assert(stepped.vy < 100, "no gravity on the free jump")
+		assert(stepped.steerZ > 0, "the keys didn't steer the free jump")
+		local vx, _, vz = DiveKick.velocity(stepped, KICK, 0, 0, 0, 9, 9, 9, 0, 0, 0)
+		assert(vx == 50 and vz == stepped.steerZ, "the free jump homed on the target")
+
+		local snap = DiveKick.snap(DiveKick.start(), -1, 0, 0.3, 0.45)
+		local snapped = DiveKick.step(snap, KICK, 0.1, GRAVITY, 0, 1) :: DiveKick.State
+		assert(snapped.steerZ == 0 and snapped.vy == 0)
+	end,
+}

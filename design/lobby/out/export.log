@@ -1,0 +1,71 @@
+00:03.969  blend            | Read blend: "C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\lobby.blend"
+C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\maps\export_roblox.py:53: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  if not (mat and mat.use_nodes):
+C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\maps\export_roblox.py:47: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  bsdf = mat.node_tree.nodes.get("Principled BSDF") if mat and mat.use_nodes else None
+C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\maps\export_roblox.py:149: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  new.use_nodes = True
+PAINTED Lobby_Floor_00: 12 tris, maps ['colour', 'mr', 'normal']
+PAINTED Lobby_Floor_01: 12 tris, maps ['colour', 'mr', 'normal']
+PAINTED Lobby_Floor_02: 12 tris, maps ['colour', 'mr', 'normal']
+PAINTED Lobby_Floor_10: 12 tris, maps ['colour', 'mr', 'normal']
+PAINTED Lobby_Floor_11: 12 tris, maps ['colour', 'mr', 'normal']
+PAINTED Lobby_Floor_12: 12 tris, maps ['colour', 'mr', 'normal']
+PAINTED Lobby_Floor_20: 12 tris, maps ['colour', 'mr', 'normal']
+PAINTED Lobby_Floor_21: 12 tris, maps ['colour', 'mr', 'normal']
+PAINTED Lobby_Floor_22: 12 tris, maps ['colour', 'mr', 'normal']
+PAINTED Lobby_Floor_30: 12 tris, maps ['colour', 'mr', 'normal']
+PAINTED Lobby_Floor_31: 12 tris, maps ['colour', 'mr', 'normal']
+PAINTED Lobby_Floor_32: 12 tris, maps ['colour', 'mr', 'normal']
+BAKED Lobby_Base: 36 tris, 64px
+BAKED Lobby_Beams: 96 tris, 64px
+INFO Draco is available, use library at C:\Program Files\Blender Foundation\Blender 5.2\5.2\scripts\addons_core\io_scene_gltf2\bf_intern_draco_bridge.dll
+INFO MeshOptimizer is available, use library at C:\Program Files\Blender Foundation\Blender 5.2\5.2\scripts\addons_core\io_scene_gltf2\bf_intern_meshopt_bridge.dll
+19:02:24 | INFO: Starting glTF 2.0 export
+19:02:24 | INFO: Extracting primitive: Lobby_Base
+19:02:24 | INFO: Primitives created: 1
+19:02:24 | INFO: Extracting primitive: Lobby_Beams
+19:02:24 | INFO: Primitives created: 1
+19:02:24 | INFO: Extracting primitive: Lobby_Floor_00
+19:02:24 | WARNING: More than one shader node tex image used for a texture. The resulting glTF sampler will behave like the first shader node tex image.
+19:02:24 | INFO: Primitives created: 1
+19:02:24 | INFO: Extracting primitive: Lobby_Floor_01
+19:02:24 | WARNING: More than one shader node tex image used for a texture. The resulting glTF sampler will behave like the first shader node tex image.
+19:02:24 | INFO: Primitives created: 1
+19:02:24 | INFO: Extracting primitive: Lobby_Floor_02
+19:02:24 | WARNING: More than one shader node tex image used for a texture. The resulting glTF sampler will behave like the first shader node tex image.
+19:02:24 | INFO: Primitives created: 1
+19:02:24 | INFO: Extracting primitive: Lobby_Floor_10
+19:02:24 | WARNING: More than one shader node tex image used for a texture. The resulting glTF sampler will behave like the first shader node tex image.
+19:02:24 | INFO: Primitives created: 1
+19:02:24 | INFO: Extracting primitive: Lobby_Floor_11
+19:02:24 | WARNING: More than one shader node tex image used for a texture. The resulting glTF sampler will behave like the first shader node tex image.
+19:02:24 | INFO: Primitives created: 1
+19:02:24 | INFO: Extracting primitive: Lobby_Floor_12
+19:02:24 | WARNING: More than one shader node tex image used for a texture. The resulting glTF sampler will behave like the first shader node tex image.
+19:02:24 | INFO: Primitives created: 1
+19:02:24 | INFO: Extracting primitive: Lobby_Floor_20
+19:02:24 | WARNING: More than one shader node tex image used for a texture. The resulting glTF sampler will behave like the first shader node tex image.
+19:02:24 | INFO: Primitives created: 1
+19:02:24 | INFO: Extracting primitive: Lobby_Floor_21
+19:02:24 | WARNING: More than one shader node tex image used for a texture. The resulting glTF sampler will behave like the first shader node tex image.
+19:02:24 | INFO: Primitives created: 1
+19:02:24 | INFO: Extracting primitive: Lobby_Floor_22
+19:02:24 | WARNING: More than one shader node tex image used for a texture. The resulting glTF sampler will behave like the first shader node tex image.
+19:02:24 | INFO: Primitives created: 1
+19:02:24 | INFO: Extracting primitive: Lobby_Floor_30
+19:02:24 | WARNING: More than one shader node tex image used for a texture. The resulting glTF sampler will behave like the first shader node tex image.
+19:02:24 | INFO: Primitives created: 1
+19:02:24 | INFO: Extracting primitive: Lobby_Floor_31
+19:02:24 | WARNING: More than one shader node tex image used for a texture. The resulting glTF sampler will behave like the first shader node tex image.
+19:02:24 | INFO: Primitives created: 1
+19:02:24 | INFO: Extracting primitive: Lobby_Floor_32
+19:02:24 | WARNING: More than one shader node tex image used for a texture. The resulting glTF sampler will behave like the first shader node tex image.
+19:02:24 | INFO: Primitives created: 1
+19:02:24 | INFO: Finished glTF 2.0 export in 0.7107999324798584 s
+
+GLB C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\export\lobby.glb 8.45 MB
+ALL WITHIN LIMITS True
+Blender 5.2.2 LTS (hash d13f752e3b9c built 2026-09-15 01:37:04)
+
+Blender quit

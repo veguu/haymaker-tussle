@@ -26,10 +26,16 @@ HudTheme.Colour = {
 HudTheme.Transparency = {
 	Panel = 0.15, -- the compact dark backing behind light HUD text
 	Stepped = 0.55, -- groups that step back while a timed prompt or clash has priority
+	-- The controls list has no panel (user, 2026-11-09): light text with a thin dark outline, and key
+	-- caps as faint see-through tags.
+	CapTag = 0.45,
+	Outline = 0.3,
 }
 
 -- Whole-HUD scale: window size against 1280 x 720, kept within these so text stays readable.
-HudTheme.Scale = { Reference = Vector2.new(1280, 720), Min = 1, Max = 1.35 }
+-- `Bottom` shrinks the two bottom groups (your stagger and speed, and the controls) against the rest
+-- (user, 2026-11-09: smaller). At the 1280 x 720 reference that takes 15-unit text to about 12 px.
+HudTheme.Scale = { Reference = Vector2.new(1280, 720), Min = 1, Max = 1.35, Bottom = 0.82 }
 
 HudTheme.Size = {
 	Edge = 16, -- inset from the screen's edges (inside the safe area)
@@ -175,6 +181,21 @@ HudTheme.Afk = {
 	Height = 52,
 	Top = 8, -- below the safe area's top edge
 	Corner = 6,
+	PressScale = 0.96,
+	PressSeconds = 0.05,
+	ReleaseSeconds = 0.16,
+}
+
+-- The Spectate button sits under the AFK button and opens a small panel beside it.
+HudTheme.Spectate = {
+	Width = 132,
+	Height = 52,
+	Gap = 8, -- between tap targets
+	PanelWidth = 280,
+	Row = 52,
+	Pad = 8,
+	Corner = 6,
+	Arrow = 52,
 	PressScale = 0.96,
 	PressSeconds = 0.05,
 	ReleaseSeconds = 0.16,

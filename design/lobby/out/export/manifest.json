@@ -1,0 +1,168 @@
+{
+ "map": "lobby",
+ "units": "1 Blender unit = 1 stud; fighting surface top at y = 0",
+ "meshes": [
+  {
+   "name": "Lobby_Floor_00",
+   "triangles": 12,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Lobby_Floor_01",
+   "triangles": 12,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Lobby_Floor_02",
+   "triangles": 12,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Lobby_Floor_10",
+   "triangles": 12,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Lobby_Floor_11",
+   "triangles": 12,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Lobby_Floor_12",
+   "triangles": 12,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Lobby_Floor_20",
+   "triangles": 12,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Lobby_Floor_21",
+   "triangles": 12,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Lobby_Floor_22",
+   "triangles": 12,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Lobby_Floor_30",
+   "triangles": 12,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Lobby_Floor_31",
+   "triangles": 12,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Lobby_Floor_32",
+   "triangles": 12,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Lobby_Base",
+   "triangles": 36,
+   "texture": "lobby_Lobby_BaseStone.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Lobby_Beams",
+   "triangles": 96,
+   "texture": "lobby_Lobby_BeamTimber.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  }
+ ],
+ "glb": "lobby.glb",
+ "all_within_limits": true
+}

@@ -122,6 +122,10 @@ function CombatService:CanFight(a: Model, b: Model): boolean
 	if round ~= nil then
 		return round
 	end
+	local lobby = Knit.GetService("LobbyService"):AllowsFight(a, b)
+	if lobby ~= nil then
+		return lobby
+	end
 	return Knit.GetService("TrainingService"):AllowsFight(a, b)
 end
 

@@ -1,0 +1,46 @@
+PAINTED Lobby_Floor_00
+PAINTED Lobby_Floor_01
+PAINTED Lobby_Floor_02
+PAINTED Lobby_Floor_10
+PAINTED Lobby_Floor_11
+PAINTED Lobby_Floor_12
+PAINTED Lobby_Floor_20
+PAINTED Lobby_Floor_21
+PAINTED Lobby_Floor_22
+PAINTED Lobby_Floor_30
+PAINTED Lobby_Floor_31
+PAINTED Lobby_Floor_32
+00:16.156  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\lobby_top.png'
+00:17.750  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\lobby_overview.png'
+00:18.328  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\lobby_spawn.png'
+00:18.828  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\lobby_edgeleft.png'
+00:19.297  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\lobby_edgeright.png'
+00:19.843  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\lobby_training.png'
+00:20.375  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\lobby_strip.png'
+MESH Lobby_Floor_00: 12 tris, 1 material(s)
+MESH Lobby_Floor_01: 12 tris, 1 material(s)
+MESH Lobby_Floor_02: 12 tris, 1 material(s)
+MESH Lobby_Floor_10: 12 tris, 1 material(s)
+MESH Lobby_Floor_11: 12 tris, 1 material(s)
+MESH Lobby_Floor_12: 12 tris, 1 material(s)
+MESH Lobby_Floor_20: 12 tris, 1 material(s)
+MESH Lobby_Floor_21: 12 tris, 1 material(s)
+MESH Lobby_Floor_22: 12 tris, 1 material(s)
+MESH Lobby_Floor_30: 12 tris, 1 material(s)
+MESH Lobby_Floor_31: 12 tris, 1 material(s)
+MESH Lobby_Floor_32: 12 tris, 1 material(s)
+MESH Lobby_Base: 36 tris, 1 material(s)
+MESH Lobby_Beams: 96 tris, 1 material(s)
+OVER LIMIT: []
+FLAT: (True, 12)
+Info: Saved as "lobby.blend"
+RENDER C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\lobby_top.png
+RENDER C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\lobby_overview.png
+RENDER C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\lobby_spawn.png
+RENDER C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\lobby_edgeleft.png
+RENDER C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\lobby_edgeright.png
+RENDER C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\lobby_training.png
+RENDER C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\lobby_strip.png
+Blender 5.2.2 LTS (hash d13f752e3b9c built 2026-09-15 01:37:04)
+
+Blender quit

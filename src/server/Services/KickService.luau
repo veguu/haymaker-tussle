@@ -73,6 +73,7 @@ type Record = {
 	startedAt: number,
 	held: boolean,
 	heldAt: number,
+	snap: boolean, -- the locked-on follow-up: held and snapped to. Otherwise a free jump they steer.
 	startGap: number,
 	qteAt: number,
 	facedAt: number,
@@ -81,6 +82,9 @@ type Record = {
 }
 
 local active: { [Player]: Record } = {}
+-- Who each player says they're locked onto. Only ever used to choose between the snap and the free
+-- jump at someone the server would have let them jump at anyway.
+local lockedOn: { [Player]: Model } = setmetatable({}, { __mode = "k" }) :: any
 local lastUse: { [Player]: number } = {}
 local launched: { [Model]: number } = {}
 local stunTokens: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
@@ -383,7 +387,7 @@ end
 
 -- Who this body can follow up: everyone floating that it may fight, in range, with a clear path, picked
 -- by the shared rule. The range has RANGE_TOLERANCE of slack, since both bodies are slightly old here.
-local function jumpTarget(player: Player, character: Model, root: BasePart): Model?
+local function jumpTarget(player: Player, character: Model, root: BasePart): (Model?, boolean)
 	local combat = Knit.GetService("CombatService")
 	local models: { Model } = {}
 	local candidates: { DiveKick.Candidate } = {}
@@ -406,6 +410,11 @@ local function jumpTarget(player: Player, character: Model, root: BasePart): Mod
 			})
 		end
 	end
+	-- Locked onto one of them: that's the one, and it's the snap.
+	local locked = lockedOn[player]
+	if locked and table.find(models, locked) then
+		return locked, true
+	end
 	local look = root.CFrame.LookVector
 	local index = DiveKick.pickFollowUp(
 		cfg,
@@ -417,7 +426,7 @@ local function jumpTarget(player: Player, character: Model, root: BasePart): Mod
 		candidates,
 		RANGE_TOLERANCE
 	)
-	return if index then models[index] else nil
+	return if index then models[index] else nil, false
 end
 
 -- Turns a held body to face whoever is touching it.
@@ -436,9 +445,26 @@ function KickService:KnitInit()
 	self._impactEvent = Net.server("KickImpact")
 	self._hitConfirmed = Net.server("HitConfirmed")
 	self._accepted = Net.server("KickAccepted")
+	self._lockOn = Net.server("LockOnState")
 end
 
 function KickService:KnitStart()
+	self._lockOn.OnServerEvent:Connect(function(player: Player, ...)
+		local target = ...
+		if select("#", ...) > 1 then
+			return
+		end
+		if
+			typeof(target) == "Instance"
+			and target:IsA("Model")
+			and table.find(Combatants.all(), target)
+		then
+			lockedOn[player] = target
+		else
+			lockedOn[player] = nil
+		end
+	end)
+
 	self._request.OnServerEvent:Connect(function(player: Player, ...)
 		if select("#", ...) ~= 0 or active[player] then
 			return
@@ -454,7 +480,7 @@ function KickService:KnitStart()
 		then
 			return
 		end
-		local target = jumpTarget(player, character, root)
+		local target, snap = jumpTarget(player, character, root)
 		if not target then
 			return
 		end
@@ -472,6 +498,7 @@ function KickService:KnitStart()
 			startedAt = now,
 			held = false,
 			heldAt = now,
+			snap = snap,
 			startGap = (targetRoot.Position - root.Position).Magnitude,
 			qteAt = DiveKick.pickQte(cfg, math.random()),
 			facedAt = 0,
@@ -481,11 +508,14 @@ function KickService:KnitStart()
 		trace(`{player.Name} follows up {target.Name} from {math.floor(record.startGap)} studs`)
 		character:SetAttribute(QTE_ATTRIBUTE, record.qteAt)
 		active[player] = record
-		-- Held from now, so they can't move out of the snap. A held target is nobody else's to take.
-		hold(record, now)
-		faceJumper(record, root, targetRoot)
+		-- Locked on: held from now, so they can't move out of the snap. A held target is nobody else's
+		-- to take. Not locked on: nothing is held, and the jumper has to get there on their own arc.
+		if snap then
+			hold(record, now)
+			faceJumper(record, root, targetRoot)
+		end
 		setPhase(record, "chase")
-		self._accepted:FireClient(player, target)
+		self._accepted:FireClient(player, target, snap)
 	end)
 
 	self._attach.OnServerEvent:Connect(function(player: Player, ...)
@@ -499,7 +529,7 @@ function KickService:KnitStart()
 		if
 			not root
 			or not targetRoot
-			or target:GetAttribute(AIR_ATTRIBUTE) ~= "hold"
+			or target:GetAttribute(AIR_ATTRIBUTE) ~= (if record.held then "hold" else "float")
 			or not Combatants.isAlive(target)
 		then
 			return
@@ -514,7 +544,10 @@ function KickService:KnitStart()
 		-- The snap is far faster than this server sees it, so while it can still be on its way, being no
 		-- further than where it started (the target is held) is enough. It was in range and clear then.
 		local since = os.clock() - record.phaseAt
-		if since <= cfg.ApproachMaxSeconds + cfg.JumpMissGrace + CLOCK_TOLERANCE then
+		if
+			record.snap
+			and since <= cfg.ApproachMaxSeconds + cfg.JumpMissGrace + CLOCK_TOLERANCE
+		then
 			allowed = math.max(allowed, record.startGap + ATTACH_TOLERANCE)
 		end
 		if gap > allowed then
@@ -588,7 +621,7 @@ function KickService:KnitStart()
 			end
 			if record.phase == "chase" then
 				over = over
-					or waited >= cfg.ChaseSeconds + CLOCK_TOLERANCE
+					or waited >= (if record.snap then cfg.ChaseSeconds else cfg.LeapChaseSeconds) + CLOCK_TOLERANCE
 					or launched[target] == nil
 					or (
 						root ~= nil

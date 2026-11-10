@@ -20,9 +20,38 @@
 
 local DiveKick = {}
 
+-- How a launched target comes down, for planning a free jump at them, when that isn't simply one
+-- gravity all the way. The caller supplies these from AirRecovery.
+export type TargetFall = {
+	-- Seconds until a body at vertical speed `vy` has dropped `height`.
+	timeToDrop: (vy: number, height: number) -> number,
+	-- How much higher it is after `seconds` at vertical speed `vy`. Negative is lower.
+	rise: (vy: number, seconds: number) -> number,
+}
+
+export type JumpPlan = {
+	meet: number,
+	leap: number,
+	carry: number,
+	towardX: number,
+	towardZ: number,
+	reachable: boolean,
+}
+
 export type Settings = {
 	AirGravityScale: number,
 	JumpSquatSeconds: number,
+	LeapMin: number,
+	LeapMax: number,
+	SteerSpeed: number,
+	AirAcceleration: number,
+	JumpCarryMax: number,
+	JumpMeetShare: number,
+	JumpMeetMin: number,
+	JumpMeetMax: number,
+	JumpShortShare: number,
+	JumpShortMax: number,
+	AimForgiveDegrees: number,
 	ApproachSpeed: number,
 	ApproachMinSeconds: number,
 	ApproachMaxSeconds: number,
@@ -190,6 +219,89 @@ end
 --- than a ball. It doesn't need real contact, but nothing happens from any further away.
 function DiveKick.isTouching(cfg: Settings, dx: number, dy: number, dz: number): boolean
 	return dx * dx + dz * dz <= cfg.TouchFlat * cfg.TouchFlat and math.abs(dy) <= cfg.TouchTall
+end
+
+--- THE FREE JUMP, for when you aren't locked onto them. The spring is worked out once: it picks a
+--- moment partway through their remaining time in the air, then an arc reaching their height at that
+--- moment and a strength covering the distance to where they'll be, a little short so it takes a small
+--- correction to finish. Nothing follows the target after that: only the movement keys steer it.
+--- `dx`, `dy`, `dz` is from you to them, `vx`, `vy`, `vz` how they're moving, `decay` how fast their
+--- push fades, `gravity` the air gravity, `fall` how they really come down.
+function DiveKick.planJump(
+	cfg: Settings,
+	dx: number,
+	dy: number,
+	dz: number,
+	vx: number,
+	vy: number,
+	vz: number,
+	decay: number,
+	gravity: number,
+	fall: TargetFall?
+): JumpPlan
+	local height = math.max(dy, 0)
+	local airLeft = if fall
+		then fall.timeToDrop(vy, height)
+		else (vy + math.sqrt(vy * vy + 2 * gravity * height)) / gravity
+	local meet = math.clamp(airLeft * cfg.JumpMeetShare, cfg.JumpMeetMin, cfg.JumpMeetMax)
+	local neededLeap = if fall
+		then (height + fall.rise(vy, meet) + gravity * meet * meet / 2) / meet
+		else vy + height / meet
+	local leap = math.clamp(neededLeap, cfg.LeapMin, cfg.LeapMax)
+	-- Where they'll be by then, with their push fading along the way.
+	local speed = math.sqrt(vx * vx + vz * vz)
+	local toX, toZ = dx, dz
+	if speed > 0.01 then
+		local moving = if decay > 0 then math.min(meet, speed / decay) else meet
+		local travel = speed * moving - decay * moving * moving / 2
+		toX += vx / speed * travel
+		toZ += vz / speed * travel
+	end
+	local distance = math.sqrt(toX * toX + toZ * toZ)
+	local short = math.min(distance * cfg.JumpShortShare, cfg.JumpShortMax)
+	local neededCarry = (distance - short) / meet
+	local reachable = airLeft >= meet
+		and neededLeap <= cfg.LeapMax
+		and neededCarry <= cfg.JumpCarryMax
+	local carry = math.min(neededCarry, cfg.JumpCarryMax)
+	if distance < 0.01 then
+		return {
+			meet = meet,
+			leap = leap,
+			carry = 0,
+			towardX = 0,
+			towardZ = 0,
+			reachable = reachable,
+		}
+	end
+	return {
+		meet = meet,
+		leap = leap,
+		carry = carry,
+		towardX = toX / distance,
+		towardZ = toZ / distance,
+		reachable = reachable,
+	}
+end
+
+--- Where the free jump actually goes: the player's aim, unless that's nearly right, when it's forgiven
+--- into exactly right. An aim further off stays as it is, and so misses unless they correct it.
+function DiveKick.aimJump(
+	cfg: Settings,
+	aimX: number,
+	aimZ: number,
+	towardX: number,
+	towardZ: number
+): (number, number)
+	local size = math.sqrt(aimX * aimX + aimZ * aimZ)
+	if size < 0.001 then
+		return towardX, towardZ
+	end
+	aimX, aimZ = aimX / size, aimZ / size
+	if aimX * towardX + aimZ * towardZ >= math.cos(math.rad(cfg.AimForgiveDegrees)) then
+		return towardX, towardZ
+	end
+	return aimX, aimZ
 end
 
 --- Directional air control: pushes the velocity toward where the keys point, up to `limit`. With no
@@ -393,7 +505,17 @@ function DiveKick.step(
 	nextState.t += dt
 	if state.phase == "chase" then
 		if state.approach == nil then
+			-- The free jump: an arc under gravity that only the movement keys steer.
 			nextState.vy -= gravity * dt
+			nextState.steerX, nextState.steerZ = DiveKick.airSteer(
+				state.steerX,
+				state.steerZ,
+				inputX,
+				inputZ,
+				cfg.SteerSpeed,
+				cfg.AirAcceleration,
+				dt
+			)
 		end
 	elseif state.phase == "attach" then
 		if nextState.t >= DiveKick.ringEnd(cfg, state.qteAt) then
@@ -430,7 +552,7 @@ function DiveKick.velocity(
 	if state.phase == "chase" then
 		local approach = state.approach
 		if approach == nil then
-			return state.vx, state.vy, state.vz
+			return state.vx + state.steerX, state.vy, state.vz + state.steerZ
 		end
 		local remaining = math.max(approach - state.t, SNAP_MIN_REMAINING)
 		local wantX = targetX + state.sideX * cfg.AttachSide

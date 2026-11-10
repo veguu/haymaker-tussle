@@ -202,12 +202,26 @@ Two opponents whose punches land at effectively the same moment, and would each 
 
 ## Lobby
 
+The open-air lobby beside the arena: one level rectangle with no visible walls, its long axis pointing at the arena. Going away from the arena: the viewing edge, the main lobby (where you arrive, facing the arena), then the walk-in training area with two practice dummies. Nobody on it can be hit; the dummies can only be hit by players on it. Positions are worked out in `Core/Lobby`, and its tests fail if the floor hides the arena from spawn, a dummy stands too near an edge, or the viewing edge comes inside the round's out line. The visible model is built by `design/lobby/lobby.py`; keep its numbers the same as these.
+
 | Setting | Start | What it does |
 |---|---|---|
-| `CenterX` | 0 | Lobby centre X. |
-| `CenterY` | 100 | Lobby floor height. |
-| `CenterZ` | 240 | Lobby centre Z, far enough that knockback from the arena cannot reach it. |
-| `Radius` | 55 | Lobby floor radius. |
+| `Enabled` | true | The lobby exists and waiting players are sent to it. Off: they go to the training arena, if that's on. |
+| `CenterX` | 0 | Centre of the viewing edge, across the arena's long axis. |
+| `FloorY` | 101 | Floor height: 1 above the arena, so feet on the arena show but the lobby's own edge doesn't hide it. |
+| `ViewEdgeZ` | 170 | The arena-facing edge. Past the round's out line (165), so its invisible wall never helps a fighter. |
+| `Width` | 180 | Length of the viewing edge. |
+| `Depth` | 240 | From the viewing edge to the back of training. |
+| `TrainingDepth` | 80 | The far part that is the practice area (a third). |
+| `StripWidth` / `StripSide` | 28 / 1 | The strip kept clear for gamepass displays, down the +X side (`-1` for the other). |
+| `SpawnZ` / `SpawnSpread` | 312 / 12 | Where you arrive, and how far arrivals are scattered round it. |
+| `WallHeight` / `WallThickness` | 240 / 6 | The invisible walls on the floor's edge. |
+| `FallDepth` | 20 | This far under the floor, a dummy goes home. |
+| `EyeHeight` | 4.5 | A standing player's eye above the floor, for the sightline test. |
+| `ShowFloor` | true | The plain stand-in floor is visible. Turn off once the Blender model is imported: it keeps colliding. |
+| `DummyResetSeconds` | 4 | A knocked dummy goes home this long after its last hit. |
+| `Dummies` | 2 | Each one's name, `X` from the centre line and `FromBack` from the back edge. |
+| `Spectate` | 13 / 5.5 / 16 / 9 | Fighter POV camera: `Back` and `Up` from the fighter, how far `LookAhead` it aims, and how quickly it follows (`Smooth`). |
 
 ## Training
 

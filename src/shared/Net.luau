@@ -26,7 +26,8 @@ export type EventName =
 	| "PropelRequest" -- client to server: I propelled. No arguments, ever.
 	| "PropelStarted" -- server to other clients: this player propelled
 	| "KickRequest" -- client to server: I jumped at someone in the air. No arguments, ever.
-	| "KickAccepted" -- server to the jumper's client: your follow-up is on, at this target
+	| "KickAccepted" -- server to the jumper's client: your follow-up is on, at this target, and whether it's the locked-on snap
+	| "LockOnState" -- client to server: who I'm locked onto now (a Model), or nil
 	| "KickAttach" -- client to server: I reached them. No arguments, ever.
 	| "KickCommit" -- client to server: I pressed the timing key. No arguments, ever.
 	| "KickImpact" -- server to all: this character's kick landed, on this target, here

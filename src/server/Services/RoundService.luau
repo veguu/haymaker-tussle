@@ -9,7 +9,7 @@
 --
 -- WHO PLAYS: every player with a living character who hasn't switched AFK on, up to Round.MaxPlayers. In
 -- Studio the 1v1 arena's test bot also counts (Round.StudioBotCounts), so a round can be tested alone.
--- Until the lobby exists, the training arena is the lobby: new, waiting and eliminated players go there.
+-- New, waiting and eliminated players go to the lobby (LobbyService), or the training arena if it's off.
 --
 -- AFK is a lobby setting: switched on there, you aren't put in the next round. It can't be switched while
 -- you're in a round (player attribute HT_InRound, which the button reads), so it never moves anyone.
@@ -21,6 +21,7 @@
 -- Through Starting, everyone in the round is held still on their spawn with HT_RoundHold, which
 -- movement, punches and the boost all respect.
 
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -38,6 +39,7 @@ local ELIMINATED = "HT_Eliminated"
 local HOLD = "HT_RoundHold"
 local AFK = "HT_AFK"
 local IN_ROUND = "HT_InRound"
+local FIGHTER_TAG = "HT_Fighter" -- on every body still in the round: what the Spectate button lists
 local STAND_HEIGHT = 3 -- a standing body's root is this far above the floor
 
 local RoundService = Knit.CreateService({
@@ -144,6 +146,7 @@ local function place(model: Model, spot: CFrame)
 		return
 	end
 	Knit.GetService("TrainingService"):Release(player)
+	Knit.GetService("LobbyService"):Release(player)
 	local root = Combatants.rootOf(model)
 	if root then
 		root.AssemblyLinearVelocity = Vector3.zero
@@ -152,14 +155,18 @@ local function place(model: Model, spot: CFrame)
 	RoundService._bodyReset:FireClient(player, spot.LookVector, "moved")
 end
 
---- Sends a player to wait for the next round: the training arena, until the lobby exists.
+--- Sends a player to wait for the next round: the lobby, or the training arena if the lobby is off.
 function RoundService:SendToLobby(player: Player)
 	local character = player.Character
 	if character then
 		Knit.GetService("KickService"):Release(character)
 		Knit.GetService("ClashService"):EndFor(character, "fell")
 	end
-	Knit.GetService("TrainingService"):EnterLobby(player)
+	if GameConfig.Lobby.Enabled then
+		Knit.GetService("LobbyService"):Enter(player)
+	else
+		Knit.GetService("TrainingService"):EnterLobby(player)
+	end
 end
 
 local function startRound()
@@ -189,6 +196,7 @@ local function startRound()
 			inPlayer:SetAttribute(IN_ROUND, true)
 		end
 		lastHits[model] = nil
+		CollectionService:AddTag(model, FIGHTER_TAG)
 		model:SetAttribute(HOLD, true)
 		local at = Vector3.new(spawn.x, arena.CenterY + STAND_HEIGHT, spawn.z)
 		place(model, CFrame.lookAt(at, at + Vector3.new(spawn.faceX, 0, spawn.faceZ)))
@@ -199,6 +207,11 @@ local function startRound()
 end
 
 local function finishRound(winner: Model?)
+	for model in standing do
+		if model.Parent then
+			CollectionService:RemoveTag(model, FIGHTER_TAG)
+		end
+	end
 	folder:SetAttribute("Winner", if winner then roster[winner] else "")
 	trace(`round {roundNumber} over: {if winner then roster[winner] else "no winner"}`)
 	setPhase("RoundOver", cfg.RoundOverSeconds)
@@ -208,6 +221,9 @@ end
 local function settleOuts()
 	for model, out in outs do
 		standing[model] = nil
+		if model.Parent then
+			CollectionService:RemoveTag(model, FIGHTER_TAG)
+		end
 		local credited = if out.left then nil else Round.credit(cfg, lastHits[model], out.at)
 		local cause = Round.cause(out.left, credited)
 		ringOut:FireAllClients(out.name, credited, cause)
@@ -281,6 +297,9 @@ end
 local function endRound()
 	for model in roster do
 		model:SetAttribute(HOLD, nil)
+		if model.Parent then
+			CollectionService:RemoveTag(model, FIGHTER_TAG)
+		end
 		if model.Parent and not Combatants.playerOf(model) then
 			model:SetAttribute(ELIMINATED, nil)
 		end

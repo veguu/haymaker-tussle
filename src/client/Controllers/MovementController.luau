@@ -35,6 +35,7 @@ local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local DiveKick = require(ReplicatedStorage.Shared.Core.DiveKick)
 local Momentum = require(ReplicatedStorage.Shared.Core.Momentum)
 local TrainingLayout = require(ReplicatedStorage.Shared.Core.TrainingLayout)
+local Lobby = require(ReplicatedStorage.Shared.Core.Lobby)
 local Net = require(ReplicatedStorage.Shared.Net)
 
 local STEP_NAME = "HaymakerMovement"
@@ -253,12 +254,15 @@ function MovementController:_bind(
 	floorParams.FilterType = Enum.RaycastFilterType.Exclude
 	floorParams.FilterDescendantsInstances = { character }
 	local kickAccepted = false
+	local kickSnap = false -- the server's word: the locked-on snap, or a free jump you steer
+	local lockSent: Model? = nil
 	local fx = Knit.GetController("FxController")
 	local prompt = Knit.GetController("KickPromptController")
 	local kickRemotes = {
 		request = Net.client("KickRequest"),
 		attach = Net.client("KickAttach"),
 		commit = Net.client("KickCommit"),
+		lockOn = Net.client("LockOnState"),
 	}
 
 	local function endKick()
@@ -324,9 +328,10 @@ function MovementController:_bind(
 
 	-- The server's pick for the follow-up. It only counts for a squat waiting on it, so a late answer
 	-- can never start anything.
-	local function onKickAccepted(target: Model)
+	local function onKickAccepted(target: Model, snap: boolean?)
 		if kick and kick.phase == "squat" and not kickAccepted and target and target.Parent then
 			kickTarget = target
+			kickSnap = snap == true
 			kickAccepted = true
 		end
 	end
@@ -348,8 +353,15 @@ function MovementController:_bind(
 					local facing = root.CFrame.LookVector
 					local at = root.Position
 					-- Whichever platform this is: the rebound lands on the one you kicked from.
-					local arena =
-						TrainingLayout.platformAt(GameConfig.Training, GameConfig.Arena, at.X, at.Z)
+					local lobbyCfg: any = GameConfig.Lobby
+					local arena = if lobbyCfg.Enabled and Lobby.contains(lobbyCfg, at.X, at.Z)
+						then Lobby.disc(lobbyCfg)
+						else TrainingLayout.platformAt(
+							GameConfig.Training,
+							GameConfig.Arena,
+							at.X,
+							at.Z
+						)
 					local plan = DiveKick.planRebound(
 						kickCfg,
 						character:GetAttribute("HT_KickGrade") or "red",
@@ -402,6 +414,66 @@ function MovementController:_bind(
 		local offset = root.Position - targetRoot.Position
 		local approach = DiveKick.approachSeconds(kickCfg, offset.Magnitude)
 		return DiveKick.snap(squat, offset.X, offset.Z, approach, approach + kickCfg.JumpMissGrace)
+	end
+
+	-- How a launched body comes down, to plan a free jump at one.
+	local targetFall: DiveKick.TargetFall = {
+		timeToDrop = function(vy: number, height: number): number
+			return AirRecovery.timeToDrop(
+				airCfg,
+				workspace.Gravity,
+				kickCfg.AirGravityScale,
+				vy,
+				height
+			)
+		end,
+		rise = function(vy: number, seconds: number): number
+			return AirRecovery.predictRise(
+				airCfg,
+				workspace.Gravity,
+				kickCfg.AirGravityScale,
+				vy,
+				seconds
+			)
+		end,
+	}
+
+	-- The free jump, for when you aren't locked onto them: worked out once, at the end of the squat.
+	-- The strength fits the distance, but the direction is yours: where the keys point, or where you're
+	-- facing. An aim that's nearly right is forgiven. Nothing follows the target after this moment.
+	local function springJump(
+		squat: DiveKick.State,
+		targetRoot: BasePart,
+		aimX: number,
+		aimZ: number
+	): DiveKick.State
+		if aimX == 0 and aimZ == 0 then
+			aimX, aimZ = Momentum.facing(state)
+		end
+		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+		fx:JumpBreak(character, GameConfig.Effects.GroundBreakOwnReach)
+		local offset = targetRoot.Position - root.Position
+		local moving = targetRoot.AssemblyLinearVelocity
+		local plan = DiveKick.planJump(
+			kickCfg,
+			offset.X,
+			offset.Y,
+			offset.Z,
+			moving.X,
+			moving.Y,
+			moving.Z,
+			cfg.KnockbackDecay,
+			workspace.Gravity * kickCfg.AirGravityScale,
+			targetFall
+		)
+		local dirX, dirZ = DiveKick.aimJump(kickCfg, aimX, aimZ, plan.towardX, plan.towardZ)
+		return DiveKick.spring(
+			squat,
+			dirX * plan.carry,
+			plan.leap,
+			dirZ * plan.carry,
+			plan.meet + kickCfg.JumpMissGrace
+		)
 	end
 
 	-- The server decides knockback, and this client applies it because it owns the body.
@@ -611,6 +683,8 @@ function MovementController:_bind(
 		-- A round's countdown holds you on your spawn the same way a stun does, without the stun's look.
 		local stunned = character:GetAttribute("HT_Stunned") ~= nil
 			or character:GetAttribute("HT_RoundHold") ~= nil
+			-- Watching a fighter's view: your own body stays where it is (SpectateController).
+			or character:GetAttribute("HT_Spectating") ~= nil
 		if stunned then
 			kickRequested, propelRequested, punchRequested = false, false, false
 			inputX, inputZ = 0, 0
@@ -629,6 +703,14 @@ function MovementController:_bind(
 
 		local pressed = kickRequested
 		kickRequested = false
+		-- The server needs to know who you're locked onto: only that makes a follow-up the snap.
+		if kickRemotes.lockOn then
+			local lockedNow = Knit.GetController("LockOnController"):GetTarget()
+			if lockedNow ~= lockSent then
+				lockSent = lockedNow
+				kickRemotes.lockOn:FireServer(lockedNow)
+			end
+		end
 
 		if not kick then
 			local canJump = grounded and not floating and kickRemotes.request ~= nil
@@ -775,7 +857,10 @@ function MovementController:_bind(
 					and kickAccepted
 					and targetRoot
 				then
-					nextKick = snapJump(nextKick, targetRoot)
+					-- Locked onto them: the fast snap straight to them. Otherwise you jump and steer it.
+					nextKick = if kickSnap
+						then snapJump(nextKick, targetRoot)
+						else springJump(nextKick, targetRoot, inputX, inputZ)
 				end
 				if before == "attach" and nextKick.phase == "flip" then
 					-- The ring ran out with no press. The kick still comes, as a red.
@@ -1139,9 +1224,9 @@ function MovementController:KnitStart()
 	end
 	local kickAccepted = Net.client("KickAccepted")
 	if kickAccepted then
-		kickAccepted.OnClientEvent:Connect(function(target: Model)
+		kickAccepted.OnClientEvent:Connect(function(target: Model, snap: boolean?)
 			if self._kickAccepted then
-				self._kickAccepted(target)
+				self._kickAccepted(target, snap)
 			end
 		end)
 	end
