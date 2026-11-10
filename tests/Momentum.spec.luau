@@ -24,6 +24,9 @@ local CFG: Momentum.Settings = {
 	PropelEaseOutSeconds = 0.3,
 	PropelTurnScale = 0.28,
 	PropelControlReturnSeconds = 0.25,
+	PropelChargeSeconds = 1,
+	PropelChargedSpeed = 110,
+	PropelChargedTurnScale = 0.08,
 	ReverseDeceleration = 40,
 	TurnRateLowSpeed = 540,
 	TurnRateHighSpeed = 110,
@@ -702,5 +705,41 @@ return {
 		end
 		local length = math.sqrt(state.headingX ^ 2 + state.headingZ ^ 2)
 		assert(near(length, 1, 0.0001), `heading length drifted to {length}`)
+	end,
+
+	["a tap dash is the plain one, and a charged one is faster"] = function()
+		local tap = propel(atSpeed(36), 0, -1)
+		assert(tap.dashPeak == CFG.PropelSpeed, `tap peak {tap.dashPeak}`)
+		assert(tap.dashTurn == CFG.PropelTurnScale, "a tap steers as before")
+		local full = Momentum.tryPropel(atSpeed(36), CFG, 0, -1, nil, 1) :: Momentum.State
+		assert(full.dashPeak == CFG.PropelChargedSpeed, `full peak {full.dashPeak}`)
+		local half = Momentum.tryPropel(atSpeed(36), CFG, 0, -1, nil, 0.5) :: Momentum.State
+		assert(half.dashPeak > tap.dashPeak and half.dashPeak < full.dashPeak, "half sits between")
+		-- nonsense power is a tap or a full charge, never more
+		local over = Momentum.tryPropel(atSpeed(36), CFG, 0, -1, nil, 50) :: Momentum.State
+		assert(over.dashPeak == CFG.PropelChargedSpeed, "power went past full")
+		local bad = Momentum.tryPropel(atSpeed(36), CFG, 0, -1, nil, 0 / 0) :: Momentum.State
+		assert(bad.dashPeak == CFG.PropelSpeed, "a NaN power should be a tap")
+	end,
+
+	["holding charges up to one second and no further"] = function()
+		assert(Momentum.chargePower(CFG, 0) == 0)
+		assert(near(Momentum.chargePower(CFG, CFG.PropelChargeSeconds / 2), 0.5, 1e-6))
+		assert(Momentum.chargePower(CFG, CFG.PropelChargeSeconds * 3) == 1)
+		assert(Momentum.chargePower(CFG, -1) == 0)
+	end,
+
+	["a charged dash is harder to steer"] = function()
+		local function bend(power: number): number
+			local state = Momentum.tryPropel(atSpeed(36), CFG, 0, -1, nil, power) :: Momentum.State
+			for _ = 1, 30 do
+				state = Momentum.step(state, CFG, 1, 0, true, DT, "side", 1)
+			end
+			assert((state.propelLeft or 0) > 0, "the dash ended early")
+			return math.abs(math.atan2(state.headingX, -state.headingZ))
+		end
+		local tap, full = bend(0), bend(1)
+		assert(full > 0, "a full charge can't be steered at all")
+		assert(full < tap * 0.5, `full bent {full}, tap {tap}`)
 	end,
 }

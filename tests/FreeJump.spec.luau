@@ -60,4 +60,41 @@ return {
 		local snapped = DiveKick.step(snap, KICK, 0.1, GRAVITY, 0, 1) :: DiveKick.State
 		assert(snapped.steerZ == 0 and snapped.vy == 0)
 	end,
+
+	["not locked on: the leap is guided to a falling, drifting target, slower than the snap"] = function()
+		assert(KICK.LeapGuideSpeed < KICK.ApproachSpeed, "the leap is as fast as the snap")
+		assert(KICK.LeapGuideMaxSpeed < KICK.ApproachSpeed, "the leap's cap is as fast as the snap")
+		for _, gap in { 12, 40, 80, 160 } do
+			local guide = DiveKick.leapSeconds(KICK, gap)
+			assert(guide >= KICK.LeapGuideMinSeconds and guide <= KICK.LeapGuideMaxSeconds)
+			assert(
+				guide > DiveKick.approachSeconds(KICK, gap),
+				`at {gap} studs the leap is no slower than the snap`
+			)
+			local state = DiveKick.leap(DiveKick.start(), -1, 0, guide, guide + KICK.JumpMissGrace)
+			local x, y, z = 0, 3, 0
+			local tx, ty, tz = gap * 0.8, 3 + gap * 0.6, 0
+			local tvx, tvy, tvz = 6, -20, 9
+			local dt = 1 / 60
+			local touched, top, peak = false, 0, y
+			while state.t < guide + KICK.JumpMissGrace do
+				local vx, vy, vz =
+					DiveKick.velocity(state, KICK, x, y, z, tx, ty, tz, tvx, tvy, tvz)
+				assert(vx and vy and vz, "the leap set no velocity")
+				top = math.max(top, math.sqrt(vx * vx + vy * vy + vz * vz))
+				x, y, z = x + vx * dt, y + vy * dt, z + vz * dt
+				tx, ty, tz = tx + tvx * dt, ty + tvy * dt, tz + tvz * dt
+				peak = math.max(peak, y - ty)
+				-- the keys play no part in it
+				state = DiveKick.step(state, KICK, dt, GRAVITY, 0, 1) :: DiveKick.State
+				assert(state.steerZ == 0, "the keys steered the guided leap")
+				if DiveKick.isTouching(KICK, x - tx, y - ty, z - tz) then
+					touched = true
+					break
+				end
+			end
+			assert(touched, `the leap never reached a target {gap} studs away`)
+			assert(top <= KICK.LeapGuideMaxSpeed + 0.001, `too fast: {top}`)
+		end
+	end,
 }

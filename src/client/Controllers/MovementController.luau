@@ -227,6 +227,11 @@ function MovementController:_bind(
 	local state = Momentum.new(flat.X, flat.Z)
 	local lean = 0
 	local propelRequested = false
+	-- Holding the propel key charges it: when the hold began, whether the key is still down, and whether
+	-- the rules have had their say on it yet. The dash goes on release, or at a full charge.
+	local chargeAt: number? = nil
+	local chargeHeld = false
+	local chargeChecked = false
 	local knockGraceUntil = 0
 	local kick: DiveKick.State? = nil
 	local kickTarget: Model? = nil
@@ -254,7 +259,7 @@ function MovementController:_bind(
 	floorParams.FilterType = Enum.RaycastFilterType.Exclude
 	floorParams.FilterDescendantsInstances = { character }
 	local kickAccepted = false
-	local kickSnap = false -- the server's word: the locked-on snap, or a free jump you steer
+	local kickSnap = false -- the server's word: the locked-on snap, or the slower guided leap
 	local lockSent: Model? = nil
 	local fx = Knit.GetController("FxController")
 	local prompt = Knit.GetController("KickPromptController")
@@ -264,6 +269,15 @@ function MovementController:_bind(
 		commit = Net.client("KickCommit"),
 		lockOn = Net.client("LockOnState"),
 	}
+
+	-- A charge that was building is dropped, along with what shows it.
+	local function dropCharge()
+		if chargeAt then
+			chargeAt = nil
+			fx:PropelCharge(character, nil)
+		end
+	end
+	trove:Add(dropCharge)
 
 	local function endKick()
 		kick = nil
@@ -416,64 +430,15 @@ function MovementController:_bind(
 		return DiveKick.snap(squat, offset.X, offset.Z, approach, approach + kickCfg.JumpMissGrace)
 	end
 
-	-- How a launched body comes down, to plan a free jump at one.
-	local targetFall: DiveKick.TargetFall = {
-		timeToDrop = function(vy: number, height: number): number
-			return AirRecovery.timeToDrop(
-				airCfg,
-				workspace.Gravity,
-				kickCfg.AirGravityScale,
-				vy,
-				height
-			)
-		end,
-		rise = function(vy: number, seconds: number): number
-			return AirRecovery.predictRise(
-				airCfg,
-				workspace.Gravity,
-				kickCfg.AirGravityScale,
-				vy,
-				seconds
-			)
-		end,
-	}
-
-	-- The free jump, for when you aren't locked onto them: worked out once, at the end of the squat.
-	-- The strength fits the distance, but the direction is yours: where the keys point, or where you're
-	-- facing. An aim that's nearly right is forgiven. Nothing follows the target after this moment.
-	local function springJump(
-		squat: DiveKick.State,
-		targetRoot: BasePart,
-		aimX: number,
-		aimZ: number
-	): DiveKick.State
-		if aimX == 0 and aimZ == 0 then
-			aimX, aimZ = Momentum.facing(state)
-		end
+	-- The guided leap, for when you aren't locked onto them: a real jump on an arc, a good deal slower
+	-- than the snap, but re-aimed at them the whole way, so it gets there on its own. The server isn't
+	-- holding them, so they keep falling and steering while you're on your way.
+	local function guidedJump(squat: DiveKick.State, targetRoot: BasePart): DiveKick.State
 		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
 		fx:JumpBreak(character, GameConfig.Effects.GroundBreakOwnReach)
-		local offset = targetRoot.Position - root.Position
-		local moving = targetRoot.AssemblyLinearVelocity
-		local plan = DiveKick.planJump(
-			kickCfg,
-			offset.X,
-			offset.Y,
-			offset.Z,
-			moving.X,
-			moving.Y,
-			moving.Z,
-			cfg.KnockbackDecay,
-			workspace.Gravity * kickCfg.AirGravityScale,
-			targetFall
-		)
-		local dirX, dirZ = DiveKick.aimJump(kickCfg, aimX, aimZ, plan.towardX, plan.towardZ)
-		return DiveKick.spring(
-			squat,
-			dirX * plan.carry,
-			plan.leap,
-			dirZ * plan.carry,
-			plan.meet + kickCfg.JumpMissGrace
-		)
+		local offset = root.Position - targetRoot.Position
+		local guide = DiveKick.leapSeconds(kickCfg, offset.Magnitude)
+		return DiveKick.leap(squat, offset.X, offset.Z, guide, guide + kickCfg.JumpMissGrace)
 	end
 
 	-- The server decides knockback, and this client applies it because it owns the body.
@@ -533,6 +498,7 @@ function MovementController:_bind(
 		slammed = false
 		steerX, steerZ, pushX, pushZ, lift = 0, 0, 0, 0, 0
 		punchRequested, propelRequested, kickRequested = false, false, false
+		dropCharge()
 		lastPush = nil
 		lifts, liftUntil, liftSet = AirRecovery.newLifts(), 0, false
 		state = if face and face.Magnitude > 0.01
@@ -569,12 +535,19 @@ function MovementController:_bind(
 		end
 	end
 
-	-- One press is one propel: only the moment of pressing counts, never holding.
+	-- Pressing starts the charge and letting go dashes: a tap is the plain dash, a longer hold a harder
+	-- one, up to PropelChargeSeconds, when it goes by itself.
 	ContextActionService:BindActionAtPriority(
 		PROPEL_ACTION,
 		function(_name: string, inputState: Enum.UserInputState)
 			if inputState == Enum.UserInputState.Begin then
 				propelRequested = true
+				chargeHeld = true
+			elseif
+				inputState == Enum.UserInputState.End
+				or inputState == Enum.UserInputState.Cancel
+			then
+				chargeHeld = false
 			end
 			return Enum.ContextActionResult.Sink
 		end,
@@ -635,6 +608,7 @@ function MovementController:_bind(
 		-- Hung in the air while someone is attached. The kick's own knock takes over at once.
 		if air == "hold" and now >= knockGraceUntil then
 			kickRequested, propelRequested, punchRequested = false, false, false
+			dropCharge()
 			pushX, pushZ, lift = 0, 0, 0
 			state = Momentum.stopped(state)
 			humanoid.WalkSpeed = 0
@@ -656,6 +630,7 @@ function MovementController:_bind(
 		local clashAt = character:GetAttribute("HT_ClashAt") :: Vector3?
 		if clashAt and now >= knockGraceUntil then
 			kickRequested, propelRequested, punchRequested = false, false, false
+			dropCharge()
 			pushX, pushZ, lift = 0, 0, 0
 			local face = character:GetAttribute("HT_ClashFace") :: Vector3?
 			if face then
@@ -687,6 +662,7 @@ function MovementController:_bind(
 			or character:GetAttribute("HT_Spectating") ~= nil
 		if stunned then
 			kickRequested, propelRequested, punchRequested = false, false, false
+			dropCharge()
 			inputX, inputZ = 0, 0
 			drive, side = "side", 0
 		end
@@ -817,6 +793,7 @@ function MovementController:_bind(
 				and kickTarget:FindFirstChild("HumanoidRootPart") :: BasePart?
 			local before = kick.phase
 			propelRequested = false -- no propel during the committed jump or the kick
+			dropCharge()
 			punchRequested = false
 			pushX, pushZ, lift = 0, 0, 0
 			-- The jump is a jump, and lasts until you land, whatever happens to anyone else. Once
@@ -857,10 +834,10 @@ function MovementController:_bind(
 					and kickAccepted
 					and targetRoot
 				then
-					-- Locked onto them: the fast snap straight to them. Otherwise you jump and steer it.
+					-- Locked onto them: the fast snap straight to them. Otherwise a slower leap, guided to them.
 					nextKick = if kickSnap
 						then snapJump(nextKick, targetRoot)
-						else springJump(nextKick, targetRoot, inputX, inputZ)
+						else guidedJump(nextKick, targetRoot)
 				end
 				if before == "attach" and nextKick.phase == "flip" then
 					-- The ring ran out with no press. The kick still comes, as a red.
@@ -981,17 +958,36 @@ function MovementController:_bind(
 
 		if propelRequested then
 			propelRequested = false
-			-- A burst the way you're already going; from a standstill, the way the keys point.
-			local propelled = Momentum.tryPropel(state, cfg, inputX, inputZ, drive)
-			if not propelled then
+			chargeAt = now
+			chargeChecked = false
+		end
+		if chargeAt and not chargeChecked then
+			chargeChecked = true
+			-- Still cooling down, or one already running: turned down at the press, with nothing to charge.
+			if (state.propelCooldownLeft or 0) > 0 or (state.propelLeft or 0) > 0 then
+				chargeAt = nil
 				self.PropelBlocked:Fire()
 			end
-			if propelled then
-				state = propelled
-				self.Propelled:Fire()
-				fx:PropelGust(character, state.dashSeconds)
-				if propelRemote then
-					propelRemote:FireServer()
+		end
+		if chargeAt then
+			local power = Momentum.chargePower(cfg, now - chargeAt)
+			if chargeHeld and power < 1 then
+				fx:PropelCharge(character, power)
+			else
+				chargeAt = nil
+				fx:PropelCharge(character, nil)
+				-- A burst the way you're already going; from a standstill, the way the keys point.
+				local propelled = Momentum.tryPropel(state, cfg, inputX, inputZ, drive, power)
+				if not propelled then
+					self.PropelBlocked:Fire()
+				end
+				if propelled then
+					state = propelled
+					self.Propelled:Fire()
+					fx:PropelGust(character, state.dashSeconds, power)
+					if propelRemote then
+						propelRemote:FireServer(power)
+					end
 				end
 			end
 		end
@@ -1216,9 +1212,10 @@ function MovementController:KnitStart()
 	end
 	local propelStarted = Net.client("PropelStarted")
 	if propelStarted then
-		propelStarted.OnClientEvent:Connect(function(other: Player)
+		propelStarted.OnClientEvent:Connect(function(other: Player, power: number?)
 			if other and other.Character then
-				Knit.GetController("FxController"):PropelGust(other.Character, cfg.PropelSeconds)
+				Knit.GetController("FxController")
+					:PropelGust(other.Character, cfg.PropelSeconds, power)
 			end
 		end)
 	end

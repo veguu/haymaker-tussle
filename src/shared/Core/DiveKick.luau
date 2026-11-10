@@ -52,6 +52,11 @@ export type Settings = {
 	JumpShortShare: number,
 	JumpShortMax: number,
 	AimForgiveDegrees: number,
+	LeapGuideSpeed: number,
+	LeapGuideMinSeconds: number,
+	LeapGuideMaxSeconds: number,
+	LeapGuideMaxSpeed: number,
+	LeapGuideArc: number,
 	ApproachSpeed: number,
 	ApproachMinSeconds: number,
 	ApproachMaxSeconds: number,
@@ -142,6 +147,8 @@ export type State = {
 	missAt: number,
 	-- The snap's length in seconds, while it runs.
 	approach: number?,
+	-- The guided leap's length in seconds, while it runs: the follow-up at someone you aren't locked onto.
+	guide: number?,
 }
 
 local FLIP_GRACE = 0.5 -- how long a flip waits for the server before giving up
@@ -212,6 +219,16 @@ function DiveKick.approachSeconds(cfg: Settings, distance: number): number
 		distance / math.max(cfg.ApproachSpeed, 1),
 		cfg.ApproachMinSeconds,
 		cfg.ApproachMaxSeconds
+	)
+end
+
+--- How long the guided leap to a target this far away takes: slower than the snap, and never so short
+--- that it looks like one.
+function DiveKick.leapSeconds(cfg: Settings, distance: number): number
+	return math.clamp(
+		distance / math.max(cfg.LeapGuideSpeed, 1),
+		cfg.LeapGuideMinSeconds,
+		cfg.LeapGuideMaxSeconds
 	)
 end
 
@@ -426,6 +443,26 @@ function DiveKick.snap(
 	return nextState
 end
 
+--- Off the floor in the guided leap, for a target you aren't locked onto: `guide` seconds to reach them
+--- on an arc that is re-aimed at them the whole way, so it gets there without the keys, but as a real
+--- jump through the air rather than the snap. `dx`, `dz` is the flat offset from the target to the
+--- jumper, the side you'll arrive on. Past `missAt` without touching, it has missed.
+function DiveKick.leap(state: State, dx: number, dz: number, guide: number, missAt: number): State
+	local nextState = table.clone(state)
+	nextState.phase = "chase"
+	nextState.t = 0
+	nextState.vx, nextState.vy, nextState.vz = 0, 0, 0
+	nextState.steerX, nextState.steerZ = 0, 0
+	nextState.approach = nil
+	nextState.guide = guide
+	nextState.missAt = missAt
+	local size = math.sqrt(dx * dx + dz * dz)
+	if size > 0.01 then
+		nextState.sideX, nextState.sideZ = dx / size, dz / size
+	end
+	return nextState
+end
+
 --- Has this jump missed? Then it's yours to recover from.
 function DiveKick.hasMissed(state: State): boolean
 	return state.phase == "chase" and state.t >= state.missAt
@@ -504,7 +541,7 @@ function DiveKick.step(
 	local nextState = table.clone(state)
 	nextState.t += dt
 	if state.phase == "chase" then
-		if state.approach == nil then
+		if state.approach == nil and state.guide == nil then
 			-- The free jump: an arc under gravity that only the movement keys steer.
 			nextState.vy -= gravity * dt
 			nextState.steerX, nextState.steerZ = DiveKick.airSteer(
@@ -550,6 +587,25 @@ function DiveKick.velocity(
 	targetVZ: number
 ): (number?, number?, number?)
 	if state.phase == "chase" then
+		local guide = state.guide
+		if guide then
+			-- The guided leap: the speed that gets to the spot beside them as the leap ends, plus the rise
+			-- of an arc that falls away as it closes. Worked out again every frame from where both are
+			-- now, so it follows them down as they fall.
+			local left = math.max(guide - state.t, SNAP_MIN_REMAINING)
+			local toX = targetX + state.sideX * cfg.AttachSide
+			local toY = targetY + cfg.AttachAbove
+			local toZ = targetZ + state.sideZ * cfg.AttachSide
+			local gx = targetVX + (toX - x) / left
+			local gy = targetVY + (toY - y) / left + cfg.LeapGuideArc * left / 2
+			local gz = targetVZ + (toZ - z) / left
+			local fast = math.sqrt(gx * gx + gy * gy + gz * gz)
+			if fast > cfg.LeapGuideMaxSpeed then
+				local share = cfg.LeapGuideMaxSpeed / fast
+				gx, gy, gz = gx * share, gy * share, gz * share
+			end
+			return gx, gy, gz
+		end
 		local approach = state.approach
 		if approach == nil then
 			return state.vx + state.steerX, state.vy, state.vz + state.steerZ

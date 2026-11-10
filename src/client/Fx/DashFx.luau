@@ -25,8 +25,14 @@ local DashFx = {}
 
 local WHITE = Color3.new(1, 1, 1)
 local PALE = Color3.fromRGB(226, 238, 252)
-local WIND = Color3.fromRGB(143, 211, 255)
-local DEEP = Color3.fromRGB(70, 130, 230)
+-- A dash is coloured by how charged it is: white for a tap, through yellow, to a fiery orange at full.
+-- HEAD is where a line or streak starts and what an after-image is when it appears; TAIL is what each
+-- fades to.
+local COOL_TAIL = Color3.fromRGB(196, 222, 250)
+local WARM_HEAD = Color3.fromRGB(255, 226, 120)
+local WARM_TAIL = Color3.fromRGB(255, 170, 60)
+local HOT_HEAD = Color3.fromRGB(255, 176, 56)
+local HOT_TAIL = Color3.fromRGB(255, 72, 16)
 local STREAK_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
 local DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local PARK = CFrame.new(0, -1000, 0)
@@ -48,6 +54,9 @@ type Kit = {
 	trails: { Trail },
 	streaks: ParticleEmitter,
 	dust: ParticleEmitter,
+	charge: ParticleEmitter,
+	head: Color3,
+	tail: Color3,
 	ghosts: { Ghost },
 	ghostSources: number,
 	holder: Folder?,
@@ -62,6 +71,15 @@ local kits: { [Model]: Kit } = setmetatable({}, { __mode = "k" }) :: any
 local live: { Kit } = {}
 local connection: RBXScriptConnection? = nil
 local random = Random.new()
+
+-- The two colours of a dash this charged, 0 to 1.
+local function coloursFor(power: number): (Color3, Color3)
+	local share = math.clamp(power, 0, 1)
+	if share <= 0.5 then
+		return WHITE:Lerp(WARM_HEAD, share * 2), COOL_TAIL:Lerp(WARM_TAIL, share * 2)
+	end
+	return WARM_HEAD:Lerp(HOT_HEAD, share * 2 - 1), WARM_TAIL:Lerp(HOT_TAIL, share * 2 - 1)
+end
 
 local function attachmentAt(root: BasePart, name: string, offset: Vector3): Attachment
 	local attachment = Instance.new("Attachment")
@@ -88,7 +106,7 @@ local function lineTrail(
 	trail.FaceCamera = true
 	trail.Lifetime = seconds
 	trail.MinLength = 0.05
-	trail.Color = ColorSequence.new(WHITE, WIND)
+	trail.Color = ColorSequence.new(WHITE, COOL_TAIL)
 	trail.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 0.1),
 		NumberSequenceKeypoint.new(0.6, 0.55),
@@ -132,7 +150,7 @@ local function buildKit(root: BasePart): Kit
 	})
 	-- A negative squash stretches the sprite along its flight; a positive one stands it on end.
 	streaks.Squash = NumberSequence.new(-cfg.DashStreakSquash)
-	streaks.Color = ColorSequence.new(WHITE, WIND)
+	streaks.Color = ColorSequence.new(WHITE, COOL_TAIL)
 	streaks.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 0.15),
 		NumberSequenceKeypoint.new(0.7, 0.4),
@@ -170,11 +188,39 @@ local function buildKit(root: BasePart): Kit
 	dust.Enabled = false
 	dust.Parent = feet
 
+	-- Sparks drawn up off the floor while a dash is being charged, thicker and hotter as it builds.
+	local charge = Instance.new("ParticleEmitter")
+	charge.Name = "HT_DashCharge"
+	charge.Texture = STREAK_TEXTURE
+	charge.Orientation = Enum.ParticleOrientation.VelocityParallel
+	charge.EmissionDirection = Enum.NormalId.Top
+	charge.Lifetime = NumberRange.new(0.2, 0.4)
+	charge.Speed = NumberRange.new(8, 18)
+	charge.SpreadAngle = Vector2.new(55, 55)
+	charge.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.9),
+		NumberSequenceKeypoint.new(1, 0.2),
+	})
+	charge.Squash = NumberSequence.new(-2)
+	charge.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.1),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	charge.LightEmission = 1
+	charge.LightInfluence = 0
+	charge.Brightness = 2
+	charge.Rate = 0
+	charge.Enabled = false
+	charge.Parent = attachmentAt(root, "HT_DashChargeAt", Vector3.new(0, -cfg.FootDrop + 0.3, 0))
+
 	return {
 		root = root,
 		trails = trails,
 		streaks = streaks,
 		dust = dust,
+		charge = charge,
+		head = WHITE,
+		tail = COOL_TAIL,
 		ghosts = {},
 		ghostSources = 0,
 		holder = nil,
@@ -334,10 +380,10 @@ local function step()
 				else
 					busy = true
 					if now - ghost.bornAt >= GHOST_SHOW_DELAY then
-						-- Fades from the wind colour toward a deeper blue as it goes.
+						-- Fades from the dash's colour toward its deeper one as it goes.
 						local start = cfg.DashGhostTransparency
 						local transparency = start + (1 - start) * age
-						local colour = WIND:Lerp(DEEP, age)
+						local colour = kit.head:Lerp(kit.tail, age)
 						for _, part in ghost.parts do
 							part.Transparency = transparency
 							part.Color = colour
@@ -356,9 +402,51 @@ local function step()
 	end
 end
 
+-- This character's kit, made the first time it's needed.
+local function kitFor(character: Model, root: BasePart): Kit
+	local kit = kits[character]
+	if kit and kit.root == root then
+		return kit
+	end
+	local made = buildKit(root)
+	kits[character] = made
+	-- A body that leaves the world takes its after-images with it.
+	character.AncestryChanged:Connect(function()
+		if not character:IsDescendantOf(workspace) then
+			stop(made)
+			made.charge.Enabled = false
+			dropGhosts(made)
+		end
+	end)
+	return made
+end
+
+--- A dash being charged on `character`: sparks off the floor in the colour it has built up to, `power`
+--- 0 to 1. Nil ends it, whether the dash went or the charge was dropped.
+function DashFx.charge(character: Model, power: number?)
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not root or not root:IsA("BasePart") then
+		return
+	end
+	if power == nil then
+		local kit = kits[character]
+		if kit then
+			kit.charge.Enabled = false
+		end
+		return
+	end
+	local kit = kitFor(character, root)
+	local head, tail = coloursFor(power)
+	kit.charge.Color = ColorSequence.new(head, tail)
+	kit.charge.Rate = (cfg.DashChargeRate + cfg.DashChargeRate * 3 * power) * QUALITY
+	kit.charge.Enabled = true
+end
+
 --- Shows a dash on `character` for `seconds`: speed lines and wind streaks for as long as it runs,
---- after-images left along the way, and dust at the feet if it starts on the ground.
-function DashFx.play(character: Model, seconds: number)
+--- after-images left along the way, and dust at the feet if it starts on the ground. `power` is how
+--- charged it is, 0 to 1: it sets the colour, white for a tap to a fiery orange at full, and a charged
+--- one throws more streaks.
+function DashFx.play(character: Model, seconds: number, power: number?)
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if not root or not root:IsA("BasePart") then
 		return
@@ -369,25 +457,20 @@ function DashFx.play(character: Model, seconds: number)
 		return
 	end
 
-	local kit = kits[character]
-	if not kit or kit.root ~= root then
-		local made = buildKit(root)
-		kit = made
-		kits[character] = made
-		-- A body that leaves the world takes its after-images with it.
-		character.AncestryChanged:Connect(function()
-			if not character:IsDescendantOf(workspace) then
-				stop(made)
-				dropGhosts(made)
-			end
-		end)
-	end
+	local kit = kitFor(character, root)
+	local charge = math.clamp(power or 0, 0, 1)
+	local head, tail = coloursFor(charge)
+	kit.head, kit.tail = head, tail
+	kit.charge.Enabled = false
 
 	local now = os.clock()
 	for _, trail in kit.trails do
 		trail:Clear()
+		trail.Color = ColorSequence.new(head, tail)
 		trail.Enabled = true
 	end
+	kit.streaks.Color = ColorSequence.new(head, tail)
+	kit.streaks.Rate = cfg.DashStreakRate * QUALITY * (1 + charge)
 	kit.streaks.Enabled = true
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if humanoid and humanoid.FloorMaterial ~= Enum.Material.Air then

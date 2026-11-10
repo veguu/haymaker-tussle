@@ -40,6 +40,9 @@ local GameConfig = {
 		PropelCooldown = 3,
 		PropelTurnScale = 0.28,
 		PropelControlReturnSeconds = 0.25,
+		PropelChargeSeconds = 1,
+		PropelChargedSpeed = 140,
+		PropelChargedTurnScale = 0.08,
 		KnockbackAirDecay = 20,
 		KnockbackMaxSpeed = 250,
 		HitSpeedKeep = 0.3,
@@ -511,6 +514,11 @@ local GameConfig = {
 		JumpShortMax = 7,
 		AimForgiveDegrees = 14,
 		LeapChaseSeconds = 4,
+		LeapGuideSpeed = 130,
+		LeapGuideMinSeconds = 0.3,
+		LeapGuideMaxSeconds = 1.1,
+		LeapGuideMaxSpeed = 190,
+		LeapGuideArc = 120,
 	},
 	AirRecovery = {
 		BoostSpeed = 17,
@@ -689,7 +697,7 @@ local GameConfig = {
 	Debug = {
 		MoveReadout = false,
 		TestFloor = true,
-		ShowHitbox = true,
+		ShowHitbox = false,
 	},
 	Tutorial = {
 		Enabled = false,
@@ -786,6 +794,8 @@ local GameConfig = {
 		DashStreakRate = 45,
 		DashStreakSquash = 3,
 		DashDustCount = 10,
+		DashChargeRate = 14,
+		SwingSparkScale = 0.4,
 	},
 }
 

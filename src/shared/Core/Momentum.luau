@@ -37,6 +37,9 @@ export type Settings = {
 	PropelCooldown: number,
 	PropelTurnScale: number,
 	PropelControlReturnSeconds: number,
+	PropelChargeSeconds: number,
+	PropelChargedSpeed: number,
+	PropelChargedTurnScale: number,
 	ReverseDeceleration: number,
 	TurnRateLowSpeed: number,
 	TurnRateHighSpeed: number,
@@ -68,6 +71,10 @@ export type State = {
 	dashSeconds: number?,
 	dashPeak: number?,
 	dashFrom: number?,
+	-- How charged this burst is, 0 (a tap) to 1 (held the full PropelChargeSeconds), and the share of the
+	-- turn rate that leaves it. Empty for an uncharged one.
+	dashPower: number?,
+	dashTurn: number?,
 	-- Seconds until steering is fully back after a dash.
 	controlReturnLeft: number?,
 	-- Knockback velocity, on top of normal travel. Normal movement never replaces it.
@@ -517,7 +524,7 @@ local function dashStep(
 			if math.abs(remaining) <= REVERSE_ANGLE then
 				local control = if grounded then 1 else cfg.AirControl
 				local maxStep = Momentum.turnRate(cfg, speed)
-					* math.clamp(cfg.PropelTurnScale, 0, 1)
+					* math.clamp(state.dashTurn or cfg.PropelTurnScale, 0, 1)
 					* control
 					* dt
 				local applied = math.clamp(remaining, -maxStep, maxStep)
@@ -542,6 +549,8 @@ local function dashStep(
 		dashSeconds = total,
 		dashPeak = peak,
 		dashFrom = from,
+		dashPower = state.dashPower,
+		dashTurn = state.dashTurn,
 	}
 end
 
@@ -581,16 +590,39 @@ function Momentum.step(
 	return nextState
 end
 
+--- How charged a burst is after holding the key this long: 0 for a tap, 1 at PropelChargeSeconds or more.
+function Momentum.chargePower(cfg: Settings, heldSeconds: number): number
+	if not isFinite(heldSeconds) or cfg.PropelChargeSeconds <= 0 then
+		return 0
+	end
+	return math.clamp(heldSeconds / cfg.PropelChargeSeconds, 0, 1)
+end
+
+--- Top speed of a burst this charged: PropelSpeed for a tap, up to PropelChargedSpeed at full.
+function Momentum.chargedSpeed(cfg: Settings, power: number): number
+	local share = math.clamp(power, 0, 1)
+	return cfg.PropelSpeed + (cfg.PropelChargedSpeed - cfg.PropelSpeed) * share
+end
+
+--- Share of the turn rate a burst this charged leaves the keys: PropelTurnScale for a tap, down to
+--- PropelChargedTurnScale at full. The harder the burst, the harder it is to steer.
+function Momentum.chargedTurnScale(cfg: Settings, power: number): number
+	local share = math.clamp(power, 0, 1)
+	return cfg.PropelTurnScale + (cfg.PropelChargedTurnScale - cfg.PropelTurnScale) * share
+end
+
 --- Starts a burst along the current travel, or toward the input from a standstill. It never goes
 --- backward: S is refused without spending the cooldown. Returns the new state, or nil if refused. Its
 --- speed is a fixed profile rather than something added, so pressing again can never stack speed: one
---- runs at a time, and the cooldown starts the moment it does.
+--- runs at a time, and the cooldown starts the moment it does. `power` is how charged it is, 0 to 1
+--- (see chargePower); left out, it's a plain tap.
 function Momentum.tryPropel(
 	state: State,
 	cfg: Settings,
 	inputX: number,
 	inputZ: number,
-	drive: Drive?
+	drive: Drive?,
+	power: number?
 ): State?
 	if (state.propelCooldownLeft or 0) > 0 or (state.propelLeft or 0) > 0 then
 		return nil
@@ -608,6 +640,7 @@ function Momentum.tryPropel(
 		end
 	end
 	local total = math.max(cfg.PropelSeconds, 0.05)
+	local charge = if power and isFinite(power) then math.clamp(power, 0, 1) else 0
 	return {
 		speed = state.speed,
 		headingX = hx,
@@ -620,8 +653,10 @@ function Momentum.tryPropel(
 		knockX = state.knockX,
 		knockZ = state.knockZ,
 		dashSeconds = total,
-		dashPeak = math.max(cfg.PropelSpeed, state.speed),
+		dashPeak = math.max(Momentum.chargedSpeed(cfg, charge), state.speed),
 		dashFrom = state.speed,
+		dashPower = charge,
+		dashTurn = Momentum.chargedTurnScale(cfg, charge),
 	}
 end
 

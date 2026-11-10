@@ -23,8 +23,8 @@ export type EventName =
 	| "HitConfirmed" -- server to all: this character's punch hit this target
 	| "Knockback" -- server to the target's client: launch velocity, and lift if airborne
 	| "BumpHappened" -- server to all: these two characters bumped
-	| "PropelRequest" -- client to server: I propelled. No arguments, ever.
-	| "PropelStarted" -- server to other clients: this player propelled
+	| "PropelRequest" -- client to server: I propelled, and how charged it was (0 to 1, only for how it looks)
+	| "PropelStarted" -- server to other clients: this player propelled, this charged (0 to 1)
 	| "KickRequest" -- client to server: I jumped at someone in the air. No arguments, ever.
 	| "KickAccepted" -- server to the jumper's client: your follow-up is on, at this target, and whether it's the locked-on snap
 	| "LockOnState" -- client to server: who I'm locked onto now (a Model), or nil

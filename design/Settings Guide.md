@@ -34,6 +34,9 @@ Every adjustable value in the game. All numbers are **starting guesses to tune b
 | `PropelEaseOutSeconds` | 0.28 | Seconds at the end of the dash easing from `PropelSpeed` back to running speed. |
 | `PropelTurnScale` | 0.28 | Share of the normal turn rate (`TurnRateHighSpeed` at dash speed) the keys get during a dash: 0.28 is about 150°/s, so it bends but turning is hard. Input more than a right angle off the travel is ignored, so it can never be turned round. |
 | `PropelControlReturnSeconds` | 0.25 | After a dash, steering eases from `PropelTurnScale` back to normal over this long instead of all at once. |
+| `PropelChargeSeconds` | 1 | Holding the dash key charges it. This is the longest hold that counts: at this many seconds it is fully charged and goes by itself. Letting go earlier dashes at whatever it has built. |
+| `PropelChargedSpeed` | 140 | Top speed of a fully charged dash. A tap is `PropelSpeed`; a part charge sits in between. |
+| `PropelChargedTurnScale` | 0.08 | Share of the normal turn rate the keys get during a fully charged dash. A tap is `PropelTurnScale`; the more charge, the harder it is to steer. |
 | `SideStopDeceleration` | 45 | Studs/s lost per second after releasing A, D or S. Only W earns the coast. |
 | `CoastMaxAngle` | 45 | When you let go of A or D, you only keep the long coast if you're heading within this many degrees of where the camera looks. Further off, you stop quickly at `SideStopDeceleration`. Letting go of W always coasts, wherever the camera turns afterward. |
 | `ForwardInputThreshold` | 0.3 | How much of the input must point along the camera to count as W (or against it, as S). W+D counts as W. |
@@ -338,13 +341,15 @@ The training arena beside the 1v1 arena: a hub, six station platforms joined to 
 | `DashStreakRate` | 45 | Wind streaks thrown off the body per second while the dash runs. |
 | `DashStreakSquash` | 3 | How thin and long each streak is stretched along its flight. 0 is a round sparkle. |
 | `DashDustCount` | 10 | Dust puffs kicked back from the feet when a dash starts on the ground. |
+| `DashChargeRate` | 14 | Sparks per second at the feet when a dash starts charging. It rises to four times this at a full charge. The dash and its sparks are white for a tap, through yellow, to fiery orange at full. |
+| `SwingSparkScale` | 0.4 | Size of the small spark where a swing cuts the air, as a share of a landed punch's spark. It sits at `Punch.Range` in front of the puncher, so it shows how far the punch reaches. |
 
 ## Debug
 
 | Setting | Start | What it does |
 |---|---|---|
 | `MoveReadout` | true | TEMPORARY: small on-screen speed readout for tuning. The real HUD replaces it. |
-| `ShowHitbox` | true | TEMPORARY: draws every player's punch hitbox on the floor in see-through red. Turn off before anyone else plays. |
+| `ShowHitbox` | false | Off since move-4 (punches show a spark instead; the training toggle still switches it on). draws every player's punch hitbox on the floor in see-through red. Turn off before anyone else plays. |
 | `TestFloor` | true | TEMPORARY: builds a plain floor and returns players who fall. The real arena replaces it. |
 
 ## Tutorial
@@ -414,6 +419,11 @@ The air kick. An uppercut launches someone, who can steer and propel in the air.
 | `ApproachMinSeconds` | 0.08 | Shortest snap, so it's never instant. |
 | `ApproachMaxSeconds` | 0.65 | Longest snap. It must cover `FollowUpOwnRange` at `ApproachMaxSpeed` (a test checks). |
 | `ApproachMaxSpeed` | 280 | Fastest the snap ever moves. Keep it under `Security.TeleportSpeed` (300), or the speed audit takes it for a teleport (a test checks). |
+| `LeapGuideSpeed` | 130 | The follow-up at someone you are NOT locked onto is a guided leap: an arc that is re-aimed at them the whole way. This is its speed, which sets how long it takes. Keep it under `ApproachSpeed`, or it is the snap again. |
+| `LeapGuideMinSeconds` | 0.3 | Shortest guided leap, so a close one still reads as a jump. |
+| `LeapGuideMaxSeconds` | 1.1 | Longest guided leap. |
+| `LeapGuideMaxSpeed` | 190 | Fastest the guided leap ever moves, when the target is far or moving away. |
+| `LeapGuideArc` | 120 | How much the guided leap arcs upward on its way, as a gravity. 0 is a straight line. |
 | `AcceptWaitSeconds` | 0.6 | How long the squat waits for the server to accept. If it never does, nothing happens and it can be tried again. |
 | `FollowUpRange` | 80 | Studs (straight line) within which someone else's launch can be followed up. |
 | `FollowUpOwnRange` | 170 | The same for your own uppercut's launch. A strong uppercut throws them 150 studs within a second. |

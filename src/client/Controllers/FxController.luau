@@ -18,6 +18,7 @@ local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Sfx = require(ReplicatedStorage.Shared.Sfx)
 local GroundBreak = require(ReplicatedStorage.Shared.Core.GroundBreak)
 local DashFx = require(script.Parent.Parent.Fx.DashFx)
+local ImpactFx = require(script.Parent.Parent.Fx.ImpactFx)
 
 local cfg = GameConfig.Effects
 local LIGHT = Color3.fromRGB(226, 238, 252)
@@ -167,18 +168,31 @@ local function gustSide(feet: Vector3, right: Vector3, back: Vector3, side: numb
 end
 
 --- A dash starting: after-images, speed lines, wind streaks and dust (Fx/DashFx), and its gust of
---- wind. `seconds` is how long that dash runs.
-function FxController:PropelGust(character: Model, seconds: number?)
+--- wind. `seconds` is how long that dash runs, `power` how charged it is (0 to 1), which colours it
+--- and deepens its sound.
+function FxController:PropelGust(character: Model, seconds: number?, power: number?)
 	local length = seconds or GameConfig.Movement.PropelSeconds
 	propelEnds[character] = os.clock() + length
 	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked on the next line)
 	if not root then
 		return
 	end
-	DashFx.play(character, length)
+	local charge = math.clamp(power or 0, 0, 1)
+	DashFx.play(character, length, charge)
 	-- A sharp gust of air, pitched up a little, over the old whoosh as a soft tail.
-	Sfx.play("dash", root, PITCH_VARY, { pitch = 1.15, volume = 0.8, cut = 0.5 })
+	Sfx.play(
+		"dash",
+		root,
+		PITCH_VARY,
+		{ pitch = 1.15 - 0.2 * charge, volume = 0.8 + 0.25 * charge, cut = 0.5 }
+	)
 	Sfx.play("propel", root, PITCH_VARY, { volume = 0.4 })
+end
+
+--- A dash being charged: sparks at the feet in the colour it has built to. Nil ends it. Only the one
+--- charging sees this.
+function FxController:PropelCharge(character: Model, power: number?)
+	DashFx.charge(character, power)
 end
 
 --- A puff of the propel's wind behind a punch thrown in the air, level with the body. It has no sound of
@@ -244,6 +258,8 @@ function FxController:HitBurst(target: Model, attacker: Model?, strength: number
 	streak(center + up * 0.7, away, 2.6 * scale, seconds * 0.7)
 	streak(center - up * 0.6 + right * 0.4, away, 2.2 * scale, seconds * 0.6)
 	streak(center + right * -0.7, away, 1.8 * scale, seconds * 0.55)
+	-- The spark of the hit itself, sprayed the way they're sent.
+	ImpactFx.burst(center, away, scale)
 
 	-- The crack on top, the old impact as its body, and on a strong hit a deep boom for weight.
 	Sfx.play("punch_crack", root, PITCH_VARY, { volume = 1.25 })
@@ -688,10 +704,18 @@ function FxController:JumpBreak(character: Model, floorReach: number)
 	end
 end
 
---- The sound of a swing, played as soon as a punch starts.
+--- A swing: its sound, played as soon as the punch starts, and a small spark where the fist cuts the
+--- air as it goes live, which marks how far the punch reaches.
 function FxController:Swing(character: Model)
 	local root = character:FindFirstChild("HumanoidRootPart")
-	if root then
+	if root and root:IsA("BasePart") then
+		task.delay(GameConfig.Punch.Windup, function()
+			if root.Parent then
+				local look = root.CFrame.LookVector
+				local reach = root.Position + look * GameConfig.Punch.Range + Vector3.yAxis * 0.6
+				ImpactFx.burst(reach, look, cfg.SwingSparkScale)
+			end
+		end)
 		-- Heavy: a low whoosh with a thud in it that peaks as the punch goes active, over the old
 		-- swing's air, pitched down.
 		Sfx.play("swing_heavy", root, PITCH_VARY, { pitch = 0.88, volume = 0.5 })
