@@ -224,30 +224,92 @@ end
 -- last frame (their speed is measured here, not taken from their client), and who they've hit already.
 type Flight = {
 	kicker: Model,
+	startedAt: number,
 	untilAt: number,
 	last: Vector3?,
 	lastAt: number,
+	velocity: Vector3, -- smoothed from the positions the server saw, never from the client
+	landed: boolean,
 	struck: { [Model]: boolean },
 }
 local flights: { [Model]: Flight } = setmetatable({}, { __mode = "k" }) :: any
+local FLIGHT_VELOCITY_EASE = 0.5 -- how much of each frame's measured travel the smoothed velocity takes
+local FLIGHT_LAND_AFTER = 0.15 -- a body can't count as landing this soon after the kick launched it
+local FLIGHT_LAND_FALL = 15 -- it must be coming down at least this fast to count as slamming into the floor
 
 local function startFlight(target: Model, kicker: Model)
 	if cfg.CrashSeconds > 0 then
+		local now = os.clock()
 		flights[target] = {
 			kicker = kicker,
-			untilAt = os.clock() + cfg.CrashSeconds,
+			startedAt = now,
+			untilAt = now + cfg.CrashSeconds,
 			last = nil,
-			lastAt = os.clock(),
+			lastAt = now,
+			velocity = Vector3.zero,
+			landed = false,
 			struck = {},
 		}
 	end
 end
 
--- One frame of every flight: anyone the flying body reaches while it's still moving fast is hit.
+-- Which way someone the flying body reaches is thrown: the way the body was going, across the floor.
+-- A body coming almost straight down has hardly any way across, so they're thrown out from under it.
+local function crashWay(velocity: Vector3, from: Vector3, to: Vector3): Vector3
+	local flat = Vector3.new(velocity.X, 0, velocity.Z)
+	if flat.Magnitude >= velocity.Magnitude * cfg.CrashAcrossShare and flat.Magnitude > 1 then
+		return flat.Unit
+	end
+	local out = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
+	if out.Magnitude > 0.05 then
+		return out.Unit
+	end
+	return if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1)
+end
+
+local function crash(
+	self: any,
+	flight: Flight,
+	body: Model,
+	other: Model,
+	way: Vector3,
+	why: string
+)
+	flight.struck[other] = true
+	trace(`{body.Name} {why} {other.Name}`)
+	local combat = Knit.GetService("CombatService")
+	Knit.GetService("StaggerService"):AddAmount(other, cfg.CrashStagger)
+	combat:MarkHit(other)
+	Knit.GetService("RoundService"):NoteHit(other, flight.kicker)
+	Knit.GetService("KnockbackService")
+		:Launch(other, way.X * cfg.CrashPush, way.Z * cfg.CrashPush, cfg.CrashLift, 0)
+	self._crash:FireAllClients(body, other, cfg.CrashPush)
+end
+
+-- Can this flying body hit this fighter at all?
+local function crashable(flight: Flight, body: Model, other: Model): BasePart?
+	if other == body or other == flight.kicker or flight.struck[other] then
+		return nil
+	end
+	local otherRoot = Combatants.rootOf(other)
+	if
+		not otherRoot
+		or not Combatants.isAlive(other)
+		or other:GetAttribute(AIR_ATTRIBUTE) == "hold"
+		or not Knit.GetService("CombatService"):CanFight(body, other)
+	then
+		return nil
+	end
+	return otherRoot
+end
+
+-- One frame of every flight. While the body is moving fast, anyone it passes through is hit, thrown the
+-- way it was going. When it slams into the floor, anyone it lands beside is hit the same way (the splash).
+-- After landing, or past CrashSeconds, the flight is over.
 local function stepFlights(self: any, now: number)
 	for body, flight in flights do
 		local root = Combatants.rootOf(body)
-		if now >= flight.untilAt or not root or body.Parent == nil then
+		if now >= flight.untilAt or flight.landed or not root or body.Parent == nil then
 			flights[body] = nil
 			continue
 		end
@@ -259,36 +321,64 @@ local function stepFlights(self: any, now: number)
 			continue
 		end
 		local travel = at - last
-		local speed = travel.Magnitude / dt
-		if speed < cfg.CrashMinSpeed or speed > TELEPORT_STUDS / dt then
+		if travel.Magnitude > TELEPORT_STUDS then
+			flights[body] = nil -- moved somewhere else, such as home after falling off
 			continue
 		end
-		local combat = Knit.GetService("CombatService")
-		for _, other in Combatants.all() do
-			local otherRoot = other ~= body
-				and other ~= flight.kicker
-				and not flight.struck[other]
-				and Combatants.rootOf(other)
-			if
-				otherRoot
-				and (otherRoot.Position - at).Magnitude <= cfg.CrashDistance
-				and Combatants.isAlive(other)
-				and other:GetAttribute(AIR_ATTRIBUTE) ~= "hold"
-				and combat:CanFight(body, other)
-			then
-				flight.struck[other] = true
-				local flat = Vector3.new(travel.X, 0, travel.Z)
-				if flat.Magnitude < 0.05 then
-					flat = Vector3.new(otherRoot.Position.X - at.X, 0, otherRoot.Position.Z - at.Z)
+		flight.velocity = flight.velocity:Lerp(travel / dt, FLIGHT_VELOCITY_EASE)
+		local velocity = flight.velocity
+		local speed = velocity.Magnitude
+
+		-- Slamming into the floor: the splash.
+		if
+			now - flight.startedAt >= FLIGHT_LAND_AFTER
+			and velocity.Y <= -FLIGHT_LAND_FALL
+			and touchingFloor(root)
+		then
+			flight.landed = true
+			for _, other in Combatants.all() do
+				local otherRoot = crashable(flight, body, other)
+				if otherRoot then
+					local offset = otherRoot.Position - at
+					if
+						Vector3.new(offset.X, 0, offset.Z).Magnitude <= cfg.CrashSplashRadius
+						and math.abs(offset.Y) <= cfg.CrashTall
+					then
+						crash(
+							self,
+							flight,
+							body,
+							other,
+							crashWay(velocity, at, otherRoot.Position),
+							"landed on"
+						)
+					end
 				end
-				local way = if flat.Magnitude > 0.001 then flat.Unit else Vector3.new(0, 0, -1)
-				trace(`{body.Name} crashed into {other.Name} at {math.floor(speed)}`)
-				Knit.GetService("StaggerService"):AddAmount(other, cfg.CrashStagger)
-				combat:MarkHit(other)
-				Knit.GetService("RoundService"):NoteHit(other, flight.kicker)
-				Knit.GetService("KnockbackService")
-					:Launch(other, way.X * cfg.CrashPush, way.Z * cfg.CrashPush, cfg.CrashLift, 0)
-				self._crash:FireAllClients(body, other, cfg.CrashPush)
+			end
+			continue
+		end
+
+		-- In flight: anyone it passes through.
+		if speed < cfg.CrashMinSpeed then
+			continue
+		end
+		for _, other in Combatants.all() do
+			local otherRoot = crashable(flight, body, other)
+			if otherRoot then
+				local offset = otherRoot.Position - at
+				if
+					Vector3.new(offset.X, 0, offset.Z).Magnitude <= cfg.CrashDistance
+					and math.abs(offset.Y) <= cfg.CrashTall
+				then
+					crash(
+						self,
+						flight,
+						body,
+						other,
+						crashWay(velocity, at, otherRoot.Position),
+						"crashed into"
+					)
+				end
 			end
 		end
 	end

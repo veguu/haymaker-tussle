@@ -7,13 +7,15 @@ local GameConfig: any = require("../src/shared/Config/GameConfig")
 local SWINGS = { "HookLeft", "HookRight", "Uppercut", "HookLeftRun", "HookRightRun", "UppercutRun" }
 
 return {
-	["every swing lands exactly when the server decides the hit"] = function()
+	["every swing can be slowed to land when the server decides the hit"] = function()
+		-- AnimController plays the lead-in at strike / Windup speed, so the strike lands on the windup. That
+		-- only works slowing a clip down, never speeding it up past its own frames.
 		for _, name in SWINGS do
 			local clip = AnimClips[name]
 			assert(clip, `missing {name}`)
 			assert(
-				clip.strike == GameConfig.Punch.Windup,
-				`{name} strikes at {clip.strike}, not the windup`
+				clip.strike > 0 and clip.strike <= GameConfig.Punch.Windup,
+				`{name} strikes at {clip.strike}, after the windup`
 			)
 		end
 	end,

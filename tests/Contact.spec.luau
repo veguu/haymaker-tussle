@@ -128,8 +128,8 @@ return {
 
 	-- 2. Crossings and the grace window --------------------------------------------------------------
 	["a target crossing you just before the swing goes live is hit"] = function()
-		-- Crosses your centre 20 ms after the press and is behind you, out of reach, when the swing goes live.
-		local target = crossing(72, 0.02)
+		-- Crosses your centre 60 ms before the swing goes live and is behind you, out of reach, by then.
+		local target = crossing(72, PUNCH.Windup - 0.06)
 		local tx, tz = target(PUNCH.Windup)
 		assert(
 			not Combat.inHitbox(PUNCH, 0, 0, 0, 0, -1, tx, 0, tz, "Left"),
@@ -141,13 +141,16 @@ return {
 
 	["it works when you're the one moving, and when both are"] = function()
 		local me = function(t: number)
-			return 0, -84 * (t - 0.02)
+			return 0, -84 * (t - (PUNCH.Windup - 0.06))
 		end
 		assert(swing(PUNCH, me, still(0, 0), "Left") ~= nil, "you ran through them")
 		local meHalf = function(t: number)
-			return 0, -50 * (t - 0.03)
+			return 0, -50 * (t - (PUNCH.Windup - 0.05))
 		end
-		assert(swing(PUNCH, meHalf, crossing(50, 0.03), "Left") ~= nil, "both running")
+		assert(
+			swing(PUNCH, meHalf, crossing(50, PUNCH.Windup - 0.05), "Left") ~= nil,
+			"both running"
+		)
 	end,
 
 	["the grace ends where it says: inside it hits, just outside misses"] = function()
@@ -164,7 +167,7 @@ return {
 	end,
 
 	["no grace at all is the old behaviour: that same crossing misses"] = function()
-		local at = swing(withGrace(0), still(0, 0), crossing(72, 0.02), "Left")
+		local at = swing(withGrace(0), still(0, 0), crossing(72, PUNCH.Windup - 0.06), "Left")
 		assert(at == nil, "only the grace forgives it")
 	end,
 

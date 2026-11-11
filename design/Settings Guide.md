@@ -66,8 +66,8 @@ Every adjustable value in the game. All numbers are **starting guesses to tune b
 
 | Setting | Start | What it does |
 |---|---|---|
-| `Cooldown` | 0.32 | Seconds between accepted punches. |
-| `Windup` | 0.08 | Seconds from accepted punch to the server's hit check. Must match the clips' strike time. |
+| `Cooldown` | 0.42 | Seconds between accepted punches. |
+| `Windup` | 0.16 | Seconds from accepted punch to the server's hit check. Must match the clips' strike time. | The swing animations strike at 0.08 s, so their lead-in is played slower to fill the windup (AnimController).
 | `ActiveSeconds` | 0.05 | How long a swing stays live after the strike. The server checks it every frame in that time, so someone crossing fast can't slip between checks. Each target is only ever hit once per swing. |
 | `MissRecovery` | 0.1 | Extra seconds before the next punch after one that hit nobody. It's what makes baiting a whiff worth it. |
 | `BufferSeconds` | 0.1 | A press this close before the swing is ready is remembered and thrown when it is. Only one is held, and it's dropped if it gets older than this or you can't punch. |
@@ -91,6 +91,11 @@ Every adjustable value in the game. All numbers are **starting guesses to tune b
 | `GraceSeconds` | 0.05 | **Punch forgiveness.** How far before the active frames a swing still looks for contact, so bodies that crossed just before it went live count as a hit (resolved at the normal impact time). Never reaches back before the press was accepted. 0 turns it off. The test "the grace ends where it says" shows the boundary. |
 | `SweepStep` | 0.008 | Seconds between the moments a swing checks, back to the last check, using where the server saw both bodies. Catches contact that happens entirely between two server frames. Smaller is finer and costs more. |
 | `PointBlankRadius` | 0.75 | Closer than this, centre to centre, a landed punch throws the target the way the attacker faces instead of along their (noisy) offset, so exact overlap gets a steady shove. |
+| `ChargeSeconds` | 0.8 | Holding punch charges it; letting go throws it. This is the longest hold that counts: at this many seconds it goes by itself. A quick tap is an ordinary punch. The server measures the charge on its own clock (from PunchCharge to PunchRequest), so it can't be faked. |
+| `ChargeGrace` | 0.4 | A charge still open this long past `ChargeSeconds` with no punch is dropped. |
+| `ChargeReach` | 0.3 | How much further a full charge reaches: 0.3 is 30% (range 4.5 to about 5.9). The hitbox keeps its shape. |
+| `ChargeKnock` | 0.45 | How much harder a full charge throws: 0.45 is 45% more knockback. |
+| `ChargeFx` | 0.7 | How much bigger a full charge looks: the glow at the fist while charging, the streak behind the swing and the hit burst. |
 | `RequestsPerSecondLimit` | 8 | Server rate limit on punch requests; extras are dropped. |
 
 ## Clash
@@ -497,8 +502,11 @@ The air kick. An uppercut launches someone, who can steer and propel in the air.
 | `FinisherLift` | 45 | Studs/s a finisher sends them up. |
 | `FinisherStunSeconds` | 0.45 | Seconds they can't act after a finisher, then they can punch to recover as usual. |
 | `FinisherShake` | 1.3 | Camera shake for the kicker and the kicked on a finisher, as a multiple of a normal kick's. |
-| `CrashSeconds` | 1.2 | For this long after an air kick sends someone flying, their body hits anyone it flies into (not the kicker). 0 turns crashes off. |
-| `CrashDistance` | 5 | How close the flying body has to pass to someone to hit them, in studs. |
+| `CrashSeconds` | 4 | After an air kick sends someone flying, their body can hit others until it lands, for at most this long. 0 turns crashes off. |
+| `CrashDistance` | 5 | While it flies, how close across the floor the body has to pass to someone to hit them, in studs. |
+| `CrashTall` | 6 | How far above or below them it can pass and still count. |
+| `CrashSplashRadius` | 8 | When the body slams into the floor, everyone this close to where it lands is hit too. |
+| `CrashAcrossShare` | 0.3 | Those hit are thrown the way the body was going across the floor. If it was coming down steeper than this share across (nearly straight down), they are thrown out from under it instead. |
 | `CrashMinSpeed` | 30 | The flying body must still be moving at least this fast, measured by the server. |
 | `CrashPush` | 90 | How hard the one crashed into is thrown, the way the body was going. A regular punch at full run is about 55. |
 | `CrashLift` | 22 | Upward speed the crash gives someone standing on the floor. |
@@ -558,24 +566,32 @@ The marker and who it shows. It moves nobody and changes no hit.
 |---|---|---|
 | `Range` | 70 | Studs: how close someone must be for the marker to show them. |
 | `ReleaseRange` | 85 | Studs: past this, whoever is shown or selected is let go. Larger than `Range`, so it can't flicker at the limit. |
+| `AssistRange` | 45 | Lock-on is aim assist, not a camera lock. Within this many studs of the one you locked onto, your movement keys and punches lean toward them. |
+| `AssistYawRate` | 2.5 | How quickly the camera turns toward them: the share of the gap closed each second (2.5 closes most of it in about a second). It never quite gets there, and you can always turn faster. |
+| `AssistMouseShare` | 0.2 | While you're turning the camera yourself (mouse or right stick), the pull is this share of normal. |
+| `AssistCameraDegrees` | 75 | Someone further than this off where the camera looks isn't pulled toward at all, so it never drags you round. |
+| `AssistInputDegrees` | 50 | Movement keys pointing within this many degrees of them are bent toward them. |
+| `AssistInputShare` | 0.35 | How far the keys are bent: 0.35 is about a third of the way. |
+| `AssistPunchDegrees` | 45 | A punch thrown with them within this many degrees of where you face turns you to face them. |
+| `AssistPunchReach` | 9 | ...and only when they're this close. Kept near a charged punch's reach, so it's aim, not a lunge. |
 | `LookDegrees` | 12 | How close to the centre of your view someone must be to show the marker. |
 | `LookReleaseDegrees` | 18 | How far off they can drift before the white marker lets go. |
 | `LookStuds` | 2.5 | Up close, looking within this many studs of their middle also counts, since they fill your view. |
 | `LostSightSeconds` | 0.75 | A selected opponent out of sight this long is let go. The marker goes the moment they're out of sight, and the camera holds on where they were last seen. |
 | `CheckSeconds` | 0.1 | Seconds between checks of who you're looking at. A selection is checked every frame. |
-| `MarkerPixels` | 128 | Marker width across the outer segments at `ReferenceHeight`. It never changes with distance. |
+| `MarkerPixels` | 52 | Marker width across the outer segments at `ReferenceHeight`. It never changes with distance. |
 | `ReferenceHeight` | 1080 | Screen height at which the marker is exactly `MarkerPixels`. Other screens scale in proportion. |
-| `MinMarkerPixels` | 80 | It never gets smaller than this, on a small screen. |
+| `MinMarkerPixels` | 36 | It never gets smaller than this, on a small screen. |
 | `ImageOuter, ImageInner, ImageDiamond, ImageDiamondFilled, ImagePulse` | (ids) | The white shapes, made by `assets/lockon/build_lockon_art.py`. Stroke thickness lives in that script's numbers: change it, rerun it and upload again. |
 | `ImageOuterOutline, ImageInnerOutline, ImageDiamondOutline, ImageDiamondFilledOutline, ImagePulseOutline` | (ids) | The dark edge behind each shape. Thickness is `OUTLINE` and `THIN_OUTLINE` in the same script: 3 and 2.5 of the concept's pixels, about 3.4 and 2.9 px on screen. |
 | `MarkerColor` | FFFFFF | Colour of the marker when a target is available, as hex. |
 | `LockedColor` | FFCA54 | Colour when selected, as hex. |
 | `OutlineColor` | 0B1320 | Colour of the dark edge, as hex. It stays this colour in both states. |
-| `OutlineOpacity` | 1 | How solid the dark edge is. |
+| `OutlineOpacity` | 0.55 | How solid the dark edge is. |
 | `OuterSpinSeconds` | 5 | Seconds per clockwise turn of the outer segments. |
 | `InnerSpinSeconds` | 7 | Seconds per counterclockwise turn of the inner arcs. |
-| `InnerOpacity` | 1 | How solid the inner arcs are. |
-| `DiamondOpacity` | 1 | How solid the diamond is on the white marker. |
+| `InnerOpacity` | 0.6 | How solid the inner arcs are. |
+| `DiamondOpacity` | 0.85 | How solid the diamond is on the white marker. |
 | `DiamondScale` | 0.85 | Size of the diamond on the white marker. It's full size when selected. |
 | `PopSeconds` | 0.26 | How long the marker takes to pop in. |
 | `PopStart` | 0.88 | Size it pops in from. |
@@ -590,7 +606,7 @@ The marker and who it shows. It moves nobody and changes no hit.
 | `PulseRepeats` | 2 | How many pulses play on selecting. |
 | `PulseStart` | 0.94 | Size a pulse starts at. |
 | `PulseEnd` | 1.14 | Size a pulse ends at. |
-| `PulseOpacity` | 0.9 | How solid a pulse starts. It fades to nothing. |
+| `PulseOpacity` | 0.45 | How solid a pulse starts. It fades to nothing. |
 | `SettleSeconds` | 0.18 | How long it takes to return to full size on letting go. |
 | `DiamondSeconds` | 0.15 | How long the diamond takes to change between its two sizes. |
 | `FadeSeconds` | 0.15 | How long the marker takes to fade out. |

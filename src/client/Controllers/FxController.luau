@@ -50,6 +50,13 @@ local pool: { Part } = {}
 local rockPool: { Part } = {}
 -- When each character's propel ends, which is the only time they make drift smoke.
 local propelEnds: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
+-- How charged each fighter's last swing was, and when, so its hit burst can be sized to it.
+local swingPower: { [Model]: { power: number, at: number } } = setmetatable({}, { __mode = "k" }) :: any
+local SWING_POWER_LIFE = 1 -- a hit this long after the swing is no longer counted as that swing's
+-- Other fighters' charges, from the server's HT_PunchCharge attribute: the side, and when it was seen.
+local chargesSeen: { [Model]: { side: string, at: number } } = setmetatable({}, { __mode = "k" }) :: any
+local ARMS: { [string]: string } =
+	{ Left = "Left Arm", Right = "Right Arm", Uppercut = "Right Arm" }
 -- What each effect is adding to the field of view right now, so a kick's punch and a dash's zoom stack
 -- instead of overwriting each other.
 local kickFov = 0
@@ -302,6 +309,10 @@ function FxController:HitBurst(target: Model, attacker: Model?, strength: number
 	end
 	local strong = strength >= cfg.StrongHitSpeed
 	local scale = if strong then cfg.StrongHitScale else 1
+	local swung = attacker and swingPower[attacker]
+	if swung and os.clock() - swung.at <= SWING_POWER_LIFE then
+		scale *= 1 + GameConfig.Punch.ChargeFx * swung.power
+	end
 	local seconds = cfg.HitBurstSeconds * (if strong then 1.3 else 1)
 	local center = tip or root.Position - away * 0.8
 	local up = Vector3.yAxis
@@ -559,8 +570,8 @@ function FxController:KickImpact(
 	if landing then
 		local body = target and target:FindFirstChild("HumanoidRootPart") or root
 		-- The floor breaks and blows up where they hit it, whatever kind of kick sent them there.
-		if target and body and body:IsA("BasePart") then
-			self:GroundBlast(target, body, power)
+		if target then
+			self:GroundBlast(target, position, power)
 		end
 		Sfx.play("ground_break", body, PITCH_VARY, { volume = 1.1 })
 		Sfx.play("boom_mid", body, 0, { pitch = 0.9, cut = 1 })
@@ -745,11 +756,23 @@ end
 
 --- The spring of a jump: the floor breaks under the feet, and smoke and dust burst out around them in a
 --- ring, drifting up and fading. With no floor within `floorReach`, it's only the smoke.
---- A kicked body hitting the floor: the floor under it breaks up (the same rocks and cracks as a jump's
---- push-off) and an explosion goes off on it (ImpactFx.groundBlast). Nothing happens with no floor in
---- reach, such as past the platform's edge. `power` is the kick's strength, about 0.5 to 1.3.
-function FxController:GroundBlast(body: Model, root: BasePart, power: number)
-	local floor = findFloor(body, root, cfg.GroundBlastReach)
+--- A kicked body hitting the floor: the floor breaks up (the same rocks and cracks as a jump's push-off)
+--- and an explosion goes off on it (ImpactFx.groundBlast). `at` is where the SERVER saw them land: this
+--- client sees other bodies a moment late, so at the moment the news arrives the body can still look
+--- well up in the air here, and looking for floor under it would find none. Nothing happens with no
+--- floor in reach, such as past the platform's edge. `power` is the kick's strength, about 0.5 to 1.3.
+function FxController:GroundBlast(body: Model, at: Vector3, power: number)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local ignore: { Instance } = CollectionService:GetTagged("HT_Combatant")
+	table.insert(ignore, body)
+	params.FilterDescendantsInstances = ignore
+	params.IgnoreWater = true
+	local floor = workspace:Raycast(
+		at + Vector3.yAxis * 4,
+		Vector3.new(0, -(cfg.GroundBlastReach + 4), 0),
+		params
+	)
 	if floor then
 		breakFloor(floor)
 		ImpactFx.groundBlast(floor.Position, cfg.GroundBlastScale * math.max(power, 0.6))
@@ -799,15 +822,19 @@ function FxController:JumpBreak(character: Model, floorReach: number)
 end
 
 --- A swing: its sound, played as soon as the punch starts, and a thin streak behind the fist, the
---- after-image of the arm going through. The spark is kept for punches that land (HitBurst).
-function FxController:Swing(character: Model)
+--- after-image of the arm going through. The spark is kept for punches that land (HitBurst). `power` is
+--- how charged it was, 0 to 1: a charged swing leaves a wider streak, and its hit a bigger burst.
+function FxController:Swing(character: Model, power: number?)
+	local charge = math.clamp(power or 0, 0, 1)
+	swingPower[character] = { power = charge, at = os.clock() }
+	local grow = 1 + GameConfig.Punch.ChargeFx * charge
 	local arm = Knit.GetController("AnimController"):SwingArm(character)
 	if arm then
 		local punch = GameConfig.Punch
 		ImpactFx.fistTrail(
 			arm,
 			punch.Windup + punch.ActiveSeconds + cfg.FistTrailSeconds,
-			cfg.FistTrailWidth,
+			cfg.FistTrailWidth * grow,
 			cfg.FistTrailSeconds
 		)
 	end
@@ -817,6 +844,15 @@ function FxController:Swing(character: Model)
 		-- swing's air, pitched down.
 		Sfx.play("swing_heavy", root, PITCH_VARY, { pitch = 0.88, volume = 0.5 })
 		Sfx.play("punch_swing", root, PITCH_VARY, { pitch = 0.85, volume = 0.55 })
+	end
+end
+
+--- A punch being charged on `character`, the swing it will be (`side`), `power` 0 to 1: light gathers
+--- at that fist. Nil ends it, whether the punch was thrown or the charge dropped.
+function FxController:PunchCharge(character: Model, side: string, power: number?)
+	local arm = character:FindFirstChild(ARMS[side] or "Right Arm")
+	if arm and arm:IsA("BasePart") then
+		ImpactFx.fistCharge(arm, power, GameConfig.Punch.ChargeFx)
 	end
 end
 
@@ -918,6 +954,25 @@ function FxController:KnitStart()
 			local character = player.Character
 			if character then
 				driftSmoke(character)
+				if player ~= Players.LocalPlayer then
+					local side = character:GetAttribute("HT_PunchCharge") :: string?
+					local seen = chargesSeen[character]
+					if side and (not seen or seen.side ~= side) then
+						seen = { side = side, at = now }
+						chargesSeen[character] = seen
+					elseif not side and seen then
+						chargesSeen[character] = nil
+						self:PunchCharge(character, seen.side, nil)
+						seen = nil
+					end
+					if seen then
+						self:PunchCharge(
+							character,
+							seen.side,
+							math.clamp((now - seen.at) / GameConfig.Punch.ChargeSeconds, 0, 1)
+						)
+					end
+				end
 			end
 		end
 	end)

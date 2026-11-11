@@ -659,4 +659,34 @@ function Combat.bumpPriority(pending: boolean, hitSince: boolean, held: boolean?
 	return "bump"
 end
 
+--- How charged a punch is after holding the button this long: 0 for a tap, 1 at ChargeSeconds or more.
+function Combat.chargePower(cfg: any, heldSeconds: number): number
+	if heldSeconds ~= heldSeconds or cfg.ChargeSeconds <= 0 then
+		return 0
+	end
+	return math.clamp(heldSeconds / cfg.ChargeSeconds, 0, 1)
+end
+
+--- The punch settings for a swing charged to `power`: the same, with its reach stretched by up to
+--- ChargeReach (0.3 is 30% further at a full charge). The shape keeps its proportions. A copy: the
+--- shared settings are never changed.
+function Combat.chargedPunch(cfg: any, power: number): any
+	local share = math.clamp(if power == power then power else 0, 0, 1)
+	if share <= 0 then
+		return cfg
+	end
+	local stretch = 1 + (cfg.ChargeReach or 0) * share
+	local charged = table.clone(cfg)
+	charged.Range = cfg.Range * stretch
+	charged.CloseRange = cfg.CloseRange * stretch
+	charged.OverlapRadius = cfg.OverlapRadius * stretch
+	return charged
+end
+
+--- What a charge multiplies a punch's knockback by: 1 for a tap, up to 1 + ChargeKnock at full.
+function Combat.chargeKnockScale(cfg: any, power: number): number
+	local share = math.clamp(if power == power then power else 0, 0, 1)
+	return 1 + (cfg.ChargeKnock or 0) * share
+end
+
 return Combat

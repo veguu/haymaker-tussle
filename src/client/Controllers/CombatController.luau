@@ -97,17 +97,23 @@ function CombatController:KnitStart()
 	local clashTap = Net.client("ClashTap")
 	local result = Net.client("PunchResult")
 
+	local chargeRemote = Net.client("PunchCharge")
+
 	local nextSide = "Left"
 	local lastPress = -math.huge
 	local recovery = 0 -- what the last swing owes on top of the cooldown, which only a whiff does
 	local buffered: number? = nil
 	local undoPress: number? = nil
 	local undoSide = "Left"
-	-- Holding the button: the next punch goes the moment the cooldown allows, exactly as a press then
-	-- would. `heldBy` is the input holding it, polled so a lost release can't leave it held.
+	-- The button is held: that charges the next punch, and letting go throws it. `heldBy` is the input
+	-- holding it, polled so a lost release can't leave it held.
 	local held = false
 	local heldBy: Enum.UserInputType? = nil
-	local holdBlockedUntil = 0 -- after a refusal, a hold waits a cooldown before trying again
+	local holdBlockedUntil = 0 -- after a refusal, a hold waits a cooldown before charging again
+	-- A charge in progress: when it began on this clock, and the swing it will be. The server measures
+	-- the real charge on its own clock, from PunchCharge to PunchRequest; this one is for what's shown.
+	local chargeAt: number? = nil
+	local chargeSide = "Left"
 
 	local function letGo()
 		held = false
@@ -140,7 +146,42 @@ function CombatController:KnitStart()
 			and character:GetAttribute("HT_Clash") == nil
 	end
 
-	local function throw(now: number, character: Model)
+	local function readyAt(): number
+		return lastPress + punchCfg.Cooldown + recovery
+	end
+
+	-- Starts charging: the arm draws back and holds, and the fist gathers light.
+	local function startCharge(now: number, character: Model)
+		chargeAt = now
+		chargeSide = Combat.comboSwing(punchCfg, nextSide, now, lastPress)
+		if chargeRemote then
+			chargeRemote:FireServer()
+		end
+		anim:HoldWindup(character, chargeSide)
+		fx:PunchCharge(character, chargeSide, 0)
+	end
+
+	-- A charge given up without a punch (stunned, caught, in a clash): the arm lets go.
+	local function dropCharge(character: Model?)
+		if chargeAt then
+			chargeAt = nil
+			if character then
+				fx:PunchCharge(character, chargeSide, nil)
+				anim:DropWindup(character)
+			end
+		end
+	end
+
+	local function throw(now: number, character: Model, power: number)
+		-- A punch that skipped the charge (a press remembered through the cooldown) still says it started,
+		-- so the server never counts an old, abandoned charge for it.
+		if not chargeAt and chargeRemote then
+			chargeRemote:FireServer()
+		end
+		if chargeAt then
+			fx:PunchCharge(character, chargeSide, nil)
+		end
+		chargeAt = nil
 		undoPress, undoSide = lastPress, nextSide
 		nextSide = Combat.comboSwing(punchCfg, nextSide, now, lastPress)
 		lastPress = now
@@ -148,27 +189,37 @@ function CombatController:KnitStart()
 		buffered = nil
 		local swing = nextSide
 		anim:PlaySwing(character, swing)
-		fx:Swing(character)
+		fx:Swing(character, power)
 		nextSide = Combat.nextSwing(nextSide)
 		movement:PunchThrown(swing)
 		request:FireServer()
 		self.PunchEvent:Fire("thrown")
 	end
 
+	-- Letting go throws the charged punch.
+	local function release(now: number)
+		local character = player.Character
+		if chargeAt and character then
+			if canPunch(character) then
+				throw(now, character, Combat.chargePower(punchCfg, now - chargeAt))
+			else
+				dropCharge(character)
+			end
+		end
+		letGo()
+	end
+
 	-- The HUD's view of the punch: when it can swing again, the whole wait that started, and whether
 	-- the body is in a state to swing at all.
 	self._timing = function(): (number, number, boolean)
-		return lastPress + punchCfg.Cooldown + recovery,
-			punchCfg.Cooldown + recovery,
-			canPunch(player.Character)
+		return readyAt(), punchCfg.Cooldown + recovery, canPunch(player.Character)
 	end
 
-	-- A press is one punch, thrown at once. Pressed a moment too early, it's remembered once, and thrown
-	-- as soon as it can be. It's not a queue: a second early press just replaces the first. A press that
-	-- can't punch tells the HUD it was blocked.
-	-- Holding the button after that throws the next punch each time the cooldown allows, through the same
-	-- gates as a press, so a hold is never faster than clicking and keeps the same combo. Letting go stops
-	-- it at once. A clash still takes one tap per press: holding never mashes.
+	-- Pressing starts a charge and letting go throws it, so a quick tap is an ordinary punch and holding
+	-- longer (up to ChargeSeconds, when it goes by itself) a charged one. Pressed a moment before the
+	-- cooldown is over, the press is remembered: still held when it's over, the charge starts; let go,
+	-- it's thrown as a tap. A press that can't punch tells the HUD it was blocked. Holding never repeats:
+	-- each punch takes its own press. A clash still takes one tap per press.
 	ContextActionService:BindAction(
 		ACTION,
 		function(_name: string, inputState: Enum.UserInputState, inputObject: InputObject)
@@ -188,10 +239,11 @@ function CombatController:KnitStart()
 				else
 					held = true
 					heldBy = inputObject.UserInputType
-					local readyAt = lastPress + punchCfg.Cooldown + recovery
-					if now >= readyAt then
-						throw(now, character)
-					elseif Combat.pressBuffers(punchCfg, now, readyAt) then
+					if chargeAt then
+						return Enum.ContextActionResult.Pass
+					elseif now >= readyAt() and now >= holdBlockedUntil then
+						startCharge(now, character)
+					elseif Combat.pressBuffers(punchCfg, now, readyAt()) then
 						buffered = now
 					else
 						self.PunchEvent:Fire("blocked")
@@ -201,7 +253,7 @@ function CombatController:KnitStart()
 				inputState == Enum.UserInputState.End
 				or inputState == Enum.UserInputState.Cancel
 			then
-				letGo()
+				release(os.clock())
 			end
 			return Enum.ContextActionResult.Pass
 		end,
@@ -212,8 +264,12 @@ function CombatController:KnitStart()
 	ContextActionService:SetTitle(ACTION, "Punch")
 
 	-- Anything that could swallow the release lets go: the window losing focus, and a new body.
-	UserInputService.WindowFocusReleased:Connect(letGo)
+	UserInputService.WindowFocusReleased:Connect(function()
+		dropCharge(player.Character)
+		letGo()
+	end)
 	player.CharacterAdded:Connect(function(character: Model)
+		chargeAt = nil
 		letGo()
 		buffered = nil
 		local humanoid = character:WaitForChild("Humanoid", 10)
@@ -221,16 +277,39 @@ function CombatController:KnitStart()
 			humanoid.Died:Connect(letGo)
 		end
 	end)
-	player.CharacterRemoving:Connect(letGo)
+	player.CharacterRemoving:Connect(function()
+		chargeAt = nil
+		letGo()
+	end)
 
 	RunService.Heartbeat:Connect(function()
 		local now = os.clock()
 		local character = player.Character
+		if chargeAt then
+			if not character or not canPunch(character) then
+				dropCharge(character)
+				letGo()
+			elseif not stillHeld() then
+				release(now)
+			elseif now - chargeAt >= punchCfg.ChargeSeconds then
+				-- Full: it goes by itself, and the next punch takes a new press.
+				throw(now, character, 1)
+				letGo()
+			else
+				fx:PunchCharge(character, chargeSide, Combat.chargePower(punchCfg, now - chargeAt))
+			end
+			return
+		end
 		if buffered then
 			if not Combat.bufferLive(punchCfg, now, buffered) or not canPunch(character) then
 				buffered = nil
-			elseif character and now >= lastPress + punchCfg.Cooldown + recovery then
-				throw(now, character)
+			elseif character and now >= readyAt() then
+				buffered = nil
+				if stillHeld() then
+					startCharge(now, character)
+				else
+					throw(now, character, 0)
+				end
 			end
 			return
 		end
@@ -241,13 +320,10 @@ function CombatController:KnitStart()
 			letGo()
 			return
 		end
-		if
-			character
-			and canPunch(character)
-			and now >= holdBlockedUntil
-			and now >= lastPress + punchCfg.Cooldown + recovery
-		then
-			throw(now, character)
+		-- Held from before the punch was possible (stunned, mid-kick, cooling down): the charge starts
+		-- the moment it is.
+		if character and canPunch(character) and now >= holdBlockedUntil and now >= readyAt() then
+			startCharge(now, character)
 		end
 	end)
 
@@ -260,6 +336,7 @@ function CombatController:KnitStart()
 				if kind == "miss" then
 					recovery = punchCfg.MissRecovery
 				elseif kind == "refused" then
+					dropCharge(player.Character)
 					-- It never happened, so the timing and the combo go back to before it. A hold
 					-- waits a cooldown before asking again, so it can't hammer the server.
 					lastPress = undoPress or lastPress
@@ -292,12 +369,12 @@ function CombatController:KnitStart()
 	end
 
 	-- Attackers are characters, not players, because the test bot punches too.
-	started.OnClientEvent:Connect(function(attacker: Model, side: string)
+	started.OnClientEvent:Connect(function(attacker: Model, side: string, power: number?)
 		if attacker == player.Character then
 			-- Our swing already played. Follow the server's side in case they differ.
 			nextSide = Combat.nextSwing(side)
 		elseif attacker and attacker.Parent then
-			fx:Swing(attacker)
+			fx:Swing(attacker, power)
 		end
 	end)
 

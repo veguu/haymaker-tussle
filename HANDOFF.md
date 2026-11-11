@@ -289,3 +289,35 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
 ### bot fill in Team Test (2026-11-10, committed; user confirmed bots work in Team Test)
 - Round.BotFillStudioOnly = false: bots fill on any server, one real player starts a round, the test bot counts.
 - BEFORE THE GAME GOES PUBLIC: turn BotFillStudioOnly back on, or build the real few-players bot rule.
+### move-8 (2026-11-10, spicy; COMMITTED, NOT PUSHED, NOT TRIED BY THE USER YET)
+- KICK LANDINGS: the ground break + explosion now show for every kicked landing. Cause found in Play: the server
+  reported every landing (slam and finisher), but each client looked for floor under the body AS IT SAW IT, which
+  was still ~12 studs up (other bodies arrive late), and skipped. `FxController:GroundBlast(body, at, power)` now
+  raycasts down from the position the server sent with `KickImpact`.
+- CRASH (KickService flights): a kicked body now hits others the whole flight until it lands (`Kick.CrashSeconds`
+  1.2 -> 4, ends on landing), with velocity smoothed from server positions. New SPLASH: when it slams into the
+  floor (falling >= 15 studs/s, touching floor), everyone within `CrashSplashRadius` 8 is hit too. Thrown the way
+  it was going across the floor, or out from under it when it came down nearly straight (`CrashAcrossShare` 0.3).
+  `CrashTall` 6 limits the height difference.
+- PUNCH (touches the contact-2 punch code, at the user's request): `Punch.Windup` 0.08 -> 0.16, `Cooldown` 0.32 ->
+  0.42. The swing clips still strike at 0.08, so AnimController plays the lead-in at strike / Windup speed and back
+  at 1 from the strike marker. Holding punch no longer auto-repeats: press starts a CHARGE (arm held in its
+  pull-back, light at the fist), release throws, full at `ChargeSeconds` 0.8 throws by itself. New remote
+  `PunchCharge` (no args); the server takes the charge as the gap PunchCharge -> PunchRequest on its own clock,
+  only when a punch could be thrown, drops it on a hit, a cooldown refusal, or `ChargeGrace` 0.4 past full.
+  Effects: `Combat.chargedPunch` stretches Range/CloseRange/OverlapRadius by `ChargeReach` 0.3, knockback x
+  (1 + `ChargeKnock` 0.45), visuals x (1 + `ChargeFx` 0.7). `PunchStarted` carries the charge; others see a charge
+  through the `HT_PunchCharge` attribute (the side it will be). Contact.spec crossings re-timed relative to
+  Windup (same intent); AnimClips.spec now checks strike <= Windup.
+- LOCK-ON IS AIM ASSIST: no forced camera. LockCameraController was rewritten: while locked it turns the stock
+  camera around the character toward the target by `AimAssist.cameraYaw` (`LockOn.AssistYawRate` 2.5/s, x0.2 while
+  the player turns the camera, none past 75 degrees). MovementController bends the keys up to 35% toward the target
+  when within 50 degrees, and a punch within 9 studs / 45 degrees turns the body to face them. New
+  `Core/AimAssist.luau` + `tests/AimAssist.spec.luau`. `Core/LockCamera.luau` and `GameConfig.LockCamera` are now
+  UNUSED (kept with their tests; remove when sure). Marker: 128 -> 52 px (min 36), outline 0.55, inner 0.6,
+  diamond 0.85, pulse 0.45.
+- CHECKED: gates green (374 tests, 6 new). In Play: a 0.6 s charge measured 0.77 by the server and showed the
+  charge attribute; fist glow on/off; ground blast from a server position. NOT CHECKED: the camera assist in Play
+  (Studio's view wasn't drawing, render steps ran 0 frames), the input bend and punch facing, a real kick landing
+  with the fix, two players. Output also shows the teammate's grass wind hitting the EditableMesh memory budget
+  (12 refusals this session).

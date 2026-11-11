@@ -19,7 +19,7 @@ local CLIENT_WAIT_TIMEOUT = 10
 -- Every remote in the game is declared here. A name not on this list is a bug.
 export type EventName =
 	"PunchRequest" -- client to server: I pressed punch. No arguments, ever.
-	| "PunchStarted" -- server to all: this character started a swing: Left, Right or Uppercut
+	| "PunchStarted" -- server to all: this character started a swing: Left, Right or Uppercut, and how charged it was (0 to 1)
 	| "HitConfirmed" -- server to all: this character's punch hit this target
 	| "Knockback" -- server to the target's client: launch velocity, and lift if airborne
 	| "BumpHappened" -- server to all: these two characters bumped

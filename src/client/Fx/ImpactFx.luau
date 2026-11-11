@@ -198,6 +198,12 @@ function ImpactFx.fistTrail(arm: BasePart, seconds: number, width: number, life:
 		trail = made
 	end
 	local shown = trail :: Trail
+	-- Its width can change from swing to swing (a charged one is wider).
+	local drop = arm.Size.Y / 2 - 0.15
+	if shown.Attachment0 and shown.Attachment1 then
+		shown.Attachment0.Position = Vector3.new(0, -drop, width / 2)
+		shown.Attachment1.Position = Vector3.new(0, -drop, -width / 2)
+	end
 	shown.Lifetime = life
 	shown:Clear()
 	shown.Enabled = true
@@ -447,6 +453,86 @@ function ImpactFx.groundBlast(position: Vector3, scale: number)
 		0.3,
 		0.3
 	)
+end
+
+-- THE FIST CHARGE: light gathering at the fist while a punch is held to charge it. A small glow that
+-- swells and brightens, with sparks drawn in toward it, more and bigger as the charge builds. One set per
+-- arm, made the first time that arm charges, switched off between charges.
+type FistGlow = {
+	at: Attachment,
+	glow: ParticleEmitter,
+	sparks: ParticleEmitter,
+}
+local fistGlows: { [BasePart]: FistGlow } = setmetatable({}, { __mode = "k" }) :: any
+
+local function fistGlowFor(arm: BasePart): FistGlow
+	local existing = fistGlows[arm]
+	if existing and existing.at.Parent == arm then
+		return existing
+	end
+	local at = Instance.new("Attachment")
+	at.Name = "HT_FistCharge"
+	at.Position = Vector3.new(0, -arm.Size.Y / 2 - 0.1, 0)
+	at.Parent = arm
+
+	-- The glow: a soft star that stays on the fist, flickering as each one fades.
+	local halo = emitter(at, "Glow")
+	halo.LockedToPart = true
+	halo.Lifetime = NumberRange.new(0.08, 0.14)
+	halo.Speed = NumberRange.new(0)
+	halo.Rotation = NumberRange.new(0, 360)
+	halo.Brightness = 3
+	halo.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.2),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+
+	-- Sparks: thrown out a little and pulled back in, so they seem to gather.
+	local sparks = emitter(at, "Sparks")
+	sparks.LockedToPart = true
+	sparks.Orientation = Enum.ParticleOrientation.VelocityParallel
+	sparks.Lifetime = NumberRange.new(0.15, 0.3)
+	sparks.Speed = NumberRange.new(6, 10)
+	sparks.SpreadAngle = Vector2.new(180, 180)
+	sparks.Drag = 8
+	sparks.Squash = NumberSequence.new(-1.5)
+	sparks.Brightness = 3
+	sparks.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.1),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+
+	local made = { at = at, glow = halo, sparks = sparks }
+	fistGlows[arm] = made
+	return made
+end
+
+--- Light gathering at the fist of `arm` while a punch charges, `power` 0 to 1. Nil switches it off.
+--- `extra` is how much bigger a full charge is than none (Punch.ChargeFx).
+function ImpactFx.fistCharge(arm: BasePart, power: number?, extra: number)
+	if power == nil then
+		local existing = fistGlows[arm]
+		if existing then
+			existing.glow.Enabled = false
+			existing.sparks.Enabled = false
+		end
+		return
+	end
+	local share = math.clamp(power, 0, 1)
+	local made = fistGlowFor(arm)
+	local grow = 1 + extra * share
+	made.glow.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1.1 * grow),
+		NumberSequenceKeypoint.new(1, 1.6 * grow),
+	})
+	made.glow.Rate = 30
+	made.glow.Enabled = true
+	made.sparks.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.5 * grow),
+		NumberSequenceKeypoint.new(1, 0.1),
+	})
+	made.sparks.Rate = (12 + 48 * share) * QUALITY
+	made.sparks.Enabled = true
 end
 
 return ImpactFx

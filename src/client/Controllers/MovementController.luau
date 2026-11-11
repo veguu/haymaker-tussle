@@ -34,6 +34,7 @@ local AirRecovery = require(ReplicatedStorage.Shared.Core.AirRecovery)
 local Clash = require(ReplicatedStorage.Shared.Core.Clash)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local DiveKick = require(ReplicatedStorage.Shared.Core.DiveKick)
+local AimAssist = require(ReplicatedStorage.Shared.Core.AimAssist)
 local Momentum = require(ReplicatedStorage.Shared.Core.Momentum)
 local TrainingLayout = require(ReplicatedStorage.Shared.Core.TrainingLayout)
 local Lobby = require(ReplicatedStorage.Shared.Core.Lobby)
@@ -279,6 +280,19 @@ function MovementController:_bind(
 		end
 	end
 	trove:Add(dropCharge)
+
+	-- Who you're locked onto, where their body is, if they're close enough for the aim assist to help.
+	local function assistTarget(): BasePart?
+		local target = Knit.GetController("LockOnController"):GetTarget()
+		local targetRoot = target and target:FindFirstChild("HumanoidRootPart")
+		if not targetRoot or not targetRoot:IsA("BasePart") then
+			return nil
+		end
+		if (targetRoot.Position - root.Position).Magnitude > GameConfig.LockOn.AssistRange then
+			return nil
+		end
+		return targetRoot
+	end
 
 	local function endKick()
 		kick = nil
@@ -542,6 +556,26 @@ function MovementController:_bind(
 	self._punchThrown = function(swing: string?)
 		punchRequested = true
 		punchIsUppercut = swing == "Uppercut"
+		-- Locked on and close, roughly in front: the punch turns you to face them.
+		local targetRoot = assistTarget()
+		if targetRoot then
+			local to = targetRoot.Position - root.Position
+			local faceX, faceZ = AimAssist.punchFacing(
+				GameConfig.LockOn :: any,
+				state.headingX,
+				state.headingZ,
+				to.X,
+				to.Z
+			)
+			if faceX and faceZ then
+				local turned = table.clone(state)
+				turned.headingX, turned.headingZ = faceX, faceZ
+				state = turned
+				local facing = Vector3.new(faceX, 0, faceZ)
+				align.CFrame = CFrame.lookAt(Vector3.zero, facing)
+				root.CFrame = CFrame.lookAt(root.Position, root.Position + facing)
+			end
+		end
 	end
 	-- The server refused that punch, so it never happened: its push goes back too.
 	self._punchRefused = function()
@@ -620,6 +654,15 @@ function MovementController:_bind(
 		hud.kickTarget = false
 		local inputX, inputZ = worldInput(input)
 		local drive, side = driveOf(inputX, inputZ)
+		-- Locked on: the keys lean a little toward them, when they already point roughly their way.
+		do
+			local targetRoot = (inputX ~= 0 or inputZ ~= 0) and assistTarget()
+			if targetRoot then
+				local to = targetRoot.Position - root.Position
+				inputX, inputZ =
+					AimAssist.bendInput(GameConfig.LockOn :: any, inputX, inputZ, to.X, to.Z)
+			end
+		end
 
 		local now = os.clock()
 		local air = character:GetAttribute("HT_Air")

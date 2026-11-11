@@ -1,17 +1,14 @@
 --!strict
--- LockCameraController - points the camera at a locked-on opponent. It only sets the camera: it never touches
--- a velocity, a jump or a hit. Movement already reads the camera's flat direction, so W heads toward where
--- you're looking, and that's the whole of the help this gives you.
+-- LockCameraController - the camera's half of a lock-on: aim assist, not an aim lock. While you're locked
+-- onto someone, the camera is turned a little toward them each frame (Core/AimAssist.cameraYaw), around
+-- your character, so they drift toward the middle of the view. You keep full control: moving the camera
+-- yourself weakens the pull to a fraction, and someone well off to the side isn't pulled toward at all.
 --
--- The stock camera keeps running underneath, and this step runs straight after it and replaces what it
--- produced. The stock camera reads the camera back next frame, so it follows along, and letting go is just
--- a blend back to what it's already producing. This step is only bound while it's in use.
---
--- It never writes the mouse itself: ShiftLockController owns the mouse, the cursor and the shift lock key, and is
--- told when the camera lock needs them.
+-- The stock camera keeps running and this step runs straight after it, only adjusting what it produced.
+-- The stock camera reads the camera back next frame, so the turn sticks, and letting go is simply not
+-- turning any more. It only touches the camera: never a velocity, a jump or a hit. The step is bound only
+-- while a lock is on.
 
-local CollectionService = game:GetService("CollectionService")
-local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -19,177 +16,83 @@ local UserInputService = game:GetService("UserInputService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
-local LockCamera = require(ReplicatedStorage.Shared.Core.LockCamera)
+local AimAssist = require(ReplicatedStorage.Shared.Core.AimAssist)
 
-local cfg = GameConfig.LockCamera
-local STEP_NAME = "HT_LockCamera"
+local cfg = GameConfig.LockOn
+local STEP_NAME = "HT_LockAssist"
 -- Straight after the stock camera. A camera kick runs after this, so its shake still shows.
 local STEP_PRIORITY = Enum.RenderPriority.Camera.Value + 1
-local COMBATANT_TAG = "HT_Combatant"
+local STEER_PIXELS = 1 -- the mouse moving more than this in a frame counts as you turning the camera
+local STEER_STICK = 0.2 -- the right stick pushed further than this does too
+local STEER_HOLD = 0.25 -- and the pull stays weak this long after you stop
 
 local LockCameraController = Knit.CreateController({
 	Name = "LockCameraController",
 })
 
 function LockCameraController:KnitInit()
-	self._bound = false
 	self._engaged = false
 	self._point = Vector3.zero
+	self._stick = Vector3.zero
 end
 
---- Starts tracking this point, easing in from wherever the camera is now.
+--- Starts leaning the camera toward this point.
 function LockCameraController:Engage(point: Vector3)
 	self._point = point
 	self._engaged = true
-	if not self._bound then
-		self:_bind()
-	end
+	self:_bind()
 end
 
---- The opponent's position, while they can be seen. During a loss of sight this simply isn't called, so the
---- camera keeps using the last place they were seen and gives nothing away.
+--- The opponent's position, while they can be seen. During a loss of sight this isn't called, so the camera
+--- only ever leans toward where they were last seen and gives nothing away.
 function LockCameraController:SetPoint(point: Vector3)
 	self._point = point
 end
 
---- Eases back to the normal camera.
+--- Stops leaning. The camera stays wherever it is.
 function LockCameraController:Release()
 	self._engaged = false
+	RunService:UnbindFromRenderStep(STEP_NAME)
 end
 
 function LockCameraController:_bind()
-	local camera = workspace.CurrentCamera
-	local player = Players.LocalPlayer
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not camera or not root then
-		self._engaged = false
-		return
-	end
-	self._bound = true
-
-	local gameSettings = UserSettings():GetService("UserGameSettings")
-	local focus = root.Position + Vector3.yAxis * cfg.FocusHeight
-	local target = self._point
-	local _, startYaw = camera.CFrame:ToOrientation()
-	local startPitch = select(1, camera.CFrame:ToOrientation())
-	local yaw, pitch = startYaw, startPitch
-	local distance =
-		math.clamp((camera.CFrame.Position - focus).Magnitude, cfg.MinDistance, cfg.MaxDistance)
-	local pulled = distance
-	local orbitYaw, orbitPitch = 0, 0
-	local mouseMovedAt = os.clock()
-	local weight = 0
-	local shiftLock = Knit.GetController("ShiftLockController")
-
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.RespectCanCollide = true
-	params.IgnoreWater = true
-
-	local function finish()
-		RunService:UnbindFromRenderStep(STEP_NAME)
-		shiftLock:ReleaseMouse()
-		self._bound = false
-		self._engaged = false
-	end
-
+	RunService:UnbindFromRenderStep(STEP_NAME)
+	local steeredAt = -math.huge
 	RunService:BindToRenderStep(STEP_NAME, STEP_PRIORITY, function(dt: number)
-		local view = workspace.CurrentCamera
-		local body = player.Character
-		local bodyRoot = body and body:FindFirstChild("HumanoidRootPart") :: BasePart?
-		if not view or not bodyRoot then
-			finish()
+		local camera = workspace.CurrentCamera
+		local character = Players.LocalPlayer.Character
+		if not self._engaged or not camera or not character then
 			return
 		end
-
-		local engaged = self._engaged
-		weight += dt / (if engaged then cfg.EnterSeconds else -cfg.ExitSeconds)
-		if weight <= 0 then
-			finish()
-			return
-		end
-		weight = math.min(weight, 1)
-
-		local focusWanted = bodyRoot.Position + Vector3.yAxis * cfg.FocusHeight
-		focus = Vector3.new(
-			LockCamera.smooth(focus.X, focusWanted.X, cfg.FocusRate, dt),
-			LockCamera.smooth(focus.Y, focusWanted.Y, cfg.FocusRate, dt),
-			LockCamera.smooth(focus.Z, focusWanted.Z, cfg.FocusRate, dt)
-		)
-		local point = self._point
-		target = Vector3.new(
-			LockCamera.smooth(target.X, point.X, cfg.TargetRate, dt),
-			LockCamera.smooth(target.Y, point.Y, cfg.TargetRate, dt),
-			LockCamera.smooth(target.Z, point.Z, cfg.TargetRate, dt)
-		)
-
-		local yawWanted, pitchWanted, flat =
-			LockCamera.angleTo(focus.X, focus.Y, focus.Z, target.X, target.Y, target.Z)
-		yaw = LockCamera.smoothAngle(
-			yaw,
-			yawWanted,
-			cfg.YawRate * LockCamera.yawShare(cfg, flat),
-			math.rad(cfg.YawMaxDegrees),
-			dt
-		)
-		pitch = LockCamera.smoothAngle(
-			pitch,
-			pitchWanted,
-			cfg.PitchRate,
-			math.rad(cfg.PitchMaxDegrees),
-			dt
-		)
-		distance = LockCamera.smooth(
-			distance,
-			LockCamera.zoom(cfg, (target - focus).Magnitude),
-			cfg.ZoomRate,
-			dt
-		)
-
-		-- The mouse nudges the view while locked, so it has to stay captured.
 		local now = os.clock()
-		if engaged and not GuiService.MenuIsOpen then
-			shiftLock:HoldMouse()
-			local moved = UserInputService:GetMouseDelta()
-			if moved.Magnitude > 0 then
-				local scale = cfg.MouseDegreesPerPixel * gameSettings.MouseSensitivity
-				orbitYaw, orbitPitch =
-					LockCamera.orbit(cfg, orbitYaw, orbitPitch, moved.X * scale, moved.Y * scale)
-				mouseMovedAt = now
-			end
-		else
-			shiftLock:ReleaseMouse()
+		if
+			UserInputService:GetMouseDelta().Magnitude > STEER_PIXELS
+			or self._stick.Magnitude > STEER_STICK
+		then
+			steeredAt = now
 		end
-		orbitYaw = LockCamera.orbitSettle(cfg, orbitYaw, now - mouseMovedAt, dt)
-		orbitPitch = LockCamera.orbitSettle(cfg, orbitPitch, now - mouseMovedAt, dt)
-
-		local aimYaw = yaw + orbitYaw
-		local aimPitch = LockCamera.finalPitch(cfg, pitch, orbitPitch)
-		local lookX, lookY, lookZ = LockCamera.look(aimYaw, aimPitch)
-		local look = Vector3.new(lookX, lookY, lookZ)
-
-		-- Anything solid between the focus and the camera brings the camera in front of it.
-		local ignore: { Instance } = CollectionService:GetTagged(COMBATANT_TAG)
-		table.insert(ignore, body :: Model)
-		params.FilterDescendantsInstances = ignore
-		local hit = workspace:Spherecast(focus, cfg.CollisionRadius, -look * distance, params)
-		local clear = if hit then hit.Distance - cfg.CollisionMargin else distance
-		pulled = LockCamera.pull(cfg, pulled, clear, dt)
-		local position = focus - look * pulled
-
-		-- The stock camera's result this frame is what to blend from, in yaw, pitch and position rather than
-		-- as a whole rotation, which could tip the horizon on the way.
-		local share = LockCamera.blendShare(weight)
-		if share < 1 then
-			local stock = view.CFrame
-			local stockPitch, stockYaw = stock:ToOrientation()
-			aimYaw = stockYaw + LockCamera.angleBetween(stockYaw, aimYaw) * share
-			aimPitch = stockPitch + (aimPitch - stockPitch) * share
-			position = stock.Position:Lerp(position, share)
+		local view = camera.CFrame
+		local focus = camera.Focus.Position
+		local look = view.LookVector
+		local to = self._point - focus
+		local angle = AimAssist.turnBetween(look.X, look.Z, to.X, to.Z)
+		local turn = AimAssist.cameraYaw(cfg, angle, dt, now - steeredAt <= STEER_HOLD)
+		if turn ~= 0 then
+			-- Around a vertical line through what the camera follows, so your character stays put on screen.
+			camera.CFrame = CFrame.new(focus)
+				* CFrame.Angles(0, turn, 0)
+				* CFrame.new(-focus)
+				* view
 		end
-		view.CFrame = CFrame.new(position) * CFrame.fromOrientation(aimPitch, aimYaw, 0)
-		view.Focus = CFrame.new(focus)
+	end)
+end
+
+function LockCameraController:KnitStart()
+	-- The right stick's position, to tell when a gamepad player is turning the camera themselves.
+	UserInputService.InputChanged:Connect(function(input: InputObject)
+		if input.KeyCode == Enum.KeyCode.Thumbstick2 then
+			self._stick = input.Position
+		end
 	end)
 end
 
