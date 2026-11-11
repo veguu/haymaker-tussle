@@ -285,3 +285,7 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   and retries a chunk refused for memory. In this Studio session 10 of 12 chunks got memory (suspected: shared
   with earlier Edit previews) - confirm all 12 after a Studio restart.
 - Wind raised (user: "too subtle"): lean 0.09, gusts 0.3, flutter 0.05, gust bands every 4 s.
+
+### bot fill in Team Test (2026-11-10, committed; user confirmed bots work in Team Test)
+- Round.BotFillStudioOnly = false: bots fill on any server, one real player starts a round, the test bot counts.
+- BEFORE THE GAME GOES PUBLIC: turn BotFillStudioOnly back on, or build the real few-players bot rule.

@@ -183,7 +183,7 @@ local GameConfig = {
 		AfkEnabled = true,
 		AfkToggleSeconds = 0.5,
 		BotFill = 25,
-		BotFillStudioOnly = true,
+		BotFillStudioOnly = false,
 	},
 	Lobby = {
 		Enabled = true,

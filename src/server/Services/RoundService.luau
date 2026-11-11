@@ -21,7 +21,8 @@
 -- Through Starting, everyone in the round is held still on their spawn with HT_RoundHold, which
 -- movement, punches and the boost all respect.
 --
--- BOT FILL (Round.BotFill, Studio-only while Round.BotFillStudioOnly): once a countdown is running, fill bots
+-- BOT FILL (Round.BotFill; Studio-only only while Round.BotFillStudioOnly): one real player is enough to start the
+-- countdown, then fill bots
 -- are built along the lobby's viewing edge until the round would have BotFill fighters, and the round waits
 -- for them. They're placed and held like everyone else; any left when the round ends are removed.
 --
@@ -126,8 +127,13 @@ local function setPhase(nextPhase: string, seconds: number?)
 end
 
 -- The Studio test bot, when it exists and is allowed to count.
+local function fillOn(): boolean
+	return (cfg.BotFill or 0) > 0 and (RunService:IsStudio() or not cfg.BotFillStudioOnly)
+end
+
+-- The test bot counts in Studio, and anywhere bots fill the rounds (Team Test runs on a real server).
 local function studioBot(): Model?
-	if not RunService:IsStudio() or not cfg.StudioBotCounts then
+	if not (RunService:IsStudio() or fillOn()) or not cfg.StudioBotCounts then
 		return nil
 	end
 	for _, model in Combatants.all() do
@@ -157,10 +163,6 @@ local function ready(): { Model }
 		end
 	end
 	return list
-end
-
-local function fillOn(): boolean
-	return (cfg.BotFill or 0) > 0 and (RunService:IsStudio() or not cfg.BotFillStudioOnly)
 end
 
 -- Builds the fill bots a round starting now would need, along the lobby's viewing edge (in the background:
@@ -398,7 +400,18 @@ end
 local function step()
 	local now = os.clock()
 	if phase == "Intermission" then
-		local canStart = Round.canStart(cfg, Round.rosterSize(cfg, #ready()))
+		local list = ready()
+		local count = #list
+		-- with bot fill on, one real player is enough: the bots are built once the countdown runs
+		if fillOn() then
+			for _, model in list do
+				if Combatants.playerOf(model) then
+					count = math.max(count, cfg.BotFill)
+					break
+				end
+			end
+		end
+		local canStart = Round.canStart(cfg, Round.rosterSize(cfg, count))
 		if canStart and not endsAt then
 			setPhase("Intermission", cfg.IntermissionSeconds)
 		elseif not canStart and endsAt then
