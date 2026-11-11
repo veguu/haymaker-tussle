@@ -1,7 +1,7 @@
 --!strict
 -- EnvironmentKit - turns a resolved environment preset (Core/Environment.resolve over Config/MapEnvironments)
--- into the place: Lighting and its effects, the drifting cartoon clouds, the falling leaves, and the slow
--- bob of a map's floating scenery. Used by EnvironmentController at runtime and by the Edit-mode preview.
+-- into the place: Lighting and its effects, the wind (GlobalWind and the grass sway, GrassWind), the
+-- drifting cartoon clouds, the falling leaves, and the slow bob of a map's floating scenery. Used by EnvironmentController at runtime and by the Edit-mode preview.
 --
 -- ONE OWNER: this is the only thing that writes Lighting. It adopts the first Sky / Atmosphere / Bloom /
 -- ColorCorrection / SunRays it finds in Lighting (creating HT_* ones if missing) and switches off any extra
@@ -21,6 +21,7 @@ local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Environment = require(script.Parent.Core.Environment)
+local GrassWind = require(script.Parent.GrassWind)
 local Envs = require(script.Parent.Config.MapEnvironments)
 
 local EnvironmentKit = {}
@@ -99,6 +100,8 @@ function EnvironmentKit.applyLighting(p: any, created: { Instance }?)
 	L.EnvironmentDiffuseScale = p.ambient.diffuse
 	L.EnvironmentSpecularScale = p.ambient.specular
 	L.ExposureCompensation = p.exposure
+	local gx, gz = Environment.wind(p.wind.direction)
+	workspace.GlobalWind = Vector3.new(gx, 0, gz) * (p.wind.global or 0)
 
 	local sky = own(OWNED[1], created) :: Sky
 	sky.SunAngularSize = p.sky.sunAngularSize
@@ -137,6 +140,7 @@ function EnvironmentKit.snapshotLighting(): () -> ()
 		saved[inst] = t
 	end
 	keep(Lighting, LIGHTING_PROPS)
+	keep(workspace, { "GlobalWind" })
 	for _, child in Lighting:GetChildren() do
 		local props = CHILD_PROPS[child.ClassName]
 		if props then
@@ -145,7 +149,7 @@ function EnvironmentKit.snapshotLighting(): () -> ()
 	end
 	return function()
 		for inst, t in saved do
-			if inst.Parent or inst == Lighting then
+			if inst.Parent or inst == Lighting or inst == workspace then
 				for name, value in t do
 					(inst :: any)[name] = value
 				end
@@ -199,7 +203,7 @@ export type Scene = {
 	bind: (self: Scene, mapModel: Instance?) -> (),
 	step: (self: Scene, t: number) -> (),
 	destroy: (self: Scene) -> (),
-	counts: (self: Scene) -> (number, number, number),
+	counts: (self: Scene) -> (number, number, number, number),
 }
 
 -- One cloud from rounded parts: white masses over a pale-blue flattened base, the base's top hidden inside
@@ -271,7 +275,7 @@ end
 function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 	local folder = Instance.new("Folder")
 	folder.Name = "HT_Environment"
-	local wx, wz = Environment.wind(p.clouds.wind)
+	local wx, wz = Environment.wind(p.wind.direction)
 	local atmoColour = rgb(p.atmosphere.colour)
 
 	local assets = mapId and ReplicatedStorage:FindFirstChild("HT_MapAssets")
@@ -304,6 +308,7 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 	end
 
 	local bobs: { Bob } = {}
+	local grass: GrassWind.Swayer? = nil
 
 	-- every moving part, in one list for a single BulkMoveTo per frame
 	local parts: { BasePart } = {}
@@ -348,6 +353,10 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 			local sway = (b.rule.sway or 0) * math.sin(w * 0.5)
 			b.part.CFrame = b.home + Vector3.new(wx * sway, rise, wz * sway)
 		end
+		if grass then
+			local camera = workspace.CurrentCamera
+			grass:step(t, camera and camera.CFrame.Position)
+		end
 	end
 
 	function scene.show(self: Scene, parent: Instance)
@@ -363,6 +372,10 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 			end
 		end
 		table.clear(bobs)
+		if grass then
+			grass:destroy()
+		end
+		grass = GrassWind.new(mapModel, p.wind)
 		if not mapModel then
 			return
 		end
@@ -390,11 +403,20 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 			end
 		end
 		table.clear(bobs)
+		if grass then
+			grass:destroy()
+			grass = nil
+		end
 		folder:Destroy()
 	end
 
-	function scene.counts(_self: Scene): (number, number, number)
-		return #clouds, #motes, #bobs
+	function scene.counts(_self: Scene): (number, number, number, number)
+		local tips = 0
+		if grass then
+			local _, n = grass:count()
+			tips = n
+		end
+		return #clouds, #motes, #bobs, tips
 	end
 
 	return scene :: Scene
@@ -422,8 +444,8 @@ function EnvironmentKit.preview(mapId: string, anchor: Vector3, mapModel: Instan
 	scene.folder.Name = PREVIEW
 	scene:show(workspace)
 	G.HT_EnvPreviewState = { restore = restore, created = created, scene = scene }
-	local c, m, b = scene:counts()
-	return `previewing {mapId}: {c} clouds, {m} leaves, {b} bobbing parts`
+	local c, m, b, g = scene:counts()
+	return `previewing {mapId}: {c} clouds, {m} leaves, {b} bobbing parts, {g} grass tips in the wind`
 end
 
 --- Move the Edit preview's clouds and leaves to time `t` (to look at another moment of the sway).

@@ -71,7 +71,7 @@ return {
 
 	["the same time gives the same sky: clouds and leaves are pure functions of time"] = function()
 		local p = Environment.resolve(Envs, "gnomon")
-		local wx, wz = Environment.wind(p.clouds.wind)
+		local wx, wz = Environment.wind(p.wind.direction)
 		local c = p.clouds.list[1]
 		local ax, ay, az = Environment.cloudCentre(c, wx, wz, 37.5)
 		local bx, by, bz = Environment.cloudCentre(c, wx, wz, 37.5)
@@ -91,6 +91,39 @@ return {
 		assert(Environment.inCorridor(c, 0, 20, -300, 1), "right behind the arena")
 		assert(not Environment.inCorridor(c, 600, 50, 150, 10), "far off to the side")
 		assert(not Environment.inCorridor(c, 0, 600, -300, 10), "high above")
+	end,
+
+	["grass sways downwind, within a gentle bound, and gust bands travel along the wind"] = function()
+		for id in Envs.Maps do
+			local w = Environment.resolve(Envs, id).wind
+			local wx, wz = Environment.wind(w.direction)
+			local most = 0
+			for i = 0, 200 do
+				local t = i * 0.37
+				local dx, dz, dy = Environment.grassSway(w, i * 3.1, -i * 1.7, 2, t, i)
+				local push = dx * wx + dz * wz
+				assert(push > -0.05, `{id}: a tip pushed upwind ({push})`)
+				assert(dy <= 0, `{id}: a bending tip doesn't rise`)
+				most = math.max(most, math.sqrt(dx * dx + dz * dz))
+			end
+			-- a 2-stud blade never leans more than about 40 degrees
+			assert(most > 0.1 and most < 0.85, `{id}: tip travel {most}`)
+		end
+		-- a band seen at one place is seen further downwind a moment later
+		local w = {
+			direction = { 1, 0 },
+			lean = 0,
+			strength = 1,
+			gustLength = 40,
+			gustSeconds = 4,
+			flutter = 0,
+		}
+		local a = Environment.grassSway(w, 0, 0, 1, 1, 0)
+		local b = Environment.grassSway(w, 10, 0, 1, 2, 0) -- 10 studs on, 1 s later (40 studs per 4 s)
+		assert(
+			math.abs(a - b) < 1e-6,
+			"the gust moves along the wind at gustLength per gustSeconds"
+		)
 	end,
 
 	["the fade steps toward its target and stops there"] = function()

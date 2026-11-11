@@ -265,3 +265,16 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
 - Tested in Play: join, gnomon->kitestead fade (covered before the swap), interrupted change, 2 reloads (no build-up), round
   end -> next map. Lighting tuned on the Gnomon preview only; Kitestead and Saltcrest values are scaled to match, unverified
   on their real geometry (they get tuned with their rework).
+
+### wind + bots + Gnomon in Play (2026-11-10, NOT COMMITTED - waiting for the user's verdict)
+- Grass wind: `src/shared/GrassWind.luau` moves blade tips (EditableMesh) near the camera within ~1 ms a frame;
+  `Core/Environment.grassSway` is the maths (tested). Each preset has one `wind` (direction, lean, gusts, GlobalWind).
+  In game it needs Game Settings > Security > "Allow Mesh / Image APIs" ON; until then the grass stays still.
+- Bot fill: `Round.BotFill` 25 (Studio only, `BotFillStudioOnly`). DummyService fill bots fight the nearest fighter,
+  are removed when out; RoundService builds them during the countdown and clears them at round end.
+- Placeholder floor: the red test wall is gone (bots got pinned against it).
+- GNOMON IS IMPORTED: Open Cloud Model assets 132930149516661 + 125437537718079 (group 2970443), the GLB split in
+  two for the 20 MB limit, aligned and joined as ServerStorage.HT_Maps.Gnomon (pivot = arena centre, 14 solid
+  surface parts, grass no shadow). It lives in the PLACE, not in git: the place must be saved to keep it.
+- Tested in Play: a full 25-fighter round on Gnomon (player + test bot + 23 bots), round end, next map.
+- Not built yet: the arena shrink (rounds can drag when fighters avoid each other).

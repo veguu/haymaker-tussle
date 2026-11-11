@@ -307,7 +307,7 @@ function Environment.problems(preset: any, lobby: any, arena: any): { string }
 	for _, mark in preset.landmarks or {} do
 		table.insert(corridors, Environment.landmarkCorridor(mark))
 	end
-	local wx, wz = Environment.wind(preset.clouds.wind)
+	local wx, wz = Environment.wind(preset.wind.direction)
 	local minElev = math.tan(math.rad(L.cloudMinElevation))
 	for index, cloud in preset.clouds.list do
 		local masses = Environment.cloudMasses(cloud, index)
@@ -359,6 +359,33 @@ function Environment.problems(preset: any, lobby: any, arena: any): { string }
 		end
 	end
 	return out
+end
+
+--- How far a grass blade's tip is pushed by the wind at time `t`: a steady lean downwind, gust bands that
+--- roll across the ground along the wind (stronger in some lanes than others, so it isn't a stripe
+--- pattern), and a small fast shiver. `x`, `z` are the tip's world position (only its place in the gust
+--- matters), `h` its height above the ground, `seed` a per-blade number so neighbours don't move in step.
+--- Returns the push along x and z, and the drop (the tip arcs down a little as it bends, keeping its length).
+function Environment.grassSway(
+	wind: any,
+	x: number,
+	z: number,
+	h: number,
+	t: number,
+	seed: number
+): (number, number, number)
+	local wx, wz = Environment.wind(wind.direction)
+	local along = x * wx + z * wz
+	local across = -x * wz + z * wx
+	local len = math.max(wind.gustLength or 40, 1)
+	local sec = math.max(wind.gustSeconds or 4.5, 0.1)
+	local band = 0.5 + 0.5 * math.sin(TAU * (along / len - t / sec))
+	local lane = 0.65 + 0.35 * math.sin(TAU * (across / (len * 2.3) + t / (sec * 3.1)))
+	local gust = band * band * lane
+	local shiver = math.sin(TAU * (t / math.max(wind.flutterSeconds or 1.2, 0.1)) + seed * 6.1)
+	local push = h * ((wind.lean or 0) + (wind.strength or 0) * gust + (wind.flutter or 0) * shiver)
+	local drop = (push * push) / (2 * math.max(h, 0.2))
+	return wx * push, wz * push, -drop
 end
 
 --- One step of the screen fade toward `target` (1 = covered, 0 = clear), taking `seconds` for a full fade.

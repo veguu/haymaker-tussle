@@ -182,6 +182,8 @@ local GameConfig = {
 		StudioBotCounts = true,
 		AfkEnabled = true,
 		AfkToggleSeconds = 0.5,
+		BotFill = 25,
+		BotFillStudioOnly = true,
 	},
 	Lobby = {
 		Enabled = true,

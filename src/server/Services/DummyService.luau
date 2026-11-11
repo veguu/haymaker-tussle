@@ -10,6 +10,11 @@
 -- spec has `fights`, so Core/BotBrain pushes a stick and presses punch, and everything after that is the
 -- normal movement and combat rules. It only chases players who've finished the tutorial.
 --
+-- FILL BOTS (Round.BotFill, a test of a full round): the same brain, but they fight the nearest fighter in
+-- the round (player or bot), only while they're in it (tagged HT_Fighter, not held, not out). They wait
+-- along the lobby's viewing edge, never go home on their own, and are removed - not rebuilt - when they
+-- fall out or the round ends. RoundService spawns and clears them.
+--
 -- Going home waits for a launch, a kick, a bounce or a combo to finish: see TrainingLayout.shouldReset.
 
 local CollectionService = game:GetService("CollectionService")
@@ -41,6 +46,8 @@ local BOT_SPOT = Vector3.new(0, 3, -12)
 local HOME_TOLERANCE = 0.5
 local PATROL_ARRIVE = 1.5
 local LABEL_DISTANCE = 140
+local FIGHTER_TAG = "HT_Fighter" -- RoundService's tag for everyone still in the round
+local FILL_ATTRIBUTE = "HT_FillBot"
 
 local PHYSICS_COLOUR = Color3.fromRGB(255, 140, 40)
 local STATIONARY_COLOUR = Color3.fromRGB(150, 205, 255)
@@ -61,6 +68,8 @@ export type Spec = {
 	stationary: boolean?,
 	patrol: Patrol?,
 	fights: boolean?, -- the test bot: chases and punches players
+	fill: boolean?, -- a fill bot: fights anyone in the round, removed when out
+	colour: Color3?,
 	fallY: number?, -- below this it goes home; the training fall line if left out
 }
 
@@ -254,18 +263,22 @@ end
 --- Builds a dummy where the spec says. This takes a moment, because Roblox builds the rig.
 function DummyService:Spawn(spec: Spec): Model
 	local description = Instance.new("HumanoidDescription")
-	description.HeadColor = PHYSICS_COLOUR
-	description.TorsoColor = PHYSICS_COLOUR
-	description.LeftArmColor = PHYSICS_COLOUR
-	description.RightArmColor = PHYSICS_COLOUR
-	description.LeftLegColor = PHYSICS_COLOUR
-	description.RightLegColor = PHYSICS_COLOUR
+	local body = spec.colour or PHYSICS_COLOUR
+	description.HeadColor = if spec.colour then Color3.fromRGB(245, 205, 170) else PHYSICS_COLOUR
+	description.TorsoColor = body
+	description.LeftArmColor = body
+	description.RightArmColor = body
+	description.LeftLegColor = body:Lerp(Color3.new(0, 0, 0), 0.35)
+	description.RightLegColor = body:Lerp(Color3.new(0, 0, 0), 0.35)
 	local model = Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R6)
 	description:Destroy()
 	model.Name = spec.name
 	model:SetAttribute(Combatants.DUMMY_ATTRIBUTE, true)
-	if spec.fights then
+	if spec.fights and not spec.fill then
 		model:SetAttribute(Combatants.BOT_ATTRIBUTE, true)
+	end
+	if spec.fill then
+		model:SetAttribute(FILL_ATTRIBUTE, true)
 	end
 	placeAt(model, spec.home)
 	local humanoid = model:FindFirstChildOfClass("Humanoid") :: Humanoid
@@ -409,6 +422,24 @@ local function nearestPlayer(root: BasePart): BasePart?
 	return best
 end
 
+-- A fill bot's target: the nearest other fighter still in the round, at punching height.
+local function nearestFighter(root: BasePart, self: Model): BasePart?
+	local best: BasePart? = nil
+	local bestDistance = math.huge
+	for _, model in CollectionService:GetTagged(FIGHTER_TAG) do
+		if model ~= self and model:IsA("Model") and model:GetAttribute("HT_Eliminated") == nil then
+			local other = Combatants.isAlive(model) and Combatants.rootOf(model)
+			if other and math.abs(other.Position.Y - root.Position.Y) <= punchCfg.VerticalLimit then
+				local distance = (other.Position - root.Position).Magnitude
+				if distance < bestDistance then
+					best, bestDistance = other, distance
+				end
+			end
+		end
+	end
+	return best
+end
+
 -- The nearest player anywhere, at any height: who to get away from when launched.
 local function nearestInAir(root: BasePart): BasePart?
 	local best: BasePart? = nil
@@ -432,7 +463,9 @@ end
 -- makes it swing at where you were. It guesses reach differently each swing, so it sometimes
 -- swings too early. It doesn't predict or track during the windup, so a sidestep dodges.
 local function think(dummy: Dummy, root: BasePart, now: number): (number, number)
-	local target = nearestPlayer(root)
+	local target = if dummy.spec.fill
+		then nearestFighter(root, dummy.model)
+		else nearestPlayer(root)
 	local position = root.Position
 	local seen: Vector3? = nil
 	if target then
@@ -515,8 +548,11 @@ local function stepDummy(
 	-- everyone alone.
 	local held = dummy.model:GetAttribute("HT_RoundHold") ~= nil
 	local stunned = dummy.model:GetAttribute("HT_Stunned") ~= nil or held
+	local inRound = CollectionService:HasTag(dummy.model, FIGHTER_TAG)
 	local fighting = dummy.spec.fights == true
-		and shouldFight()
+		and (if dummy.spec.fill
+			then inRound and botCfg.Fights and not workspace:GetAttribute("HT_TestBotQuiet")
+			else shouldFight())
 		and not held
 		and dummy.model:GetAttribute("HT_Eliminated") == nil
 
@@ -560,13 +596,25 @@ local function stepDummy(
 			busy = busy,
 			busyFor = if dummy.busySince then now - dummy.busySince else 0,
 			-- A bot that's fighting is meant to be away from home.
-			displaced = patrol == nil and not fighting and (
+			displaced = patrol == nil and not fighting and not dummy.spec.fill and (
 				root.Position - dummy.spec.home.Position
 			).Magnitude > HOME_TOLERANCE,
 			sinceHit = now - dummy.lastHit,
 			requested = dummy.requested,
 		}, dummy.spec.resetSeconds)
 	then
+		if dummy.spec.fill then
+			-- out for good: the round hears it (DummyReset), then the body goes
+			if root.Position.Y < (dummy.spec.fallY or -math.huge) and dummies[dummy.model] then
+				dummies[dummy.model] = nil
+				self.DummyReset:Fire(dummy.model)
+				local model = dummy.model
+				task.delay(1, function()
+					model:Destroy()
+				end)
+			end
+			return
+		end
 		sendHome(self, dummy)
 		return
 	end
@@ -593,7 +641,9 @@ local function stepDummy(
 		dummy.steerX, dummy.steerZ = 0, 0
 	elseif fighting and botCfg.AirSteers then
 		-- Launched, it tries to get away from whoever is nearest, like a person would.
-		local nearest = nearestInAir(root)
+		local nearest = if dummy.spec.fill
+			then nearestFighter(root, dummy.model)
+			else nearestInAir(root)
 		if nearest then
 			local away = Vector3.new(
 				root.Position.X - nearest.Position.X,
@@ -689,6 +739,62 @@ local function stepDummy(
 	end
 end
 
+--- Builds fill bots at these spots (they wait there until a round places them). Yields while the rigs are
+--- built. `colours` cycles.
+function DummyService:SpawnFill(
+	spots: { CFrame },
+	colours: { Color3 },
+	startIndex: number
+): { Model }
+	local made: { Model } = {}
+	for i, spot in spots do
+		local n = startIndex + i - 1
+		table.insert(
+			made,
+			self:Spawn({
+				name = `Bot {n}`,
+				home = spot,
+				startStagger = 0,
+				resetSeconds = botCfg.ReturnSeconds,
+				fights = true,
+				fill = true,
+				colour = colours[(n - 1) % #colours + 1],
+				fallY = arena.CenterY - arena.EliminationDepth,
+			})
+		)
+	end
+	return made
+end
+
+--- Every fill bot that's still here.
+function DummyService:FillBots(): { Model }
+	local list: { Model } = {}
+	for model, dummy in dummies do
+		if dummy.spec.fill and model.Parent then
+			table.insert(list, model)
+		end
+	end
+	return list
+end
+
+--- Removes every fill bot (a round has ended).
+function DummyService:ClearFill()
+	for model, dummy in dummies do
+		if dummy.spec.fill then
+			dummies[model] = nil
+			model:Destroy()
+		end
+	end
+end
+
+--- A fill bot's new home: where a round put it, so nothing ever sends it back to the lobby.
+function DummyService:SetHome(model: Model, spot: CFrame)
+	local dummy = dummies[model]
+	if dummy and dummy.spec.fill then
+		dummy.spec.home = spot
+	end
+end
+
 --- Takes a body away for good, without it being rebuilt.
 function DummyService:Remove(model: Model)
 	dummies[model] = nil
@@ -749,8 +855,14 @@ function DummyService:KnitStart()
 				stepDummy(self, dummy, root, humanoid, now, dt)
 				playClip(dummy, humanoid.FloorMaterial ~= Enum.Material.Air)
 			else
-				-- Never left permanently broken: a new body takes over the same spot.
+				-- Never left permanently broken: a new body takes over the same spot. (A fill bot is just
+				-- gone: the round already counts it out.)
 				dummies[model] = nil
+				if dummy.spec.fill then
+					self.DummyReset:Fire(model)
+					model:Destroy()
+					continue
+				end
 				model:Destroy()
 				task.spawn(function()
 					local replacement = self:Spawn(dummy.spec)

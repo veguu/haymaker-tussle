@@ -87,7 +87,8 @@ local function disc(
 	part.Parent = parent
 end
 
--- The old test floor, in the map's colours: a solid disc with a ring every 15 studs, and the test wall.
+-- The old test floor, in the map's colours: a solid disc with a ring every 15 studs. (No test wall: a real
+-- arena has nothing standing on it, and fighters got pinned against it.)
 local function standIn(model: Model, p: any)
 	local floor = rgb(p.standIn.floor)
 	local ring = rgb(p.standIn.ring)
@@ -100,14 +101,6 @@ local function standIn(model: Model, p: any)
 		radius -= 15
 		index += 1
 	end
-	local wall = Instance.new("Part")
-	wall.Name = "TestWall"
-	wall.Size = Vector3.new(3, 10, 30)
-	wall.CFrame = CFrame.new(CENTER + Vector3.new(40, 5, 0))
-	wall.Anchored = true
-	wall.Color = Color3.fromRGB(200, 70, 70)
-	wall.Material = Enum.Material.SmoothPlastic
-	wall.Parent = model
 end
 
 local function buildModel(id: string): Model

@@ -54,8 +54,19 @@ MapEnvironments.Default = {
 		haze = 0.4,
 	},
 	sky = { sunAngularSize = 11 }, -- the place's own Sky textures are kept
+	-- One wind per map: grass sways with it (gusts roll across the meadow along it), clouds sway along it,
+	-- leaves drift with it, and Workspace.GlobalWind is set from it (particles, terrain decoration).
+	wind = {
+		direction = { 1, 0.3 }, -- flat x, z; normalised in code
+		lean = 0.07, -- a blade tip's steady push downwind, studs per stud of blade height
+		strength = 0.2, -- a gust's extra push, studs per stud of blade height
+		gustLength = 40, -- studs between gust bands
+		gustSeconds = 4.5, -- how long a gust band takes to pass a point
+		flutter = 0.035, -- small fast shiver, studs per stud of height
+		flutterSeconds = 1.2,
+		global = 6, -- Workspace.GlobalWind speed
+	},
 	clouds = {
-		wind = { 1, 0.3 }, -- the direction clouds sway along (normalised in code)
 		top = { 252, 253, 255 },
 		under = { 206, 224, 246 }, -- pale blue
 		-- far clouds lose contrast: the underside is blended toward the top, both toward the sky haze
@@ -74,6 +85,7 @@ MapEnvironments.Default = {
 -- Cloud entry: x, y, z (centre), length (studs), kind "compact" | "stretched", heading (degrees, from +X
 -- toward +Z), sway (studs, each way along the wind), period (seconds per sway), phase (0-1).
 -- Mote spot: x, y (top of the fall), z, radius, count, kind "leaf" | "petal", colours, fall (studs).
+-- Wind: see Default.wind.
 -- Bob: match (Lua pattern on part names in the map model; outline/twin names ending _Line follow their
 -- owner), rise (studs, each way), period, sway (studs along the wind).
 
@@ -105,6 +117,14 @@ MapEnvironments.Maps = {
 			},
 			bloom = { intensity = 0.25 },
 			atmosphere = { haze = 0.45, colour = { 200, 222, 246 } },
+			-- a gentle summer breeze across the meadow from the lobby's left
+			wind = {
+				direction = { 1, 0.3 },
+				lean = 0.06,
+				strength = 0.2,
+				gustLength = 42,
+				gustSeconds = 5,
+			},
 			clouds = {
 				list = {
 					{
@@ -249,8 +269,8 @@ MapEnvironments.Maps = {
 			exposure = -0.12,
 			grade = { saturation = 0, contrast = 0.13, tint = { 255, 250, 242 } },
 			atmosphere = { colour = { 205, 222, 242 }, decay = { 140, 166, 206 } },
+			wind = { direction = { -0.4, 1 } },
 			clouds = {
-				wind = { -0.4, 1 },
 				list = {
 					{
 						x = 520,
@@ -343,8 +363,8 @@ MapEnvironments.Maps = {
 				colour = { 196, 224, 250 },
 				decay = { 118, 166, 220 },
 			},
+			wind = { direction = { 1, -0.2 } },
 			clouds = {
-				wind = { 1, -0.2 },
 				list = {
 					{
 						x = -600,

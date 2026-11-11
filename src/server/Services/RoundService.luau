@@ -21,6 +21,10 @@
 -- Through Starting, everyone in the round is held still on their spawn with HT_RoundHold, which
 -- movement, punches and the boost all respect.
 --
+-- BOT FILL (Round.BotFill, Studio-only while Round.BotFillStudioOnly): once a countdown is running, fill bots
+-- are built along the lobby's viewing edge until the round would have BotFill fighters, and the round waits
+-- for them. They're placed and held like everyone else; any left when the round ends are removed.
+--
 -- MAPS: as a round ends (everyone back in the lobby), MapService:RoundEnded() may bring in the next map;
 -- a round never starts while a map change is under way.
 
@@ -33,6 +37,7 @@ local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Round = require(ReplicatedStorage.Shared.Core.Round)
 local Net = require(ReplicatedStorage.Shared.Net)
+local Lobby = require(ReplicatedStorage.Shared.Core.Lobby)
 local Combatants = require(script.Parent.Parent.Combatants)
 
 local cfg: any = GameConfig.Round
@@ -62,6 +67,17 @@ local lastHits: { [Model]: Round.Hit } = setmetatable({}, { __mode = "k" }) :: a
 local lastAfkToggle: { [Player]: number } = {}
 local folder: Folder
 local ringOut: RemoteEvent
+local filling = false
+local BOT_COLOURS = {
+	Color3.fromRGB(226, 88, 72),
+	Color3.fromRGB(72, 120, 226),
+	Color3.fromRGB(238, 186, 60),
+	Color3.fromRGB(146, 92, 204),
+	Color3.fromRGB(56, 168, 120),
+	Color3.fromRGB(236, 128, 178),
+	Color3.fromRGB(96, 196, 220),
+	Color3.fromRGB(240, 140, 60),
+}
 
 local function trace(message: string)
 	if
@@ -135,7 +151,51 @@ local function ready(): { Model }
 	if bot then
 		table.insert(list, bot)
 	end
+	for _, model in Knit.GetService("DummyService"):FillBots() do
+		if Combatants.isAlive(model) then
+			table.insert(list, model)
+		end
+	end
 	return list
+end
+
+local function fillOn(): boolean
+	return (cfg.BotFill or 0) > 0 and (RunService:IsStudio() or not cfg.BotFillStudioOnly)
+end
+
+-- Builds the fill bots a round starting now would need, along the lobby's viewing edge (in the background:
+-- building rigs takes a moment). The round waits while `filling`.
+local function fillUp()
+	if filling or not fillOn() then
+		return
+	end
+	local need = math.min(cfg.BotFill, cfg.MaxPlayers) - #ready()
+	if need <= 0 then
+		return
+	end
+	filling = true
+	local lobby: any = GameConfig.Lobby
+	local x0, x1, z0 = Lobby.bounds(lobby)
+	local have = #Knit.GetService("DummyService"):FillBots()
+	local spots: { CFrame } = {}
+	local perRow = 8
+	for i = 0, need - 1 do
+		local col, row = i % perRow, i // perRow
+		local x = x0 + 24 + (x1 - x0 - 48) * (col + 0.5) / perRow
+		local z = z0 + 14 + row * 7
+		local at = Vector3.new(x, lobby.FloorY + STAND_HEIGHT, z)
+		table.insert(spots, CFrame.lookAt(at, at - Vector3.zAxis))
+	end
+	task.spawn(function()
+		local ok, err = pcall(function()
+			Knit.GetService("DummyService"):SpawnFill(spots, BOT_COLOURS, have + 1)
+		end)
+		if not ok then
+			warn(`[Round] bot fill failed: {err}`)
+		end
+		trace(`filled {need} bots`)
+		filling = false
+	end)
 end
 
 -- Moves a fighter onto a spot, with nothing left over from what it was doing.
@@ -146,6 +206,7 @@ local function place(model: Model, spot: CFrame)
 	local player = Combatants.playerOf(model)
 	if not player then
 		Knit.GetService("DummyService"):PlaceAt(model, spot)
+		Knit.GetService("DummyService"):SetHome(model, spot) -- fill bots only: their home is their spawn
 		return
 	end
 	Knit.GetService("TrainingService"):Release(player)
@@ -266,7 +327,11 @@ local function checkOuts()
 		local gone = model.Parent == nil
 			or not Combatants.isAlive(model)
 			or (player ~= nil and player.Character ~= model)
-			or (player == nil and not model:GetAttribute(Combatants.BOT_ATTRIBUTE))
+			or (
+				player == nil
+				and not model:GetAttribute(Combatants.BOT_ATTRIBUTE)
+				and not model:GetAttribute("HT_FillBot")
+			)
 		if gone or (player ~= nil and player.Parent == nil) then
 			noteOut(model, true)
 			continue
@@ -322,6 +387,7 @@ local function endRound()
 	table.clear(standing)
 	table.clear(outs)
 	firstOutAt = nil
+	Knit.GetService("DummyService"):ClearFill()
 	roundNumber += 1
 	folder:SetAttribute("Winner", nil)
 	setPhase("Intermission", nil)
@@ -338,9 +404,12 @@ local function step()
 		elseif not canStart and endsAt then
 			setPhase("Intermission", nil)
 		end
+		if endsAt then
+			fillUp()
+		end
 		if endsAt and now >= endsAt then
-			-- never place fighters while the map is being swapped: wait for it
-			if Knit.GetService("MapService"):IsChanging() then
+			-- never place fighters while the map is being swapped or bots are still being built: wait
+			if Knit.GetService("MapService"):IsChanging() or filling then
 				endsAt = now + 1
 				publish()
 			else
