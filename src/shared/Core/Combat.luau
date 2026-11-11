@@ -305,14 +305,41 @@ function Combat.sweepReach(
 	return nil, if blocked then "blocked" else why
 end
 
---- The swing after this one: left hook, right hook, uppercut, then round again.
+--- The swing after this one: right hook, left hook, and round again. The launcher is its own button
+--- now (the heavy kick), so the string is only ever the two hooks.
 function Combat.nextSwing(side: string): string
-	if side == "Left" then
-		return "Right"
-	elseif side == "Right" then
-		return "Uppercut"
+	if side == "Right" then
+		return "Left"
 	end
-	return "Left"
+	return "Right"
+end
+
+--- How long a punch takes to land after the request. Held back first (the server saw the hold start at
+--- `readyAt`, at least Windup - ReleaseWindup ago), the arm is already drawn and only ReleaseWindup is
+--- left. Otherwise the full Windup.
+function Combat.releaseWindup(cfg: any, readyAt: number?, now: number): number
+	if
+		readyAt
+		and now - readyAt >= cfg.Windup - cfg.ReleaseWindup
+		and now - readyAt <= cfg.ReadyMaxSeconds
+	then
+		return cfg.ReleaseWindup
+	end
+	return cfg.Windup
+end
+
+--- Does a heavy kick thrown at this speed launch its target into the air, for an air kick?
+function Combat.kickLaunches(cfg: any, speed: number): boolean
+	return speed == speed and speed >= cfg.LaunchSpeed
+end
+
+--- A heavy kick that doesn't launch: an upward arc, outward speed then lift, both growing with how fast
+--- the kicker was going (ArcBase + ArcPerStud a stud/s, up to ArcMax), and with the target's stagger
+--- like any hit.
+function Combat.heavyKickArc(cfg: any, speed: number, staggerMultiplier: number): (number, number)
+	local fast = if speed == speed then math.max(speed, 0) else 0
+	local out = math.min(cfg.ArcBase + cfg.ArcPerStud * fast, cfg.ArcMax) * staggerMultiplier
+	return out, out * cfg.ArcLiftShare
 end
 
 --- The swing to throw now: the next in the order, or back to the first after a pause.
@@ -323,7 +350,7 @@ function Combat.comboSwing(
 	lastPunch: number?
 ): string
 	if lastPunch == nil or now - lastPunch >= cfg.ComboResetSeconds then
-		return "Left"
+		return "Right"
 	end
 	return nextSide
 end
@@ -478,12 +505,15 @@ function Combat.closingSpeed(
 end
 
 export type BumpSettings = {
-	BumpPropelShare: number,
-	BumpFullClosing: number,
-	BumpSoftShare: number,
-	BumpFullAdvantage: number,
-	BumpEdgeShare: number,
+	BumpBasePush: number,
+	BumpPushPerSpeed: number,
+	BumpDashSpeed: number,
+	BumpDashPerSpeed: number,
+	BumpMaxPush: number,
+	BumpSpeedKeep: number,
+	BumpDashSpeedKeep: number,
 	BumpStaggerShare: number,
+	BumpStaggerFullPush: number,
 }
 
 export type BumpOutcome = {
@@ -491,16 +521,39 @@ export type BumpOutcome = {
 	knockB: number,
 	staggerA: number,
 	staggerB: number,
+	keepA: number, -- share of running speed A keeps
+	keepB: number,
 }
 
---- A bump is a shove, well under a propel: `BumpPropelShare` of `propelSpeed` at most, whatever anyone's speed
---- or stagger, and less for a soft one. Both take it. Whoever was going faster shoves a little harder and adds a
---- little more stagger, and takes a little less of both. `knockA` and `staggerA` are what A takes.
+-- What one side takes from the other running into it at `speed`: a small shove (BumpBasePush plus
+-- BumpPushPerSpeed a stud/s), unless the other was dashing (BumpDashSpeed or faster), which is a real
+-- hit (BumpDashPerSpeed a stud/s, up to BumpMaxPush) that also costs more running speed.
+local function bumpTaken(
+	cfg: BumpSettings,
+	staggerCfg: StaggerSettings,
+	speed: number
+): (number, number, number)
+	local dashed = speed >= cfg.BumpDashSpeed
+	local knock = if dashed
+		then math.min(speed * cfg.BumpDashPerSpeed, cfg.BumpMaxPush)
+		else cfg.BumpBasePush + speed * cfg.BumpPushPerSpeed
+	local stagger = staggerCfg.PerHit
+		* cfg.BumpStaggerShare
+		* math.min(knock / cfg.BumpStaggerFullPush, 3)
+	return knock,
+		math.floor(stagger * 10 + 0.5) / 10,
+		if dashed then cfg.BumpDashSpeedKeep else cfg.BumpSpeedKeep
+end
+
+--- Two fighters run into each other. Both are bumped back, each by how fast the OTHER was going: walk
+--- into someone standing and you bounce off them a little while they're barely moved, and the faster
+--- you go, the harder they're shoved. An ordinary run is a small shove; a dash into someone throws them.
+--- `closing` and `propelSpeed` are no longer used and are kept so callers don't change.
 function Combat.bumpOutcome(
 	cfg: BumpSettings,
 	staggerCfg: StaggerSettings,
-	propelSpeed: number,
-	closing: number,
+	_propelSpeed: number,
+	_closing: number,
 	avx: number,
 	avz: number,
 	bvx: number,
@@ -508,18 +561,15 @@ function Combat.bumpOutcome(
 ): BumpOutcome
 	local speedA = math.sqrt(avx * avx + avz * avz)
 	local speedB = math.sqrt(bvx * bvx + bvz * bvz)
-	local edge = math.clamp(math.abs(speedA - speedB) / cfg.BumpFullAdvantage, 0, 1)
-	local lead = cfg.BumpEdgeShare * edge
-	local shareOnA = if speedA >= speedB then 1 - lead else 1 + lead
-	local shareOnB = if speedA >= speedB then 1 + lead else 1 - lead
-	local hardness = math.clamp(closing / cfg.BumpFullClosing, cfg.BumpSoftShare, 1)
-	local base = propelSpeed * cfg.BumpPropelShare * hardness
-	local stagger = staggerCfg.PerHit * cfg.BumpStaggerShare
+	local knockA, staggerA, keepA = bumpTaken(cfg, staggerCfg, speedB)
+	local knockB, staggerB, keepB = bumpTaken(cfg, staggerCfg, speedA)
 	return {
-		knockA = base * shareOnA,
-		knockB = base * shareOnB,
-		staggerA = math.floor(stagger * shareOnA * 10 + 0.5) / 10,
-		staggerB = math.floor(stagger * shareOnB * 10 + 0.5) / 10,
+		knockA = knockA,
+		knockB = knockB,
+		staggerA = staggerA,
+		staggerB = staggerB,
+		keepA = keepA,
+		keepB = keepB,
 	}
 end
 

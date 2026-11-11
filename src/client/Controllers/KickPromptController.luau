@@ -89,10 +89,15 @@ function KickPromptController:KnitStart()
 	self._resultText = KickResultText.new(gui)
 end
 
-function KickPromptController:_setKeyText()
+-- The jump is Space (Y); the timed kick once attached is a left click (R2), the punch button.
+function KickPromptController:_setKeyText(timed: boolean?)
 	local kind = UserInputService:GetLastInputType()
 	local pad = kind.Name:find("Gamepad") ~= nil
-	self._key.Text = if kind == Enum.UserInputType.Touch then "TAP" elseif pad then "Y" else "SPACE"
+	self._key.Text = if kind == Enum.UserInputType.Touch
+		then "TAP"
+		elseif pad then (if timed then "R2" else "Y")
+		elseif timed then "CLICK"
+		else "SPACE"
 end
 
 --- Shows the first prompt: someone is in the air close enough to jump at.
@@ -114,7 +119,7 @@ function KickPromptController:UpdateAttach(since: number, qteAt: number)
 	if not self._holder then
 		return
 	end
-	self:_setKeyText()
+	self:_setKeyText(true)
 	self._holder.Visible = true
 	self._ring.Visible = true
 	self._word.Text = "KICK"

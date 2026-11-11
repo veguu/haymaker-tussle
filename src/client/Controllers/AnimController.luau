@@ -48,13 +48,17 @@ local SWING_ARMS: { [string]: string } = {
 	Left = "Left Arm",
 	Right = "Right Arm",
 	Uppercut = "Right Arm",
+	Kick = "Right Leg",
 }
 
 local SWING_CLIPS: { [string]: string } = {
 	Left = "HookLeft",
 	Right = "HookRight",
 	Uppercut = "Uppercut",
+	Kick = "HeavyKick",
 }
+-- Someone else holding a punch back, from the server's attribute (the swing it will be).
+local READY_ATTRIBUTE = "HT_PunchReady"
 
 local AnimController = Knit.CreateController({
 	Name = "AnimController",
@@ -74,6 +78,8 @@ type Fighter = {
 	baseC1: CFrame,
 	offsetting: boolean,
 	swingName: string?,
+	heldSwing: string?, -- the swing track waiting drawn back while a punch is held
+	readySeen: string?, -- someone else's held punch, from the server's attribute
 	lastSide: string?,
 	stopUntil: number,
 	stopped: { AnimationTrack },
@@ -315,6 +321,36 @@ local function updateFighter(model: Model, dt: number)
 	end
 
 	updateSkill(model, fighter)
+	if model ~= game:GetService("Players").LocalPlayer.Character then
+		local ready = model:GetAttribute(READY_ATTRIBUTE) :: string?
+		if ready ~= fighter.readySeen then
+			fighter.readySeen = ready
+			if ready then
+				AnimController:HoldSwing(model, ready)
+			elseif fighter.heldSwing then
+				-- Thrown, the swing itself takes over; dropped, this lets go a moment later.
+				task.delay(0.25, function()
+					if fighter.readySeen == nil and fighter.heldSwing then
+						fighter.heldSwing = nil
+						AnimController:CancelSwing(model)
+					end
+				end)
+			end
+		end
+	end
+	-- A held punch waits drawn back at its clip's hold point.
+	local heldTrack = fighter.heldSwing and fighter.tracks[fighter.heldSwing]
+	local holdAt = fighter.heldSwing and (AnimClips :: any)[fighter.heldSwing].hold
+	if
+		heldTrack
+		and holdAt
+		and heldTrack.IsPlaying
+		and heldTrack.Speed > 0
+		and heldTrack.TimePosition >= holdAt
+	then
+		heldTrack:AdjustSpeed(0)
+		heldTrack.TimePosition = holdAt
+	end
 
 	local now = os.clock()
 	local velocity = root.AssemblyLinearVelocity
@@ -467,7 +503,20 @@ function AnimController:PlaySwing(model: Model, side: string)
 		local velocity = root.AssemblyLinearVelocity
 		speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 	end
-	local chosen = if speed >= cfg.RunVariantSpeed then `{clip}Run` else clip
+	local chosen = if speed >= cfg.RunVariantSpeed and fighter.tracks[`{clip}Run`]
+		then `{clip}Run`
+		else clip
+	local held = fighter.heldSwing
+	fighter.heldSwing = nil
+	-- A held swing carries on as it is, even if the run variant would now be the other one.
+	if
+		held
+		and string.sub(held, 1, #clip) == clip
+		and fighter.tracks[held]
+		and fighter.tracks[held].IsPlaying
+	then
+		chosen = held
+	end
 	for name in SWING_CLIPS do
 		local base = SWING_CLIPS[name]
 		for _, variant in { base, `{base}Run` } do
@@ -495,9 +544,49 @@ function AnimController:PlaySwing(model: Model, side: string)
 		-- The lead-in to the strike is stretched over the whole windup, so the fist lands when the server
 		-- decides the hit.
 		local strike = (AnimClips :: any)[chosen].strike or 0
-		local windup = math.max(GameConfig.Punch.Windup, 0.01)
-		track:Play(SWING_FADE, 1, if strike > 0 then math.min(strike / windup, 1) else 1)
+		local windup = math.max(
+			if side == "Kick" then GameConfig.HeavyKick.Windup else GameConfig.Punch.Windup,
+			0.01
+		)
+		if held == chosen and track.IsPlaying then
+			-- Let go of a held punch: it carries on from where it waited, ReleaseWindup from the strike.
+			track:AdjustSpeed(1)
+		else
+			track:Play(SWING_FADE, 1, if strike > 0 then math.min(strike / windup, 1) else 1)
+		end
 	end
+end
+
+--- A punch held back: its swing plays up to the clip's hold point (where the arm is drawn back) and
+--- waits there until it's thrown (PlaySwing carries on from there) or let go (CancelSwing).
+function AnimController:HoldSwing(model: Model, side: string)
+	local clip = SWING_CLIPS[side]
+	local fighter = fighters[model]
+	if not clip or not fighter then
+		return
+	end
+	local root = model:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local speed = 0
+	if root then
+		local velocity = root.AssemblyLinearVelocity
+		speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+	end
+	local chosen = if speed >= cfg.RunVariantSpeed and fighter.tracks[`{clip}Run`]
+		then `{clip}Run`
+		else clip
+	local track = fighter.tracks[chosen]
+	if not track or not (AnimClips :: any)[chosen].hold then
+		return
+	end
+	if fighter.swingName and fighter.swingName ~= chosen then
+		local old = fighter.tracks[fighter.swingName]
+		if old and old.IsPlaying then
+			old:Stop(SWING_FADE)
+		end
+	end
+	fighter.heldSwing = chosen
+	fighter.swingName = chosen
+	track:Play(SWING_FADE, 1, 1)
 end
 
 --- A swing the server refused or that got beaten stops here, so it doesn't play through someone.

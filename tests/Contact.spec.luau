@@ -263,7 +263,7 @@ return {
 	end,
 
 	["a clear miss is still a miss"] = function()
-		local at, why = swing(PUNCH, still(0, 0), still(0, -9), "Left")
+		local at, why = swing(PUNCH, still(0, 0), still(0, -12), "Left")
 		assert(at == nil and why == "range", `{why}`)
 	end,
 
@@ -394,7 +394,7 @@ return {
 		assert(hits == 14, `{hits} punches`)
 	end,
 
-	["a running bump adds about a quarter of a punch's stagger"] = function()
+	["a running bump adds a little stagger, well under a punch, the most to whoever was run into"] = function()
 		local out = Combat.bumpOutcome(
 			KNOCK,
 			STAGGER,
@@ -405,9 +405,8 @@ return {
 			0,
 			0
 		)
-		for _, amount in { out.staggerA, out.staggerB } do
-			local share = amount / STAGGER.PerHit
-			assert(share > 0.18 and share < 0.33, `{amount} is {share} of a punch`)
-		end
+		local share = out.staggerB / STAGGER.PerHit
+		assert(share > 0.05 and share < 0.33, `{out.staggerB} is {share} of a punch`)
+		assert(out.staggerA < out.staggerB, "the runner takes less")
 	end,
 }

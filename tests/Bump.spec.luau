@@ -1,7 +1,8 @@
 --!strict
 -- Spec files are required BY the runner, so this path is relative to tests/.
 -- These run on the game's real settings, so a tuning change that breaks the promise of a
--- bump (a shove under half a propel, both ways, with only a small edge to the faster one) fails here.
+-- collision (both bumped, each by the other's speed; small unless it's a dash; a short check, not
+-- a stun) fails here.
 local Combat = require("../src/shared/Core/Combat")
 local GameConfig = require("../src/shared/Config/GameConfig")
 local Momentum = require("../src/shared/Core/Momentum")
@@ -73,51 +74,37 @@ return {
 		assert(PUNCH.HitRecoilSpeed < KNOCK.BaseSpeed, "the recoil must be weaker than the punch")
 	end,
 
-	["no bump ever reaches half a propel, at any speed"] = function()
-		local half = MOVE.PropelSpeed / 2
-		for _, speeds in
-			{ { FULL_SPEED, 0 }, { FULL_SPEED, -FULL_SPEED }, { 84, 0 }, { 84, -84 }, { 500, 0 } }
-		do
-			local out = bump(speeds[1], speeds[2])
-			assert(out.knockA < half, `A took {out.knockA}, half a propel is {half}`)
-			assert(out.knockB < half, `B took {out.knockB}, half a propel is {half}`)
-		end
-	end,
-
 	-- Changed on purpose (2026-11-08): a punch on a fresh fighter is now a short shove so one step puts you
 	-- back in reach, while a bump keeps its old strength. So the hardest bump can out-shove a punch on
 	-- someone with no stagger, but never one on anyone a quarter of the way to full stagger.
-	["a bump is weaker than any punch once a fight is underway"] = function()
-		local out = bump(84, -84)
-		local punch = Combat.punchStrength(KNOCK, STAGGER, 0, STAGGER.Max * 0.25)
-		assert(
-			out.knockA < punch * 0.75 and out.knockB < punch * 0.75,
-			`{out.knockA}, {out.knockB} against {punch}`
-		)
-	end,
-
 	["a finisher at full stagger is as strong as before the retune"] = function()
 		local full = Combat.punchStrength(KNOCK, STAGGER, 0, STAGGER.Max)
 		-- Before: 55 base at 2.5x.
 		assert(math.abs(full - 55 * 2.5) < 2, `full-stagger punch {full}`)
 	end,
 
-	["a soft bump is softer than a hard one, but still a nudge"] = function()
-		local soft = bump(10, 0)
-		local hard = bump(FULL_SPEED, 0)
-		assert(soft.knockB < hard.knockB, "softer")
-		assert(soft.knockB > 5, `still felt, got {soft.knockB}`)
+	["both are bumped, each by how fast the other was going"] = function()
+		local out = bump(FULL_SPEED, 0)
+		assert(out.knockB > out.knockA, "the one run into takes more than the runner")
+		assert(
+			out.knockA == KNOCK.BumpBasePush,
+			"running into someone standing: a small bounce back"
+		)
+		assert(out.knockA > 0 and out.knockB > 0, "both are bumped")
+		local slower = bump(20, 0)
+		assert(slower.knockB < out.knockB, "a slower runner bumps less")
 	end,
 
-	["the faster one makes the other stagger more, but not by much"] = function()
-		local out = bump(FULL_SPEED, 0)
-		assert(out.staggerB > out.staggerA, `{out.staggerB} against {out.staggerA}`)
-		assert(out.staggerB <= STAGGER.PerHit * 0.75, "well under a punch")
-		assert(out.staggerA >= 1, "the faster one still takes some")
+	["an ordinary bump is small, a dash into someone is a real hit"] = function()
+		local run = bump(FULL_SPEED, 0)
+		assert(run.knockB < 40, `a running bump is a modest shove, got {run.knockB}`)
 		assert(
-			out.knockB > out.knockA and out.knockB / out.knockA < 1.5,
-			`{out.knockB / out.knockA}`
+			run.knockB < Combat.punchStrength(KNOCK, STAGGER, 50, 0) * 0.5,
+			"well under a running punch"
 		)
+		local dash = bump(140, 0)
+		assert(dash.knockB == KNOCK.BumpMaxPush, "a full dash is the hardest, capped")
+		assert(dash.keepB <= run.keepB, "and costs at least as much running speed")
 	end,
 
 	["it works whichever of the two is faster"] = function()
@@ -127,25 +114,25 @@ return {
 		assert(out.staggerA > out.staggerB, "and A staggers more")
 	end,
 
-	["level speeds split exactly evenly"] = function()
+	["same speed: the same bump both ways"] = function()
 		local out = bump(FULL_SPEED, -FULL_SPEED)
-		assert(out.knockA == out.knockB, "knock")
-		assert(out.staggerA == out.staggerB, "stagger")
+		assert(out.knockA == out.knockB and out.staggerA == out.staggerB, "even")
 	end,
 
-	["the faster one's edge grows with the speed gap, then stops growing"] = function()
-		local small = bump(FULL_SPEED, FULL_SPEED - 10)
-		local big = bump(FULL_SPEED, 0)
+	["a bump is a short check, not a stun"] = function()
+		local out = bump(FULL_SPEED, 0)
 		assert(
-			small.knockB / small.knockA < big.knockB / big.knockA,
-			"a small lead is a small edge"
+			out.knockB / MOVE.KnockbackDecay <= 0.6,
+			"the knock fades within about half a second"
 		)
-		local huge = bump(500, 0)
-		assert(near(huge.knockB / huge.knockA, big.knockB / big.knockA), "capped at full advantage")
+		assert(out.keepB == KNOCK.BumpSpeedKeep, "it stops your run, then you speed back up")
 	end,
 
-	["stagger doesn't make a bump throw anyone further"] = function()
+	["stagger doesn't make a collision throw anyone further"] = function()
 		local out = bump(FULL_SPEED, -FULL_SPEED)
-		assert(out.knockA == MOVE.PropelSpeed * KNOCK.BumpPropelShare, "no stagger in it")
+		assert(
+			out.knockA == KNOCK.BumpBasePush + FULL_SPEED * KNOCK.BumpPushPerSpeed,
+			"no stagger in it"
+		)
 	end,
 }

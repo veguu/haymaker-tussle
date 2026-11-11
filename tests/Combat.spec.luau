@@ -251,10 +251,47 @@ return {
 		assert(Combat.relieveStagger(cfg, 4) == 0, "should stop at zero")
 	end,
 
-	["swings go left hook, right hook, uppercut, then round again"] = function()
+	["swings go right hook, left hook, and round again: no uppercut in the string"] = function()
 		assert(Combat.nextSwing("Left") == "Right", "left then right")
-		assert(Combat.nextSwing("Right") == "Uppercut", "right then uppercut")
-		assert(Combat.nextSwing("Uppercut") == "Left", "uppercut then left")
+		assert(Combat.nextSwing("Right") == "Left", "right then left")
+		assert(Combat.nextSwing("Uppercut") == "Right", "anything else goes back to the right")
+	end,
+
+	["a held punch throws fast; a tap, or a hold too short, takes the full windup"] = function()
+		local GameConfig = require("../src/shared/Config/GameConfig")
+		local punch: any = GameConfig.Punch
+		assert(Combat.releaseWindup(punch, nil, 10) == punch.Windup, "a tap")
+		assert(
+			Combat.releaseWindup(punch, 9.99, 10) == punch.Windup,
+			"a hold shorter than the draw-back"
+		)
+		assert(
+			Combat.releaseWindup(punch, 9, 10) == punch.ReleaseWindup,
+			"held: only the release is left"
+		)
+		assert(
+			Combat.releaseWindup(punch, 10 - punch.ReadyMaxSeconds - 1, 10) == punch.Windup,
+			"a stale hold"
+		)
+		assert(punch.ReleaseWindup < punch.Windup, "the release is quicker than a full swing")
+	end,
+
+	["a heavy kick launches only from speed; slower, its arc grows with speed"] = function()
+		local GameConfig = require("../src/shared/Config/GameConfig")
+		local kick: any = GameConfig.HeavyKick
+		assert(Combat.kickLaunches(kick, kick.LaunchSpeed), "at the line it launches")
+		assert(not Combat.kickLaunches(kick, kick.LaunchSpeed - 1), "under it, no launch")
+		assert(not Combat.kickLaunches(kick, 0 / 0), "NaN never launches")
+		local slowOut, slowUp = Combat.heavyKickArc(kick, 0, 1)
+		local fastOut, fastUp = Combat.heavyKickArc(kick, 25, 1)
+		assert(fastOut > slowOut and fastUp > slowUp, "faster kicks throw further and higher")
+		assert(slowUp > 0, "even standing, it lifts them")
+		local maxOut = Combat.heavyKickArc(kick, 1000, 1)
+		assert(maxOut == kick.ArcMax, "capped")
+		assert(
+			kick.Windup > GameConfig.Punch.Windup,
+			"the kick is telegraphed: slower than a punch"
+		)
 	end,
 
 	["a pause sends the combo back to the first swing"] = function()
@@ -262,9 +299,9 @@ return {
 			Combat.comboSwing(PUNCH, "Uppercut", 10, 9) == "Uppercut",
 			"a quick punch carries on"
 		)
-		assert(Combat.comboSwing(PUNCH, "Uppercut", 12, 10) == "Left", "two seconds resets it")
+		assert(Combat.comboSwing(PUNCH, "Uppercut", 12, 10) == "Right", "two seconds resets it")
 		assert(
-			Combat.comboSwing(PUNCH, "Right", 10, nil) == "Left",
+			Combat.comboSwing(PUNCH, "Left", 10, nil) == "Right",
 			"the first punch ever is the first swing"
 		)
 	end,

@@ -11,6 +11,7 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local Typography = require(ReplicatedStorage.Shared.Typography)
 local Knit = require(ReplicatedStorage.Packages.Knit)
@@ -21,6 +22,8 @@ local Net = require(ReplicatedStorage.Shared.Net)
 
 local punchCfg = GameConfig.Punch
 local ACTION = "HaymakerPunch"
+local KICK_ACTION = "HaymakerHeavyKick"
+local kickCfg = GameConfig.HeavyKick
 local COMBATANT_TAG = "HT_Combatant"
 local FLASH_SECONDS = 0.12
 
@@ -96,12 +99,17 @@ function CombatController:KnitStart()
 	local clashTap = Net.client("ClashTap")
 	local result = Net.client("PunchResult")
 
-	local nextSide = "Left"
+	local nextSide = "Right"
 	local lastPress = -math.huge
 	local recovery = 0 -- what the last swing owes on top of the cooldown, which only a whiff does
 	local buffered: number? = nil
 	local undoPress: number? = nil
-	local undoSide = "Left"
+	local undoSide = "Right"
+	local holdAt: number? = nil -- when the punch started being held back, on this clock
+	local held = false
+	local heldBy: Enum.UserInputType? = nil
+	local readyRemote = Net.client("PunchReady")
+	local kickRemote = Net.client("HeavyKickRequest")
 	-- The same things the server refuses a punch for, so no swing plays that was never going to count.
 	local function canPunch(character: Model?): boolean
 		if character == nil then
@@ -117,6 +125,13 @@ function CombatController:KnitStart()
 	end
 
 	local function throw(now: number, character: Model)
+		local wasHeld = holdAt ~= nil
+		holdAt = nil
+		-- A punch that skipped the hold (a press remembered through the cooldown) says so first, so the
+		-- server never counts an old hold for it.
+		if not wasHeld and readyRemote then
+			readyRemote:FireServer()
+		end
 		undoPress, undoSide = lastPress, nextSide
 		nextSide = Combat.comboSwing(punchCfg, nextSide, now, lastPress)
 		lastPress = now
@@ -131,57 +146,180 @@ function CombatController:KnitStart()
 		self.PunchEvent:Fire("thrown")
 	end
 
+	-- Holding: the arm draws back and waits there, and the server is told, so a release throws fast.
+	local function startHold(now: number, character: Model)
+		holdAt = now
+		if readyRemote then
+			readyRemote:FireServer()
+		end
+		anim:HoldSwing(character, Combat.comboSwing(punchCfg, nextSide, now, lastPress))
+	end
+
+	-- A hold given up without a punch (stunned, caught, in a clash): the arm comes back.
+	local function dropHold(character: Model?)
+		if holdAt then
+			holdAt = nil
+			if character then
+				anim:CancelSwing(character)
+			end
+		end
+	end
+
+	local function readyAt(): number
+		return lastPress + punchCfg.Cooldown + recovery
+	end
+
 	-- The HUD's view of the punch: when it can swing again, the whole wait that started, and whether
 	-- the body is in a state to swing at all.
 	self._timing = function(): (number, number, boolean)
-		return lastPress + punchCfg.Cooldown + recovery,
-			punchCfg.Cooldown + recovery,
-			canPunch(player.Character)
+		return readyAt(), punchCfg.Cooldown + recovery, canPunch(player.Character)
 	end
 
-	-- A press is one punch, thrown at once. Pressed a moment too early, it's remembered once, and thrown
-	-- as soon as it can be. It's not a queue: a second early press just replaces the first. A press that
-	-- can't punch tells the HUD it was blocked.
-	-- Holding the button does nothing more: each punch takes its own press. A clash takes one tap per press.
-	ContextActionService:BindAction(ACTION, function(_name: string, inputState: Enum.UserInputState)
-		if inputState == Enum.UserInputState.Begin then
+	-- Pressing draws the punch back; letting go throws it. A quick click is an ordinary punch. Held, the
+	-- arm waits drawn back for as long as you like (it adds no power), so you can run in holding it and
+	-- let go just before you reach them: the punch then lands after only Punch.ReleaseWindup. Pressed a
+	-- moment too early, the press is remembered and the hold (or the tap) starts the moment it can. A
+	-- press that can't punch tells the HUD it was blocked. A clash takes one tap per press.
+	ContextActionService:BindAction(
+		ACTION,
+		function(_name: string, inputState: Enum.UserInputState, inputObject: InputObject)
 			local now = os.clock()
 			local character = player.Character
-			if character and character:GetAttribute("HT_Clash") then
-				if clashTap then
-					clashTap:FireServer()
-				end
-			elseif not character or not canPunch(character) then
-				buffered = nil
-				self.PunchEvent:Fire("blocked")
-			else
-				local readyAt = lastPress + punchCfg.Cooldown + recovery
-				if now >= readyAt then
-					throw(now, character)
-				elseif Combat.pressBuffers(punchCfg, now, readyAt) then
-					buffered = now
-				else
+			if inputState == Enum.UserInputState.Begin then
+				if character and character:GetAttribute("HT_Clash") then
+					if clashTap then
+						clashTap:FireServer()
+					end
+				elseif not character or not canPunch(character) then
+					buffered = nil
+					held, heldBy = true, inputObject.UserInputType
 					self.PunchEvent:Fire("blocked")
+				else
+					held, heldBy = true, inputObject.UserInputType
+					if holdAt then
+						return Enum.ContextActionResult.Pass
+					elseif now >= readyAt() then
+						startHold(now, character)
+					elseif Combat.pressBuffers(punchCfg, now, readyAt()) then
+						buffered = now
+					else
+						self.PunchEvent:Fire("blocked")
+					end
+				end
+			elseif
+				inputState == Enum.UserInputState.End
+				or inputState == Enum.UserInputState.Cancel
+			then
+				held, heldBy = false, nil
+				if holdAt and character then
+					if canPunch(character) then
+						throw(now, character)
+					else
+						dropHold(character)
+					end
 				end
 			end
-		end
-		return Enum.ContextActionResult.Pass
-	end, true, Enum.UserInputType.MouseButton1, Enum.KeyCode.ButtonR2)
+			return Enum.ContextActionResult.Pass
+		end,
+		true,
+		Enum.UserInputType.MouseButton1,
+		Enum.KeyCode.ButtonR2
+	)
 	ContextActionService:SetTitle(ACTION, "Punch")
 
+	-- THE HEAVY KICK: right click (or L2). A slow, telegraphed rising kick that roots you through its
+	-- windup. Fast enough at the press, it throws them up for an air kick; slower, an arc that grows with
+	-- your speed. It has its own cooldown and also counts as a swing for the punch's.
+	local lastKick = -math.huge
+	ContextActionService:BindAction(
+		KICK_ACTION,
+		function(_name: string, inputState: Enum.UserInputState)
+			if inputState ~= Enum.UserInputState.Begin then
+				return Enum.ContextActionResult.Pass
+			end
+			local now = os.clock()
+			local character = player.Character
+			if
+				not character
+				or not canPunch(character)
+				or now < readyAt()
+				or now - lastKick < kickCfg.Cooldown
+				or not kickRemote
+			then
+				self.PunchEvent:Fire("blocked")
+				return Enum.ContextActionResult.Pass
+			end
+			dropHold(character)
+			buffered = nil
+			lastKick = now
+			undoPress, undoSide = lastPress, nextSide
+			lastPress = now
+			recovery = 0
+			anim:PlaySwing(character, "Kick")
+			movement:HeavyKickStarted(kickCfg.Windup + kickCfg.RootAfter)
+			kickRemote:FireServer()
+			self.PunchEvent:Fire("thrown")
+			return Enum.ContextActionResult.Pass
+		end,
+		true,
+		Enum.UserInputType.MouseButton2,
+		Enum.KeyCode.ButtonL2
+	)
+	ContextActionService:SetTitle(KICK_ACTION, "Kick")
+
+	-- Anything that could swallow the release lets go: the window losing focus, and a new body.
+	UserInputService.WindowFocusReleased:Connect(function()
+		held, heldBy = false, nil
+		dropHold(player.Character)
+	end)
 	player.CharacterAdded:Connect(function()
 		buffered = nil
+		holdAt = nil
+		held, heldBy = false, nil
 	end)
+
+	local function stillHeld(): boolean
+		if not held then
+			return false
+		end
+		if heldBy == Enum.UserInputType.MouseButton1 then
+			return UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+		elseif heldBy and string.find(heldBy.Name, "Gamepad") then
+			return UserInputService:IsGamepadButtonDown(heldBy, Enum.KeyCode.ButtonR2)
+		end
+		return true -- touch has no polled state; End and Cancel cover it
+	end
 
 	RunService.Heartbeat:Connect(function()
 		local now = os.clock()
 		local character = player.Character
+		if holdAt then
+			if not character or not canPunch(character) then
+				dropHold(character)
+			elseif not stillHeld() then
+				held, heldBy = false, nil
+				throw(now, character)
+			end
+			return
+		end
 		if buffered then
 			if not Combat.bufferLive(punchCfg, now, buffered) or not canPunch(character) then
 				buffered = nil
-			elseif character and now >= lastPress + punchCfg.Cooldown + recovery then
-				throw(now, character)
+			elseif character and now >= readyAt() then
+				buffered = nil
+				if stillHeld() then
+					startHold(now, character)
+				else
+					throw(now, character)
+				end
 			end
+			return
+		end
+		-- Held from before a punch was possible (stunned, cooling down): the hold starts the moment it is.
+		if held and stillHeld() and character and canPunch(character) and now >= readyAt() then
+			startHold(now, character)
+		elseif held and not stillHeld() then
+			held, heldBy = false, nil
 		end
 	end)
 
@@ -194,6 +332,7 @@ function CombatController:KnitStart()
 				if kind == "miss" then
 					recovery = punchCfg.MissRecovery
 				elseif kind == "refused" then
+					dropHold(player.Character)
 					-- It never happened, so the timing and the combo go back to before it.
 					lastPress = undoPress or lastPress
 					nextSide = undoSide
@@ -245,12 +384,25 @@ function CombatController:KnitStart()
 	end)
 
 	if bumped then
-		-- A shove, not a hit: the puff and a small reaction sized to it, with no burst or flash.
+		-- A shove, not a hit: the puff, and a small reaction on whoever was knocked, sized to it. The faster
+		-- one carries on untouched, with no pose freeze.
 		bumped.OnClientEvent:Connect(function(a: Model, b: Model, knockA: number, knockB: number)
 			if a and b and a.Parent and b.Parent then
-				fx:BumpPuff(a, b)
-				anim:HitLanded(b, a, knockA)
-				anim:HitLanded(a, b, knockB)
+				-- Our own bump already showed the moment it happened, on this client.
+				local me = player.Character
+				if
+					(a == me and movement:RecentlyBumped(b))
+					or (b == me and movement:RecentlyBumped(a))
+				then
+					return
+				end
+				fx:BumpPuff(a, b, math.max(knockA, knockB))
+				if knockA > 0 then
+					anim:HitLanded(nil, a, knockA)
+				end
+				if knockB > 0 then
+					anim:HitLanded(nil, b, knockB)
+				end
 			end
 		end)
 	end

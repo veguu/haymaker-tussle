@@ -343,3 +343,29 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   push-off stays 1). ImpactFx.groundBlast adds a fireball and a smoke cloud.
 - Gates green, 378 tests. Not checked in Play: the speed knockback by hand, the aimed kick from a real player's
   client, the lock-on assist.
+### move-11 to move-13 (2026-11-10, spicy; committed after the user tried it)
+- PUNCH (contact-2 code, at the user's request): hooks instead of jabs. AnimClips HookLeft/HookRight(+Run)
+  rebuilt by the new `animations/build_strikes.luau` (Lune; no Python here): a wide level arc that strikes at
+  0.16 = Punch.Windup, with a `hold` point at 0.09. WARNING: build_clips.py still has the old hooks and no
+  HeavyKick, and rewrites all of AnimClips: run build_strikes straight after it. AnimClips is 183k chars
+  (limit 185k). String is right hook, left hook, repeat (no uppercut; Combat.nextSwing/comboSwing).
+  HOLD: press draws the punch back and waits (no power); release throws. New remote PunchReady (no args);
+  the server takes a hold it saw start >= Windup - ReleaseWindup ago (0.09 s) and the swing lands after
+  Punch.ReleaseWindup 0.07 (Combat.releaseWindup); others see HT_PunchReady. Punch.Range 4.5 -> 7.
+- HEAVY KICK (right click / L2): new remote HeavyKickRequest (no args), side "Kick" through the punch
+  machinery with its own hitbox (HeavyKick.Range 6, Degrees 35), Windup 0.3 (rooted, HT_KickWindup), Cooldown
+  5. Server measures speed at the press: >= LaunchSpeed 30 launches (MarkLaunched, air kick possible),
+  slower is an upward arc ArcBase + ArcPerStud*speed (Combat.heavyKickArc). New AnimClips.HeavyKick.
+  Bots never use it, so bots no longer launch anyone.
+- AIR KICK: Kick.Cooldown 15 -> 5. Space still jumps; the timed press once attached is now left click / R2
+  (MovementController KICK_CLICK_ACTION sinks the click only while a kick is under way; touch unchanged).
+- PUNCH KNOCKBACK: Knockback.SpeedBonusPerStud 2.4, SpeedBonusMax 120: 23 standing, 143 at 50.
+- MOVEMENT: Movement.MaxSpeed 36 -> 50 (to try out).
+- BUMPS: both are bumped, each by the OTHER's speed: BumpBasePush 12 + 0.45/stud; a dasher (>= 70) hits
+  for 0.8/stud up to 110. BumpSpeedKeep 0 (thrown back, run stops, knock fades in ~0.5 s). Separate dash hit
+  removed (DashHit settings/module unused, kept). TIMING: in a round, each client detects its own contact
+  (src/shared/BumpPredict + MovementController checkBumps, the server's own stepBumpPair rule) and knocks
+  itself at once; the server still adds stagger/credit, knocks bots, and skips players it predicted. Bump
+  FX/sound made audible (the old "bump" sound peaks at 6) and sized by the knock.
+- Checked in Play: hold release 0.07, kick request/root, bump fires at contact distance (2.9). NOT checked:
+  the new animations by eye, two players bumping, the backward throw on a real run.

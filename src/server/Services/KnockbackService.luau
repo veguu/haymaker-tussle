@@ -16,8 +16,8 @@ local RunService = game:GetService("RunService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
+local BumpPredict = require(ReplicatedStorage.Shared.BumpPredict)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
-local DashHit = require(ReplicatedStorage.Shared.Core.DashHit)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Combatants = require(script.Parent.Parent.Combatants)
 
@@ -46,16 +46,13 @@ type Deferred = {
 	bz: number,
 }
 local deferred: { [Model]: { [Model]: Deferred } } = {}
--- When each dasher last hit each target, so one dash hits someone once, and no bump follows it.
-local dashHits: { [Model]: { [Model]: number } } = setmetatable({}, { __mode = "k" }) :: any
-local DASH_HIT_ONCE_SECONDS = 1.5
 -- A dash goes from a creep to full speed in a tenth of a second. The audit's usual velocity is an
--- average over about 0.2 s, so for the first third of a dash it still reads as too slow to hit. A dash
--- hit measures over this much shorter stretch instead, still from positions the server saw itself.
+-- average over about 0.2 s, so for the first third of a dash it would still read as slow. Collisions
+-- also measure over this much shorter stretch, still from positions the server saw itself.
 local DASH_SPEED_WINDOW = 0.08
 
--- How fast this dasher is really going right now: the faster of the short measure and the usual one.
-local function dashVelocity(audit: any, dasher: Model, root: BasePart): (number, number)
+-- How fast this body is really going right now: the faster of the short measure and the usual one.
+local function velocityOf(audit: any, dasher: Model, root: BasePart): (number, number)
 	local vx, vz = audit:GetVelocity(dasher)
 	local past = audit:PositionAt(dasher, DASH_SPEED_WINDOW)
 	if past then
@@ -127,56 +124,9 @@ local function eligible(combat: any, a: Model, b: Model): boolean
 		and not b:GetAttribute(Combatants.STATIONARY_ATTRIBUTE)
 end
 
--- One of the two ran into the other during a dash charged to `power`: if that was high enough, it's a
--- hit on the other, thrown the way the dasher was going and harder the faster it was (Core/DashHit).
--- Returns false if it wasn't charged enough or was too slow, which leaves it an ordinary bump.
-local function applyDashHit(
-	self: any,
-	dasher: Model,
-	victim: Model,
-	vx: number,
-	vz: number,
-	power: number
-): boolean
-	local now = os.clock()
-	local already = dashHits[dasher] and dashHits[dasher][victim]
-	if already and now - already < DASH_HIT_ONCE_SECONDS then
-		return true -- this dash has hit them already: nothing more, and no bump on top
-	end
-	local speed = math.sqrt(vx * vx + vz * vz)
-	local hit = DashHit.outcome(cfg, speed, power)
-	if not hit then
-		return false
-	end
-	dashHits[dasher] = dashHits[dasher] or setmetatable({}, { __mode = "k" }) :: any
-	dashHits[dasher][victim] = now
-	Knit.GetService("RoundService"):NoteHit(victim, dasher)
-	Knit.GetService("StaggerService"):AddAmount(victim, hit.stagger)
-	Knit.GetService("CombatService"):MarkHit(victim)
-	self:Launch(victim, vx / speed * hit.push, vz / speed * hit.push, hit.lift, 0)
-	self._dashHit:FireAllClients(dasher, victim, math.floor(hit.push))
-	if workspace:GetAttribute("HaymakerCombatDebug") then
-		print(
-			`[Combat] dash hit {dasher.Name} into {victim.Name} at {math.floor(speed)}, push {math.floor(
-				hit.push
-			)}, stagger {hit.stagger}`
-		)
-	end
-	return true
-end
-
--- Both take the shove, along the line A was travelling relative to B.
+-- Both are knocked along the line A was travelling relative to B (A back, B forward), each by the other's
+-- speed (Combat.bumpOutcome). A dash into someone is just this at dash speed.
 local function applyBump(self: any, a: Model, b: Model, bump: Deferred)
-	local propel = Knit.GetService("PropelService")
-	local aPower, bPower = propel:DashPower(a), propel:DashPower(b)
-	if (aPower == nil) ~= (bPower == nil) then
-		local landed = if aPower
-			then applyDashHit(self, a, b, bump.ax, bump.az, aPower)
-			else applyDashHit(self, b, a, bump.bx, bump.bz, bPower :: number)
-		if landed then
-			return
-		end
-	end
 	local outcome = Combat.bumpOutcome(
 		cfg,
 		staggerCfg,
@@ -189,26 +139,37 @@ local function applyBump(self: any, a: Model, b: Model, bump: Deferred)
 	)
 	local stagger = Knit.GetService("StaggerService")
 	local round = Knit.GetService("RoundService")
-	round:NoteHit(a, b)
-	round:NoteHit(b, a)
-	stagger:AddAmount(a, outcome.staggerA)
-	stagger:AddAmount(b, outcome.staggerB)
-	self:Launch(
-		a,
-		-bump.lineX * outcome.knockA,
-		-bump.lineZ * outcome.knockA,
-		0,
-		0,
-		cfg.BumpSpeedKeep
-	)
-	self:Launch(
-		b,
-		bump.lineX * outcome.knockB,
-		bump.lineZ * outcome.knockB,
-		0,
-		0,
-		cfg.BumpSpeedKeep
-	)
+	-- A player's own client already knocked them the instant they touched (BumpPredict): this would be a
+	-- second, late knock. Bots, and bumps outside a round, are knocked from here.
+	local predicted = BumpPredict.predicted(a, b)
+	if outcome.knockA > 0 then
+		round:NoteHit(a, b)
+		stagger:AddAmount(a, outcome.staggerA)
+	end
+	if outcome.knockA > 0 and not (predicted and Combatants.playerOf(a)) then
+		self:Launch(
+			a,
+			-bump.lineX * outcome.knockA,
+			-bump.lineZ * outcome.knockA,
+			0,
+			0,
+			outcome.keepA
+		)
+	end
+	if outcome.knockB > 0 then
+		round:NoteHit(b, a)
+		stagger:AddAmount(b, outcome.staggerB)
+	end
+	if outcome.knockB > 0 and not (predicted and Combatants.playerOf(b)) then
+		self:Launch(
+			b,
+			bump.lineX * outcome.knockB,
+			bump.lineZ * outcome.knockB,
+			0,
+			0,
+			outcome.keepB
+		)
+	end
 	self._bumpHappened:FireAllClients(a, b, math.floor(outcome.knockA), math.floor(outcome.knockB))
 	if workspace:GetAttribute("HaymakerCombatDebug") then
 		print(
@@ -248,39 +209,6 @@ local function settleBump(
 	return true
 end
 
--- Dash hits are looked for every frame and land at once, ahead of the bump check: a bump waits a moment
--- to see whether a punch lands on the same impact, and only notices contact once the two overlap, by
--- which time a dasher is already through. This looks along the dasher's path instead (DashHit.reaches).
-function KnockbackService:_checkDashHits()
-	local propel = Knit.GetService("PropelService")
-	local list = Combatants.all()
-	local audit, combat
-	for _, dasher in list do
-		local power = propel:DashPower(dasher)
-		local root = power and power >= cfg.DashHitMinCharge and Combatants.rootOf(dasher)
-		if not power or not root then
-			continue
-		end
-		audit = audit or Knit.GetService("SpeedAuditService")
-		combat = combat or Knit.GetService("CombatService")
-		local vx, vz = dashVelocity(audit, dasher, root)
-		for _, victim in list do
-			local other = victim ~= dasher and Combatants.rootOf(victim)
-			if not other or propel:DashPower(victim) ~= nil then
-				continue
-			end
-			local offset = other.Position - root.Position
-			if
-				math.abs(offset.Y) <= cfg.BumpVerticalLimit
-				and DashHit.reaches(cfg, offset.X, offset.Z, vx, vz)
-				and eligible(combat, dasher, victim)
-			then
-				applyDashHit(self, dasher, victim, vx, vz, power)
-			end
-		end
-	end
-end
-
 function KnockbackService:_checkBumps()
 	local audit = Knit.GetService("SpeedAuditService")
 	local combat = Knit.GetService("CombatService")
@@ -304,8 +232,8 @@ function KnockbackService:_checkBumps()
 				continue
 			end
 			local offset = rootB.Position - rootA.Position
-			local ax, az = audit:GetVelocity(a)
-			local bx, bz = audit:GetVelocity(b)
+			local ax, az = velocityOf(audit, a, rootA)
+			local bx, bz = velocityOf(audit, b, rootB)
 			local state = pairState(a, b)
 			local nextState, closing =
 				Combat.stepBumpPair(cfg, state, offset.X, offset.Z, ax - bx, az - bz, now)
@@ -373,7 +301,6 @@ end
 function KnockbackService:KnitInit()
 	self._remote = Net.server("Knockback")
 	self._bumpHappened = Net.server("BumpHappened")
-	self._dashHit = Net.server("DashHit")
 	PhysicsService:RegisterCollisionGroup(COLLISION_GROUP)
 	PhysicsService:CollisionGroupSetCollidable(COLLISION_GROUP, COLLISION_GROUP, false)
 end
@@ -395,7 +322,6 @@ function KnockbackService:KnitStart()
 
 	local elapsed = 0
 	RunService.Heartbeat:Connect(function(dt)
-		self:_checkDashHits()
 		elapsed += dt
 		if elapsed >= BUMP_CHECK_SECONDS then
 			elapsed = 0

@@ -22,7 +22,7 @@ Every adjustable value in the game. All numbers are **starting guesses to tune b
 | Setting | Start | What it does |
 |---|---|---|
 | `Acceleration` | 42 | Studs/s gained per second while holding a direction. Higher = quicker to top speed. |
-| `MaxSpeed` | 36 | Top running speed in studs/s (default Roblox walk is 16). |
+| `MaxSpeed` | 50 | Top running speed in studs/s (default Roblox walk is 16). Raised from 36 to try out (move-11). |
 | `CoastHoldSeconds` | 0.4 | Seconds speed stays unchanged after releasing W, before it starts to fall. |
 | `CoastFallSeconds` | 2 | Seconds from the end of the hold to a full stop. |
 | `CoastFallCurve` | 1.5 | Shape of the fall. 1 is a steady drop; higher starts gentler and ends sharper. |
@@ -71,10 +71,10 @@ Every adjustable value in the game. All numbers are **starting guesses to tune b
 | `ActiveSeconds` | 0.05 | How long a swing stays live after the strike. The server checks it every frame in that time, so someone crossing fast can't slip between checks. Each target is only ever hit once per swing. |
 | `MissRecovery` | 0.1 | Extra seconds before the next punch after one that hit nobody. It's what makes baiting a whiff worth it. |
 | `BufferSeconds` | 0.1 | A press this close before the swing is ready is remembered and thrown when it is. Only one is held, and it's dropped if it gets older than this or you can't punch. |
-| `Range` | 4.5 | Radius of a swing's reach, from the attacker's root. A target connects when its hurtbox touches it, so the most centre to centre is `Range` + `TargetRadius`, 6.5. Lowered from 5 when `TargetRadius` went back to 2, so reach stayed 6.5. |
+| `Range` | 7 | Radius of a swing's reach, from the attacker's root. A target connects when its hurtbox touches it, so the most centre to centre is `Range` + `TargetRadius`, 9. Raised from 4.5 (move-11) so a punch lands before the two bodies collide (a collision starts at `BumpDistance`, 3.5). |
 | `HookOuterDegrees` | 55 | How far to its own side a hook reaches: left for a left hook, right for a right hook. |
 | `HookInnerDegrees` | 20 | How far past straight ahead a hook carries, across the body. |
-| `UppercutDegrees` | 20 | The uppercut's arc, either way. It's the narrow swing. |
+| `UppercutDegrees` | 20 | The uppercut's arc, either way. The uppercut is no longer in the punch string (move-11); only the test bot setup still names it. |
 | `CloseRange` | 2.2 | Radius of the close sector, for someone at your side. With `TargetRadius` it reaches 4.2 studs centre to centre, a little past two characters exactly shoulder to shoulder at 4. Lowered from 2.7 with `TargetRadius` 2, so it's unchanged. |
 | `CloseDegrees` | 100 | How far round from straight ahead the close sector goes, either way. Under 180 means someone behind you has to be inside `OverlapRadius`. |
 | `OverlapRadius` | 2.5 | Anyone within this many studs, centre to centre, can be hit from any direction, so running through someone still connects. |
@@ -91,6 +91,27 @@ Every adjustable value in the game. All numbers are **starting guesses to tune b
 | `GraceSeconds` | 0.05 | **Punch forgiveness.** How far before the active frames a swing still looks for contact, so bodies that crossed just before it went live count as a hit (resolved at the normal impact time). Never reaches back before the press was accepted. 0 turns it off. The test "the grace ends where it says" shows the boundary. |
 | `SweepStep` | 0.008 | Seconds between the moments a swing checks, back to the last check, using where the server saw both bodies. Catches contact that happens entirely between two server frames. Smaller is finer and costs more. |
 | `PointBlankRadius` | 0.75 | Closer than this, centre to centre, a landed punch throws the target the way the attacker faces instead of along their (noisy) offset, so exact overlap gets a steady shove. |
+| `ReleaseWindup` | 0.07 | Holding punch draws it back and keeps it there (no power). Let go after holding at least `Windup` - `ReleaseWindup` (0.09 s, by the server's clock) and the punch lands after only this much. The hook clip waits at its hold point (0.09) and strikes this long after the release. |
+| `ReadyMaxSeconds` | 5 | A hold the server saw start longer ago than this no longer counts: the release takes the full `Windup`. |
+
+## HeavyKick
+
+Right click (L2). A slow, telegraphed rising kick on its own cooldown. Through its windup the kicker is rooted to the spot.
+
+| Setting | Value | What it does |
+|---|---|---|
+| `Windup` | 0.3 | Seconds from the press to the kick landing: the telegraph. The HeavyKick clip strikes at this time. |
+| `RootAfter` | 0.15 | The kicker stays rooted this long after the strike too. |
+| `Cooldown` | 5 | Seconds between heavy kicks, the same as the air kick's. A kick also starts the punch cooldown. |
+| `Range` | 6 | The kick's reach, the same way a punch's `Range` works (plus `Punch.TargetRadius`). |
+| `Degrees` | 35 | The kick's arc either side of straight ahead. |
+| `LaunchSpeed` | 30 | Going at least this fast (studs/s, measured by the server at the press) launches the target into the air for an Air Kick, as the uppercut used to. Slower, it's an arc instead. |
+| `LaunchLift` | 125 | Upward speed of a launch. |
+| `LaunchPush` | 20 | Outward speed of a launch. |
+| `ArcBase` | 25 | A slower kick's outward speed when standing still... |
+| `ArcPerStud` | 1.3 | ...plus this per stud/s the kicker was going... |
+| `ArcMax` | 90 | ...up to this. Stagger multiplies it like any hit. |
+| `ArcLiftShare` | 0.55 | A slower kick's upward speed, as a share of its outward speed: an upward arc. |
 | `RequestsPerSecondLimit` | 8 | Server rate limit on punch requests; extras are dropped. |
 
 ## Clash
@@ -131,29 +152,22 @@ Two opponents whose punches land at effectively the same moment, and would each 
 | Setting | Start | What it does |
 |---|---|---|
 | `BaseSpeed` | 23 | Launch speed in studs/s of a punch from a standing attacker on a target with no stagger: about 4.6 studs of slide (measured), so one step puts you back in reach. Was 55 (26 studs of slide) until build contact-1. |
-| `SpeedBonusPerStud` | 0.7 | Extra launch speed per stud/s of the attacker's server-measured speed, so a punch thrown on the move throws much harder: running (about 36) adds about 25, more than doubling a standing punch. Was 0.38. |
-| `SpeedBonusMax` | 40 | The most that speed can add, so a punch thrown out of a dash (well over 100 studs/s) adds 40, not 70 or more. |
+| `SpeedBonusPerStud` | 2.4 | Extra launch speed per stud/s of the attacker's server-measured speed, so speed is most of a punch's power: standing 23, half speed (25) 83, full speed (50) 143, about six times a standing punch. Was 0.7, and 0.38 before that. |
+| `SpeedBonusMax` | 120 | The most speed can add: reached at 50 studs/s, so a punch out of a dash hits no harder than one at full running speed. Stagger multiplies the total, and `Movement.KnockbackMaxSpeed` (250) caps it. |
 | `UpwardFraction` | 0.18 | Share of launch speed added upward on a grounded target. |
 | `UpwardMax` | 16 | Hard cap on upward launch speed. |
 | `AirborneUpwardFraction` | 0 | Share added upward if the target is already airborne; 0 stops punches juggling anyone into the sky. |
 | `UppercutLift` | 125 | Studs/s upward from an uppercut, on top of its normal punch push. With `Kick.AirGravityScale` that's about 57 studs high (measured +56 to +57), and about 1.7 s in the air with the falling rule in `AirRecovery`: 0.9 s up, 0.8 s down. |
-| `BumpPropelShare` | 0.4 | A bump's shove at its hardest, as a share of `Movement.PropelSpeed`: 34 studs/s, about 10 studs of slide. Stagger doesn't add to it. A test checks that it stays under half a propel, even with the faster player's edge. |
-| `DashHitMinCharge` | 0.6 | Running into someone while dashing is a hit, not a bump, only if the dash was charged at least this much (0 is a tap, 1 a full second). Below it, it is the ordinary bump. |
-| `DashHitMinSpeed` | 90 | The server must also have measured the dasher at least this fast. Keep it above `Movement.PropelSpeed` (a tap dash), so claiming a charge that was not held gets nothing; a test checks it. |
-| `DashHitPushShare` | 0.9 | The push a dash hit gives, as a share of the dasher's measured speed: about 106 at the lowest charge that hits, 126 at full. They are thrown the way the dasher was going, and slide further than the dasher's whole dash; a test checks that. |
-| `DashHitMaxPush` | 130 | A dash hit never pushes harder than this. |
-| `DashHitFullSpeed` | 140 | Speed counted as a full dash. Anything measured above it counts as this. |
-| `DashHitLift` | 16 | Upward speed a dash hit gives someone standing on the floor. |
-| `DashHitStagger` | 12 | Stagger a dash hit at `DashHitFullSpeed` adds. Slower hits add a share of it. |
-| `DashHitReach` | 6 | A dash hit lands on anyone this many studs ahead along the dasher's path, plus `DashHitLeadSeconds` of travel. A bump only notices at `BumpDistance` (3.5), by which time a dasher is already through them. |
-| `DashHitLeadSeconds` | 0.12 | Extra reach, as seconds of the dasher's speed (about 17 studs at a full 140). It makes up for the server seeing bodies late and the push taking a moment to arrive. Raise it if hits still feel late, lower it if they land before contact. |
-| `DashHitWidth` | 4.5 | How far to either side of the dasher's path still counts. |
-| `BumpFullClosing` | 36 | Collision speed for a full shove. Softer collisions shove less. |
-| `BumpSoftShare` | 0.4 | The softest a bump can be, as a share of the full shove. |
-| `BumpSpeedKeep` | 0.6 | Share of running speed both keep through a bump. |
-| `BumpStaggerShare` | 0.25 | A bump's stagger as a share of a punch's: 1.8, or 2.1 and 1.5 with the full edge below (rounded to a tenth). If a punch lands on the same impact, only the punch counts. |
-| `BumpFullAdvantage` | 30 | How much faster one player must be moving, in studs/s, to get the whole edge below. Less gets part of it, and level speeds get none. |
-| `BumpEdgeShare` | 0.15 | The faster player's whole edge: they shove 15% harder and add 15% more stagger, and take 15% less of both. |
+| `BumpBasePush` | 12 | Both players are bumped when they run into each other, each by how fast the OTHER was going. This is the knock from someone standing still... | In a round each player's own client applies its own bump the instant it touches someone (src/shared/BumpPredict.luau), so it lands exactly on contact. |
+| `BumpPushPerSpeed` | 0.45 | ...plus this per stud/s of the other's speed: about 28 from someone running at 36, 35 at 50. |
+| `BumpDashSpeed` | 70 | The other going at least this fast (a dash) is a real hit instead... |
+| `BumpDashPerSpeed` | 0.8 | ...of this per stud/s of their speed (about 67 at a tap dash, 110 at a full one)... |
+| `BumpMaxPush` | 110 | ...up to this. |
+| `BumpDashSpeedKeep` | 0 | Share of running speed kept after being hit by a dasher. |
+| `BumpStaggerFullPush` | 40 | A knock this size adds `BumpStaggerShare` of a punch's stagger; smaller adds less, bigger more (up to three times). |
+| `DashHit*` | - | Unused since move-11: a dash into someone is now an ordinary collision. The settings and Core/DashHit stay (with their tests) until someone removes them. |
+| `BumpSpeedKeep` | 0 | Share of running speed kept through an ordinary bump: none, so both are really thrown back, then speed back up as the knock fades (about half a second). |
+| `BumpStaggerShare` | 0.25 | A bump's stagger, at a `BumpStaggerFullPush` knock, as a share of a punch's. If a punch lands on the same impact, only the punch counts. |
 | `BumpMinClosingSpeed` | 10 | Two players must close at this speed or more to bump. Softer collisions than this do nothing at all. |
 | `BumpDistance` | 3.5 | Two characters this close can bump. |
 | `BumpVerticalLimit` | 4 | Largest height difference that can still bump. |
@@ -432,7 +446,7 @@ The air kick. An uppercut launches someone, who can steer and propel in the air.
 
 | Setting | Value | What it does |
 |---|---|---|
-| `Cooldown` | 15 | Seconds between jumps, hit or miss. Your first jump is ready, and it's the only limit: uppercuts don't earn jumps. |
+| `Cooldown` | 5 | Seconds between jumps, hit or miss (was 15). Your first jump is ready, and it's the only limit: launches don't earn jumps. |
 | `AirGravityScale` | 0.7 | Share of normal gravity on someone launched by an uppercut while they rise, and on the jump after them. From the top of the arc they fall on `AirRecovery`. Lower hangs longer and feels floatier. |
 | `JumpSquatSeconds` | 0.067 | Seconds down in the squat before leaving the floor. Must match `JUMP_SQUAT` in `build_clips.py`. |
 | `ApproachSpeed` | 260 | Speed the snap's length is worked out from: distance / this, in seconds, kept between the two limits below. |

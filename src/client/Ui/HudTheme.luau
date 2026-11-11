@@ -143,7 +143,11 @@ HudTheme.Guide = {
 	mouse = {
 		{
 			key = "Click",
-			action = "Punch. Hold to keep punching. Three in a row end on an uppercut.",
+			action = "Punch: left and right hooks. Hold to draw it back, let go to throw it fast.",
+		},
+		{
+			key = "Right click",
+			action = "Heavy kick: roots you, then kicks them up. At 30+ speed, up for an Air Kick.",
 		},
 		{
 			key = "Q",
@@ -151,23 +155,33 @@ HudTheme.Guide = {
 		},
 		{
 			key = "Space",
-			action = "Air Kick at someone launched. Press as the ring meets the key.",
+			action = "Air Kick: jump at someone launched, then click as the ring meets the key.",
 		},
 		{ key = "Ctrl", action = "Shift lock. The camera aims your kick." },
 		{ key = lockKey, action = "Lock on to the nearest opponent." },
 		{ key = "H", action = "Show or hide this guide." },
 	},
 	gamepad = {
-		{ key = "R2", action = "Punch. Hold to keep punching. Three in a row end on an uppercut." },
+		{
+			key = "R2",
+			action = "Punch: left and right hooks. Hold to draw it back, let go to throw.",
+		},
+		{
+			key = "L2",
+			action = "Heavy kick: roots you, then kicks them up. At 30+ speed, up for an Air Kick.",
+		},
 		{ key = "B", action = "Dash: a short burst the way you're going. Hard to steer." },
-		{ key = "Y", action = "Air Kick at someone launched. Press as the ring meets the key." },
+		{
+			key = "Y",
+			action = "Air Kick: jump at someone launched, then R2 as the ring meets the key.",
+		},
 		{ key = "L1", action = "Lock on to the nearest opponent." },
 		{ key = "Select", action = "Show or hide this guide." },
 	},
 	touch = {
 		{
 			key = "Punch",
-			action = "Punch. Hold to keep punching. Three in a row end on an uppercut.",
+			action = "Punch: left and right hooks. Hold to draw it back, let go to throw it fast.",
 		},
 		{ key = "Propel", action = "Dash: a short burst the way you're going. 3 s to recharge." },
 		{ key = "Kick", action = "Air Kick at someone launched. Tap as the ring meets the key." },

@@ -12,6 +12,18 @@
 -- each player's swing lands, never by which server callback came first. Two that strike
 -- at effectively the same moment and reach each other go to ClashService instead of one
 -- cancelling the other. See Core/Clash.
+--
+-- HOLDING. Holding the button draws the punch back and keeps it there; letting go throws it. The client
+-- says "I'm holding" (PunchReady, no arguments) and later "I pressed punch" (PunchRequest). A hold the
+-- server itself has seen last at least Windup - ReleaseWindup on its own clock throws with only the
+-- short ReleaseWindup left, since the arm is already back. It adds no power. While held, the body carries
+-- HT_PunchReady (the swing it will be), for others to see it coming.
+--
+-- THE HEAVY KICK (right click, HeavyKickRequest, no arguments): a slow, telegraphed rising kick on its
+-- own cooldown, through the same swing machinery with side "Kick". The kicker is rooted through the
+-- windup (the client keeps itself still; HT_KickWindup marks it). At the press, the server measures how
+-- fast they were going: at LaunchSpeed or more it throws the target into the air for an air kick, the
+-- same launch the uppercut used to give; slower, it's an upward arc whose strength grows with speed.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -29,6 +41,13 @@ local punchCfg = GameConfig.Punch
 local knockCfg = GameConfig.Knockback
 local staggerCfg = GameConfig.Stagger
 local clashCfg = GameConfig.Clash
+local kickCfg = GameConfig.HeavyKick
+local READY_ATTRIBUTE = "HT_PunchReady"
+local KICK_WINDUP_ATTRIBUTE = "HT_KickWindup"
+-- The heavy kick's hitbox: the punch's shape, with the kick's reach and a narrow straight-ahead arc.
+local kickHitbox = table.clone(punchCfg) :: any
+kickHitbox.Range = kickCfg.Range
+kickHitbox.UppercutDegrees = kickCfg.Degrees
 -- The drawing is sent whenever it could be wanted, and each client decides whether to show it.
 local SHOW_DEBUG = GameConfig.Debug.ShowHitbox or GameConfig.Training.Enabled
 
@@ -38,6 +57,8 @@ type PunchRecord = {
 	recovery: number,
 	nextSide: string,
 	refused: number,
+	readyAt: number?, -- when the server saw this player start holding a punch
+	lastKick: number?,
 }
 
 -- Someone a swing has reached, waiting on whether it's a hit or a clash.
@@ -73,6 +94,8 @@ type Punch = {
 	repelled: boolean,
 	flat: Vector3?,
 	origin: Vector3?,
+	cfg: any, -- the hitbox settings for this swing: Punch, or a kick's
+	pressSpeed: number, -- how fast the attacker was going when they pressed
 }
 
 local CombatService = Knit.CreateService({
@@ -108,7 +131,7 @@ local function recordFor(player: Player): PunchRecord
 			bucket = { tokens = punchCfg.RequestsPerSecondLimit, at = os.clock() },
 			lastPunch = nil,
 			recovery = 0,
-			nextSide = "Left",
+			nextSide = "Right",
 			refused = 0,
 		}
 		records[player] = record
@@ -195,7 +218,9 @@ local function landHit(self: any, punch: Punch, target: Model, at: Vector3, from
 	local stagger = Knit.GetService("StaggerService")
 	local knockback = Knit.GetService("KnockbackService")
 	local flat = punch.flat :: Vector3
-	local attackerSpeed = audit:GetTrustedSpeed(punch.attacker)
+	local attackerSpeed = if punch.side == "Kick"
+		then punch.pressSpeed
+		else audit:GetTrustedSpeed(punch.attacker)
 	local before = stagger:Get(target)
 	local strength = Combat.punchStrength(knockCfg, staggerCfg, attackerSpeed, before)
 	stagger:AddHit(target)
@@ -209,7 +234,20 @@ local function landHit(self: any, punch: Punch, target: Model, at: Vector3, from
 	punch.awayZ += away.Z
 	local up, airUp = Combat.swingLift(knockCfg, punch.side, strength)
 	local kicks = Knit.GetService("KickService")
-	if punch.side == "Uppercut" and kicks:CanLaunch(target) then
+	if punch.side == "Kick" then
+		-- Fast enough: up into the air for an air kick. Otherwise an arc that grows with speed.
+		local launches = Combat.kickLaunches(kickCfg, attackerSpeed) and kicks:CanLaunch(target)
+		strength, up = Combat.heavyKickArc(
+			kickCfg,
+			attackerSpeed,
+			Combat.staggerMultiplier(staggerCfg, before)
+		)
+		if launches then
+			kicks:MarkLaunched(target, punch.attacker)
+			strength, up = kickCfg.LaunchPush, kickCfg.LaunchLift
+		end
+		airUp = up
+	elseif punch.side == "Uppercut" and kicks:CanLaunch(target) then
 		kicks:MarkLaunched(target, punch.attacker)
 	elseif punch.side == "Uppercut" then
 		up, airUp = 0, 0
@@ -263,7 +301,7 @@ local function reaches(
 	everyone: { Instance }
 ): (boolean, string?)
 	local inside, why = Combat.inHitbox(
-		punchCfg,
+		punch.cfg,
 		origin.X,
 		origin.Y,
 		origin.Z,
@@ -396,7 +434,7 @@ end
 -- rule for everyone, and the other swing has to really reach back. If so, both swings end here.
 local function tryClash(self: any, punch: Punch, target: Model): boolean
 	local other = punches[target]
-	if not other or other.wild or punch.wild then
+	if not other or other.wild or punch.wild or punch.side == "Kick" or other.side == "Kick" then
 		return false
 	end
 	if not Clash.simultaneous(clashCfg, punch.impactAt, other.impactAt, punch.ping, other.ping) then
@@ -542,7 +580,9 @@ local function startPunch(
 	now: number,
 	windup: number,
 	ping: number,
-	wild: boolean
+	wild: boolean,
+	cfg: any?,
+	pressSpeed: number?
 )
 	local old = punches[attacker]
 	if old then
@@ -572,6 +612,8 @@ local function startPunch(
 		awayX = 0,
 		awayZ = 0,
 		repelled = false,
+		cfg = cfg or punchCfg,
+		pressSpeed = pressSpeed or 0,
 	}
 end
 
@@ -591,6 +633,13 @@ end
 
 function CombatService:MarkHit(target: Model)
 	lastHitAt[target] = os.clock()
+	-- Getting hit lets go of a punch held back.
+	local hitPlayer = Combatants.playerOf(target)
+	local hitRecord = hitPlayer and records[hitPlayer]
+	if hitRecord and hitRecord.readyAt then
+		hitRecord.readyAt = nil
+		target:SetAttribute(READY_ATTRIBUTE, nil)
+	end
 	Knit.GetService("KickService"):Cancel(target)
 end
 
@@ -617,7 +666,7 @@ end
 --- miss like anyone else.
 function CombatService:PunchAs(model: Model, wild: boolean?)
 	local now = os.clock()
-	local side = Combat.comboSwing(punchCfg, botSides[model] or "Left", now, botLastSwing[model])
+	local side = Combat.comboSwing(punchCfg, botSides[model] or "Right", now, botLastSwing[model])
 	botLastSwing[model] = now
 	botSides[model] = Combat.nextSwing(side)
 	self._punchStarted:FireAllClients(model, side)
@@ -635,6 +684,8 @@ end
 
 function CombatService:KnitInit()
 	self._punchRequest = Net.server("PunchRequest")
+	self._punchReady = Net.server("PunchReady")
+	self._heavyKickRequest = Net.server("HeavyKickRequest")
 	self._punchStarted = Net.server("PunchStarted")
 	self._hitConfirmed = Net.server("HitConfirmed")
 	self._punchResult = Net.server("PunchResult")
@@ -642,58 +693,140 @@ function CombatService:KnitInit()
 end
 
 function CombatService:KnitStart()
-	self._punchRequest.OnServerEvent:Connect(function(player: Player, ...)
-		local record = recordFor(player)
-		local now = os.clock()
+	-- The checks every swing request shares. Returns the attacker, or nil after saying why not.
+	local function acceptable(player: Player, record: PunchRecord, now: number, ...): Model?
 		-- Rate limit before anything else, so a flood costs almost nothing.
 		if not Combat.takeToken(record.bucket, now, punchCfg.RequestsPerSecondLimit) then
 			record.refused += 1
-			return
+			return nil
 		end
 		-- A real client sends no arguments at all. Anything else is malformed.
 		if select("#", ...) ~= 0 then
 			record.refused += 1
 			trace(`{player.Name} refused: unexpected arguments`)
-			return
+			return nil
 		end
 		local attacker = player.Character
 		if not attacker or not Combatants.isAlive(attacker) then
 			trace(`{player.Name} refused: no living character`)
-			return
+			return nil
 		end
 		-- Held on a spawn through a round's countdown.
 		if attacker:GetAttribute("HT_RoundHold") then
 			trace(`{player.Name} refused: round countdown`)
 			self._punchResult:FireClient(player, attacker, "refused")
-			return
+			return nil
 		end
 		if Knit.GetService("KickService"):IsBusy(attacker) then
 			trace(`{player.Name} refused: mid-kick`)
 			self._punchResult:FireClient(player, attacker, "refused")
-			return
+			return nil
 		end
 		if not Combat.cooldownReady(punchCfg, now, record.lastPunch, record.recovery) then
 			record.refused += 1
 			trace(`{player.Name} refused: cooldown`)
 			self._punchResult:FireClient(player, attacker, "refused")
+			return nil
+		end
+		return attacker
+	end
+
+	local function dropReady(player: Player, record: PunchRecord)
+		record.readyAt = nil
+		local character = player.Character
+		if character then
+			character:SetAttribute(READY_ATTRIBUTE, nil)
+		end
+	end
+
+	-- "I'm holding a punch back": taken only when a punch could be thrown right now.
+	self._punchReady.OnServerEvent:Connect(function(player: Player, ...)
+		local record = recordFor(player)
+		local now = os.clock()
+		if not Combat.takeToken(record.bucket, now, punchCfg.RequestsPerSecondLimit) then
+			record.refused += 1
 			return
 		end
+		local attacker = player.Character
+		if
+			select("#", ...) ~= 0
+			or not attacker
+			or not Combatants.isAlive(attacker)
+			or attacker:GetAttribute("HT_RoundHold")
+			or punches[attacker]
+			or Knit.GetService("KickService"):IsBusy(attacker)
+			or not Combat.cooldownReady(punchCfg, now, record.lastPunch, record.recovery)
+		then
+			return
+		end
+		record.readyAt = now
+		attacker:SetAttribute(
+			READY_ATTRIBUTE,
+			Combat.comboSwing(punchCfg, record.nextSide, now, record.lastPunch)
+		)
+	end)
 
+	self._punchRequest.OnServerEvent:Connect(function(player: Player, ...)
+		local record = recordFor(player)
+		local now = os.clock()
+		local readyAt = record.readyAt
+		dropReady(player, record)
+		local attacker = acceptable(player, record, now, ...)
+		if not attacker then
+			return
+		end
 		-- Everything is marked before the wait, so a second request can't pass the same check.
 		local side = Combat.comboSwing(punchCfg, record.nextSide, now, record.lastPunch)
 		record.lastPunch = now
 		record.recovery = 0
 		record.nextSide = Combat.nextSwing(side)
+		local windup = Combat.releaseWindup(punchCfg, readyAt, now)
 		self._punchStarted:FireAllClients(attacker, side)
+		trace(`{player.Name} {side} thrown, windup {string.format("%.2f", windup)}`)
+		startPunch(self, attacker, player, side, now, windup, player:GetNetworkPing(), false)
+	end)
+
+	self._heavyKickRequest.OnServerEvent:Connect(function(player: Player, ...)
+		local record = recordFor(player)
+		local now = os.clock()
+		dropReady(player, record)
+		local attacker = acceptable(player, record, now, ...)
+		if not attacker then
+			return
+		end
+		if
+			record.lastKick
+			and now - record.lastKick < kickCfg.Cooldown - punchCfg.CooldownTolerance
+		then
+			record.refused += 1
+			trace(`{player.Name} refused: kick cooldown`)
+			self._punchResult:FireClient(player, attacker, "refused")
+			return
+		end
+		record.lastKick = now
+		record.lastPunch = now
+		record.recovery = 0
+		-- How fast they were going at the press, before the windup roots them.
+		local speed = Knit.GetService("SpeedAuditService"):GetTrustedSpeed(attacker)
+		attacker:SetAttribute(KICK_WINDUP_ATTRIBUTE, true)
+		task.delay(kickCfg.Windup + kickCfg.RootAfter, function()
+			if attacker.Parent then
+				attacker:SetAttribute(KICK_WINDUP_ATTRIBUTE, nil)
+			end
+		end)
+		self._punchStarted:FireAllClients(attacker, "Kick")
+		trace(`{player.Name} heavy kick at speed {math.floor(speed)}`)
 		startPunch(
 			self,
 			attacker,
 			player,
-			side,
+			"Kick",
 			now,
-			punchCfg.Windup,
+			kickCfg.Windup,
 			player:GetNetworkPing(),
-			false
+			false,
+			kickHitbox,
+			speed
 		)
 	end)
 

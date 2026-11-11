@@ -611,6 +611,16 @@ function Momentum.chargeSlow(state: State, cfg: Settings, dt: number): State
 	return nextState
 end
 
+--- Rooted (a heavy kick's windup): running speed brakes hard to a stop, at PropelChargeBrake.
+function Momentum.rootSlow(state: State, cfg: Settings, dt: number): State
+	if not isFinite(dt) or dt <= 0 or state.speed <= 0 then
+		return state
+	end
+	local nextState = table.clone(state)
+	nextState.speed = math.max(state.speed - cfg.PropelChargeBrake * dt, 0)
+	return nextState
+end
+
 --- Top speed of a burst this charged: PropelSpeed for a tap, up to PropelChargedSpeed at full.
 function Momentum.chargedSpeed(cfg: Settings, power: number): number
 	local share = math.clamp(power, 0, 1)

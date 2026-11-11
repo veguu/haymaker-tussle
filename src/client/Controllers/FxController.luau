@@ -363,27 +363,55 @@ function FxController:HitBurst(target: Model, attacker: Model?, strength: number
 end
 
 --- A small puff where two characters bumped.
-function FxController:BumpPuff(a: Model, b: Model)
-	local rootA = a:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local rootB = b:FindFirstChild("HumanoidRootPart") :: BasePart?
+function FxController:BumpPuff(a: Model, b: Model, knock: number?)
+	local rootA = a:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked just below)
+	local rootB = b:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked just below)
 	if not rootA or not rootB then
 		return
 	end
+	-- Sized by the harder of the two knocks: a jostle is a small pop, a dash into someone a real impact.
+	local share = math.clamp((knock or 20) / 60, 0.35, 1.6)
 	local middle = rootA.Position:Lerp(rootB.Position, 0.5)
+	local line = rootB.Position - rootA.Position
+	local flat = Vector3.new(line.X, 0, line.Z)
+	ImpactFx.burst(middle, if flat.Magnitude > 0.01 then flat.Unit else nil, 0.7 * share)
 	spawnBlob({
 		from = CFrame.new(middle),
 		to = CFrame.new(middle + Vector3.yAxis * 0.7),
-		fromSize = ball(0.8),
-		toSize = ball(2.2),
+		fromSize = ball(1),
+		toSize = ball(3.2 * share),
 		seconds = cfg.HitBurstSeconds,
 	})
-	Sfx.play("bump", rootA, PITCH_VARY)
+	-- A ring of dust kicked up at their feet.
+	local feet = middle - Vector3.yAxis * (cfg.FootDrop - 0.2)
+	spawnBlob({
+		from = CFrame.new(feet),
+		to = CFrame.new(feet),
+		fromSize = Vector3.new(2, 0.3, 2),
+		toSize = Vector3.new(9 * share, 0.3, 9 * share),
+		seconds = cfg.HitBurstSeconds * 1.3,
+		colour = SHADE,
+	})
+	Sfx.play(
+		"punch_hit",
+		rootA,
+		PITCH_VARY,
+		{ pitch = 0.75, volume = 0.35 + 0.35 * math.min(share, 1) }
+	)
+	Sfx.play("bump", rootA, PITCH_VARY, { volume = 3 })
+	if share >= 1 then
+		Sfx.play("boom_low", rootA, 0, { volume = 0.6, cut = 0.6 })
+	end
+	local me = Players.LocalPlayer.Character
+	if me == a or me == b then
+		self:CameraKick(0.25 * share)
+	end
 end
 
 --- One of the barrage's punches meeting in the middle of a clash. Small and quick, and only for show.
 function FxController:ClashPulse(a: Model, b: Model)
-	local rootA = a:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local rootB = b:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local rootA = a:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked just below)
+	local rootB = b:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked just below)
 	if not rootA or not rootB then
 		return
 	end

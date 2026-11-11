@@ -32,6 +32,7 @@ local Trove = require(ReplicatedStorage.Packages.Trove)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local AirRecovery = require(ReplicatedStorage.Shared.Core.AirRecovery)
 local Clash = require(ReplicatedStorage.Shared.Core.Clash)
+local BumpPredict = require(ReplicatedStorage.Shared.BumpPredict)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local DiveKick = require(ReplicatedStorage.Shared.Core.DiveKick)
 local AimAssist = require(ReplicatedStorage.Shared.Core.AimAssist)
@@ -43,6 +44,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local STEP_NAME = "HaymakerMovement"
 local PROPEL_ACTION = "HaymakerPropel"
 local KICK_ACTION = "HaymakerKick"
+local KICK_CLICK_ACTION = "HaymakerKickClick"
 local STEP_PRIORITY = Enum.RenderPriority.Input.Value + 1
 local INPUT_STALE_SECONDS = 0.25
 local MIN_LIFT = 1 -- below this a knock isn't a lift, just the floor's own tiny motion
@@ -238,6 +240,7 @@ function MovementController:_bind(
 	local kick: DiveKick.State? = nil
 	local kickTarget: Model? = nil
 	local kickRequested = false
+	local kickClicked = false -- the timed kick, once attached: a left click (R2), the punch button
 	local kickAwaiting = false -- the timing is over, and waiting for the server's verdict
 	local kickReadyAt = 0
 	local steerX, steerZ = 0, 0 -- a launched body's own steering, on top of its push
@@ -251,6 +254,7 @@ function MovementController:_bind(
 	local lift = 0 -- a punch's small lift, waiting for this step's velocity
 	local punchRequested = false
 	local punchIsUppercut = false -- only an uppercut gives the falling lift
+	local rootedUntil = 0 -- a heavy kick's windup holds you still until then
 	local lastPush: { x: number, z: number, up: number, at: number, lifted: boolean? }? = nil
 	local slammed = false -- driven down by a kick, so its fall isn't lightened
 	-- The falling lift: how many this fall, and until when its lighter gravity lasts.
@@ -553,6 +557,10 @@ function MovementController:_bind(
 
 	-- An accepted punch, from CombatController. The push is worked out at the next step, from the keys
 	-- at that moment. This is the only place one starts, so there's one per punch thrown.
+	self._heavyKick = function(seconds: number)
+		rootedUntil = os.clock() + seconds
+	end
+
 	self._punchThrown = function(swing: string?)
 		punchRequested = true
 		punchIsUppercut = swing == "Uppercut"
@@ -624,7 +632,7 @@ function MovementController:_bind(
 		ContextActionService:UnbindAction(PROPEL_ACTION)
 	end)
 
-	-- Space jumps at someone in the air, and pressing again once attached is the timed press.
+	-- Space jumps at someone in the air. The timed press once attached is a left click (below).
 	ContextActionService:BindActionAtPriority(
 		KICK_ACTION,
 		function(_name: string, inputState: Enum.UserInputState)
@@ -643,7 +651,103 @@ function MovementController:_bind(
 		ContextActionService:UnbindAction(KICK_ACTION)
 	end)
 
+	-- Once a jump is under way, the punch button is the timed kick instead: the press is taken here, above
+	-- the punch, and the punch never sees it. Any other time it passes straight through to the punch.
+	ContextActionService:BindActionAtPriority(
+		KICK_CLICK_ACTION,
+		function(_name: string, inputState: Enum.UserInputState)
+			if not kick then
+				return Enum.ContextActionResult.Pass
+			end
+			if inputState == Enum.UserInputState.Begin then
+				kickClicked = true
+			end
+			return Enum.ContextActionResult.Sink
+		end,
+		false,
+		Enum.ContextActionPriority.High.Value,
+		Enum.UserInputType.MouseButton1,
+		Enum.KeyCode.ButtonR2
+	)
+	trove:Add(function()
+		ContextActionService:UnbindAction(KICK_CLICK_ACTION)
+	end)
+
+	-- BUMPS, the instant they happen (BumpPredict): in a round, this client watches its own body against
+	-- every other fighter with the server's own contact rule (Combat.stepBumpPair, swept so a fast pass
+	-- can't skip it), and on contact knocks itself back along the line of the collision at once, by the
+	-- server's rule for how hard (Combat.bumpOutcome). Their reaction and the impact show here at the same
+	-- moment. The server sees the collision too, for stagger, credit and bots, but leaves this body alone.
+	local bumpCfg = GameConfig.Knockback
+	local bumpPairs: { [Model]: Combat.BumpPair } = setmetatable({}, { __mode = "k" }) :: any
+	local bumpedAt: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
+	self._bumpedAt = bumpedAt
+	local function checkBumps(now: number)
+		local mine = root.AssemblyLinearVelocity
+		for _, other in CollectionService:GetTagged("HT_Combatant") do
+			if other == character or not other:IsA("Model") then
+				continue
+			end
+			local otherRoot = other:FindFirstChild("HumanoidRootPart")
+			if not otherRoot or not otherRoot:IsA("BasePart") then
+				bumpPairs[other] = nil
+				continue
+			end
+			local offset = otherRoot.Position - root.Position
+			local theirs = otherRoot.AssemblyLinearVelocity
+			local pair = bumpPairs[other] or Combat.newBumpPair()
+			local nextPair, closing = Combat.stepBumpPair(
+				bumpCfg,
+				pair,
+				offset.X,
+				offset.Z,
+				mine.X - theirs.X,
+				mine.Z - theirs.Z,
+				now
+			)
+			bumpPairs[other] = nextPair
+			if
+				not closing
+				or math.abs(offset.Y) > bumpCfg.BumpVerticalLimit
+				or not BumpPredict.predicted(character, other)
+			then
+				continue
+			end
+			local outcome = Combat.bumpOutcome(
+				bumpCfg,
+				GameConfig.Stagger,
+				cfg.PropelSpeed,
+				closing,
+				mine.X,
+				mine.Z,
+				theirs.X,
+				theirs.Z
+			)
+			local lineX, lineZ = Combat.bumpDirection(
+				root.Position.X,
+				root.Position.Z,
+				mine.X,
+				mine.Z,
+				otherRoot.Position.X,
+				otherRoot.Position.Z,
+				theirs.X,
+				theirs.Z
+			)
+			bumpedAt[other] = now
+			self._applyKnock(
+				Vector3.new(-lineX * outcome.knockA, 0, -lineZ * outcome.knockA),
+				0,
+				outcome.keepA
+			)
+			fx:BumpPuff(character, other, math.max(outcome.knockA, outcome.knockB))
+			local anim = Knit.GetController("AnimController")
+			anim:HitLanded(nil, character, outcome.knockA)
+			anim:HitLanded(nil, other, outcome.knockB)
+		end
+	end
+
 	trove:BindToRenderStep(STEP_NAME, STEP_PRIORITY, function(dt: number)
+		checkBumps(os.clock())
 		local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
 		local hud = self.Hud
 		local flatVelocity = root.AssemblyLinearVelocity
@@ -653,6 +757,11 @@ function MovementController:_bind(
 		hud.kicking = kick ~= nil
 		hud.kickTarget = false
 		local inputX, inputZ = worldInput(input)
+		-- Winding up a heavy kick: rooted to the spot, the keys do nothing.
+		local rooted = os.clock() < rootedUntil
+		if rooted then
+			inputX, inputZ = 0, 0
+		end
 		local drive, side = driveOf(inputX, inputZ)
 		-- Locked on: the keys lean a little toward them, when they already point roughly their way.
 		do
@@ -751,6 +860,10 @@ function MovementController:_bind(
 
 		local pressed = kickRequested
 		kickRequested = false
+		-- The timed press: a left click (R2). On touch the Kick button does it, as before.
+		local timedPress = kickClicked
+			or (pressed and UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled)
+		kickClicked = false
 		-- The server needs to know who you're locked onto: only that makes a follow-up the snap.
 		if kickRemotes.lockOn then
 			local lockedNow = Knit.GetController("LockOnController"):GetTarget()
@@ -780,7 +893,7 @@ function MovementController:_bind(
 			else
 				prompt:Hide()
 			end
-		elseif pressed and kick.phase == "attach" then
+		elseif timedPress and kick.phase == "attach" then
 			if kickRemotes.commit then
 				local aimAt = kickTarget and kickTarget:FindFirstChild("HumanoidRootPart")
 				kickRemotes.commit:FireServer(
@@ -1126,6 +1239,9 @@ function MovementController:_bind(
 			if chargeAt then
 				state = Momentum.chargeSlow(state, cfg, dt)
 			end
+			if rooted then
+				state = Momentum.rootSlow(state, cfg, dt)
+			end
 			if airRun and airRun.keep then
 				state, airRun.keep = Momentum.airKeep(state, airRun.keep, inputX, inputZ)
 			end
@@ -1255,6 +1371,20 @@ function MovementController:PunchThrown(swing: string?)
 	if self._punchThrown then
 		self._punchThrown(swing)
 	end
+end
+
+--- A heavy kick started: rooted for `seconds`, through its windup.
+function MovementController:HeavyKickStarted(seconds: number)
+	if self._heavyKick then
+		self._heavyKick(seconds)
+	end
+end
+
+--- Did this client already show its own bump with `other` just now (BumpPredict)? The server's word on
+--- the same collision arrives later and is then only for everyone else.
+function MovementController:RecentlyBumped(other: Model): boolean
+	local at = self._bumpedAt and self._bumpedAt[other]
+	return at ~= nil and os.clock() - at < 0.75
 end
 
 --- The server refused the last punch, so its push is taken back.
