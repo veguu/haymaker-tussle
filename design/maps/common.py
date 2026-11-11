@@ -1,7 +1,7 @@
 """Shared building blocks for the three Haymaker Tussle arenas, run inside Blender (5.2, headless).
 
 Units: 1 Blender unit = 1 Roblox stud. Z is up; the fighting surface's top is z = 0. Every map has the
-SAME flat oval: 230 x 190 studs (semi-axes A along X, B along Y), a 3-stud contrasting rim band flush
+SAME flat oval: 213 x 176 studs for 25 fighters (semi-axes A along X, B along Y; was 230 x 190 for 30), a 3-stud contrasting rim band flush
 with the surface, and nothing standing on it. Personality goes into the surface paint, the island's
 sides and underside, and the scenery beyond (kept at least 60 studs past the edge if it rises above the
 rim).
@@ -21,8 +21,9 @@ import bmesh
 import bpy
 from mathutils import Vector
 
-A = 115.0  # semi-axis along X (the long one)
-B = 95.0  # semi-axis along Y
+# 2026-11-10: sized for 25 fighters (was 115 x 95 for 30): same 115:95 shape, same room per fighter
+A = 106.5  # semi-axis along X (the long one)
+B = 88.0  # semi-axis along Y
 RIM = 3.0  # contrasting rim band width
 SEGMENTS = 128
 
@@ -373,7 +374,7 @@ def cloud_cluster(bm, centre, size, rng, puffs=7, squash=0.55):
 _CLOUD_MAT = None
 
 
-def cloud_layer(name, z, inner, outer, count, size_range, rng, col="Export", keep_clear=None, per_mesh=8):
+def cloud_layer(name, z, inner, outer, count, size_range, rng, col="Export", keep_clear=None, per_mesh=8, avoid=None):
     """A ring of clouds between two distances from the centre, split into meshes of `per_mesh` clusters
     (each cluster is about 2,240 triangles, so 8 stay under Roblox's 20,000). `keep_clear` is (a, b) of an
     oval nothing may sit under, so the rim's drop stays open."""
@@ -394,6 +395,8 @@ def cloud_layer(name, z, inner, outer, count, size_range, rng, col="Export", kee
             a, b = keep_clear
             if (x / a) ** 2 + (y / b) ** 2 < 1:
                 continue
+        if avoid and any(math.hypot(x - ax, y - ay) < ar for ax, ay, ar in avoid):
+            continue  # circles (x, y, radius) kept open, so clouds never sit on a sight
         cloud_cluster(bm, (x, y, z + rng.uniform(-8, 8)), rng.uniform(*size_range), rng)
         placed += 1
         in_mesh += 1
@@ -430,7 +433,13 @@ def standard_cameras(gameplay_target=(40, 8, -4), edge_target=None, overview_fro
         "Edge": camera("Edge", (A - 30, -20, 11), edge_target or (A + 200, 40, -40), 26),
         "Recovery": camera("Recovery", (A + 38, -24, -14), (A - 8, 0, 1), 24),
         "Overview": camera("Overview", overview_from, (0, 0, -28), 30),
+        # Floor: a fighter's eye height, a few steps from the rim, looking at floor, rim and drop.
+        "Floor": camera("Floor", (44, -36, 6), (80, -67, -2), 26),
     }
+    # Look-around views from the middle of the arena at eye height, for judging the backdrop: what
+    # shows above the rim in each direction, and how much clear sky an airborne fighter has behind them.
+    for name, (dx, dy) in {"LookE": (1, 0), "LookN": (0, 1), "LookW": (-1, 0), "LookS": (0, -1)}.items():
+        cams[name] = camera(name, (0, 0, 7), (dx * 300, dy * 300, 22), 20)
     return cams
 
 

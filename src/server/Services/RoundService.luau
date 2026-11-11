@@ -20,6 +20,9 @@
 --
 -- Through Starting, everyone in the round is held still on their spawn with HT_RoundHold, which
 -- movement, punches and the boost all respect.
+--
+-- MAPS: as a round ends (everyone back in the lobby), MapService:RoundEnded() may bring in the next map;
+-- a round never starts while a map change is under way.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -322,6 +325,8 @@ local function endRound()
 	roundNumber += 1
 	folder:SetAttribute("Winner", nil)
 	setPhase("Intermission", nil)
+	-- Everyone's in the lobby now: the next map (and its sky) comes in behind a short screen fade.
+	Knit.GetService("MapService"):RoundEnded()
 end
 
 local function step()
@@ -334,7 +339,13 @@ local function step()
 			setPhase("Intermission", nil)
 		end
 		if endsAt and now >= endsAt then
-			startRound()
+			-- never place fighters while the map is being swapped: wait for it
+			if Knit.GetService("MapService"):IsChanging() then
+				endsAt = now + 1
+				publish()
+			else
+				startRound()
+			end
 		end
 	elseif phase == "Starting" then
 		checkOuts()

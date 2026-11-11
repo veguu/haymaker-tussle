@@ -126,7 +126,10 @@ function TestFloorService:KnitStart()
 	if not GameConfig.Debug.TestFloor then
 		return
 	end
-	build()
+	-- With maps on, MapService puts the floor in (the map, or its stand-in); this keeps the spawns and falls.
+	if not GameConfig.Maps.Enabled then
+		build()
+	end
 
 	local function onPlayer(player: Player)
 		player.CharacterAdded:Connect(function(character)

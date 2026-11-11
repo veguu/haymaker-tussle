@@ -3,9 +3,11 @@ saltcrest.py:
 
     blender -b --factory-startup <map>.blend -P export_roblox.py -- <export folder> <map name>
 
-For every mesh in the Export collection: a UV unwrap, its procedural colour baked to a PNG (1024 for the
-big pieces, 64 for single-colour ones), the material swapped for one that uses that image, then one GLB
-for the whole map (Y up, modifiers applied, images embedded) and the PNGs beside it. A manifest.json
+Meshes the build already painted (the surface tiles, the rim, the cliff, beams, brick and roof tiles: their
+material reads an image) are exported as they are, with their colour, normal and roughness maps. Every
+other mesh gets a UV unwrap and its procedural colour baked to a PNG (1024 for the big pieces, 64 for
+single-colour ones). Then one GLB for the whole map (Y up, tangents for the normal maps, images
+embedded). A manifest.json
 lists every mesh with its triangle count, texture and whether it should collide in Roblox: only the
 fighting surface and rim collide; everything else is scenery (CanCollide false), including Saltcrest's
 eaves, which overhang the drop and must never be stood on.
@@ -21,12 +23,12 @@ import addon_utils
 import bpy
 
 args = sys.argv[sys.argv.index("--") + 1 :]
-OUT = args[0]
+OUT = os.path.abspath(args[0])  # relative paths resolve against the drive root inside Blender
 NAME = args[1]
 os.makedirs(OUT, exist_ok=True)
 
-COLLIDE = ("Deck", "Rim_", "Meadow", "Plaza_Tiles")
-BIG = ("Deck", "Rim_", "Meadow", "Plaza_", "Underside_Beams", "Underside_Brick", "Strata_", "Below_Land", "Below_Sea", "Islands_", "Sundial_Island", "Eaves_")
+COLLIDE = ("Deck_", "Rim_", "Meadow_", "Plaza_Tiles_")
+BIG = ("Deck", "Rim_", "Meadow", "Plaza_", "Underside_Beams", "Underside_Brick", "Strata_", "Below_Land", "Below_Sea", "Islands_", "Sundial_Island", "Eaves_", "Sight_Land")
 
 addon_utils.enable("cycles", default_set=True)
 scene = bpy.context.scene
@@ -46,6 +48,28 @@ def is_flat_colour(mat):
     return bsdf is not None and not bsdf.inputs["Base Color"].is_linked
 
 
+def painted_maps(mat):
+    """The images a painted material uses: {"colour": ..., "normal": ..., "mr": ...}, or None."""
+    if not (mat and mat.use_nodes):
+        return None
+    bsdf = mat.node_tree.nodes.get("Principled BSDF")
+    if bsdf is None or not bsdf.inputs["Base Color"].is_linked:
+        return None
+    src = bsdf.inputs["Base Color"].links[0].from_node
+    if src.type != "TEX_IMAGE":
+        return None
+    maps = {"colour": src.image}
+    if bsdf.inputs["Normal"].is_linked:
+        nm = bsdf.inputs["Normal"].links[0].from_node
+        if nm.type == "NORMAL_MAP" and nm.inputs["Color"].is_linked:
+            maps["normal"] = nm.inputs["Color"].links[0].from_node.image
+    if bsdf.inputs["Roughness"].is_linked:
+        sep = bsdf.inputs["Roughness"].links[0].from_node
+        if sep.inputs[0].is_linked:
+            maps["mr"] = sep.inputs[0].links[0].from_node.image
+    return maps
+
+
 def triangles(obj):
     return sum(len(p.vertices) - 2 for p in obj.data.polygons)
 
@@ -56,6 +80,21 @@ baked_cache = {}
 
 for obj in export_objs:
     mat = obj.data.materials[0]
+    painted = painted_maps(mat)
+    if painted:
+        tris = triangles(obj)
+        manifest["meshes"].append(
+            {
+                "name": obj.name,
+                "triangles": tris,
+                "textures": {k: os.path.basename(img.filepath) for k, img in painted.items()},
+                "texture_size": painted["colour"].size[0],
+                "can_collide": obj.name.startswith(COLLIDE),
+                "within_limits": tris <= 20000 and len(obj.data.materials) == 1 and len(obj.data.uv_layers) == 1,
+            }
+        )
+        print(f"PAINTED {obj.name}: {tris} tris, maps {sorted(painted)}")
+        continue
     flat = is_flat_colour(mat)
     size = 64 if flat else (1024 if obj.name.startswith(BIG) else 512)
     # Single-colour materials share one tiny texture per material.
@@ -80,14 +119,17 @@ for obj in export_objs:
             for li in poly.loop_indices:
                 co = obj.data.vertices[obj.data.loops[li].vertex_index].co
                 uv[li].uv = (co.x / (2 * half) + 0.5, co.y / (2 * half) + 0.5)
-    else:
+    elif not obj.get("keep_uv"):  # terrains come with their own top-down UVs
         bpy.ops.object.mode_set(mode="EDIT")
         bpy.ops.mesh.select_all(action="SELECT")
         bpy.ops.uv.smart_project(angle_limit=1.15, island_margin=0.01)
         bpy.ops.object.mode_set(mode="OBJECT")
     if flat and mat.name not in baked_cache:
         # One colour: fill the whole image with it, so any unwrap that shares it is right everywhere.
-        colour = list(mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value)
+        # The material's colour is linear; a PNG's pixels are sRGB. Writing the linear numbers straight
+        # in (as passes 1-3 did) made every single-colour prop come out darker and harsher in the GLB.
+        lin = list(mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value)
+        colour = [c * 12.92 if c <= 0.0031308 else 1.055 * c ** (1 / 2.4) - 0.055 for c in lin[:3]] + [1.0]
         img.pixels = colour * (size * size)
         img.filepath_raw = os.path.join(OUT, f"{img.name}.png")
         img.file_format = "PNG"
@@ -139,6 +181,7 @@ bpy.ops.export_scene.gltf(
     export_yup=True,
     export_texcoords=True,
     export_normals=True,
+    export_tangents=True,
     export_materials="EXPORT",
     export_image_format="AUTO",
 )

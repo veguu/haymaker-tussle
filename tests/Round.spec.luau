@@ -17,15 +17,15 @@ return {
 		assert(not Round.canStart(ROUND, 1) and Round.canStart(ROUND, 2))
 	end,
 
-	["a round holds up to 30, and anyone past that waits"] = function()
-		assert(ROUND.MaxPlayers == 30)
+	["a round holds up to 25, and anyone past that waits"] = function()
+		assert(ROUND.MaxPlayers == 25)
 		assert(Round.rosterSize(ROUND, 12) == 12)
-		assert(Round.rosterSize(ROUND, 41) == 30)
+		assert(Round.rosterSize(ROUND, 41) == 25)
 	end,
 
-	["30 fighters start spread round the arena, inside it, each facing the middle"] = function()
-		local points = Round.spawnPoints(ARENA, 30, 0.3)
-		assert(#points == 30)
+	["25 fighters start spread round the arena, inside it, each facing the middle"] = function()
+		local points = Round.spawnPoints(ARENA, 25, 0.3)
+		assert(#points == 25)
 		local closest = math.huge
 		for i, a in points do
 			local r = flat(a.x, a.z)
@@ -53,10 +53,10 @@ return {
 		assert(math.abs(gap - ARENA.SpawnRadius * 2) < 1e-6, "opposite sides")
 	end,
 
-	["the arena has the same room per fighter for 30 as it had for 15"] = function()
-		local per30 = math.pi * ARENA.StartRadius ^ 2 / 30
+	["the arena has the same room per fighter for 25 as it had for 15"] = function()
+		local per25 = math.pi * ARENA.StartRadius ^ 2 / 25
 		local per15 = math.pi * 75 ^ 2 / 15
-		assert(per30 >= per15 * 0.95, `{per30} square studs each against {per15}`)
+		assert(per25 >= per15 * 0.95, `{per25} square studs each against {per15}`)
 	end,
 
 	["falling below the line or leaving the play area is out; standing anywhere on the arena isn't"] = function()

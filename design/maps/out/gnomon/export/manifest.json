@@ -3,226 +3,982 @@
  "units": "1 Blender unit = 1 stud; fighting surface top at y = 0",
  "meshes": [
   {
-   "name": "Meadow",
-   "triangles": 508,
-   "texture": "gnomon_Meadow.png",
+   "name": "Meadow_00",
+   "triangles": 52,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
    "texture_size": 1024,
    "can_collide": true,
    "within_limits": true
   },
   {
-   "name": "Rim_Stone",
-   "triangles": 1024,
-   "texture": "gnomon_Rim_Stone.png",
+   "name": "Meadow_01",
+   "triangles": 68,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
    "texture_size": 1024,
    "can_collide": true,
    "within_limits": true
   },
   {
-   "name": "Strata_Cream",
-   "triangles": 584,
-   "texture": "gnomon_Strata_Cream.png",
+   "name": "Meadow_02",
+   "triangles": 64,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Meadow_03",
+   "triangles": 52,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Meadow_10",
+   "triangles": 72,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Meadow_11",
+   "triangles": 12,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Meadow_12",
+   "triangles": 12,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Meadow_13",
+   "triangles": 72,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Meadow_20",
+   "triangles": 52,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Meadow_21",
+   "triangles": 64,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Meadow_22",
+   "triangles": 68,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Meadow_23",
+   "triangles": 52,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Rim_Turf_1",
+   "triangles": 1206,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Rim_Turf_2",
+   "triangles": 1206,
+   "textures": {
+    "colour": "",
+    "normal": "",
+    "mr": ""
+   },
+   "texture_size": 1024,
+   "can_collide": true,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Cream.001_1",
+   "triangles": 76,
+   "textures": {
+    "colour": ""
+   },
    "texture_size": 1024,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Strata_Sand",
+   "name": "Strata_Cream.001_2",
+   "triangles": 76,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Cream.001_3",
+   "triangles": 92,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Cream.001_4",
+   "triangles": 84,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Cream_Soffit_1",
+   "triangles": 64,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 512,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Cream_Soffit_2",
+   "triangles": 76,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 512,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Sand.001_1",
+   "triangles": 60,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Sand.001_2",
+   "triangles": 86,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Sand.001_3",
+   "triangles": 90,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Sand.001_4",
+   "triangles": 104,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Sand_Soffit_1",
+   "triangles": 106,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 512,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Sand_Soffit_2",
    "triangles": 152,
-   "texture": "gnomon_Strata_Sand.png",
-   "texture_size": 1024,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 512,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Strata_BlueGrey",
+   "name": "Strata_Bluegrey.001_1",
    "triangles": 182,
-   "texture": "gnomon_Strata_BlueGrey.png",
+   "textures": {
+    "colour": ""
+   },
    "texture_size": 1024,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Islands_Grass",
-   "triangles": 364,
-   "texture": "gnomon_Islands_Grass.png",
+   "name": "Strata_Bluegrey.001_2",
+   "triangles": 156,
+   "textures": {
+    "colour": ""
+   },
    "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Bluegrey.001_3",
+   "triangles": 171,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Bluegrey.001_4",
+   "triangles": 142,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Bluegrey_Soffit_1",
+   "triangles": 269,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 512,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Bluegrey_Soffit_2",
+   "triangles": 246,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 512,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Cliff_Timber",
+   "triangles": 1648,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Lip_Turf",
+   "triangles": 4320,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 128,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Grass_Tufts_01",
+   "triangles": 7965,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 128,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Grass_Tufts_02",
+   "triangles": 7839,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 128,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Grass_Tufts_03",
+   "triangles": 7785,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 128,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Grass_Tufts_04",
+   "triangles": 7155,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 128,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Grass_Tufts_05",
+   "triangles": 6984,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 128,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Grass_Tufts_06",
+   "triangles": 7524,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 128,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Grass_Tufts_07",
+   "triangles": 8145,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 128,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Grass_Tufts_08",
+   "triangles": 7164,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 128,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Grass_Tufts_09",
+   "triangles": 7254,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 128,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Grass_Tufts_10",
+   "triangles": 7011,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 128,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Grass_Tufts_11",
+   "triangles": 7992,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 128,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Grass_Tufts_12",
+   "triangles": 7371,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 128,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Flowers_Meadow_stem",
+   "triangles": 1320,
+   "texture": "gnomon_Flowers_Meadow_stem.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Flowers_Meadow_coral",
+   "triangles": 360,
+   "texture": "gnomon_Flowers_Meadow_coral.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Flowers_Meadow_gold",
+   "triangles": 880,
+   "texture": "gnomon_Flowers_Meadow_gold.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Flowers_Meadow_cream",
+   "triangles": 520,
+   "texture": "gnomon_Flowers_Meadow_cream.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Garden_Cap",
+   "triangles": 380,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Garden_Stone",
+   "triangles": 1496,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Garden_Wood",
+   "triangles": 800,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Garden_Crown",
+   "triangles": 2042,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Garden_stem",
+   "triangles": 228,
+   "texture": "gnomon_Garden_stem.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Garden_coral",
+   "triangles": 110,
+   "texture": "gnomon_Garden_coral.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Garden_gold",
+   "triangles": 182,
+   "texture": "gnomon_Garden_gold.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Garden_cream",
+   "triangles": 54,
+   "texture": "gnomon_Garden_cream.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Garden_rope",
+   "triangles": 108,
+   "texture": "gnomon_Garden_rope.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Islands_Cap",
+   "triangles": 196,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 512,
    "can_collide": false,
    "within_limits": true
   },
   {
    "name": "Islands_Stone",
+   "triangles": 784,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 512,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Islands_Wood",
+   "triangles": 296,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 512,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Islands_Crown",
+   "triangles": 1180,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 512,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sundial_Cap",
+   "triangles": 116,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sundial_Stone",
+   "triangles": 580,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sundial_Wood",
+   "triangles": 148,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sundial_Crown",
+   "triangles": 728,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sundial_coral",
+   "triangles": 396,
+   "texture": "gnomon_Sundial_coral.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sundial_gold",
+   "triangles": 200,
+   "texture": "gnomon_Sundial_gold.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sundial_stem",
    "triangles": 252,
-   "texture": "gnomon_Islands_Stone.png",
-   "texture_size": 1024,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Trees_Trunks",
-   "triangles": 360,
-   "texture": "gnomon_Gnomon_Trunk.png",
+   "texture": "gnomon_Sundial_stem.png",
    "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Trees_Canopies",
-   "triangles": 1728,
-   "texture": "gnomon_Gnomon_Canopy.png",
+   "name": "Sundial_cream",
+   "triangles": 48,
+   "texture": "gnomon_Sundial_cream.png",
    "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Sundial_Island_Grass",
-   "triangles": 76,
-   "texture": "gnomon_Sundial_Island_Grass.png",
-   "texture_size": 1024,
+   "name": "Sight_BalloonNear_coral",
+   "triangles": 90,
+   "texture": "gnomon_Sight_BalloonNear_coral.png",
+   "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Sundial_Island_Stone",
-   "triangles": 44,
-   "texture": "gnomon_Sundial_Island_Stone.png",
-   "texture_size": 1024,
+   "name": "Sight_BalloonNear_cream",
+   "triangles": 90,
+   "texture": "gnomon_Sight_BalloonNear_cream.png",
+   "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Sundial_Dial",
-   "triangles": 156,
-   "texture": "gnomon_Sundial_Dial.png",
+   "name": "Sight_BalloonNear_basket",
+   "triangles": 12,
+   "texture": "gnomon_Sight_BalloonNear_basket.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sight_BalloonNear_trim",
+   "triangles": 12,
+   "texture": "gnomon_Sight_BalloonNear_trim.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sight_BalloonNear_rope",
+   "triangles": 48,
+   "texture": "gnomon_Sight_BalloonNear_rope.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sight_BalloonNear_burner",
+   "triangles": 12,
+   "texture": "gnomon_Sight_BalloonNear_burner.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sight_BalloonFar_mustard",
+   "triangles": 90,
+   "texture": "gnomon_Sight_BalloonFar_mustard.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sight_BalloonFar_cream",
+   "triangles": 90,
+   "texture": "gnomon_Sight_BalloonFar_cream.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sight_BalloonFar_basket",
+   "triangles": 12,
+   "texture": "gnomon_Sight_BalloonFar_basket.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sight_BalloonFar_trim",
+   "triangles": 12,
+   "texture": "gnomon_Sight_BalloonFar_trim.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sight_BalloonFar_rope",
+   "triangles": 48,
+   "texture": "gnomon_Sight_BalloonFar_rope.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sight_BalloonFar_burner",
+   "triangles": 12,
+   "texture": "gnomon_Sight_BalloonFar_burner.png",
+   "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sight_LaunchIsle_Cap",
+   "triangles": 116,
+   "textures": {
+    "colour": ""
+   },
    "texture_size": 512,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Sundial_Marks",
-   "triangles": 144,
-   "texture": "gnomon_Gnomon_DialMarks.png",
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Sundial_Gnomon",
-   "triangles": 8,
-   "texture": "gnomon_Sundial_Gnomon.png",
+   "name": "Sight_LaunchIsle_Stone",
+   "triangles": 464,
+   "textures": {
+    "colour": ""
+   },
    "texture_size": 512,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Sundial_GildedEdge",
-   "triangles": 20,
-   "texture": "gnomon_Gnomon_Gilt.png",
+   "name": "Sight_LaunchIsle_Wood",
+   "triangles": 164,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 512,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sight_LaunchIsle_Crown",
+   "triangles": 506,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 512,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Sight_Launch_mustard",
+   "triangles": 104,
+   "texture": "gnomon_Sight_Launch_mustard.png",
    "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Clouds_Low_1",
-   "triangles": 4480,
-   "texture": "gnomon_Cloud.png",
+   "name": "Sight_Launch_cream",
+   "triangles": 84,
+   "texture": "gnomon_Sight_Launch_cream.png",
    "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Clouds_Low_2",
-   "triangles": 4480,
-   "texture": "gnomon_Cloud.png",
+   "name": "Sight_Launch_coral",
+   "triangles": 136,
+   "texture": "gnomon_Sight_Launch_coral.png",
    "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Clouds_Low_3",
-   "triangles": 4480,
-   "texture": "gnomon_Cloud.png",
+   "name": "Sight_Launch_basket",
+   "triangles": 12,
+   "texture": "gnomon_Sight_Launch_basket.png",
    "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Clouds_Low_4",
-   "triangles": 3360,
-   "texture": "gnomon_Cloud.png",
+   "name": "Sight_Launch_trim",
+   "triangles": 12,
+   "texture": "gnomon_Sight_Launch_trim.png",
    "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Clouds_Sea_1",
-   "triangles": 4480,
-   "texture": "gnomon_Cloud.png",
+   "name": "Sight_Launch_rope",
+   "triangles": 480,
+   "texture": "gnomon_Sight_Launch_rope.png",
    "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Clouds_Sea_2",
-   "triangles": 4480,
-   "texture": "gnomon_Cloud.png",
+   "name": "Sight_Launch_burner",
+   "triangles": 48,
+   "texture": "gnomon_Sight_Launch_burner.png",
    "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Clouds_Sea_3",
-   "triangles": 4480,
-   "texture": "gnomon_Cloud.png",
+   "name": "Sight_Launch_pole",
+   "triangles": 100,
+   "texture": "gnomon_Sight_Launch_pole.png",
    "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Clouds_Sea_4",
-   "triangles": 4480,
-   "texture": "gnomon_Cloud.png",
+   "name": "Sight_Launch_canvas",
+   "triangles": 36,
+   "texture": "gnomon_Sight_Launch_canvas.png",
    "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Clouds_Sea_5",
-   "triangles": 4480,
-   "texture": "gnomon_Cloud.png",
+   "name": "Sight_Launch_crate",
+   "triangles": 60,
+   "texture": "gnomon_Sight_Launch_crate.png",
    "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Clouds_Sea_6",
-   "triangles": 4480,
-   "texture": "gnomon_Cloud.png",
+   "name": "Sight_FarMesa_Cap",
+   "triangles": 80,
+   "texture": "gnomon_Sight_FarMesa_Cap.png",
    "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Clouds_Sea_7",
-   "triangles": 4480,
-   "texture": "gnomon_Cloud.png",
+   "name": "Sight_FarMesa_Stone",
+   "triangles": 320,
+   "texture": "gnomon_Sight_FarMesa_Stone.png",
    "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Clouds_Horizon_1",
-   "triangles": 4480,
-   "texture": "gnomon_Cloud.png",
+   "name": "Sight_FarMesa_Wood",
+   "triangles": 208,
+   "texture": "gnomon_Sight_FarMesa_Wood.png",
    "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
   {
-   "name": "Clouds_Horizon_2",
-   "triangles": 2240,
-   "texture": "gnomon_Cloud.png",
+   "name": "Sight_FarMesa_Crown",
+   "triangles": 816,
+   "texture": "gnomon_Sight_FarMesa_Crown.png",
    "texture_size": 64,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Fragments_Cap",
+   "triangles": 800,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 512,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Fragments_Stone",
+   "triangles": 3776,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 512,
    "can_collide": false,
    "within_limits": true
   }
