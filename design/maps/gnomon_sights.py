@@ -15,7 +15,7 @@ they open up as a fighter nears that side.
 import math
 
 import bmesh
-from mathutils import Matrix
+from mathutils import Matrix, Vector
 
 import common as C
 import sights as K
@@ -95,10 +95,17 @@ def build_launch(rng, tex):
     k.box("basket", (0, 0, 0), (8, 8, 6.5))
     k.box("trim", (0, 0, 3.5), (8.8, 8.8, 0.9))
     k.move(m, place @ Matrix.Translation(basket) @ Matrix.Rotation(math.radians(65), 4, "Y"))
+    # ropes (fixed 2026-11-10: they ended in the air beside the mouth and the basket): from the tipped
+    # basket's top corners to points on the envelope's mouth, both through the transforms used above
+    env_m = Matrix.Diagonal((1, 1, 0.62, 1)) @ Matrix.Rotation(math.radians(72), 4, "Y")
+    bas_m = Matrix.Translation(basket) @ Matrix.Rotation(math.radians(65), 4, "Y")
+    mouth_r, mouth_z = radius * K.ENVELOPE[0][0], radius * K.ENVELOPE[0][1]
     m = k.mark()
     for sy in (-1, 1):
-        for sz in (-1, 1):
-            k.cyl("rope", (basket[0] + 3.5, sy * 3.6, basket[2] + sz * 2.6 + 1), (-29.7, sy * 4.4, -6.0 + sz * 2.8), 0.16, 4)
+        for sx in (-1, 1):
+            a = bas_m @ Vector((sx * 3.6, sy * 3.6, 3.25))
+            b = env_m @ Vector((sx * mouth_r * 0.7071, sy * mouth_r * 0.7071, mouth_z))
+            k.cyl("rope", tuple(a), tuple(b), 0.16, 4)
     k.box("burner", (-37, -13, -lift + 3), (5, 5, 6))
     k.cyl("burner", (-34.5, -13, -lift + 3.5), (-33.5, -13, -lift + 3.5), 3.2, 10)
     k.move(m, place)

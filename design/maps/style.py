@@ -29,16 +29,18 @@ import surfaces as S
 
 SKY = np.array([0.62, 0.74, 0.92])
 PAL = {
-    # turf (softened 2026-11-10, user: "too vibrant": less saturated, the warm and cool closer to the leaf)
-    "leaf": P.rgb(106, 170, 82),
-    "warm": P.rgb(140, 180, 90),
-    "cool": P.rgb(88, 160, 102),
-    "lip": P.rgb(170, 204, 112),
-    "lip_hi": P.rgb(204, 222, 150),
-    "drape": P.rgb(64, 138, 88),
-    "drape_dark": P.rgb(44, 104, 86),
-    "blade": P.rgb(196, 218, 136),
-    "blade_dark": P.rgb(56, 124, 84),
+    # turf: shade 9 of the user's matcha reference (2026-11-10), sampled about sRGB (12, 25, 7): a very deep
+    # forest green, lifted a touch so it reads as that shade under the bright sun and shadows still show on it.
+    # Solid, matte, with only gentle warmer and cooler shifts. Was a fresh leaf green with grass.
+    "leaf": P.rgb(16, 38, 10),
+    "warm": P.rgb(22, 44, 10),
+    "cool": P.rgb(12, 33, 12),
+    "lip": P.rgb(32, 58, 16),
+    "lip_hi": P.rgb(78, 104, 50),
+    "drape": P.rgb(16, 32, 12),
+    "drape_dark": P.rgb(10, 22, 10),
+    "blade": P.rgb(36, 58, 20),
+    "blade_dark": P.rgb(12, 26, 9),
     # stone
     "cream": P.rgb(240, 222, 180),
     "sand": P.rgb(220, 186, 136),

@@ -93,14 +93,25 @@ MapEnvironments.Maps = {
 	gnomon = {
 		name = "Gnomon Meadow",
 		model = "Gnomon",
+		-- THE ARENA'S SIZE (user, 2026-11-10: double this map's length and width, once). Semi-axes in studs
+		-- of the walkable oval (rim included), X along the long axis, Z toward the lobby. Absolute numbers,
+		-- never a multiplier, so nothing can double it twice. The original oval was 106.5 x 88 (213 x 176
+		-- studs; design/maps/common.py ORIGINAL_OVAL); the Blender build is common.OVALS.gnomon. Spawns sit
+		-- on the oval at spawnShare of it; Round.isOut is this oval plus Arena.PlayAreaMargin.
+		arena = {
+			semiX = 213,
+			semiZ = 176,
+			spawnShare = 0.65,
+			original = { semiX = 106.5, semiZ = 88 },
+		},
 		environment = {
 			-- fresh greens, gently warm sun low over the lobby's left shoulder (azimuth -55, elevation 38) so
 			-- the cliff's layers, the islets and the tufts model in light and shade; soft cool shade.
 			-- Tuned 2026-11-10 from the gameplay camera and lobby spawn on the reworked island (no outlines).
-			-- SOFTER pass (user, 2026-11-10: "too vibrant and bright"): less saturation and contrast, a gentler
+			-- Sunny grass pass (2026-11-11): modest saturation lift, clear greens, and a gentle
 			-- sun, lighter and softer shade, a little more haze; the sky is kept blue (desaturating further
 			-- turned it grey).
-			sun = { clockTime = 15.1, latitude = 50, colour = { 255, 240, 222 }, brightness = 1.9 },
+			sun = { clockTime = 15.1, latitude = 50, colour = { 255, 240, 222 }, brightness = 2.05 },
 			ambient = {
 				ambient = { 104, 112, 132 },
 				outdoor = { 132, 140, 160 },
@@ -108,9 +119,9 @@ MapEnvironments.Maps = {
 				shadowSoftness = 0.55,
 				diffuse = 0.45,
 			},
-			exposure = -0.25,
+			exposure = -0.12,
 			grade = {
-				saturation = -0.13,
+				saturation = 0.06,
 				contrast = 0.04,
 				brightness = 0.01,
 				tint = { 255, 252, 246 },
@@ -131,7 +142,8 @@ MapEnvironments.Maps = {
 			clouds = {
 				list = {
 					{
-						x = -560,
+						-- moved out 2026-11-10 b: the doubled arena widens the lobby's view behind it
+						x = -780,
 						y = 120,
 						z = -230,
 						length = 120,
@@ -142,7 +154,7 @@ MapEnvironments.Maps = {
 						phase = 0.1,
 					},
 					{
-						x = 600,
+						x = 760,
 						y = 150,
 						z = -420,
 						length = 140,
@@ -202,9 +214,9 @@ MapEnvironments.Maps = {
 				list = {
 					-- leaves off the grove and the tall pair, petals off the hollow log's flowers and the sundial's beds
 					{
-						x = 232,
+						x = 325,
 						y = 30,
-						z = -108,
+						z = -151,
 						radius = 16,
 						count = 6,
 						kind = "leaf",
@@ -212,9 +224,9 @@ MapEnvironments.Maps = {
 						colours = { { 92, 160, 70 }, { 150, 190, 74 } },
 					},
 					{
-						x = -250,
+						x = -354,
 						y = 34,
-						z = -46,
+						z = -65,
 						radius = 14,
 						count = 5,
 						kind = "leaf",
@@ -222,9 +234,9 @@ MapEnvironments.Maps = {
 						colours = { { 70, 140, 74 }, { 120, 176, 70 } },
 					},
 					{
-						x = -300,
+						x = -391,
 						y = 18,
-						z = 150,
+						z = 196,
 						radius = 16,
 						count = 5,
 						kind = "petal",
@@ -232,9 +244,9 @@ MapEnvironments.Maps = {
 						colours = { { 240, 120, 96 }, { 250, 214, 120 } },
 					},
 					{
-						x = 372,
+						x = 478,
 						y = -6,
-						z = -20,
+						z = -28,
 						radius = 18,
 						count = 5,
 						kind = "petal",
@@ -250,9 +262,10 @@ MapEnvironments.Maps = {
 				},
 			},
 			landmarks = {
-				{ name = "Sundial", x = 380, y = 60, z = -30, radius = 95 },
-				{ name = "Launch isle", x = 300, y = -20, z = 230, radius = 95 },
-				{ name = "Near balloon", x = -250, y = 78, z = -235, radius = 22 },
+				-- moved out with the doubled rim (2026-11-10 b): each by how far the rim moved at its bearing
+				{ name = "Sundial", x = 486, y = 60, z = -38, radius = 95 },
+				{ name = "Launch isle", x = 378, y = -20, z = 290, radius = 95 },
+				{ name = "Near balloon", x = -320, y = 78, z = -301, radius = 22 },
 			},
 			standIn = { floor = { 110, 168, 92 }, ring = { 240, 236, 214 } },
 		},

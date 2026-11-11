@@ -206,17 +206,49 @@ def envelope(kit, keys, radius, gores=12):
 
 
 def balloon(kit, pos, radius, keys, heading=0.0):
-    """A flying balloon: envelope, basket, ropes, burner. Kit needs basket, trim, rope, burner."""
+    """A flying balloon: envelope, basket, ropes, burner. Kit needs basket, trim, rope, burner.
+
+    Fixed 2026-11-10 (user: balloon parts looked wrongly attached): every piece now touches the next. A
+    load ring round the envelope's mouth; four ropes from the basket's top corners to points ON that ring;
+    the burner on a square frame tied to the ropes just above the basket (it used to float alone halfway
+    up). The game bobs the whole balloon as one (MapEnvironments bob rules share a phase per balloon)."""
     m = kit.mark()
     envelope(kit, keys, radius)
+    rope_r = 0.15 + radius * 0.006
     b = radius * 0.3
     zb = -radius * 1.95
     kit.box("basket", (0, 0, zb), (b, b, b * 0.8))
     kit.box("trim", (0, 0, zb + b * 0.42), (b * 1.12, b * 1.12, b * 0.14))
+    mouth_r, mouth_z = radius * ENVELOPE[0][0], radius * ENVELOPE[0][1]
+    # the load ring, on the envelope's bottom edge (the gores' first ring)
+    gores = 12
+    ring = [(mouth_r * math.cos(g / gores * math.tau), mouth_r * math.sin(g / gores * math.tau), mouth_z) for g in range(gores)]
+    for g in range(gores):
+        kit.cyl("rope", ring[g], ring[(g + 1) % gores], rope_r * 1.4, 4)
+    z0 = zb + b * 0.4  # the basket's top
+    s = b / 2 * 0.95
+    corner = {}
     for sx in (-1, 1):
         for sy in (-1, 1):
-            kit.cyl("rope", (sx * b / 2, sy * b / 2, zb + b * 0.4), (sx * radius * 0.14, sy * radius * 0.14, -radius * 1.3), 0.15 + radius * 0.006, 4)
-    kit.box("burner", (0, 0, -radius * 1.5), (b * 0.3, b * 0.3, b * 0.3))
+            # the ring's point at this corner's bearing (on a gore edge between two ring vertices: use the
+            # chord's midpoint so the rope ends exactly on the ring's tube)
+            g = {(1, 1): 1, (-1, 1): 4, (-1, -1): 7, (1, -1): 10}[(sx, sy)]
+            a, c = ring[g], ring[(g + 1) % gores]
+            top = ((a[0] + c[0]) / 2, (a[1] + c[1]) / 2, mouth_z)
+            kit.cyl("rope", (sx * s, sy * s, z0), top, rope_r, 4)
+            corner[(sx, sy)] = ((sx * s, sy * s, z0), top)
+    # the burner frame: a square tied to the four ropes a little above the basket, the burner in its middle
+    zf = z0 + radius * 0.12
+    pts = {}
+    for key, (lo, hi) in corner.items():
+        t = (zf - lo[2]) / (hi[2] - lo[2])
+        pts[key] = tuple(lo[i] + (hi[i] - lo[i]) * t for i in range(3))
+    order = [(1, 1), (-1, 1), (-1, -1), (1, -1)]
+    for i, key in enumerate(order):
+        kit.cyl("rope", pts[key], pts[order[(i + 1) % 4]], rope_r, 4)
+    kit.cyl("burner", pts[(1, 1)], pts[(-1, -1)], rope_r * 1.2, 4)
+    kit.cyl("burner", pts[(-1, 1)], pts[(1, -1)], rope_r * 1.2, 4)
+    kit.box("burner", (0, 0, zf + b * 0.12), (b * 0.3, b * 0.3, b * 0.3))
     kit.move(m, Matrix.Translation(pos) @ Matrix.Rotation(heading, 4, "Z"))
 
 

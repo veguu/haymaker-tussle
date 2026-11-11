@@ -17,6 +17,21 @@ on top of pass 4's palette (style.py) and detail.py's builders:
 - The lobby side (Blender -Y) is kept open: detail.LOBBY_VIEW, checked at build ("CORRIDOR" lines).
 Accents: coral and gold only.
 
+Rework 2026-11-10 b (user brief: enlarge, no grass, shade 9, obstacles, fix scenery), Gnomon only:
+- The oval is doubled ONCE to 426 x 352 (common.OVALS, absolute; the original 213 x 176 is
+  common.ORIGINAL_OVAL). The island is 1.5x as deep and its stone keeps its stud sizes (insets, recesses
+  and the timber are in studs from the edge, block counts follow the perimeter).
+- No grass: the tufts, painted blades, dabs and meadow flowers are gone. The ground (meadow, rim top, lip
+  and every islet's cap) is shade 9 of the user's matcha reference, a solid matte deep forest green
+  (style.PAL), with only broad gentle shifts; the rim keeps a lighter mossy line so the edge reads.
+- Obstacles (obstacles.py): 20 boulders, rock clusters, slabs and stumps in 15 groups; meshes here,
+  colliders in the game from the same list.
+- The backdrop keeps its distance from the new rim: every cluster moves out by how far the rim moved
+  at its bearing (push_backdrop), so nothing is enlarged and every gap to the arena stays.
+
+Revision 2026-11-11: #0ADD08 vibrant-green ground replaces shade 9; 132 widely separated
+3D grass clumps replace obstacles. The oval remains 426 x 352, and the other maps are unchanged.
+
 Readability rules kept here: the stone and timber never reach outside the oval (the lip's rounded roll
 reaches under a stud past it and never collides), the rim is a flush lighter band with no grass on it,
 nothing rises above the rim within 100 studs of it, and the garden islets leave open sky between them.
@@ -34,6 +49,7 @@ from mathutils import Vector
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+os.environ["HT_MAP"] = "gnomon"  # common.OVALS: Gnomon's own (doubled) oval; set before common is imported
 import common as C  # noqa: E402
 import paint as P  # noqa: E402
 import surfaces as S  # noqa: E402
@@ -41,6 +57,8 @@ import style as ST  # noqa: E402
 import gnomon_sights as GS  # noqa: E402
 import detail as D  # noqa: E402
 import sights as K  # noqa: E402
+import obstacles as OB  # noqa: E402
+import meadow_grass as MG  # noqa: E402
 
 CAP = 4.0  # the grass cap's thickness: the rim's outer face and the surface tiles' depth
 TEX = os.path.join(HERE, "out", "gnomon", "textures")
@@ -61,47 +79,15 @@ def _cells(X, Y, size, seed):
             yield cx, cy, h
 
 
-CLEAR_CENTRE = 0.3  # share of the oval's radius with almost no accents, so feet and landings read
-# accent flower beds: (centre, radius, flowers, seed). The east one lies under the sundial.
-BEDS = [((98.0, 9.0), 8.0, 11, 5), ((-97.0, -10.0), 6.5, 7, 6), ((6.0, 80.0), 5.5, 5, 7), ((-12.0, -80.0), 5.5, 5, 8)]
-
-
-def _radius(x, y):
-    return np.sqrt((x / (C.A - C.RIM)) ** 2 + (y / (C.B - C.RIM)) ** 2)
+OBSTACLES = []  # The user will place their own arena props.
+assert (OB.A, OB.B) == (C.A, C.B), "obstacles.py and common.OVALS disagree on Gnomon's oval"
 
 
 def meadow_painter(X, Y):
-    """The ground under the 3D grass (rework 2026-11-10: the painted blades, daisies and flowers are
-    gone; real tufts and flowers stand on it). Broad warmer and cooler patches of fresh green, a darker
-    dab under every tuft so the tufts sit in the turf, and a deeper patch under each flower bed. Flat
-    and matte, so a falling player reads the whole oval as one clean landing shape."""
+    """Vibrant-green matte turf with gentle variation; sparse 3D tufts supply the detail."""
     col = ST.turf_field(X, Y)
-    col = D.tuft_dabs(X, Y, col, T["blade_dark"])
-    for (px, py), rad, n, seed in BEDS:
-        if px < X.min() - rad - 3 or px > X.max() + rad + 3 or py < Y.min() - rad - 3 or py > Y.max() + rad + 3:
-            continue
-        d = np.hypot(X - px, (Y - py) * 1.2) + 1.6 * (P.fbm2(X * 0.3, Y * 0.3, 60 + seed, 2) - 0.5)
-        col = P.mix(col, T["drape"], 0.6 * (1 - P.smoothstep(rad * 0.86, rad * 0.94, d)))
+    col = col * (1 + 0.06 * (P.fbm2(X * 0.045, Y * 0.045, 71, 3) - 0.5))[..., None]
     return col, np.zeros(X.shape), np.full(X.shape, 0.95)
-
-
-def build_meadow_flowers(rng):
-    """Small modelled flowers: the four accent beds of coral and gold, and a few loose clusters in the
-    outer grass. Non-colliding, knee-high at most."""
-    G = types.SimpleNamespace(kit=K.Kit("Flowers_Meadow", ST.FLAT))
-    for (px, py), rad, n, seed in BEDS:
-        ST.flowers(G, (px, py, -0.2), n + 4, rad * 0.8, random.Random(seed), size=0.85)
-    placed = 0
-    while placed < 22:
-        t = rng.uniform(0, math.tau)
-        s = rng.uniform(0.8, 0.95)
-        x, y = (C.A - C.RIM) * s * math.cos(t), (C.B - C.RIM) * s * math.sin(t)
-        if any(math.hypot(x - bx, y - by) < r + 6 for (bx, by), r, _, _ in BEDS):
-            continue
-        keys = ("cream", "gold", "cream") if placed % 3 else ("coral", "gold", "coral")
-        ST.flowers(G, (x, y, -0.2), 3, 1.4, rng, keys=keys, size=0.6)
-        placed += 1
-    G.kit.finish()
 
 
 # --- the rim: the grass cap's lip and skirt --------------------------------------------------------
@@ -138,26 +124,35 @@ BANDS = [  # rework: thin blue-grey shelves step OUT under thicker layers, so th
     ("cream", 8.0, 7, 0.48, (0.88, 1.0)),
 ]
 SHELVES = (1, 3, 5)  # the layers that step out: boulders and chips sit on them
+DEPTH = 1.5 if C.SCALE > 1 else 1.0  # the doubled island is this much deeper (layer thicknesses, the hanging cones)
+
+
+def k(share):
+    """A share of the oval's radius that was tuned on the original oval, kept as the same STUDS in from the
+    edge on a bigger one (so blocks, recesses and the timber keep their sizes)."""
+    return 1 - (1 - share) / C.SCALE
 TIMBER_AT = [math.radians(a) for a in (352, 62, 130, 200, 268)]
 
 
 def build_strata(rng):
     bands = {"cream": bmesh.new(), "sand": bmesh.new(), "bluegrey": bmesh.new()}
     z = -CAP
-    for k, (kind, thick, blocks, scale, inset) in enumerate(BANDS):
+    for n, (kind, thick, blocks, scale, inset) in enumerate(BANDS):
+        thick *= DEPTH
         ST.chunk_band(
-            bands[kind], (0, 0), C.A * scale, C.B * scale, z, thick, blocks, rng, inset=inset, lean=0.05,
-            smax=0.992, recess_at=TIMBER_AT if k == 0 else (), recess=0.93 if k == 0 else None,
+            bands[kind], (0, 0), C.A * scale, C.B * scale, z, thick, int(blocks * C.SCALE), rng,
+            inset=(k(inset[0]), k(inset[1])), lean=0.05 / C.SCALE,
+            smax=k(0.992), recess_at=TIMBER_AT if n == 0 else (), recess=k(0.93) if n == 0 else None,
         )
-        if k in SHELVES:  # loose boulders and fallen chips on the shelf's top
-            for _ in range(12):
+        if n in SHELVES:  # loose boulders and fallen chips on the shelf's top
+            for _ in range(int(12 * C.SCALE)):
                 t = rng.uniform(0, math.tau)
                 r = rng.uniform(0.7, 2.2)
-                sc = scale * rng.uniform(0.95, 0.975)
+                sc = scale * k(rng.uniform(0.95, 0.975))
                 C.blob(bands[kind], (C.A * sc * math.cos(t), C.B * sc * math.sin(t), z + r * 0.25), r, subdiv=1, squash=0.6)
         z -= thick * 0.97
     for fx, fy, r, h in ((-18, 6, 24, 55), (20, -10, 18, 42), (2, 22, 13, 30)):
-        C.cone(bands["bluegrey"], (fx, fy, z + 2), r, -h, sides=5, rng=rng, jitter=0.15, tip_offset=(rng.uniform(-6, 6), rng.uniform(-6, 6)))
+        C.cone(bands["bluegrey"], (fx * C.SCALE, fy * C.SCALE, z + 2), r * C.SCALE * 0.8, -h * DEPTH, sides=5, rng=rng, jitter=0.15, tip_offset=(rng.uniform(-6, 6), rng.uniform(-6, 6)))
     holder = C.flat_material("Gnomon_StoneHolder", (0.9, 0.85, 0.7))
     return {kind: C.mesh_object(f"Strata_{kind.capitalize()}", bm, holder) for kind, bm in bands.items()}
 
@@ -176,18 +171,18 @@ def build_cliff_timber(rng, tex):
             return Vector((C.A * scale * ct + tx * along, C.B * scale * st + ty * along, z))
 
         for along in (-4.5, 4.5):
-            ST.tube(bm, reg, [at(0.84, -8.8, along), at(0.975, -8.3, along)], [1.5, 1.5], 8, rng)
-        ST.tube(bm, reg, [at(0.962, -6.2, -8.5), at(0.962, -6.0, 8.5)], [1.35, 1.35], 8, rng)
-        ST.tube(bm, reg, [at(0.90, -19.5, 0.0), at(0.968, -9.4, 0.0)], [1.25, 1.25], 8, rng)
+            ST.tube(bm, reg, [at(k(0.84), -8.8, along), at(k(0.975), -8.3, along)], [1.5, 1.5], 8, rng)
+        ST.tube(bm, reg, [at(k(0.962), -6.2, -8.5), at(k(0.962), -6.0, 8.5)], [1.35, 1.35], 8, rng)
+        ST.tube(bm, reg, [at(k(0.90), -19.5, 0.0), at(k(0.968), -9.4, 0.0)], [1.25, 1.25], 8, rng)
         # rework: a small plank deck on the first shelf's exposed top (the top layer is recessed here),
         # on two bearers, with seams, cut ends and a raised trim board
         out = Vector((ct / C.A, st / C.B, 0)).normalized()
         along = Vector((tx, ty, 0))
-        shelf_top = -CAP - BANDS[0][1] * 0.97
+        shelf_top = -CAP - BANDS[0][1] * DEPTH * 0.97
         for r_ in (0.945, 0.966):
-            ST.tube(bm, reg, [at(r_, shelf_top + 0.35, -4.6), at(r_, shelf_top + 0.35, 4.6)], [0.4, 0.4], 6, rng)
-        D.plank_shelf(bm, reg, at(0.955, 0.0), out, along, rng, n=5, length=4.6, width=1.4, z=shelf_top + 1.0)
-    D.roots(bm, reg, rng, count=16, tube=ST.tube)
+            ST.tube(bm, reg, [at(k(r_), shelf_top + 0.35, -4.6), at(k(r_), shelf_top + 0.35, 4.6)], [0.4, 0.4], 6, rng)
+        D.plank_shelf(bm, reg, at(k(0.955), 0.0), out, along, rng, n=5, length=4.6, width=1.4, z=shelf_top + 1.0)
+    D.roots(bm, reg, rng, count=int(16 * C.SCALE), tube=ST.tube)
     obj = C.mesh_object("Cliff_Timber", bm, C.flat_material("Gnomon_TimberHolder", (0.7, 0.45, 0.2)))
     S.paint_scenery([obj], ST.wood_painter(reg), tex, px=ST._px(1024), roughness=0.9, **ST.AO)
     return obj
@@ -336,6 +331,121 @@ def build_fragments(rng, tex):
     G.finish()
 
 
+# --- obstacles (rework 2026-11-10 b) ---------------------------------------------------------------
+def rock_mesh(bm, o, rng):
+    """A low-poly rock or slab on a round footprint, its widest ring at the obstacle's radius (each side
+    0.9-1.0 of it), its top at the obstacle's height: an upright Cylinder collider of 0.94 of the radius
+    matches it (obstacles.COLLIDER_SHARE). Sunk half a stud into the ground so it never floats."""
+    x, y, r, h = o["x"], o["y"], o["r"], o["h"]
+    slab = o["kind"] == "slab"
+    sides = 9 if slab else rng.choice((6, 7, 7, 8))
+    if slab:
+        prof = [(-0.4, 0.97), (h * 0.55, 1.0), (h, 0.9)]
+    else:
+        prof = [(-0.5, 0.95), (h * 0.45, 1.0), (h * 0.8, 0.84)]
+    phase = rng.uniform(0, math.tau)
+    jit = [rng.uniform(0.9, 1.0) for _ in range(sides)]
+    angs = [phase + (i + rng.uniform(-0.2, 0.2)) / sides * math.tau for i in range(sides)]
+    rings = []
+    for n, (z, share) in enumerate(prof):
+        dz = rng.uniform(-0.1, 0.1) * h if n == 1 else 0.0
+        ring = []
+        for i, a in enumerate(angs):
+            rr = r * share * jit[i] * rng.uniform(0.97, 1.0)
+            ring.append(bm.verts.new((x + rr * math.cos(a), y + rr * math.sin(a), z + dz)))
+        rings.append(ring)
+    bm.faces.new(list(reversed(rings[0])))
+    for ra, rb in zip(rings, rings[1:]):
+        for i in range(sides):
+            j = (i + 1) % sides
+            bm.faces.new((ra[i], ra[j], rb[j], rb[i]))
+    if slab:
+        bm.faces.new(rings[-1])
+        return
+    # a broad, slightly tilted top facet: never above h
+    tilt = rng.uniform(0, math.tau)
+    top = [
+        bm.verts.new((x + r * 0.5 * jit[i] * math.cos(a), y + r * 0.5 * jit[i] * math.sin(a), h - 0.12 * h * (1 + math.cos(a - tilt)) / 2))
+        for i, a in enumerate(angs)
+    ]
+    for i in range(sides):
+        j = (i + 1) % sides
+        bm.faces.new((rings[-1][i], rings[-1][j], top[j], top[i]))
+    bm.faces.new(top)
+
+
+def build_obstacles(tex):
+    """The colliding props from obstacles.py: rocks (cream, blue-grey and sand, the island's own stone)
+    and tree stumps. The game adds a Cylinder collider per item from the same list (MapObstacles.luau);
+    these meshes never collide themselves."""
+    stone, wood, reg = bmesh.new(), bmesh.new(), []
+    for o in OBSTACLES:
+        rng = random.Random(o["seed"])
+        if o["kind"] == "stump":
+            x, y, r, h = o["x"], o["y"], o["r"], o["h"]
+            ST.tube(wood, reg, [Vector((x, y, -0.4)), Vector((x, y, h))], [r, r * 0.97], 10, rng, jitter=0.02)
+            ST.tube(wood, reg, [Vector((x, y, -0.4)), Vector((x, y, 0.6))], [r * 1.16, r * 0.99], 10, rng, caps=(False, False), jitter=0.02)
+        else:
+            rock_mesh(stone, o, rng)
+    rocks = [o for o in OBSTACLES if o["kind"] != "stump"]
+    xs = np.array([o["x"] for o in rocks])
+    ys = np.array([o["y"] for o in rocks])
+    kinds = np.array([o["stone"] for o in rocks])
+
+    def rock_painter(Pw, N, obj):
+        d2 = (Pw[..., 0, None] - xs) ** 2 + (Pw[..., 1, None] - ys) ** 2
+        return ST.stone_colour(kinds[np.argmin(d2, axis=-1)], Pw, N)
+
+    s_obj = C.mesh_object("Obstacles_Stone", stone, C.flat_material("Gnomon_ObstacleStone", (0.9, 0.85, 0.7)))
+    S.paint_scenery([s_obj], rock_painter, tex, px=ST._px(1024), roughness=0.95, **ST.AO)
+    w_obj = C.mesh_object("Obstacles_Wood", wood, C.flat_material("Gnomon_ObstacleWood", (0.6, 0.4, 0.3)))
+    S.paint_scenery([w_obj], ST.wood_painter(reg), tex, px=ST._px(512), roughness=0.9, **ST.AO)
+
+
+# --- the backdrop's distance from the rim (rework 2026-11-10 b) --------------------------------------
+# Every backdrop cluster as it was laid out round the ORIGINAL oval: (x, y, z) of its centre. push_backdrop
+# moves each vertex with its nearest cluster, so islets, trees and balloons keep their sizes and shapes.
+def _anchors():
+    pts = [(232, 108, 8), (-300, -150, 0), (-250, 46, 11), (-20, 222, 6), (-280, -430, 0), (-40, 480, 24), (380, 30, -25)]
+    pts += [(x, y, z) for x, y, z, _ in FRAGMENTS]
+    pts += [GS.LAUNCH, (-250, 235, 78), (-540, 560, 200), (-520, -1050, 60)]
+    return pts
+
+
+def pushed(x, y, z=0.0):
+    """Where a point laid out round the original oval goes for this map's oval: outside it, out by how far
+    the rim moved at its bearing (the same gap to the rim); under it (fragments), scaled with the island
+    in plan and sunk with its extra depth."""
+    a0, b0 = C.ORIGINAL_OVAL
+    r = math.hypot(x / a0, y / b0)
+    if C.SCALE == 1:
+        return x, y, z
+    if r < 1:
+        return x * C.SCALE, y * C.SCALE, (z * DEPTH if z < -20 else z)
+    return x + x / r * (C.SCALE - 1), y + y / r * (C.SCALE - 1), z
+
+
+ARENA_PARTS = ("Meadow_", "Rim_", "Lip_", "Strata_", "Cliff_", "Obstacles_", "MeadowTuft_")
+
+
+def push_backdrop():
+    if C.SCALE == 1:
+        return
+    anchors = np.array([(a[0], a[1]) for a in _anchors()], float)
+    deltas = np.array([np.subtract(pushed(*a), a) for a in _anchors()], float)
+    for obj in C.collection("Export").objects:
+        if obj.type != "MESH" or obj.name.startswith(ARENA_PARTS):
+            continue
+        assert obj.matrix_world.is_identity, obj.name
+        me = obj.data
+        co = np.empty((len(me.vertices), 3))
+        me.vertices.foreach_get("co", co.ravel())
+        near = np.argmin(((co[:, None, :2] - anchors[None]) ** 2).sum(-1), axis=1)
+        co += deltas[near]
+        me.vertices.foreach_set("co", co.ravel())
+        me.update()
+
+
 SUN = (200, 40)  # heading (0 = east), elevation, in degrees
 BACKDROP_SEED = 111
 
@@ -356,9 +466,9 @@ MEET = math.radians(200)  # the sunlit timber spot, for the close-up where grass
 
 
 def cameras():
-    cams = C.standard_cameras(gameplay_target=(60, 10, -4), edge_target=(380, 30, 20))
+    cams = C.standard_cameras(gameplay_target=(60, 10, -4), edge_target=pushed(380, 30, 20))
     for name, (loc, target, lens) in GS.CAMS.items():
-        cams[name] = C.camera(name, loc, target, lens)
+        cams[name] = C.camera(name, pushed(*loc), pushed(*target), lens)
     ct, st = math.cos(MEET), math.sin(MEET)
     nx, ny = ct / C.A, st / C.B
     ln = math.hypot(nx, ny)
@@ -367,30 +477,45 @@ def cameras():
     cams["Meet"] = C.camera("Meet", (px + nx * 17 + ny * 10, py + ny * 17 - nx * 10, 4.5), (px * 0.972, py * 0.972, -6.5), 30)
     # rework: the lobby's view (spawn and both ends of its viewing edge, avatar camera height; the lobby
     # floor is a stud above the arena's) and a wide view of the underside and the sky below
-    cams["LobbySpawn"] = C.camera("LobbySpawn", (0, -300, 12), (0, 0, -2), 18)
-    cams["LobbyEdgeW"] = C.camera("LobbyEdgeW", (-86, -176, 9), (10, 0, -2), 18)
-    cams["LobbyEdgeE"] = C.camera("LobbyEdgeE", (86, -176, 9), (-10, 0, -2), 18)
-    cams["Underside"] = C.camera("Underside", (300, -170, -150), (0, 10, -60), 20)
+    # 2026-11-10 b: the lobby moved out to Roblox Z 250..490 and up 11 studs (GameConfig.Lobby FloorY 111): eye
+    # 15.5 above the arena's floor; spawn at Z 266, viewing edge at Z 250 (Blender y = -Z)
+    cams["LobbySpawn"] = C.camera("LobbySpawn", (0, -266, 15.5), (0, -40, -2), 24)
+    cams["LobbyEdgeW"] = C.camera("LobbyEdgeW", (-86, -252, 15.5), (10, -20, -2), 24)
+    cams["LobbyEdgeC"] = C.camera("LobbyEdgeC", (0, -252, 15.5), (0, -30, -2), 24)
+    cams["LobbyEdgeE"] = C.camera("LobbyEdgeE", (86, -252, 15.5), (-10, -20, -2), 24)
+    cams["Underside"] = C.camera("Underside", (520, -300, -230), (0, 10, -90), 22)
+    cams["Obstacles"] = C.camera("Obstacles", (-150, -60, 6), (40, 40, 0), 24)
     return cams
 
 
 def build(out):
+    # Local to this map build. Other map palettes retain their own settings.
+    ST.PAL.update({
+        "leaf": P.rgb(10, 221, 8), "warm": P.rgb(32, 226, 15), "cool": P.rgb(9, 205, 32),
+        "lip": P.rgb(50, 218, 20), "lip_hi": P.rgb(111, 230, 48),
+        "drape": P.rgb(24, 158, 19), "drape_dark": P.rgb(15, 105, 23),
+        "blade": P.rgb(102, 206, 36), "blade_dark": P.rgb(17, 98, 22),
+    })
+    D.LIP_ROWS = [(111, 230, 48), (40, 211, 16), (24, 158, 19), (17, 128, 22), (15, 105, 23)]
     rng = random.Random(11)
     C.reset()
     C.sky_and_sun(*SUN)
     tex = os.path.join(out, "textures")
+    if C.SCALE > 1:  # a plain matte ground needs no fine detail: bigger tiles, 4 px a stud, the same 12 pieces
+        S.TILE, S.TILE_PX = 128.0, (128 if ST.FAST else 512)
     S.surface_tiles("Meadow", -CAP, meadow_painter, tex)
     S.rim_strip("Rim_Turf", C.RIM, CAP, 0.3, rim_painter, tex, px=ST._px(1024))
     strata = build_strata(rng)
     for kind, obj in strata.items():
         walls, soffits = S.split_caps(obj)
-        S.paint_scenery(S.split_sectors(walls, 4), ST.stone_painter(kind), tex, px=ST._px(1024), roughness=0.95, **ST.AO)
+        S.paint_scenery(S.split_sectors(walls, int(4 * C.SCALE)), ST.stone_painter(kind), tex, px=ST._px(1024), roughness=0.95, **ST.AO)
         S.paint_scenery(S.split_sectors(soffits, 2), ST.stone_painter(kind), tex, px=ST._px(512), roughness=0.95, **ST.AO)
     build_cliff_timber(rng, tex)
     D.turf_lip(tex, rng=rng)
-    D.grass(tex)
-    build_meadow_flowers(random.Random(23))
+    # Sparse, individually pivoted clumps reuse the old Fairy grass motion in Roblox.
+    MG.build(tex)
     build_backdrop(random.Random(BACKDROP_SEED), tex)
+    push_backdrop()
     # no outlines (user decision 2026-11-10): shapes read from geometry, colour, lighting and contact shadow
     for name, n in D.corridor_report():
         print("CORRIDOR", name, n)

@@ -289,6 +289,37 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
 ### bot fill in Team Test (2026-11-10, committed; user confirmed bots work in Team Test)
 - Round.BotFillStudioOnly = false: bots fill on any server, one real player starts a round, the test bot counts.
 - BEFORE THE GAME GOES PUBLIC: turn BotFillStudioOnly back on, or build the real few-players bot rule.
+
+### mapswap-1 + arena-1: Gnomon rework b (2026-11-10, NOT COMMITTED - waiting for the user's verdict)
+- MAP SWAP AT ROUND START (mapswap-1): MapService:RoundEnded only counts; RoundService calls
+  MapService:ChangeForNextRound when the intermission countdown runs out, before placing anyone. The finished map stays
+  through RoundOver and the whole intermission; too few players -> no round -> no change. Tested in Play: winner round,
+  everyone-out round, swap gnomon->kitestead->saltcrest each at the next round's start (pending, swap, Starting).
+- GNOMON DOUBLED ONCE: 426 x 352 (semi 213 x 176). Absolute numbers in MapEnvironments.gnomon.arena (with `original`
+  106.5 x 88) and design/maps/common.py OVALS (ORIGINAL_OVAL kept). Round.arenaFor / ActiveArena give every system the
+  live map's oval: Round.isOut (oval + PlayAreaMargin), Round.spawnPoints (oval at spawnShare 0.65), bots
+  (BotBrain.steer shape: oval edge + going round obstacles), the kick rebound (smaller semi-axis). Stand-in maps keep
+  the base circle. Environment.limitsFor grows the fight space / lobby view / cloud and leaf distances per map; the lobby
+  view rule is now lobbyCorridor (lobby to arena) + lobbyBehindCorridor (behind it; the old one also swept beside it).
+  Two Gnomon clouds moved out; Gnomon's leaves and landmarks moved with the backdrop.
+- LOBBY: ViewEdgeZ 170 -> 250 (past the bigger out line), SpawnZ -> 266, FloorY 101 -> 111 (the most Lobby.seesNearEdge
+  allows). Fill bots wait in rows behind the spawn, not on the viewing edge. Raycasts from the spawn, the edge centre and
+  both ends to 9 near-rim points, the centre, the far side and a fighter's head: all clear.
+- GROUND: no 3D grass, painted blades or meadow flowers; shade 9 (deep forest green) everywhere grassy, matte (style.PAL).
+  GrassWind finds no grass on Gnomon now (harmless).
+- OBSTACLES: design/maps/obstacles.py -> Config/MapObstacles.luau (20 in 15 groups, rules checked there and in
+  tests/ArenaShape.spec). MapService adds invisible upright Cylinder colliders, frictionless, CanQuery FALSE (measured: a
+  queryable knee-high collider lets a Humanoid step up onto it). Every rock and stump >= 2.4 tall (a low rock beside a tall
+  one made a stair). Isolated runs: 0 of 62 went over at 36 and 80 studs/s; biggest hop 1.8 at dash speed.
+- SCENERY: balloon pieces bobbed apart (each part had its own phase) -> one phase per bob rule (EnvironmentKit); balloon
+  geometry now joined (load ring, ropes on it, burner frame on the ropes); launch-field ropes end on the basket and mouth.
+  design/maps/check_scene.py (loose pieces, clashes, bob reach, buried obstacles): clean.
+- IMPORT (place, saved v208): Open Cloud Models 137947322138540 (arena half) + 97763502817350 (backdrop half) + 126646880044031
+  (obstacles, no-stair heights), aligned by design/maps/out/gnomon/upload/*centres.json (arrived turned 26 deg; residual
+  < 0.002 studs) as ServerStorage.HT_Maps.Gnomon; the old model is ServerStorage.HT_MapsArchive.Gnomon_before_rework_b.
+- NOT VERIFIED: real dash/punch knockback into props with the real controls (tested with Humanoid runs at 36/80), a real
+  player falling onto a rock, phones, more than one real player, shadows' readability on the very dark ground (judge it),
+  Kitestead/Saltcrest untouched (still stand-ins at the old size).
 ### move-8 (2026-11-10, spicy; COMMITTED, NOT PUSHED, NOT TRIED BY THE USER YET)
 - KICK LANDINGS: the ground break + explosion now show for every kicked landing. Cause found in Play: the server
   reported every landing (slam and finisher), but each client looked for floor under the body AS IT SAW IT, which
@@ -369,3 +400,8 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   FX/sound made audible (the old "bump" sound peaks at 6) and sized by the knock.
 - Checked in Play: hold release 0.07, kick request/root, bump fires at contact distance (2.9). NOT checked:
   the new animations by eye, two players bumping, the backward throw on a real run.
+- 2026-11-11 (user, in Studio): Gnomon got "vibrant" grass: 86 LushGrass_* MeshParts (design/maps/build_lush.py,
+  meadow_grass.py, apply_lush.luau; src/shared/GrassClumps.luau animates MeadowTuft_* clumps from EnvironmentKit). The
+  previous model is ServerStorage.HT_MapsArchive.Gnomon_before_vibrant_grass_20261111. OPEN: that pass dropped the
+  Obstacles_Stone / Obstacles_Wood meshes from the live map, but MapService still adds their 20 colliders from
+  Config/MapObstacles, so the rocks are invisible walls until the meshes go back (they're in the archived model).

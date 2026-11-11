@@ -22,6 +22,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Environment = require(script.Parent.Core.Environment)
 local GrassWind = require(script.Parent.GrassWind)
+local GrassClumps = require(script.Parent.GrassClumps)
 local Envs = require(script.Parent.Config.MapEnvironments)
 
 local EnvironmentKit = {}
@@ -309,6 +310,7 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 
 	local bobs: { Bob } = {}
 	local grass: GrassWind.Swayer? = nil
+	local clumps: GrassClumps.Animator? = nil
 
 	-- every moving part, in one list for a single BulkMoveTo per frame
 	local parts: { BasePart } = {}
@@ -353,6 +355,10 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 			local sway = (b.rule.sway or 0) * math.sin(w * 0.5)
 			b.part.CFrame = b.home + Vector3.new(wx * sway, rise, wz * sway)
 		end
+		if clumps then
+			local camera = workspace.CurrentCamera
+			clumps:step(t, camera and camera.CFrame.Position)
+		end
 		if grass then
 			local camera = workspace.CurrentCamera
 			grass:step(t, camera and camera.CFrame.Position)
@@ -376,6 +382,10 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 			grass:destroy()
 		end
 		grass = GrassWind.new(mapModel, p.wind)
+		if clumps then
+			clumps:destroy()
+		end
+		clumps = GrassClumps.new(mapModel, p.wind)
 		if not mapModel then
 			return
 		end
@@ -384,7 +394,12 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 				local owner = inst.Name:gsub("_Line$", "")
 				for _, rule in p.scenery.bob do
 					if owner:match(rule.match) then
-						local phase = Environment.hash(#owner, owner:byte(-1) or 0, 5) * 2 * math.pi
+						-- ONE phase per rule, so every piece a rule moves (a balloon's envelope colours, basket,
+						-- trim, ropes and burner are separate parts) bobs as one assembly. Fixed 2026-11-10: the
+						-- phase came from each part's own name, so the pieces drifted apart as they bobbed.
+						local phase = Environment.hash(#rule.match, rule.match:byte(-1) or 0, 5)
+							* 2
+							* math.pi
 						table.insert(
 							bobs,
 							{ part = inst, home = inst.CFrame, rule = rule, phase = phase }
@@ -406,6 +421,10 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 		if grass then
 			grass:destroy()
 			grass = nil
+		end
+		if clumps then
+			clumps:destroy()
+			clumps = nil
 		end
 		folder:Destroy()
 	end

@@ -34,6 +34,29 @@ Environment.Limits = {
 	moteMinDistance = 170, -- drifting leaves stay this far out horizontally
 }
 
+-- The original oval these limits were tuned on (semi-axes): a bigger map's limits grow by how much bigger it is.
+local BASE_SEMI_X, BASE_SEMI_Z = 106.5, 88
+
+--- The limits for one arena (2026-11-10 b: Gnomon doubled): the fight space, the lobby's view of the arena and
+--- the clouds' and leaves' distances grow with the map's own oval (`arena.SemiX/SemiZ` from Round.arenaFor);
+--- a map without an oval keeps `Environment.Limits`.
+function Environment.limitsFor(arena: any?): any
+	local L = Environment.Limits
+	local gx = if arena and arena.SemiX then math.max(arena.SemiX - BASE_SEMI_X, 0) else 0
+	local gz = if arena and arena.SemiZ then math.max(arena.SemiZ - BASE_SEMI_Z, 0) else 0
+	if gx == 0 and gz == 0 then
+		return L
+	end
+	local out = table.clone(L)
+	out.fightHalfX += gx
+	out.fightHalfZ += gz
+	out.viewHalfX += gx
+	out.viewHalfZ += gz
+	out.cloudMinDistance += math.max(gx, gz)
+	out.moteMinDistance += math.max(gx, gz)
+	return out
+end
+
 local function isArray(t: any): boolean
 	return type(t) == "table" and (t[1] ~= nil or next(t) == nil)
 end
@@ -206,7 +229,7 @@ end
 --- patch, floor to above eye height) to the arena (oval, rim and underside, and the air an uppercut
 --- reaches), carried on past the arena so nothing sits behind it either.
 function Environment.lobbyCorridor(lobby: any, arena: any): Corridor
-	local L = Environment.Limits
+	local L = Environment.limitsFor(arena)
 	local half = lobby.Width / 2
 	local cx = lobby.CenterX - arena.CenterX
 	local floor = lobby.FloorY - arena.CenterY
@@ -230,7 +253,35 @@ function Environment.lobbyCorridor(lobby: any, arena: any): Corridor
 			z0 = -L.viewHalfZ,
 			z1 = L.viewHalfZ,
 		},
-		tMax = L.viewReach,
+		-- 1: lobby to arena. What lies BEHIND the arena is lobbyBehindCorridor (2026-11-10 b: running this one
+		-- on past t = 1 also swept the space beside the arena, since the arena box spans its whole depth)
+		tMax = 1,
+	}
+end
+
+--- The lobby's view carried on past the arena: from the arena box's far face out to where the lobby-to-arena
+--- view reaches at `viewReach` times its length, so nothing sits behind the arena as seen from the lobby
+--- either (the space beside the arena is not in it).
+function Environment.lobbyBehindCorridor(lobby: any, arena: any): Corridor
+	local near = Environment.lobbyCorridor(lobby, arena)
+	local f, t = near.from, near.to
+	local k = Environment.limitsFor(arena).viewReach
+	local function at(a: number, b: number): number
+		return a + (b - a) * k
+	end
+	local farZ = at(f.z0, t.z0)
+	return {
+		name = "lobby view behind the arena",
+		from = { x0 = t.x0, x1 = t.x1, y0 = t.y0, y1 = t.y1, z0 = t.z0, z1 = t.z0 },
+		to = {
+			x0 = at(f.x0, t.x0),
+			x1 = at(f.x1, t.x1),
+			y0 = at(f.y0, t.y0),
+			y1 = at(f.y1, t.y1),
+			z0 = farZ,
+			z1 = farZ,
+		},
+		tMax = 1,
 	}
 end
 
@@ -288,8 +339,14 @@ function Environment.inCorridor(c: Corridor, px: number, py: number, pz: number,
 	return lo <= hi
 end
 
-function Environment.inFightSpace(px: number, py: number, pz: number, r: number): boolean
-	local L = Environment.Limits
+function Environment.inFightSpace(
+	px: number,
+	py: number,
+	pz: number,
+	r: number,
+	arena: any?
+): boolean
+	local L = Environment.limitsFor(arena)
 	return math.abs(px) < L.fightHalfX + r
 		and math.abs(pz) < L.fightHalfZ + r
 		and py > L.fightBottom - r
@@ -301,9 +358,10 @@ local SWAY_SAMPLES = 16
 --- Everything wrong with a preset's clouds and leaves, as readable lines (empty when it's clean). Checks
 --- every mass of every cloud over its whole sway, and every leaf over its whole fall.
 function Environment.problems(preset: any, lobby: any, arena: any): { string }
-	local L = Environment.Limits
+	local L = Environment.limitsFor(arena)
 	local out: { string } = {}
-	local corridors = { Environment.lobbyCorridor(lobby, arena) }
+	local corridors =
+		{ Environment.lobbyCorridor(lobby, arena), Environment.lobbyBehindCorridor(lobby, arena) }
 	for _, mark in preset.landmarks or {} do
 		table.insert(corridors, Environment.landmarkCorridor(mark))
 	end
@@ -330,7 +388,7 @@ function Environment.problems(preset: any, lobby: any, arena: any): { string }
 				if (py - m.r) < d * minElev then
 					note("below the sky band (sits behind fighters or the platform edge)")
 				end
-				if Environment.inFightSpace(px, py, pz, m.r) then
+				if Environment.inFightSpace(px, py, pz, m.r, arena) then
 					note("in the fighting space")
 				end
 				for _, c in corridors do

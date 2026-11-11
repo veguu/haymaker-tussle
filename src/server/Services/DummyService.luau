@@ -26,11 +26,13 @@ local Typography = require(ReplicatedStorage.Shared.Typography)
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local AirRecovery = require(ReplicatedStorage.Shared.Core.AirRecovery)
+local ActiveArena = require(ReplicatedStorage.Shared.ActiveArena)
 local BotBrain = require(ReplicatedStorage.Shared.Core.BotBrain)
 local Clash = require(ReplicatedStorage.Shared.Core.Clash)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local DiveKick = require(ReplicatedStorage.Shared.Core.DiveKick)
 local Momentum = require(ReplicatedStorage.Shared.Core.Momentum)
+local Round = require(ReplicatedStorage.Shared.Core.Round)
 local TrainingLayout = require(ReplicatedStorage.Shared.Core.TrainingLayout)
 local Combatants = require(script.Parent.Parent.Combatants)
 
@@ -475,13 +477,17 @@ local function think(dummy: Dummy, root: BasePart, now: number): (number, number
 			else nil
 		seen = lagged or target.Position
 	end
+	-- the live map's oval and obstacles: the edge it won't run off, and the rocks it goes round
+	local live = ActiveArena.get()
+	local semiX, semiZ = Round.semiAxes(live)
 	local inputX, inputZ = BotBrain.steer(
 		botCfg,
-		arena.StartRadius,
+		live.StartRadius,
 		position.X - ARENA_CENTER.X,
 		position.Z - ARENA_CENTER.Z,
 		if seen then seen.X - ARENA_CENTER.X else nil,
-		if seen then seen.Z - ARENA_CENTER.Z else nil
+		if seen then seen.Z - ARENA_CENTER.Z else nil,
+		{ semiX = semiX, semiZ = semiZ, obstacles = live.Obstacles }
 	)
 
 	local inReach = false

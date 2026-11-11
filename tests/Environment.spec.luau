@@ -2,6 +2,7 @@
 local Environment = require("../src/shared/Core/Environment")
 local Envs: any = require("../src/shared/Config/MapEnvironments")
 local GameConfig: any = require("../src/shared/Config/GameConfig")
+local Round = require("../src/shared/Core/Round")
 
 local LOBBY = GameConfig.Lobby
 local ARENA = GameConfig.Arena
@@ -12,7 +13,9 @@ return {
 			assert(Envs.Maps[id], `{id} is in the rotation but has no entry in MapEnvironments`)
 		end
 		for id in Envs.Maps do
-			local problems = Environment.problems(Environment.resolve(Envs, id), LOBBY, ARENA)
+			-- each map against its own arena (Gnomon's doubled oval grows the fight space and the lobby's view)
+			local arena = Round.arenaFor(ARENA, Envs.Maps[id], nil)
+			local problems = Environment.problems(Environment.resolve(Envs, id), LOBBY, arena)
 			assert(#problems == 0, `{id}:\n  ` .. table.concat(problems, "\n  "))
 		end
 	end,
@@ -88,7 +91,25 @@ return {
 		local c = Environment.lobbyCorridor(LOBBY, ARENA)
 		assert(Environment.inCorridor(c, 0, 5, 150, 1), "between the viewing edge and the arena")
 		assert(Environment.inCorridor(c, 0, -40, 0, 1), "under the arena")
-		assert(Environment.inCorridor(c, 0, 20, -300, 1), "right behind the arena")
+		local behind = Environment.lobbyBehindCorridor(LOBBY, ARENA)
+		assert(Environment.inCorridor(behind, 0, 20, -300, 1), "right behind the arena")
+		assert(not Environment.inCorridor(behind, 0, 20, 150, 1), "the behind view stays behind")
+		-- beside the doubled Gnomon arena, level with it, is not in either view (its side islets live there)
+		local gnomon = Round.arenaFor(ARENA, Envs.Maps.gnomon, nil)
+		assert(
+			not Environment.inCorridor(Environment.lobbyCorridor(LOBBY, gnomon), 330, 30, -150, 16),
+			"beside, near"
+		)
+		assert(
+			not Environment.inCorridor(
+				Environment.lobbyBehindCorridor(LOBBY, gnomon),
+				330,
+				30,
+				-150,
+				16
+			),
+			"beside, behind"
+		)
 		assert(not Environment.inCorridor(c, 600, 50, 150, 10), "far off to the side")
 		assert(not Environment.inCorridor(c, 0, 600, -300, 10), "high above")
 	end,

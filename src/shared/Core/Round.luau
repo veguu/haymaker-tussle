@@ -20,6 +20,14 @@ export type ArenaSettings = {
 	EliminationDepth: number,
 	EliminationBatchSeconds: number,
 	PlayAreaMargin: number,
+	-- An oval arena (a map's `arena` in MapEnvironments): semi-axes of the walkable oval along X and Z, and the
+	-- spawn oval's. Absent -> the circle of StartRadius / SpawnRadius (stand-in maps).
+	SemiX: number?,
+	SemiZ: number?,
+	SpawnSemiX: number?,
+	SpawnSemiZ: number?,
+	-- Colliding obstacles on the floor, from the centre (Config/MapObstacles): x, z, radius, height.
+	Obstacles: { { x: number, z: number, r: number, h: number } }?,
 }
 
 export type RoundSettings = {
@@ -45,6 +53,29 @@ function Round.rosterSize(cfg: RoundSettings, ready: number): number
 	return math.clamp(ready, 0, cfg.MaxPlayers)
 end
 
+--- The arena settings for a map: the shared `base` (GameConfig.Arena) with the map's own oval (`entry.arena`
+--- from MapEnvironments) and obstacles laid over it. A map without an `arena` keeps the base circle. A new
+--- table every time; `base` is never changed. StartRadius becomes the oval's smaller semi-axis, so anything
+--- that still thinks in a circle (the kick rebound's landing check) stays on the floor.
+function Round.arenaFor(base: ArenaSettings, entry: any?, obstacles: { any }?): ArenaSettings
+	local out: any = table.clone(base)
+	local shape = entry and entry.arena
+	if shape then
+		local share = shape.spawnShare or (base.SpawnRadius / base.StartRadius)
+		out.SemiX, out.SemiZ = shape.semiX, shape.semiZ
+		out.SpawnSemiX, out.SpawnSemiZ = shape.semiX * share, shape.semiZ * share
+		out.StartRadius = math.min(shape.semiX, shape.semiZ)
+		out.SpawnRadius = math.min(out.SpawnSemiX, out.SpawnSemiZ)
+	end
+	out.Obstacles = obstacles
+	return out :: ArenaSettings
+end
+
+--- The walkable oval's semi-axes (the circle's radius twice for a round arena).
+function Round.semiAxes(arena: ArenaSettings): (number, number)
+	return arena.SemiX or arena.StartRadius, arena.SemiZ or arena.StartRadius
+end
+
 --- Where `count` fighters start: evenly round a ring of `SpawnRadius`, each facing the middle, turned by
 --- `turn` radians so the ring isn't always in the same place. As many points as fighters, so a small
 --- round is spread as wide as a full one. Never more points than `SpawnCount`; any extra fighters share
@@ -56,11 +87,15 @@ function Round.spawnPoints(arena: ArenaSettings, count: number, turn: number): {
 		local slot = (index - 1) % slots
 		local angle = turn + slot / slots * math.pi * 2
 		local x, z = math.cos(angle), math.sin(angle)
+		-- on the spawn oval (a circle when the arena is round), facing the middle
+		local sx = x * (arena.SpawnSemiX or arena.SpawnRadius)
+		local sz = z * (arena.SpawnSemiZ or arena.SpawnRadius)
+		local length = math.sqrt(sx * sx + sz * sz)
 		points[index] = {
-			x = arena.CenterX + x * arena.SpawnRadius,
-			z = arena.CenterZ + z * arena.SpawnRadius,
-			faceX = -x,
-			faceZ = -z,
+			x = arena.CenterX + sx,
+			z = arena.CenterZ + sz,
+			faceX = -sx / length,
+			faceZ = -sz / length,
 		}
 	end
 	return points
@@ -72,7 +107,10 @@ function Round.isOut(arena: ArenaSettings, x: number, y: number, z: number): boo
 		return true
 	end
 	local dx, dz = x - arena.CenterX, z - arena.CenterZ
-	return math.sqrt(dx * dx + dz * dz) > arena.StartRadius + arena.PlayAreaMargin
+	-- past the arena's oval grown by the margin on every side (a circle when the arena is round)
+	local a, b = Round.semiAxes(arena)
+	local mx, mz = a + arena.PlayAreaMargin, b + arena.PlayAreaMargin
+	return (dx / mx) ^ 2 + (dz / mz) ^ 2 > 1
 end
 
 --- Who gets the ring-out: whoever last hit them, if that was within `CreditSeconds` of going out.

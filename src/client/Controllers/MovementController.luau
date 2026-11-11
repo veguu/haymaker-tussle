@@ -30,6 +30,7 @@ local Knit = require(ReplicatedStorage.Packages.Knit)
 local Signal = require(ReplicatedStorage.Packages.Signal)
 local Trove = require(ReplicatedStorage.Packages.Trove)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
+local ActiveArena = require(ReplicatedStorage.Shared.ActiveArena)
 local AirRecovery = require(ReplicatedStorage.Shared.Core.AirRecovery)
 local Clash = require(ReplicatedStorage.Shared.Core.Clash)
 local BumpPredict = require(ReplicatedStorage.Shared.BumpPredict)
@@ -419,7 +420,8 @@ function MovementController:_bind(
 						then Lobby.disc(lobbyCfg)
 						else TrainingLayout.platformAt(
 							GameConfig.Training,
-							GameConfig.Arena,
+							-- the live map's arena (its smaller semi-axis as the radius on an oval)
+							ActiveArena.get() :: any,
 							at.X,
 							at.Z
 						)

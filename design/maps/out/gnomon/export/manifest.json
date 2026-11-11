@@ -10,7 +10,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 1024,
+   "texture_size": 512,
    "can_collide": true,
    "within_limits": true
   },
@@ -22,7 +22,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 1024,
+   "texture_size": 512,
    "can_collide": true,
    "within_limits": true
   },
@@ -34,7 +34,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 1024,
+   "texture_size": 512,
    "can_collide": true,
    "within_limits": true
   },
@@ -46,7 +46,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 1024,
+   "texture_size": 512,
    "can_collide": true,
    "within_limits": true
   },
@@ -58,7 +58,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 1024,
+   "texture_size": 512,
    "can_collide": true,
    "within_limits": true
   },
@@ -70,7 +70,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 1024,
+   "texture_size": 512,
    "can_collide": true,
    "within_limits": true
   },
@@ -82,7 +82,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 1024,
+   "texture_size": 512,
    "can_collide": true,
    "within_limits": true
   },
@@ -94,7 +94,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 1024,
+   "texture_size": 512,
    "can_collide": true,
    "within_limits": true
   },
@@ -106,7 +106,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 1024,
+   "texture_size": 512,
    "can_collide": true,
    "within_limits": true
   },
@@ -118,7 +118,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 1024,
+   "texture_size": 512,
    "can_collide": true,
    "within_limits": true
   },
@@ -130,7 +130,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 1024,
+   "texture_size": 512,
    "can_collide": true,
    "within_limits": true
   },
@@ -142,13 +142,13 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 1024,
+   "texture_size": 512,
    "can_collide": true,
    "within_limits": true
   },
   {
    "name": "Rim_Turf_1",
-   "triangles": 1206,
+   "triangles": 1686,
    "textures": {
     "colour": "",
     "normal": "",
@@ -160,7 +160,7 @@
   },
   {
    "name": "Rim_Turf_2",
-   "triangles": 1206,
+   "triangles": 1686,
    "textures": {
     "colour": "",
     "normal": "",
@@ -172,26 +172,6 @@
   },
   {
    "name": "Strata_Cream.001_1",
-   "triangles": 76,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 1024,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Strata_Cream.001_2",
-   "triangles": 76,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 1024,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Strata_Cream.001_3",
    "triangles": 92,
    "textures": {
     "colour": ""
@@ -201,7 +181,67 @@
    "within_limits": true
   },
   {
+   "name": "Strata_Cream.001_2",
+   "triangles": 84,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Cream.001_3",
+   "triangles": 60,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
    "name": "Strata_Cream.001_4",
+   "triangles": 92,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Cream.001_5",
+   "triangles": 92,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Cream.001_6",
+   "triangles": 84,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Cream.001_7",
+   "triangles": 68,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Cream.001_8",
    "triangles": 84,
    "textures": {
     "colour": ""
@@ -212,7 +252,7 @@
   },
   {
    "name": "Strata_Cream_Soffit_1",
-   "triangles": 64,
+   "triangles": 140,
    "textures": {
     "colour": ""
    },
@@ -222,7 +262,7 @@
   },
   {
    "name": "Strata_Cream_Soffit_2",
-   "triangles": 76,
+   "triangles": 140,
    "textures": {
     "colour": ""
    },
@@ -232,26 +272,6 @@
   },
   {
    "name": "Strata_Sand.001_1",
-   "triangles": 60,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 1024,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Strata_Sand.001_2",
-   "triangles": 86,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 1024,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Strata_Sand.001_3",
    "triangles": 90,
    "textures": {
     "colour": ""
@@ -261,8 +281,68 @@
    "within_limits": true
   },
   {
+   "name": "Strata_Sand.001_2",
+   "triangles": 84,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Sand.001_3",
+   "triangles": 116,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
    "name": "Strata_Sand.001_4",
-   "triangles": 104,
+   "triangles": 112,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Sand.001_5",
+   "triangles": 82,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Sand.001_6",
+   "triangles": 72,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Sand.001_7",
+   "triangles": 58,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Sand.001_8",
+   "triangles": 100,
    "textures": {
     "colour": ""
    },
@@ -272,7 +352,7 @@
   },
   {
    "name": "Strata_Sand_Soffit_1",
-   "triangles": 106,
+   "triangles": 284,
    "textures": {
     "colour": ""
    },
@@ -282,7 +362,7 @@
   },
   {
    "name": "Strata_Sand_Soffit_2",
-   "triangles": 152,
+   "triangles": 186,
    "textures": {
     "colour": ""
    },
@@ -292,7 +372,7 @@
   },
   {
    "name": "Strata_Bluegrey.001_1",
-   "triangles": 182,
+   "triangles": 150,
    "textures": {
     "colour": ""
    },
@@ -302,7 +382,7 @@
   },
   {
    "name": "Strata_Bluegrey.001_2",
-   "triangles": 156,
+   "triangles": 161,
    "textures": {
     "colour": ""
    },
@@ -312,7 +392,7 @@
   },
   {
    "name": "Strata_Bluegrey.001_3",
-   "triangles": 171,
+   "triangles": 164,
    "textures": {
     "colour": ""
    },
@@ -322,7 +402,47 @@
   },
   {
    "name": "Strata_Bluegrey.001_4",
-   "triangles": 142,
+   "triangles": 227,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Bluegrey.001_5",
+   "triangles": 204,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Bluegrey.001_6",
+   "triangles": 148,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Bluegrey.001_7",
+   "triangles": 116,
+   "textures": {
+    "colour": ""
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Strata_Bluegrey.001_8",
+   "triangles": 167,
    "textures": {
     "colour": ""
    },
@@ -332,7 +452,7 @@
   },
   {
    "name": "Strata_Bluegrey_Soffit_1",
-   "triangles": 269,
+   "triangles": 505,
    "textures": {
     "colour": ""
    },
@@ -342,7 +462,7 @@
   },
   {
    "name": "Strata_Bluegrey_Soffit_2",
-   "triangles": 246,
+   "triangles": 444,
    "textures": {
     "colour": ""
    },
@@ -352,7 +472,7 @@
   },
   {
    "name": "Cliff_Timber",
-   "triangles": 1648,
+   "triangles": 2176,
    "textures": {
     "colour": ""
    },
@@ -362,163 +482,11 @@
   },
   {
    "name": "Lip_Turf",
-   "triangles": 4320,
+   "triangles": 8640,
    "textures": {
     "colour": ""
    },
    "texture_size": 128,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Tufts_01",
-   "triangles": 7965,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 128,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Tufts_02",
-   "triangles": 7839,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 128,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Tufts_03",
-   "triangles": 7785,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 128,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Tufts_04",
-   "triangles": 7155,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 128,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Tufts_05",
-   "triangles": 6984,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 128,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Tufts_06",
-   "triangles": 7524,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 128,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Tufts_07",
-   "triangles": 8145,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 128,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Tufts_08",
-   "triangles": 7164,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 128,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Tufts_09",
-   "triangles": 7254,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 128,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Tufts_10",
-   "triangles": 7011,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 128,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Tufts_11",
-   "triangles": 7992,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 128,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Tufts_12",
-   "triangles": 7371,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 128,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Flowers_Meadow_stem",
-   "triangles": 1320,
-   "texture": "gnomon_Flowers_Meadow_stem.png",
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Flowers_Meadow_coral",
-   "triangles": 360,
-   "texture": "gnomon_Flowers_Meadow_coral.png",
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Flowers_Meadow_gold",
-   "triangles": 880,
-   "texture": "gnomon_Flowers_Meadow_gold.png",
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Flowers_Meadow_cream",
-   "triangles": 520,
-   "texture": "gnomon_Flowers_Meadow_cream.png",
-   "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   },
@@ -748,7 +716,7 @@
   },
   {
    "name": "Sight_BalloonNear_rope",
-   "triangles": 48,
+   "triangles": 240,
    "texture": "gnomon_Sight_BalloonNear_rope.png",
    "texture_size": 64,
    "can_collide": false,
@@ -756,7 +724,7 @@
   },
   {
    "name": "Sight_BalloonNear_burner",
-   "triangles": 12,
+   "triangles": 36,
    "texture": "gnomon_Sight_BalloonNear_burner.png",
    "texture_size": 64,
    "can_collide": false,
@@ -796,7 +764,7 @@
   },
   {
    "name": "Sight_BalloonFar_rope",
-   "triangles": 48,
+   "triangles": 240,
    "texture": "gnomon_Sight_BalloonFar_rope.png",
    "texture_size": 64,
    "can_collide": false,
@@ -804,7 +772,7 @@
   },
   {
    "name": "Sight_BalloonFar_burner",
-   "triangles": 12,
+   "triangles": 36,
    "texture": "gnomon_Sight_BalloonFar_burner.png",
    "texture_size": 64,
    "can_collide": false,
@@ -977,6 +945,26 @@
    "triangles": 3776,
    "textures": {
     "colour": ""
+   },
+   "texture_size": 512,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Obstacles_Stone",
+   "triangles": 784,
+   "textures": {
+    "colour": "Obstacles_Stone_Color.png"
+   },
+   "texture_size": 1024,
+   "can_collide": false,
+   "within_limits": true
+  },
+  {
+   "name": "Obstacles_Wood",
+   "triangles": 280,
+   "textures": {
+    "colour": "Obstacles_Wood_Color.png"
    },
    "texture_size": 512,
    "can_collide": false,

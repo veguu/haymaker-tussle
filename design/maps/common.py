@@ -1,7 +1,7 @@
 """Shared building blocks for the three Haymaker Tussle arenas, run inside Blender (5.2, headless).
 
 Units: 1 Blender unit = 1 Roblox stud. Z is up; the fighting surface's top is z = 0. Every map has the
-SAME flat oval: 213 x 176 studs for 25 fighters (semi-axes A along X, B along Y; was 230 x 190 for 30), a 3-stud contrasting rim band flush
+same flat oval shape: 213 x 176 studs for 25 fighters (Gnomon: 426 x 352, see OVALS) (semi-axes A along X, B along Y; was 230 x 190 for 30), a 3-stud contrasting rim band flush
 with the surface, and nothing standing on it. Personality goes into the surface paint, the island's
 sides and underside, and the scenery beyond (kept at least 60 studs past the edge if it rises above the
 rim).
@@ -21,9 +21,19 @@ import bmesh
 import bpy
 from mathutils import Vector
 
-# 2026-11-10: sized for 25 fighters (was 115 x 95 for 30): same 115:95 shape, same room per fighter
-A = 106.5  # semi-axis along X (the long one)
-B = 88.0  # semi-axis along Y
+# 2026-11-10: sized for 25 fighters (was 115 x 95 for 30): same 115:95 shape, same room per fighter.
+# Every map's oval before the user's enlargement brief (2026-11-10), recorded so a size is never derived by
+# multiplying (a rerun can't double an arena twice): the semi-axes are ABSOLUTE numbers per map.
+ORIGINAL_OVAL = (106.5, 88.0)  # semi-axes A (along X, the long one), B (along Y): 213 x 176 studs
+OVALS = {
+    # Gnomon Isle doubled once (user, 2026-11-10): 426 x 352 studs, from ORIGINAL_OVAL. Absolute; never scale again.
+    "gnomon": (213.0, 176.0),
+}
+# Which map this Blender run builds: gnomon.py sets HT_MAP before importing this module; rebuild.sh exports it
+# for the export and check steps. Unknown or unset -> ORIGINAL_OVAL (Kitestead, Saltcrest).
+MAP = os.environ.get("HT_MAP", "")
+A, B = OVALS.get(MAP, ORIGINAL_OVAL)
+SCALE = A / ORIGINAL_OVAL[0]  # how much bigger than the original this map's oval is (1 or 2)
 RIM = 3.0  # contrasting rim band width
 SEGMENTS = 128
 

@@ -26,8 +26,9 @@
 -- are built along the lobby's viewing edge until the round would have BotFill fighters, and the round waits
 -- for them. They're placed and held like everyone else; any left when the round ends are removed.
 --
--- MAPS: as a round ends (everyone back in the lobby), MapService:RoundEnded() may bring in the next map;
--- a round never starts while a map change is under way.
+-- MAPS: the finished map stays up through RoundOver and the whole intermission (MapService:RoundEnded only
+-- counts). As the intermission countdown runs out, MapService:ChangeForNextRound() brings in the next map
+-- and its environment behind the fade; fighters are placed only once that swap is done.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -37,6 +38,7 @@ local RunService = game:GetService("RunService")
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Round = require(ReplicatedStorage.Shared.Core.Round)
+local ActiveArena = require(ReplicatedStorage.Shared.ActiveArena)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Lobby = require(ReplicatedStorage.Shared.Core.Lobby)
 local Combatants = require(script.Parent.Parent.Combatants)
@@ -165,8 +167,9 @@ local function ready(): { Model }
 	return list
 end
 
--- Builds the fill bots a round starting now would need, along the lobby's viewing edge (in the background:
--- building rigs takes a moment). The round waits while `filling`.
+-- Builds the fill bots a round starting now would need, in rows just BEHIND the lobby's spawn patch (in the
+-- background: building rigs takes a moment). The round waits while `filling`. (They stood along the viewing
+-- edge until 2026-11-10 b, right in everyone's view of the arena.)
 local function fillUp()
 	if filling or not fillOn() then
 		return
@@ -177,14 +180,15 @@ local function fillUp()
 	end
 	filling = true
 	local lobby: any = GameConfig.Lobby
-	local x0, x1, z0 = Lobby.bounds(lobby)
+	local x0, x1 = Lobby.bounds(lobby)
+	local z0 = lobby.SpawnZ + lobby.SpawnSpread + 8 -- behind the spawn patch, facing the arena over it
 	local have = #Knit.GetService("DummyService"):FillBots()
 	local spots: { CFrame } = {}
 	local perRow = 8
 	for i = 0, need - 1 do
 		local col, row = i % perRow, i // perRow
 		local x = x0 + 24 + (x1 - x0 - 48) * (col + 0.5) / perRow
-		local z = z0 + 14 + row * 7
+		local z = z0 + row * 7
 		local at = Vector3.new(x, lobby.FloorY + STAND_HEIGHT, z)
 		table.insert(spots, CFrame.lookAt(at, at - Vector3.zAxis))
 	end
@@ -251,7 +255,8 @@ local function startRound()
 	table.clear(standing)
 	table.clear(outs)
 	firstOutAt = nil
-	local spawns = Round.spawnPoints(arena, count, math.random() * math.pi * 2)
+	-- the live map's spawn oval (the map swap, if any, is done before this runs)
+	local spawns = Round.spawnPoints(ActiveArena.get(), count, math.random() * math.pi * 2)
 	for index = 1, count do
 		local model = list[index]
 		local spawn = spawns[index]
@@ -321,6 +326,7 @@ end
 
 -- Who's gone since the last look.
 local function checkOuts()
+	local live = ActiveArena.get() -- the live map's oval: its ring-out line
 	for model in standing do
 		if outs[model] then
 			continue
@@ -339,7 +345,7 @@ local function checkOuts()
 			continue
 		end
 		local root = Combatants.rootOf(model)
-		if root and Round.isOut(arena, root.Position.X, root.Position.Y, root.Position.Z) then
+		if root and Round.isOut(live, root.Position.X, root.Position.Y, root.Position.Z) then
 			noteOut(model, false)
 		end
 	end
@@ -393,7 +399,7 @@ local function endRound()
 	roundNumber += 1
 	folder:SetAttribute("Winner", nil)
 	setPhase("Intermission", nil)
-	-- Everyone's in the lobby now: the next map (and its sky) comes in behind a short screen fade.
+	-- The finished map stays up while everyone waits; it only changes when the next round starts.
 	Knit.GetService("MapService"):RoundEnded()
 end
 
@@ -421,8 +427,10 @@ local function step()
 			fillUp()
 		end
 		if endsAt and now >= endsAt then
-			-- never place fighters while the map is being swapped or bots are still being built: wait
-			if Knit.GetService("MapService"):IsChanging() or filling then
+			-- never place fighters while the map is being swapped or bots are still being built: wait.
+			-- The next map (if the rotation is due) comes in only now, as this round starts.
+			local maps = Knit.GetService("MapService")
+			if maps:IsChanging() or filling or maps:ChangeForNextRound() then
 				endsAt = now + 1
 				publish()
 			else

@@ -6,6 +6,7 @@ set -e
 cd "$(dirname "$0")"
 B="${BLENDER:-/c/Program Files/Blender Foundation/Blender 5.2/blender.exe}"
 m="$1"
+export HT_MAP="$m"  # common.OVALS: each map's own oval size
 "$B" -b --factory-startup -P "$m.py" -- "out/$m" ${REUSE:+--reuse-textures} > "out/${m}_build.log" 2>&1
 "$B" -b --factory-startup "out/$m/$m.blend" -P export_roblox.py -- "out/$m/export" "$m" > "out/${m}_export.log" 2>&1
 "$B" -b --factory-startup -P check_glb.py -- "out/$m/export/$m.glb" "out/$m" "glb_$m" > "out/${m}_check.log" 2>&1

@@ -2,6 +2,7 @@
 -- Spec files are required BY the runner, so this path is relative to tests/.
 -- The open-air lobby on the game's real settings.
 local GameConfig = require("../src/shared/Config/GameConfig")
+local Envs = require("../src/shared/Config/MapEnvironments")
 local Lobby = require("../src/shared/Core/Lobby")
 local Spectate = require("../src/shared/Core/Spectate")
 
@@ -43,7 +44,14 @@ return {
 
 	["from spawn and from the edge, a standing player sees the arena's near edge"] = function()
 		local rise = CFG.FloorY - ARENA.CenterY
-		local gap = CFG.ViewEdgeZ - (ARENA.CenterZ + ARENA.StartRadius)
+		-- the nearest arena edge of any map (Gnomon's doubled oval reaches 176 toward the lobby)
+		local reach = ARENA.StartRadius
+		for _, entry in (Envs :: any).Maps do
+			if entry.arena then
+				reach = math.max(reach, entry.arena.semiZ)
+			end
+		end
+		local gap = CFG.ViewEdgeZ - (ARENA.CenterZ + reach)
 		local deepest = Lobby.spawn(CFG, 0.5, 1).z - CFG.ViewEdgeZ
 		assert(
 			Lobby.seesNearEdge(CFG, rise, gap, deepest),

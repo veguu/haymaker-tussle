@@ -94,6 +94,34 @@ other maps and the lobby follow. The rules and builders are in `style.py`; `gnom
   in `out/before_style/`. Fast look: `blender -b --factory-startup -P gnomon.py -- out/gnomon_fast
   --fast --cams=Gameplay,Meet` (quarter-size textures, about 2 minutes).
 
+## Gnomon rework b (2026-11-10): doubled, no grass, shade 9, obstacles
+
+User brief, Gnomon only. Kitestead and Saltcrest are untouched (their oval stays `common.ORIGINAL_OVAL`).
+
+- **Size, once**: `common.OVALS["gnomon"] = (213, 176)` semi-axes, 426 x 352 studs, written as absolute
+  numbers; the original 106.5 x 88 is `common.ORIGINAL_OVAL`. `gnomon.py` sets `HT_MAP=gnomon` before
+  importing `common`; `rebuild.sh` exports it for the export and check steps; `check_glb.py` takes it from the
+  GLB's name. The game's copy is `MapEnvironments.gnomon.arena`.
+- **Island**: 1.5x as deep (`DEPTH`); block counts follow the perimeter; insets, recesses, the timber and the
+  turf lip are in studs from the edge (`k()`), so the stone keeps its sizes.
+- **Ground**: no 3D grass, painted blades, dabs or meadow flowers. Meadow, rim top, lip and islet caps are
+  shade 9 of the user's matcha reference (sampled about sRGB 12, 25, 7; `style.PAL` leaf 16, 38, 10), solid and
+  matte with broad gentle shifts and a darker footing under each obstacle. The rim keeps a lighter mossy line.
+  Surface tiles are 128 studs at 4 px a stud (still 12 pieces + 2 rim).
+- **Obstacles**: `obstacles.py` (plain Python) lays out 20 rocks, slabs and stumps in 15 groups and checks the
+  rules (open middle, 8 studs off the spawn oval at any turn, 26 studs off the edge, 24 studs between groups,
+  rocks in a group touch or leave 6+); `python obstacles.py` writes `src/shared/Config/MapObstacles.luau`. The
+  meshes are `Obstacles_Stone` / `Obstacles_Wood` (never collide); MapService adds one upright Cylinder collider
+  per item, frictionless.
+- **Backdrop**: `push_backdrop` moves every cluster out by how far the rim moved at its bearing (nothing
+  scaled). Lobby corridor (`detail.LOBBY_VIEW`) widened for the moved lobby.
+- **Balloons**: `sights.balloon` has a load ring at the mouth, ropes ending on it, and the burner on a frame
+  tied to the ropes; the launch field's ropes run from the tipped basket's real corners to the mouth.
+- **Checks**: `check_scene.py` (run on the .blend) lists loose pieces, clashing clusters, balloons whose bob
+  reaches something, and buried or floating obstacles.
+- **Upload**: `export_roblox.py` also writes `out/<map>/upload/<map>_1.glb` (arena) and `_2.glb` (backdrop)
+  under the 20 MB limit, and `<map>_centres.json` (each mesh's expected centre) to align the halves in Studio.
+
 ## Files
 
 - `common.py`: the shared oval, sky, sun, clouds, cameras (Gameplay, Floor, Edge, Recovery, Overview),

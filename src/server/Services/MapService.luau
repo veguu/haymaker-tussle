@@ -15,6 +15,10 @@
 -- floor), then Map and Seq are published. A newer change made before the swap replaces the older one (only
 -- the latest token swaps). Rounds don't start while a change is under way (RoundService asks IsChanging).
 --
+-- WHEN: never at round end. The finished map stays through RoundOver and the intermission; the rotation
+-- only moves when the next round is actually starting (RoundService calls ChangeForNextRound as the
+-- intermission countdown runs out, before any fighter is placed). Too few players -> no round -> no change.
+--
 -- GEOMETRY: the imported model ServerStorage.HT_Maps.<entry.model> when present; otherwise a stand-in floor
 -- in the map's own colours (the old test floor), so the rotation and environments work before the import.
 --
@@ -29,6 +33,7 @@ local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Envs = require(ReplicatedStorage.Shared.Config.MapEnvironments)
 local Environment = require(ReplicatedStorage.Shared.Core.Environment)
+local MapObstacles = require(ReplicatedStorage.Shared.Config.MapObstacles)
 
 local cfg: any = GameConfig.Maps
 local arena: any = GameConfig.Arena
@@ -103,6 +108,48 @@ local function standIn(model: Model, p: any)
 	end
 end
 
+-- The map's colliding obstacles (Config/MapObstacles, from design/maps/obstacles.py): one invisible upright
+-- Cylinder per rock or stump, matching its round footprint and height. Frictionless, so a body running or
+-- dashing into one slides round it instead of sticking; flat-topped and unqueryable, so nothing launches off it and runners bump instead of stepping up. The
+-- visible meshes (Obstacles_*) never collide.
+local function addObstacles(model: Model, id: string)
+	local list = MapObstacles[id]
+	for _, inst in model:GetDescendants() do
+		if inst:IsA("BasePart") and inst.Name:match("^Obstacles_") then
+			inst.CanCollide = false
+			inst.CanQuery = false
+			inst.CanTouch = false
+		end
+	end
+	if not list then
+		return
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = "HT_Obstacles"
+	for index, o in list do
+		local part = Instance.new("Part")
+		part.Name = `Obstacle{index}_{o.kind}`
+		part.Shape = Enum.PartType.Cylinder
+		part.Size = Vector3.new(o.h, o.r * 2, o.r * 2)
+		part.CFrame = CFrame.new(CENTER + Vector3.new(o.x, o.h / 2, o.z))
+			* CFrame.Angles(0, 0, math.pi / 2)
+		part.Anchored = true
+		part.CanCollide = true
+		-- NOT queryable (measured 2026-11-10 in Play): a Humanoid steps up onto anything below its root
+		-- (about 3 studs) that its floor check can see, so runners climbed the knee-to-waist rocks and stumps
+		-- instead of bumping into them. Unqueryable, the body collides with the side and slides round it
+		-- (rise 0 at run speed, a 2-stud hop at most at dash speed); the low slabs are still stepped over.
+		part.CanQuery = false
+		part.CanTouch = false
+		part.CastShadow = false
+		part.Transparency = 1
+		part.CustomPhysicalProperties = PhysicalProperties.new(2.7, 0, 0, 100, 1)
+		part:SetAttribute("HT_Obstacle", true)
+		part.Parent = folder
+	end
+	folder.Parent = model
+end
+
 local function buildModel(id: string): Model
 	local entry = Envs.Maps[id]
 	local maps = ServerStorage:FindFirstChild("HT_Maps")
@@ -111,6 +158,7 @@ local function buildModel(id: string): Model
 	if source and source:IsA("Model") then
 		model = source:Clone()
 		model:PivotTo(CFrame.new(CENTER))
+		addObstacles(model, id)
 	else
 		model = Instance.new("Model")
 		standIn(model, Environment.resolve(Envs, id))
@@ -167,16 +215,29 @@ function MapService:ChangeTo(id: string)
 	end)
 end
 
---- The next map in the rotation, every Maps.ChangeEveryRounds rounds. RoundService calls this as a round ends.
+--- A round has ended. Only counts it: the finished map stays up through the round end and the whole
+--- intermission (the lobby keeps overlooking it), and nothing changes if no next round starts.
 function MapService:RoundEnded()
 	if not cfg.Enabled then
 		return
 	end
 	roundsSinceChange += 1
-	if roundsSinceChange >= math.max(cfg.ChangeEveryRounds, 1) then
-		roundsSinceChange = 0
-		self:ChangeTo(Environment.nextMap(cfg.Rotation, pending or active))
+end
+
+--- The next round is about to place its fighters. If the rotation is due (every Maps.ChangeEveryRounds rounds)
+--- this starts the change - map and environment together, behind the fade - and returns true; RoundService
+--- then waits for IsChanging() to clear before placing anyone on the new map's spawns. Returns false when
+--- the current map carries on (so a second call after the swap lets the round start).
+function MapService:ChangeForNextRound(): boolean
+	if not cfg.Enabled or pending ~= nil then
+		return false
 	end
+	if roundsSinceChange < math.max(cfg.ChangeEveryRounds, 1) then
+		return false
+	end
+	roundsSinceChange = 0
+	self:ChangeTo(Environment.nextMap(cfg.Rotation, active))
+	return true
 end
 
 function MapService:IsChanging(): boolean

@@ -110,10 +110,13 @@ def surface_tiles(prefix, z_bottom, painter, tex_dir, normal_strength=1.0, a=C.A
     poly = [C.oval_xy(i / C.SEGMENTS * math.tau, a, b) for i in range(C.SEGMENTS)]
     objs = []
     step = TILE / TILE_PX
-    for j in range(3):
-        for i in range(4):
-            x0 = TILE_ORIGIN[0] + i * TILE
-            y0 = TILE_ORIGIN[1] + j * TILE
+    # the grid covers the oval whatever its size (was a fixed 4 x 3 from TILE_ORIGIN for the original oval)
+    nx, ny = math.ceil(2 * a / TILE), math.ceil(2 * b / TILE)
+    ox, oy = -nx * TILE / 2, -ny * TILE / 2
+    for j in range(ny):
+        for i in range(nx):
+            x0 = ox + i * TILE
+            y0 = oy + j * TILE
             pts = clip_rect(poly, x0, x0 + TILE, y0, y0 + TILE)
             if len(pts) < 3 or _area(pts) < 1.0:
                 continue

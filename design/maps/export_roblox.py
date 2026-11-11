@@ -21,6 +21,7 @@ import sys
 
 import addon_utils
 import bpy
+from mathutils import Vector
 
 args = sys.argv[sys.argv.index("--") + 1 :]
 OUT = os.path.abspath(args[0])  # relative paths resolve against the drive root inside Blender
@@ -191,3 +192,43 @@ with open(os.path.join(OUT, "manifest.json"), "w", encoding="utf-8") as f:
     json.dump(manifest, f, indent=1)
 print("GLB", glb, round(os.path.getsize(glb) / 1e6, 2), "MB")
 print("ALL WITHIN LIMITS", manifest["all_within_limits"])
+
+# --- the upload halves (2026-11-10 b) -------------------------------------------------------------
+# Open Cloud takes 20 MB a file, so a map over that goes up as two Model assets: the arena (floor, rim,
+# lip, cliff, timber, obstacles) and the backdrop. Each half's meshes and their expected centres (Roblox
+# axes: x, y up, z = -Blender y; studs from the arena's centre on the floor's top) go to upload/, so the
+# halves can be put back exactly in Studio whatever offset or turn the import gives them.
+ARENA_PARTS = ("Meadow_", "Rim_", "Lip_", "Strata_", "Cliff_", "Obstacles_")
+up_dir = os.path.join(os.path.dirname(OUT), "upload")
+os.makedirs(up_dir, exist_ok=True)
+centres = {}
+# the sand cliff layers ride with the backdrop: the arena half alone came to 21 MB (2026-11-10 b)
+def first_half(o):
+    return o.name.startswith(ARENA_PARTS) and not o.name.startswith("Strata_Sand")
+
+
+for i, part in ((1, [o for o in export_objs if first_half(o)]), (2, [o for o in export_objs if not first_half(o)])):
+    for o in bpy.context.view_layer.objects:
+        o.select_set(o in part)
+    path = os.path.join(up_dir, f"{NAME}_{i}.glb")
+    bpy.ops.export_scene.gltf(
+        filepath=path,
+        export_format="GLB",
+        use_selection=True,
+        export_apply=True,
+        export_yup=True,
+        export_texcoords=True,
+        export_normals=True,
+        export_tangents=True,
+        export_materials="EXPORT",
+        export_image_format="AUTO",
+    )
+    for o in part:
+        co = [o.matrix_world @ Vector(c) for c in o.bound_box]
+        lo = [min(c[k] for c in co) for k in range(3)]
+        hi = [max(c[k] for c in co) for k in range(3)]
+        mid = [(lo[k] + hi[k]) / 2 for k in range(3)]
+        centres[o.name] = {"half": i, "x": round(mid[0], 3), "y": round(mid[2], 3), "z": round(-mid[1], 3)}
+    print("UPLOAD", path, round(os.path.getsize(path) / 1e6, 2), "MB", len(part), "meshes")
+with open(os.path.join(up_dir, f"{NAME}_centres.json"), "w", encoding="utf-8") as f:
+    json.dump(centres, f, indent=1)

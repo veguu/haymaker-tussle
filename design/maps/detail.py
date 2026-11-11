@@ -39,6 +39,11 @@ import surfaces as S
 # so Blender Y -170..-410; its viewing edge faces the arena. Scenery may pass under the corridor
 # (below FLOOR) but never rise into it.
 LOBBY_VIEW = dict(x=(-160.0, 160.0), y=(-460.0, -90.0), floor=-45.0)
+if C.MAP == "gnomon":
+    # 2026-11-10: the doubled Gnomon oval (half-depth 176) and the lobby moved out to Roblox Z 250..490 and
+    # raised 11 studs (GameConfig.Lobby): the corridor runs from the lobby back to the arena's near edge and
+    # spans the oval's width, so the near ring-out edge and floor stay in view from the spawn and both ends.
+    LOBBY_VIEW = dict(x=(-240.0, 240.0), y=(-520.0, -150.0), floor=-45.0)
 
 
 def in_lobby_view(x, y, z_top):
@@ -224,11 +229,13 @@ def grass(tex_dir, sectors=12, z=-0.15):
 
 # --- the thick turf lip ----------------------------------------------------------------------------
 LIP_ROWS = [  # v down the profile: lip highlight, leaf, drape, deep drape (sRGB)
-    (226, 242, 134),
-    (176, 222, 92),
-    (92, 172, 76),
-    (46, 140, 82),
-    (28, 104, 84),
+    # 2026-11-10 (user: shade 9 of the matcha reference, a very deep forest green): the lip keeps a lighter
+    # mossy line on top so the ring-out edge reads against the dark ground
+    (78, 104, 50),
+    (36, 58, 20),
+    (20, 38, 13),
+    (14, 30, 11),
+    (10, 22, 10),
 ]
 
 
@@ -246,7 +253,7 @@ def lip_texture(tex_dir, name="Lip_Palette", n=128):
     return S.image_material(name, {"colour": path}, roughness=0.95)
 
 
-def turf_lip(tex_dir, a=C.A, b=C.B, segs=360, rng=None, top=-0.12):
+def turf_lip(tex_dir, a=C.A, b=C.B, segs=int(360 * C.SCALE), rng=None, top=-0.12):
     """A rounded roll of turf round the oval, outside the rim's outer face by under a stud, and a skirt
     hanging over the stone in lobes. Profile (scale of the oval, depth): rounded over the edge, then
     drawn in under. v of the texture runs down the profile."""
@@ -260,7 +267,10 @@ def turf_lip(tex_dir, a=C.A, b=C.B, segs=360, rng=None, top=-0.12):
         x, y = math.cos(t), math.sin(t)
         lobe = 1.2 + 1.3 * abs(math.sin(t * 23 + 1.3 * math.sin(t * 5))) + (rng.uniform(-0.3, 0.3) if rng else 0)
         pts = [(s, z, v) for s, z, v in prof] + [(0.994, top - 3.6 - lobe, 0.82), (0.984, top - 3.9 - lobe * 1.25, 1.0)]
-        rows.append([(bm.verts.new((a * s * x, b * s * y, z)), v) for s, z, v in pts])
+        # the profile's offsets are studs from the original oval (a bigger oval keeps the same roll, not a
+        # wider one): s - 1 is a share of ORIGINAL_OVAL, added to this oval's own semi-axes
+        a0, b0 = C.ORIGINAL_OVAL
+        rows.append([(bm.verts.new(((a + (s - 1) * a0) * x, (b + (s - 1) * b0) * y, z)), v) for s, z, v in pts])
     for i in range(segs):
         n = (i + 1) % segs
         for k in range(len(rows[i]) - 1):

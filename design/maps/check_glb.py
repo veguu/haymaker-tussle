@@ -15,6 +15,9 @@ import bpy
 from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_args = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
+if _args:  # the map's own oval (common.OVALS) from the GLB's name, before common is imported
+    os.environ.setdefault("HT_MAP", os.path.splitext(os.path.basename(_args[0]))[0])
 import common as C  # noqa: E402
 
 args = sys.argv[sys.argv.index("--") + 1 :]
