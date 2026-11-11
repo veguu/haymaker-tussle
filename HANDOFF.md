@@ -278,3 +278,10 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   surface parts, grass no shadow). It lives in the PLACE, not in git: the place must be saved to keep it.
 - Tested in Play: a full 25-fighter round on Gnomon (player + test bot + 23 bots), round end, next map.
 - Not built yet: the arena shrink (rounds can drag when fighters avoid each other).
+
+### wind fixes (2026-11-10, committed)
+- "Allow Mesh / Image APIs" is ON (user). Grass wind runs in Play on the imported Gnomon: the map model is
+  ModelStreamingMode Persistent, GrassWind binds grass as it streams in, frees its EditableMeshes on map exit,
+  and retries a chunk refused for memory. In this Studio session 10 of 12 chunks got memory (suspected: shared
+  with earlier Edit previews) - confirm all 12 after a Studio restart.
+- Wind raised (user: "too subtle"): lean 0.09, gusts 0.3, flutter 0.05, gust bands every 4 s.

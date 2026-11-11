@@ -24,6 +24,8 @@ local GrassWind = {}
 local BUDGET_MS = 1.0 -- per frame
 local NEAR = 170 -- studs from the camera: chunks further out don't move (their blades are too small to see)
 local TIP_SLACK = 0.02 -- a tip's neighbours are all at least this much lower
+local RETRY_SECONDS = 6 -- a chunk refused for memory (the device's EditableMesh budget) tries again
+local RETRIES = 5
 
 type Chunk = {
 	part: MeshPart,
@@ -150,29 +152,69 @@ local function chunkOf(part: MeshPart, em: EditableMesh): Chunk?
 end
 
 --- Grass sway for the Grass_* MeshParts under `model`, in `wind` (a resolved preset's wind table).
+--- Grass parts can arrive after the model does (streaming), or stream out and back in: they're bound as
+--- they come, once per name; a returning original is just hidden again under its copy.
 function GrassWind.new(model: Instance?, wind: any): Swayer
 	local chunks: { Chunk } = {}
-	if model then
-		for _, inst in model:GetDescendants() do
-			if
-				inst:IsA("MeshPart")
-				and inst.Name:match("^Grass_")
-				and not inst.Name:match("_Wind$")
-			then
-				local shown, em, original = editable(inst)
-				local chunk = shown and em and chunkOf(shown, em)
-				if chunk and #chunk.ids > 0 then
-					chunk.original = original
-					table.insert(chunks, chunk)
-				elseif shown and original then
-					shown:Destroy()
-					original.LocalTransparencyModifier = 0
-				end
-			end
-		end
-	end
+	local byName: { [string]: Chunk } = {}
+	local alive = true
+	local conn: RBXScriptConnection? = nil
 	local cursor = 0
 	local self = {} :: any
+
+	local tries: { [string]: number } = {}
+	local function bind(inst: Instance)
+		if
+			not alive
+			or not inst:IsA("MeshPart")
+			or not inst.Name:match("^Grass_")
+			or inst.Name:match("_Wind$")
+		then
+			return
+		end
+		local known = byName[inst.Name]
+		if known then
+			if known.original and known.original ~= inst then
+				known.original = inst
+				inst.LocalTransparencyModifier = 1
+			end
+			return
+		end
+		byName[inst.Name] = {} :: any -- claimed while it's being built (that yields)
+		local shown, em, original = editable(inst :: MeshPart)
+		local chunk = shown and em and chunkOf(shown, em)
+		if not alive or not chunk or #chunk.ids == 0 then
+			if shown and original then
+				shown:Destroy()
+				original.LocalTransparencyModifier = 0
+			end
+			if em and original then
+				em:Destroy()
+			end
+			byName[inst.Name] = nil
+			-- nothing made at all: most likely the memory budget is full for now; try again a few times
+			if alive and not shown and inst.Parent then
+				local n = (tries[inst.Name] or 0) + 1
+				tries[inst.Name] = n
+				if n <= RETRIES then
+					task.delay(RETRY_SECONDS, bind, inst)
+				end
+			end
+			return
+		end
+		chunk.original = original
+		byName[inst.Name] = chunk
+		table.insert(chunks, chunk)
+	end
+
+	if model then
+		conn = model.DescendantAdded:Connect(function(inst)
+			task.spawn(bind, inst)
+		end)
+		for _, inst in model:GetDescendants() do
+			task.spawn(bind, inst)
+		end
+	end
 
 	local function update(c: Chunk, t: number)
 		local em, ids, rest, wxs, wzs, hs = c.mesh, c.ids, c.rest, c.wx, c.wz, c.h
@@ -216,18 +258,26 @@ function GrassWind.new(model: Instance?, wind: any): Swayer
 		end
 	end
 
-	-- Back to the plain grass: rest positions, and any editable copies removed (their originals shown).
+	-- Back to the plain grass: rest positions, and any editable copies removed (their originals shown) and
+	-- their EditableMeshes freed (they count against the device's memory budget until destroyed).
 	function self.destroy(_self: Swayer)
+		alive = false
+		if conn then
+			conn:Disconnect()
+			conn = nil
+		end
 		self:reset()
 		for _, c in chunks do
 			if c.original then
 				c.part:Destroy()
+				c.mesh:Destroy()
 				if c.original.Parent then
 					c.original.LocalTransparencyModifier = 0
 				end
 			end
 		end
 		table.clear(chunks)
+		table.clear(byName)
 	end
 
 	function self.count(_self: Swayer): (number, number)

@@ -106,8 +106,9 @@ return {
 				assert(dy <= 0, `{id}: a bending tip doesn't rise`)
 				most = math.max(most, math.sqrt(dx * dx + dz * dz))
 			end
-			-- a 2-stud blade never leans more than about 40 degrees
-			assert(most > 0.1 and most < 0.85, `{id}: tip travel {most}`)
+			-- a 2-stud blade moves visibly but stays a breeze: its tip never travels more than 1.1 studs
+			-- (about 29 degrees of lean)
+			assert(most > 0.3 and most < 1.1, `{id}: tip travel {most}`)
 		end
 		-- a band seen at one place is seen further downwind a moment later
 		local w = {

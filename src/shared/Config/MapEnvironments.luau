@@ -58,11 +58,11 @@ MapEnvironments.Default = {
 	-- leaves drift with it, and Workspace.GlobalWind is set from it (particles, terrain decoration).
 	wind = {
 		direction = { 1, 0.3 }, -- flat x, z; normalised in code
-		lean = 0.07, -- a blade tip's steady push downwind, studs per stud of blade height
-		strength = 0.2, -- a gust's extra push, studs per stud of blade height
+		lean = 0.09, -- a blade tip's steady push downwind, studs per stud of blade height
+		strength = 0.3, -- a gust's extra push, studs per stud of blade height
 		gustLength = 40, -- studs between gust bands
-		gustSeconds = 4.5, -- how long a gust band takes to pass a point
-		flutter = 0.035, -- small fast shiver, studs per stud of height
+		gustSeconds = 4, -- how long a gust band takes to pass a point
+		flutter = 0.05, -- small fast shiver, studs per stud of height
 		flutterSeconds = 1.2,
 		global = 6, -- Workspace.GlobalWind speed
 	},
@@ -117,13 +117,16 @@ MapEnvironments.Maps = {
 			},
 			bloom = { intensity = 0.25 },
 			atmosphere = { haze = 0.45, colour = { 200, 222, 246 } },
-			-- a gentle summer breeze across the meadow from the lobby's left
+			-- a summer breeze across the meadow from the lobby's left. Raised 2026-11-10 (user: "too subtle",
+			-- wanted "a teeny bit stronger"): about half again the lean and gusts, a livelier shiver, gust
+			-- bands passing a little faster so the waves read across the meadow.
 			wind = {
 				direction = { 1, 0.3 },
-				lean = 0.06,
-				strength = 0.2,
+				lean = 0.09,
+				strength = 0.3,
 				gustLength = 42,
-				gustSeconds = 5,
+				gustSeconds = 4,
+				flutter = 0.05,
 			},
 			clouds = {
 				list = {

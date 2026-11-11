@@ -116,6 +116,8 @@ local function buildModel(id: string): Model
 		standIn(model, Environment.resolve(Envs, id))
 	end
 	model.Name = MODEL
+	-- the arena is always loaded for everyone, whole (streaming would deliver it piece by piece)
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 	return model
 end
 
