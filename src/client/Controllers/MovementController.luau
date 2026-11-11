@@ -356,9 +356,10 @@ function MovementController:_bind(
 		return if index then models[index] else nil
 	end
 
-	-- Where a perfect kick should send them: toward the spot on the floor under the cursor, as a flat
-	-- direction from the target. Without a mouse (touch, gamepad), or with the cursor on the sky, it's
-	-- the way the camera looks.
+	-- Where a perfect kick should send them: from the target toward the spot on the floor under the
+	-- cursor. The server uses it flat for the way they're thrown, and its slope for whether it's a spike
+	-- (the cursor on the floor close under them points steeply down). Without a mouse (touch, gamepad),
+	-- or with the cursor on the sky, it's the way the camera looks.
 	local function kickAim(targetRoot: BasePart?): Vector3?
 		local camera = workspace.CurrentCamera
 		if not camera or not targetRoot then
@@ -372,15 +373,14 @@ function MovementController:_bind(
 			if ray.Direction.Y < -0.01 then
 				local reach = (floorY - ray.Origin.Y) / ray.Direction.Y
 				local spot = ray.Origin + ray.Direction * reach
-				local toSpot = Vector3.new(spot.X - from.X, 0, spot.Z - from.Z)
+				local toSpot = spot - from
 				if reach > 0 and toSpot.Magnitude > 1 then
 					return toSpot.Unit
 				end
 			end
 		end
 		local viewing = camera.CFrame.LookVector
-		local level = Vector3.new(viewing.X, 0, viewing.Z)
-		return if level.Magnitude > 0.01 then level.Unit else nil
+		return if viewing.Magnitude > 0.01 then viewing.Unit else nil
 	end
 
 	-- The server's pick for the follow-up. It only counts for a squat waiting on it, so a late answer

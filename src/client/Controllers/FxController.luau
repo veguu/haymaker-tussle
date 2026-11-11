@@ -50,13 +50,6 @@ local pool: { Part } = {}
 local rockPool: { Part } = {}
 -- When each character's propel ends, which is the only time they make drift smoke.
 local propelEnds: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
--- How charged each fighter's last swing was, and when, so its hit burst can be sized to it.
-local swingPower: { [Model]: { power: number, at: number } } = setmetatable({}, { __mode = "k" }) :: any
-local SWING_POWER_LIFE = 1 -- a hit this long after the swing is no longer counted as that swing's
--- Other fighters' charges, from the server's HT_PunchCharge attribute: the side, and when it was seen.
-local chargesSeen: { [Model]: { side: string, at: number } } = setmetatable({}, { __mode = "k" }) :: any
-local ARMS: { [string]: string } =
-	{ Left = "Left Arm", Right = "Right Arm", Uppercut = "Right Arm" }
 -- What each effect is adding to the field of view right now, so a kick's punch and a dash's zoom stack
 -- instead of overwriting each other.
 local kickFov = 0
@@ -309,10 +302,6 @@ function FxController:HitBurst(target: Model, attacker: Model?, strength: number
 	end
 	local strong = strength >= cfg.StrongHitSpeed
 	local scale = if strong then cfg.StrongHitScale else 1
-	local swung = attacker and swingPower[attacker]
-	if swung and os.clock() - swung.at <= SWING_POWER_LIFE then
-		scale *= 1 + GameConfig.Punch.ChargeFx * swung.power
-	end
 	local seconds = cfg.HitBurstSeconds * (if strong then 1.3 else 1)
 	local center = tip or root.Position - away * 0.8
 	local up = Vector3.yAxis
@@ -655,7 +644,8 @@ end
 
 -- The floor breaking: a dark hole, cracks running out of it, slabs bursting up around it and chunks thrown
 -- into the air. Anchored and moved by hand, so none of it can touch anyone or settle somewhere odd.
-local function breakFloor(floor: RaycastResult)
+local function breakFloor(floor: RaycastResult, grow: number?)
+	local s = grow or 1
 	local colour, material = floorLook(floor)
 	local dark = colour:Lerp(BLACK, DARK_SHARE)
 	local up = floor.Normal
@@ -669,11 +659,16 @@ local function breakFloor(floor: RaycastResult)
 
 	local marks: { { part: Part, delay: number } } = {}
 	local function lay(mark: GroundBreak.Mark, height: number)
-		local part =
-			takeRock(dark, Enum.Material.SmoothPlastic, Vector3.new(mark.length, 0.04, mark.width))
+		local part = takeRock(
+			dark,
+			Enum.Material.SmoothPlastic,
+			Vector3.new(mark.length * s, 0.04, mark.width * s)
+		)
 		part.CastShadow = false
 		part.Transparency = 1
-		part.CFrame = base * CFrame.new(mark.x, height, mark.z) * CFrame.Angles(0, -mark.angle, 0)
+		part.CFrame = base
+			* CFrame.new(mark.x * s, height, mark.z * s)
+			* CFrame.Angles(0, -mark.angle, 0)
 		table.insert(marks, { part = part, delay = mark.delay })
 	end
 	for _, pit in plan.pits do
@@ -688,23 +683,23 @@ local function breakFloor(floor: RaycastResult)
 		local part = takeRock(
 			colour:Lerp(BLACK, slab.dark),
 			material,
-			Vector3.new(slab.length, cfg.GroundSlabThickness, slab.width)
+			Vector3.new(slab.length * s, cfg.GroundSlabThickness * s, slab.width * s)
 		)
 		part.CastShadow = true
 		-- The outer end lifts: the rim of a hole, pushed up from underneath.
 		table.insert(slabs, {
 			part = part,
 			turn = CFrame.Angles(0, -slab.angle, 0) * CFrame.Angles(0, 0, slab.tilt),
-			x = slab.x,
-			z = slab.z,
-			high = math.sin(slab.tilt) * slab.length * 0.3,
-			low = -(slab.length / 2 + cfg.GroundSlabThickness),
+			x = slab.x * s,
+			z = slab.z * s,
+			high = math.sin(slab.tilt) * slab.length * s * 0.3,
+			low = -(slab.length * s / 2 + cfg.GroundSlabThickness * s),
 		})
 	end
 
 	local chunks = {}
 	for _, chunk in plan.chunks do
-		local size = Vector3.new(chunk.sizeX, chunk.sizeY, chunk.sizeZ)
+		local size = Vector3.new(chunk.sizeX, chunk.sizeY, chunk.sizeZ) * s
 		local part = takeRock(colour:Lerp(BLACK, chunk.dark), material, size)
 		part.CastShadow = true
 		table.insert(chunks, { part = part, chunk = chunk, size = size })
@@ -746,7 +741,7 @@ local function breakFloor(floor: RaycastResult)
 				item.part.Size = item.size * math.max(scale, 0.05)
 			end
 			item.part.CFrame = base
-				* CFrame.new(x, y, z)
+				* CFrame.new(x * s, y * s, z * s)
 				* CFrame.Angles(chunk.spinX * tumble, chunk.spinY * tumble, chunk.spinZ * tumble)
 		end
 	end
@@ -774,7 +769,7 @@ function FxController:GroundBlast(body: Model, at: Vector3, power: number)
 		params
 	)
 	if floor then
-		breakFloor(floor)
+		breakFloor(floor, cfg.GroundBreakBlastScale)
 		ImpactFx.groundBlast(floor.Position, cfg.GroundBlastScale * math.max(power, 0.6))
 	end
 end
@@ -822,19 +817,15 @@ function FxController:JumpBreak(character: Model, floorReach: number)
 end
 
 --- A swing: its sound, played as soon as the punch starts, and a thin streak behind the fist, the
---- after-image of the arm going through. The spark is kept for punches that land (HitBurst). `power` is
---- how charged it was, 0 to 1: a charged swing leaves a wider streak, and its hit a bigger burst.
-function FxController:Swing(character: Model, power: number?)
-	local charge = math.clamp(power or 0, 0, 1)
-	swingPower[character] = { power = charge, at = os.clock() }
-	local grow = 1 + GameConfig.Punch.ChargeFx * charge
+--- after-image of the arm going through. The spark is kept for punches that land (HitBurst).
+function FxController:Swing(character: Model)
 	local arm = Knit.GetController("AnimController"):SwingArm(character)
 	if arm then
 		local punch = GameConfig.Punch
 		ImpactFx.fistTrail(
 			arm,
 			punch.Windup + punch.ActiveSeconds + cfg.FistTrailSeconds,
-			cfg.FistTrailWidth * grow,
+			cfg.FistTrailWidth,
 			cfg.FistTrailSeconds
 		)
 	end
@@ -844,15 +835,6 @@ function FxController:Swing(character: Model, power: number?)
 		-- swing's air, pitched down.
 		Sfx.play("swing_heavy", root, PITCH_VARY, { pitch = 0.88, volume = 0.5 })
 		Sfx.play("punch_swing", root, PITCH_VARY, { pitch = 0.85, volume = 0.55 })
-	end
-end
-
---- A punch being charged on `character`, the swing it will be (`side`), `power` 0 to 1: light gathers
---- at that fist. Nil ends it, whether the punch was thrown or the charge dropped.
-function FxController:PunchCharge(character: Model, side: string, power: number?)
-	local arm = character:FindFirstChild(ARMS[side] or "Right Arm")
-	if arm and arm:IsA("BasePart") then
-		ImpactFx.fistCharge(arm, power, GameConfig.Punch.ChargeFx)
 	end
 end
 
@@ -954,25 +936,6 @@ function FxController:KnitStart()
 			local character = player.Character
 			if character then
 				driftSmoke(character)
-				if player ~= Players.LocalPlayer then
-					local side = character:GetAttribute("HT_PunchCharge") :: string?
-					local seen = chargesSeen[character]
-					if side and (not seen or seen.side ~= side) then
-						seen = { side = side, at = now }
-						chargesSeen[character] = seen
-					elseif not side and seen then
-						chargesSeen[character] = nil
-						self:PunchCharge(character, seen.side, nil)
-						seen = nil
-					end
-					if seen then
-						self:PunchCharge(
-							character,
-							seen.side,
-							math.clamp((now - seen.at) / GameConfig.Punch.ChargeSeconds, 0, 1)
-						)
-					end
-				end
 			end
 		end
 	end)

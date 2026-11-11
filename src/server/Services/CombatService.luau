@@ -12,14 +12,6 @@
 -- each player's swing lands, never by which server callback came first. Two that strike
 -- at effectively the same moment and reach each other go to ClashService instead of one
 -- cancelling the other. See Core/Clash.
---
--- CHARGE. Holding the button charges the next punch: the client says "I started charging"
--- (PunchCharge) and later "I pressed punch" (PunchRequest), both with no arguments. The charge is the
--- gap between the two on THIS server's clock, so it can't be claimed, only held: both messages are
--- delayed by the same trip. It's only taken when a punch could be thrown, so a full charge always costs
--- its time on top of the cooldown. Getting hit drops it. A charged punch reaches a little further
--- (Punch.ChargeReach) and throws a little harder (Punch.ChargeKnock); see Combat.chargedPunch.
--- While someone charges, their body carries HT_PunchCharge (the side it will be), for others to draw.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -46,7 +38,6 @@ type PunchRecord = {
 	recovery: number,
 	nextSide: string,
 	refused: number,
-	chargeAt: number?, -- when this player started charging, on our clock
 }
 
 -- Someone a swing has reached, waiting on whether it's a hit or a clash.
@@ -82,8 +73,6 @@ type Punch = {
 	repelled: boolean,
 	flat: Vector3?,
 	origin: Vector3?,
-	power: number, -- how charged, 0 to 1
-	cfg: any, -- the hitbox settings for this swing: Punch, stretched by the charge
 }
 
 local CombatService = Knit.CreateService({
@@ -125,22 +114,6 @@ local function recordFor(player: Player): PunchRecord
 		records[player] = record
 	end
 	return record
-end
-
-local CHARGE_ATTRIBUTE = "HT_PunchCharge"
-local chargeTokens: { [Player]: number } = {}
-
--- Drops a charge in progress, and what shows it.
-local function dropCharge(player: Player)
-	local record = records[player]
-	if record then
-		record.chargeAt = nil
-	end
-	chargeTokens[player] = (chargeTokens[player] or 0) + 1
-	local character = player.Character
-	if character then
-		character:SetAttribute(CHARGE_ATTRIBUTE, nil)
-	end
 end
 
 --- May these two fight each other right now? The round step adds its own rule for the 1v1 arena.
@@ -225,7 +198,6 @@ local function landHit(self: any, punch: Punch, target: Model, at: Vector3, from
 	local attackerSpeed = audit:GetTrustedSpeed(punch.attacker)
 	local before = stagger:Get(target)
 	local strength = Combat.punchStrength(knockCfg, staggerCfg, attackerSpeed, before)
-		* Combat.chargeKnockScale(punchCfg, punch.power)
 	stagger:AddHit(target)
 	self:MarkHit(target)
 	notePairHit(punch.attacker, target, os.clock())
@@ -291,7 +263,7 @@ local function reaches(
 	everyone: { Instance }
 ): (boolean, string?)
 	local inside, why = Combat.inHitbox(
-		punch.cfg,
+		punchCfg,
 		origin.X,
 		origin.Y,
 		origin.Z,
@@ -385,7 +357,7 @@ local function sample(self: any, punch: Punch, root: BasePart, now: number)
 		end
 		punch.tested[target] = seen[#seen][2]
 		local found, why = Combat.sweepReach(
-			punch.cfg,
+			punchCfg,
 			samples,
 			flat.X,
 			flat.Z,
@@ -570,10 +542,8 @@ local function startPunch(
 	now: number,
 	windup: number,
 	ping: number,
-	wild: boolean,
-	power: number?
+	wild: boolean
 )
-	local charge = math.clamp(power or 0, 0, 1)
 	local old = punches[attacker]
 	if old then
 		finishPunch(self, old)
@@ -602,8 +572,6 @@ local function startPunch(
 		awayX = 0,
 		awayZ = 0,
 		repelled = false,
-		power = charge,
-		cfg = Combat.chargedPunch(punchCfg, charge),
 	}
 end
 
@@ -623,10 +591,6 @@ end
 
 function CombatService:MarkHit(target: Model)
 	lastHitAt[target] = os.clock()
-	local hitPlayer = Combatants.playerOf(target)
-	if hitPlayer and records[hitPlayer] and records[hitPlayer].chargeAt then
-		dropCharge(hitPlayer)
-	end
 	Knit.GetService("KickService"):Cancel(target)
 end
 
@@ -671,7 +635,6 @@ end
 
 function CombatService:KnitInit()
 	self._punchRequest = Net.server("PunchRequest")
-	self._punchCharge = Net.server("PunchCharge")
 	self._punchStarted = Net.server("PunchStarted")
 	self._hitConfirmed = Net.server("HitConfirmed")
 	self._punchResult = Net.server("PunchResult")
@@ -711,27 +674,17 @@ function CombatService:KnitStart()
 		end
 		if not Combat.cooldownReady(punchCfg, now, record.lastPunch, record.recovery) then
 			record.refused += 1
-			dropCharge(player)
 			trace(`{player.Name} refused: cooldown`)
 			self._punchResult:FireClient(player, attacker, "refused")
 			return
 		end
-
-		-- How long they held it, on our clock. A charge left far too long has run out and counts as none.
-		local power = 0
-		local chargeAt = record.chargeAt
-		if chargeAt and now - chargeAt <= punchCfg.ChargeSeconds + punchCfg.ChargeGrace then
-			power = Combat.chargePower(punchCfg, now - chargeAt)
-		end
-		dropCharge(player)
 
 		-- Everything is marked before the wait, so a second request can't pass the same check.
 		local side = Combat.comboSwing(punchCfg, record.nextSide, now, record.lastPunch)
 		record.lastPunch = now
 		record.recovery = 0
 		record.nextSide = Combat.nextSwing(side)
-		self._punchStarted:FireAllClients(attacker, side, power)
-		trace(`{player.Name} {side} thrown, charge {string.format("%.2f", power)}`)
+		self._punchStarted:FireAllClients(attacker, side)
 		startPunch(
 			self,
 			attacker,
@@ -740,47 +693,8 @@ function CombatService:KnitStart()
 			now,
 			punchCfg.Windup,
 			player:GetNetworkPing(),
-			false,
-			power
+			false
 		)
-	end)
-
-	-- "I started charging": taken only when a punch could be thrown right now.
-	self._punchCharge.OnServerEvent:Connect(function(player: Player, ...)
-		local record = recordFor(player)
-		local now = os.clock()
-		if not Combat.takeToken(record.bucket, now, punchCfg.RequestsPerSecondLimit) then
-			record.refused += 1
-			return
-		end
-		if select("#", ...) ~= 0 then
-			record.refused += 1
-			return
-		end
-		local attacker = player.Character
-		if
-			not attacker
-			or not Combatants.isAlive(attacker)
-			or attacker:GetAttribute("HT_RoundHold")
-			or Knit.GetService("KickService"):IsBusy(attacker)
-			or punches[attacker]
-			or not Combat.cooldownReady(punchCfg, now, record.lastPunch, record.recovery)
-		then
-			return
-		end
-		record.chargeAt = now
-		chargeTokens[player] = (chargeTokens[player] or 0) + 1
-		local token = chargeTokens[player]
-		attacker:SetAttribute(
-			CHARGE_ATTRIBUTE,
-			Combat.comboSwing(punchCfg, record.nextSide, now, record.lastPunch)
-		)
-		-- The client throws by itself at a full charge, so one still open well past that was abandoned.
-		task.delay(punchCfg.ChargeSeconds + punchCfg.ChargeGrace, function()
-			if chargeTokens[player] == token then
-				dropCharge(player)
-			end
-		end)
 	end)
 
 	RunService.Heartbeat:Connect(function()
@@ -812,7 +726,6 @@ function CombatService:KnitStart()
 
 	Players.PlayerRemoving:Connect(function(player)
 		records[player] = nil
-		chargeTokens[player] = nil
 	end)
 
 	local function onCharacter(character: Model)

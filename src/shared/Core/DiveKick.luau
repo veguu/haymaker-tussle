@@ -39,6 +39,9 @@ export type JumpPlan = {
 }
 
 export type Settings = {
+	AimReachMax: number,
+	AimFlightMin: number,
+	AimFlightMax: number,
 	AirGravityScale: number,
 	JumpSquatSeconds: number,
 	LeapMin: number,
@@ -378,6 +381,51 @@ function DiveKick.aimDirection(x: number, z: number): (number?, number?)
 		return nil, nil
 	end
 	return x / size, z / size
+end
+
+--- The launch that carries a perfect kick's target from where it is to a spot on the floor, under
+--- `gravity`. Across the floor it goes at up to `push`, but never takes less than AimFlightMin seconds
+--- (so a near spot isn't a teleport) or more than AimFlightMax (so a far one isn't a lob); the up speed
+--- is then whatever lands it there in that time. A spot straight underneath is a straight drive down at
+--- `push`. Returns the velocity as x, y, z.
+function DiveKick.aimedLaunch(
+	cfg: Settings,
+	fromX: number,
+	fromY: number,
+	fromZ: number,
+	spotX: number,
+	spotY: number,
+	spotZ: number,
+	push: number,
+	gravity: number
+): (number, number, number)
+	local dx, dz = spotX - fromX, spotZ - fromZ
+	local across = math.sqrt(dx * dx + dz * dz)
+	if across < 0.5 or push <= 0 then
+		return 0, -math.max(push, 1), 0
+	end
+	if across > cfg.AimReachMax then
+		dx, dz = dx / across * cfg.AimReachMax, dz / across * cfg.AimReachMax
+		across = cfg.AimReachMax
+	end
+	local t = math.clamp(across / push, cfg.AimFlightMin, cfg.AimFlightMax)
+	local rise = (spotY - fromY) / t + gravity * t / 2
+	return dx / t, rise, dz / t
+end
+
+--- A direction a client sent, made safe: exactly one stud long, up and down kept. Nil for anything that
+--- isn't a usable direction (not finite, or too short to point anywhere).
+function DiveKick.aimWay(x: number, y: number, z: number): (number?, number?, number?)
+	for _, n in { x, y, z } do
+		if n ~= n or math.abs(n) == math.huge then
+			return nil, nil, nil
+		end
+	end
+	local size = math.sqrt(x * x + y * y + z * z)
+	if size < 0.001 then
+		return nil, nil, nil
+	end
+	return x / size, y / size, z / size
 end
 
 --- How much of the kick's full force this grade gets, for the outward push, the slam and stagger.

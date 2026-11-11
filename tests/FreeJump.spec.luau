@@ -108,6 +108,37 @@ return {
 		assert(DiveKick.aimDirection(math.huge, 1) == nil, "infinity got through")
 	end,
 
+	["a perfect kick's launch lands them on the cursor's spot"] = function()
+		local cfg = KICK :: any
+		local g = 196.2
+		for _, spot in { { 20, -14 }, { 60, -14 }, { 5, -14 }, { 30, 0 } } do
+			local vx, vy, vz = DiveKick.aimedLaunch(cfg, 0, 0, 0, spot[1], spot[2], 0, 180, g)
+			assert(vz == 0, "it went sideways")
+			local t = spot[1] / vx
+			assert(t >= cfg.AimFlightMin - 1e-9 and t <= cfg.AimFlightMax + 1e-9, `flight {t} s`)
+			local y = vy * t - g * t * t / 2
+			assert(math.abs(y - spot[2]) < 1e-6, `landed at height {y}, wanted {spot[2]}`)
+		end
+		local dx, dy = DiveKick.aimedLaunch(cfg, 0, 0, 0, 0.1, -14, 0, 180, g)
+		assert(dx == 0 and dy < 0, "a spot straight under them should be a drive down")
+		local far = DiveKick.aimedLaunch(cfg, 0, 0, 0, 1000, -14, 0, 180, g)
+		local fartime = math.clamp(cfg.AimReachMax / 180, cfg.AimFlightMin, cfg.AimFlightMax)
+		assert(
+			math.abs(far * fartime - cfg.AimReachMax) < 1e-6,
+			"it threw them past the longest aim"
+		)
+	end,
+
+	["a perfect kick's aim keeps up and down, and is always one stud long"] = function()
+		local x, y, z = DiveKick.aimWay(0, -3, 4)
+		assert(x == 0 and y and z and math.abs(y + 0.6) < 1e-9 and math.abs(z - 0.8) < 1e-9)
+		local _, dy = DiveKick.aimWay(0, -1e9, 0)
+		assert(dy == -1, "straight down should stay straight down")
+		assert(DiveKick.aimWay(0, 0, 0) == nil, "no direction pointed somewhere")
+		assert(DiveKick.aimWay(0 / 0, -1, 0) == nil, "NaN got through")
+		assert(DiveKick.aimWay(0, -math.huge, 0) == nil, "infinity got through")
+	end,
+
 	["nobody follows up someone else's launch"] = function()
 		assert(KICK.FollowUpOthers == false, "follow-ups on other players' launches are on")
 	end,

@@ -92,7 +92,7 @@ return {
 
 	["the assisted punch never reaches further than a punch does"] = function()
 		local punch: any = GameConfig.Punch
-		local reach = punch.Range * (1 + punch.ChargeReach) + punch.TargetRadius
+		local reach = punch.Range + punch.TargetRadius
 		assert(
 			CFG.AssistPunchReach <= reach + 2,
 			"turning to face someone that far away is a free dash, not a punch"

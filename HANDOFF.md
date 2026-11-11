@@ -321,3 +321,25 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   (Studio's view wasn't drawing, render steps ran 0 frames), the input bend and punch facing, a real kick landing
   with the fix, two players. Output also shows the teammate's grass wind hitting the EditableMesh memory budget
   (12 refusals this session).
+### move-9 / move-10 (2026-11-10, spicy; committed after the user tried it)
+- STUDIO HAD BEEN RUNNING OLD CODE: the place still had `BUILD arena-1` although `rojo serve` was up and the
+  plugin showed connected, so the user's reports since move-5 were about old code. A Rojo restart plus a fresh
+  plugin Connect synced it. Before debugging a report, compare the place's build stamp with disk.
+- CHARGED PUNCH REMOVED (user's call): move-8's charge is gone everywhere (PunchCharge remote, HT_PunchCharge,
+  Combat.chargedPunch, fist glow, Punch.Charge* settings). CombatService, Combat and Net are back to their
+  pre-move-8 versions. Kept: Windup 0.16, Cooldown 0.42, the lead-in slowed to the windup. A click is one punch;
+  holding never repeats. LockOn.AssistPunchReach 9 -> 8 to match the uncharged reach.
+- SPEED KNOCKBACK: Knockback.SpeedBonusPerStud 0.38 -> 0.7, new SpeedBonusMax 40 (Combat.punchStrength caps the
+  bonus). Running (~36) about doubles a standing punch (23 -> ~48); a dash punch tops out at 63, before stagger.
+- PERFECT KICK GOES TO THE CURSOR: the client sends the 3D direction from the target to the floor under the
+  cursor (DiveKick.aimWay makes it unit). The server raycasts that line to the floor and launches with
+  DiveKick.aimedLaunch to land there: across at max(push, Kick.AimSpeedMin 110), flight 0.3-0.8 s, the furthest
+  spot Kick.AimReachMax 90, Kick.AimStandHeight 3. On landing: knockdown (KnockdownSeconds) and an equal and
+  opposite push so they stop on the spot (knocks add up, so a zero push doesn't stop anything). With no floor on
+  the line they fly along it. In Play on bots: aimed 20 -> landed ~17, aimed 45 -> landed 41 and stopped.
+- Every finisher landing now knocks down too, and the landing wait is 0.15 s (not 0.5), so a drive straight down
+  shows its blast at once.
+- LANDING VFX BIGGER: Fx.GroundBlastScale 1 -> 1.6, new GroundBreakBlastScale 1.6 (kicked landings only; the jump
+  push-off stays 1). ImpactFx.groundBlast adds a fireball and a smoke cloud.
+- Gates green, 378 tests. Not checked in Play: the speed knockback by hand, the aimed kick from a real player's
+  client, the lock-on assist.

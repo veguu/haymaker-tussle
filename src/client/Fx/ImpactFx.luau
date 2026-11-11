@@ -224,12 +224,17 @@ local EMBER = Color3.fromRGB(255, 150, 50)
 local DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local BLASTS = 3
 
+local FIRE = Color3.fromRGB(255, 120, 30)
+local SOOT = Color3.fromRGB(60, 48, 42)
+
 type Blast = {
 	part: Part,
 	flash: ParticleEmitter,
 	spikes: ParticleEmitter,
 	embers: ParticleEmitter,
 	dust: ParticleEmitter,
+	fireball: ParticleEmitter,
+	smoke: ParticleEmitter,
 	ring: Part,
 	pillar: Part,
 }
@@ -332,6 +337,55 @@ local function buildBlast(parent: Instance): Blast
 	})
 	dust.Parent = at
 
+	-- The fireball: big glowing puffs that burst up and out, white-hot to orange, and go dark as they cool.
+	local fireball = Instance.new("ParticleEmitter")
+	fireball.Name = "Fireball"
+	fireball.Texture = DUST_TEXTURE
+	fireball.Rate = 0
+	fireball.Enabled = false
+	fireball.Lifetime = NumberRange.new(0.35, 0.6)
+	fireball.SpreadAngle = Vector2.new(70, 70)
+	fireball.Drag = 7
+	fireball.Acceleration = Vector3.new(0, 14, 0)
+	fireball.Rotation = NumberRange.new(0, 360)
+	fireball.RotSpeed = NumberRange.new(-90, 90)
+	fireball.LightEmission = 1
+	fireball.LightInfluence = 0
+	fireball.Brightness = 3
+	fireball.ZOffset = 1
+	fireball.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, WHITE),
+		ColorSequenceKeypoint.new(0.2, GOLD),
+		ColorSequenceKeypoint.new(0.55, FIRE),
+		ColorSequenceKeypoint.new(1, SOOT),
+	})
+	fireball.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.6, 0.2),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	fireball.Parent = at
+
+	-- The smoke: a dark cloud left behind, rising slowly and spreading as it thins.
+	local smoke = Instance.new("ParticleEmitter")
+	smoke.Name = "Smoke"
+	smoke.Texture = DUST_TEXTURE
+	smoke.Rate = 0
+	smoke.Enabled = false
+	smoke.Lifetime = NumberRange.new(1.2, 2)
+	smoke.SpreadAngle = Vector2.new(60, 60)
+	smoke.Drag = 3
+	smoke.Acceleration = Vector3.new(0, 6, 0)
+	smoke.Rotation = NumberRange.new(0, 360)
+	smoke.RotSpeed = NumberRange.new(-30, 30)
+	smoke.Color = ColorSequence.new(Color3.fromRGB(90, 80, 74), Color3.fromRGB(150, 140, 132))
+	smoke.LightEmission = 0
+	smoke.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.35),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	smoke.Parent = at
+
 	part.Parent = parent
 	return {
 		part = part,
@@ -339,6 +393,8 @@ local function buildBlast(parent: Instance): Blast
 		spikes = spikes,
 		embers = embers,
 		dust = dust,
+		fireball = fireball,
+		smoke = smoke,
 		ring = glowPart(parent, "HT_GroundRing"),
 		pillar = glowPart(parent, "HT_GroundPillar"),
 	}
@@ -433,6 +489,21 @@ function ImpactFx.groundBlast(position: Vector3, scale: number)
 	})
 	blast.dust:Emit(count(16))
 
+	blast.fireball.Speed = NumberRange.new(14 * scale, 34 * scale)
+	blast.fireball.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 3 * scale),
+		NumberSequenceKeypoint.new(0.4, 7 * scale),
+		NumberSequenceKeypoint.new(1, 9 * scale),
+	})
+	blast.fireball:Emit(count(14))
+
+	blast.smoke.Speed = NumberRange.new(6 * scale, 16 * scale)
+	blast.smoke.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 5 * scale),
+		NumberSequenceKeypoint.new(1, 13 * scale),
+	})
+	blast.smoke:Emit(count(10))
+
 	glow(
 		blast.ring,
 		at,
@@ -453,86 +524,6 @@ function ImpactFx.groundBlast(position: Vector3, scale: number)
 		0.3,
 		0.3
 	)
-end
-
--- THE FIST CHARGE: light gathering at the fist while a punch is held to charge it. A small glow that
--- swells and brightens, with sparks drawn in toward it, more and bigger as the charge builds. One set per
--- arm, made the first time that arm charges, switched off between charges.
-type FistGlow = {
-	at: Attachment,
-	glow: ParticleEmitter,
-	sparks: ParticleEmitter,
-}
-local fistGlows: { [BasePart]: FistGlow } = setmetatable({}, { __mode = "k" }) :: any
-
-local function fistGlowFor(arm: BasePart): FistGlow
-	local existing = fistGlows[arm]
-	if existing and existing.at.Parent == arm then
-		return existing
-	end
-	local at = Instance.new("Attachment")
-	at.Name = "HT_FistCharge"
-	at.Position = Vector3.new(0, -arm.Size.Y / 2 - 0.1, 0)
-	at.Parent = arm
-
-	-- The glow: a soft star that stays on the fist, flickering as each one fades.
-	local halo = emitter(at, "Glow")
-	halo.LockedToPart = true
-	halo.Lifetime = NumberRange.new(0.08, 0.14)
-	halo.Speed = NumberRange.new(0)
-	halo.Rotation = NumberRange.new(0, 360)
-	halo.Brightness = 3
-	halo.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.2),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-
-	-- Sparks: thrown out a little and pulled back in, so they seem to gather.
-	local sparks = emitter(at, "Sparks")
-	sparks.LockedToPart = true
-	sparks.Orientation = Enum.ParticleOrientation.VelocityParallel
-	sparks.Lifetime = NumberRange.new(0.15, 0.3)
-	sparks.Speed = NumberRange.new(6, 10)
-	sparks.SpreadAngle = Vector2.new(180, 180)
-	sparks.Drag = 8
-	sparks.Squash = NumberSequence.new(-1.5)
-	sparks.Brightness = 3
-	sparks.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.1),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-
-	local made = { at = at, glow = halo, sparks = sparks }
-	fistGlows[arm] = made
-	return made
-end
-
---- Light gathering at the fist of `arm` while a punch charges, `power` 0 to 1. Nil switches it off.
---- `extra` is how much bigger a full charge is than none (Punch.ChargeFx).
-function ImpactFx.fistCharge(arm: BasePart, power: number?, extra: number)
-	if power == nil then
-		local existing = fistGlows[arm]
-		if existing then
-			existing.glow.Enabled = false
-			existing.sparks.Enabled = false
-		end
-		return
-	end
-	local share = math.clamp(power, 0, 1)
-	local made = fistGlowFor(arm)
-	local grow = 1 + extra * share
-	made.glow.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 1.1 * grow),
-		NumberSequenceKeypoint.new(1, 1.6 * grow),
-	})
-	made.glow.Rate = 30
-	made.glow.Enabled = true
-	made.sparks.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.5 * grow),
-		NumberSequenceKeypoint.new(1, 0.1),
-	})
-	made.sparks.Rate = (12 + 48 * share) * QUALITY
-	made.sparks.Enabled = true
 end
 
 return ImpactFx

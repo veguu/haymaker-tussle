@@ -91,11 +91,6 @@ Every adjustable value in the game. All numbers are **starting guesses to tune b
 | `GraceSeconds` | 0.05 | **Punch forgiveness.** How far before the active frames a swing still looks for contact, so bodies that crossed just before it went live count as a hit (resolved at the normal impact time). Never reaches back before the press was accepted. 0 turns it off. The test "the grace ends where it says" shows the boundary. |
 | `SweepStep` | 0.008 | Seconds between the moments a swing checks, back to the last check, using where the server saw both bodies. Catches contact that happens entirely between two server frames. Smaller is finer and costs more. |
 | `PointBlankRadius` | 0.75 | Closer than this, centre to centre, a landed punch throws the target the way the attacker faces instead of along their (noisy) offset, so exact overlap gets a steady shove. |
-| `ChargeSeconds` | 0.8 | Holding punch charges it; letting go throws it. This is the longest hold that counts: at this many seconds it goes by itself. A quick tap is an ordinary punch. The server measures the charge on its own clock (from PunchCharge to PunchRequest), so it can't be faked. |
-| `ChargeGrace` | 0.4 | A charge still open this long past `ChargeSeconds` with no punch is dropped. |
-| `ChargeReach` | 0.3 | How much further a full charge reaches: 0.3 is 30% (range 4.5 to about 5.9). The hitbox keeps its shape. |
-| `ChargeKnock` | 0.45 | How much harder a full charge throws: 0.45 is 45% more knockback. |
-| `ChargeFx` | 0.7 | How much bigger a full charge looks: the glow at the fist while charging, the streak behind the swing and the hit burst. |
 | `RequestsPerSecondLimit` | 8 | Server rate limit on punch requests; extras are dropped. |
 
 ## Clash
@@ -136,7 +131,8 @@ Two opponents whose punches land at effectively the same moment, and would each 
 | Setting | Start | What it does |
 |---|---|---|
 | `BaseSpeed` | 23 | Launch speed in studs/s of a punch from a standing attacker on a target with no stagger: about 4.6 studs of slide (measured), so one step puts you back in reach. Was 55 (26 studs of slide) until build contact-1. |
-| `SpeedBonusPerStud` | 0.38 | Extra launch speed per stud/s of the attacker's server-measured speed. Scaled down with `BaseSpeed` (was 0.9). |
+| `SpeedBonusPerStud` | 0.7 | Extra launch speed per stud/s of the attacker's server-measured speed, so a punch thrown on the move throws much harder: running (about 36) adds about 25, more than doubling a standing punch. Was 0.38. |
+| `SpeedBonusMax` | 40 | The most that speed can add, so a punch thrown out of a dash (well over 100 studs/s) adds 40, not 70 or more. |
 | `UpwardFraction` | 0.18 | Share of launch speed added upward on a grounded target. |
 | `UpwardMax` | 16 | Hard cap on upward launch speed. |
 | `AirborneUpwardFraction` | 0 | Share added upward if the target is already airborne; 0 stops punches juggling anyone into the sky. |
@@ -365,7 +361,8 @@ The training arena beside the 1v1 arena: a hub, six station platforms joined to 
 | `DashFovPunch` | 8 | Degrees the field of view widens during your own tap dash. |
 | `DashFovChargeBonus` | 1 | Extra widening at a full charge, as a share of `DashFovPunch`: 1 means a full dash widens twice as much as a tap. |
 | `GroundBlastReach` | 12 | When a kicked player hits the floor, the floor is looked for this many studs below their middle. With none in reach (past the edge) there is no explosion and no broken ground. |
-| `GroundBlastScale` | 1 | Size of the explosion where a kicked player hits the floor: flash, spikes, embers, dust, a ring along the floor and a pillar of light. It also grows with how well the kick was timed. |
+| `GroundBlastScale` | 1.6 | Size of the explosion where a kicked player hits the floor: flash, spikes, a fireball, embers, dust, a smoke cloud, a ring along the floor and a pillar of light. It also grows with how well the kick was timed. |
+| `GroundBreakBlastScale` | 1.6 | Size of the broken ground (cracks, slabs and flying rocks) where a kicked player hits the floor, compared with a jump's push-off (1). |
 
 ## Debug
 
@@ -502,6 +499,11 @@ The air kick. An uppercut launches someone, who can steer and propel in the air.
 | `FinisherLift` | 45 | Studs/s a finisher sends them up. |
 | `FinisherStunSeconds` | 0.45 | Seconds they can't act after a finisher, then they can punch to recover as usual. |
 | `FinisherShake` | 1.3 | Camera shake for the kicker and the kicked on a finisher, as a multiple of a normal kick's. |
+| `AimReachMax` | 90 | A perfect kick lands them where the kicker's cursor meets the floor, up to this many studs away. Aimed at the sky or off the edge, they fly along the cursor line instead. |
+| `AimFlightMin` | 0.3 | The shortest flight to that spot, in seconds, so a near one isn't instant. Straight underneath is a straight drive down. |
+| `AimFlightMax` | 0.8 | The longest flight to that spot, in seconds, so a far one is a fast throw, not a lob. |
+| `AimStandHeight` | 3 | How far above the floor a body's middle is when standing, so the aim lands their feet on the spot. |
+| `AimSpeedMin` | 110 | The slowest a perfect kick carries them across to the cursor's spot, in studs per second, even when the kick itself is weaker: a slow throw is slowed by the air and lands short. They stop dead where they land. |
 | `CrashSeconds` | 4 | After an air kick sends someone flying, their body can hit others until it lands, for at most this long. 0 turns crashes off. |
 | `CrashDistance` | 5 | While it flies, how close across the floor the body has to pass to someone to hit them, in studs. |
 | `CrashTall` | 6 | How far above or below them it can pass and still count. |
@@ -573,7 +575,7 @@ The marker and who it shows. It moves nobody and changes no hit.
 | `AssistInputDegrees` | 50 | Movement keys pointing within this many degrees of them are bent toward them. |
 | `AssistInputShare` | 0.35 | How far the keys are bent: 0.35 is about a third of the way. |
 | `AssistPunchDegrees` | 45 | A punch thrown with them within this many degrees of where you face turns you to face them. |
-| `AssistPunchReach` | 9 | ...and only when they're this close. Kept near a charged punch's reach, so it's aim, not a lunge. |
+| `AssistPunchReach` | 8 | ...and only when they're this close. Kept near a punch's reach, so it's aim, not a lunge. |
 | `LookDegrees` | 12 | How close to the centre of your view someone must be to show the marker. |
 | `LookReleaseDegrees` | 18 | How far off they can drift before the white marker lets go. |
 | `LookStuds` | 2.5 | Up close, looking within this many studs of their middle also counts, since they fill your view. |

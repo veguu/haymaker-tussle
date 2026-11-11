@@ -17,9 +17,9 @@
 -- default; anything else slams them down, a knockdown.
 -- WHOSE LAUNCH. Only the one whose uppercut put a target in the air can follow it up (FollowUpOthers
 -- off): nobody takes someone else's launch.
--- THE AIM. A perfect (green) kick sends them toward where the kicker's cursor points instead of straight
--- away from the kicker. The press carries that direction, and it's only ever a direction: it's
--- flattened and made a unit vector here, and used for nothing but which way a green kick throws them.
+-- THE AIM. A perfect (green) kick sends them toward where the kicker's cursor points, up or down as well
+-- as across, instead of away from the kicker and up. The press carries that direction, and it's only ever
+-- a direction: it's made a unit vector here, and used for nothing but which way a green kick throws them.
 -- THE CRASH. A body an air kick has sent flying is dangerous to whoever it flies into for a moment
 -- (CrashSeconds): they're thrown the way it was going and staggered, once, and the kicker is credited.
 -- HT_Stunned is the loss of control: a finisher's short one, a knockdown's from the slam until
@@ -87,7 +87,7 @@ type Record = {
 	facedAt: number,
 	grade: DiveKick.Grade,
 	stopUntil: number,
-	aim: Vector3?, -- where the kicker's cursor pointed at the press, flat and unit
+	aim: Vector3?, -- from the target toward where the kicker's cursor pointed at the press, unit length
 }
 
 local active: { [Player]: Record } = {}
@@ -424,9 +424,13 @@ function KickService:_impact(player: Player, record: Record)
 	local away = if flat.Magnitude > 0.01
 		then flat.Unit
 		else Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
-	-- A perfect kick goes where the kicker pointed.
-	if record.grade == "green" and record.aim then
-		away = record.aim
+	-- A perfect kick goes where the kicker pointed: across the floor and up or down alike.
+	local aim = if record.grade == "green" then record.aim else nil
+	if aim then
+		local across = Vector3.new(aim.X, 0, aim.Z)
+		if across.Magnitude > 0.01 then
+			away = across.Unit
+		end
 	end
 	local slam = if finisher then 0 else cfg.SlamSpeed * share
 	trace(
@@ -460,20 +464,59 @@ function KickService:_impact(player: Player, record: Record)
 			end
 			stunFor(target, cfg.FinisherStunSeconds)
 			Knit.GetService("RoundService"):NoteHit(target, character)
-			knockback:Launch(
-				target,
-				away.X * push,
-				away.Z * push,
-				cfg.FinisherLift,
-				cfg.FinisherLift
-			)
+			-- The floor where the kicker's cursor line meets it, from where the target is now.
+			local spot: Vector3? = nil
+			if aim then
+				local params = RaycastParams.new()
+				params.FilterType = Enum.RaycastFilterType.Exclude
+				params.FilterDescendantsInstances = CollectionService:GetTagged(Combatants.TAG)
+				params.IgnoreWater = true
+				local from = targetRoot.Position
+				local hit = workspace:Raycast(from, aim * (cfg.AimReachMax * 3), params)
+				if hit and hit.Normal.Y > 0.5 then
+					spot = hit.Position + Vector3.yAxis * cfg.AimStandHeight
+				end
+			end
+			if spot then
+				-- Landed right on it: across at up to the kick's push, with whatever lift that needs.
+				local from = targetRoot.Position
+				local vx, vy, vz = DiveKick.aimedLaunch(
+					cfg,
+					from.X,
+					from.Y,
+					from.Z,
+					spot.X,
+					spot.Y,
+					spot.Z,
+					math.max(push, cfg.AimSpeedMin),
+					workspace.Gravity
+				)
+				trace(
+					`{target.Name} aimed at a spot {math.floor((spot - from).Magnitude)} studs away`
+				)
+				knockback:Launch(target, vx, vz, math.max(vy, 0), vy, 0)
+			elseif aim then
+				-- The cursor line never meets the floor (aimed at the sky or off the edge): along it.
+				local across = math.sqrt(aim.X * aim.X + aim.Z * aim.Z)
+				local rise = aim.Y * push + cfg.FinisherLift * across
+				knockback:Launch(target, aim.X * push, aim.Z * push, math.max(rise, 0), rise)
+			else
+				knockback:Launch(
+					target,
+					away.X * push,
+					away.Z * push,
+					cfg.FinisherLift,
+					cfg.FinisherLift
+				)
+			end
 			startFlight(target, character)
 			-- Wherever they come down, the floor takes it: the same landing a slam gets, so every kicked
 			-- body breaks the ground it hits. Past the edge there is no floor, and nothing happens.
 			local started = os.clock()
 			local last = targetRoot.Position
 			local moved = false
-			task.wait(LIFTOFF_SECONDS)
+			-- They start up in the air, so only a moment's wait: one driven straight down lands almost at once.
+			task.wait(FLIGHT_LAND_AFTER)
 			repeat
 				task.wait()
 				moved = (targetRoot.Position - last).Magnitude > TELEPORT_STUDS
@@ -484,6 +527,14 @@ function KickService:_impact(player: Player, record: Record)
 				or os.clock() - started >= FLIGHT_WATCH_SECONDS
 			if target.Parent and not moved and touchingFloor(targetRoot) and character.Parent then
 				trace(`{target.Name} hit the floor after a finisher`)
+				-- Knocked down where they land, the same as a slam.
+				stunFor(target, cfg.KnockdownSeconds)
+				if spot then
+					-- Aimed at a spot: they stop on it instead of skidding on past it. A knock adds to what they
+					-- already have, so the stop is the same push the other way.
+					local moving = targetRoot.AssemblyLinearVelocity
+					knockback:Launch(target, -moving.X, -moving.Z, 0, 0, 0)
+				end
 				self._impactEvent:FireAllClients(
 					character,
 					target,
@@ -775,9 +826,9 @@ function KickService:KnitStart()
 		end
 		local aim = ...
 		if typeof(aim) == "Vector3" then
-			local x, z = DiveKick.aimDirection(aim.X, aim.Z)
-			if x and z then
-				record.aim = Vector3.new(x, 0, z)
+			local x, y, z = DiveKick.aimWay(aim.X, aim.Y, aim.Z)
+			if x and y and z then
+				record.aim = Vector3.new(x, y, z)
 			end
 		end
 		-- Both messages are delayed by the same trip, so the gap between them is the real timing.

@@ -212,12 +212,7 @@
    "InterpolationSeconds": 0.05,
    "GraceSeconds": 0.05,
    "SweepStep": 0.008,
-   "PointBlankRadius": 0.75,
-   "ChargeSeconds": 0.8,
-   "ChargeGrace": 0.4,
-   "ChargeReach": 0.3,
-   "ChargeKnock": 0.45,
-   "ChargeFx": 0.7
+   "PointBlankRadius": 0.75
   },
   "Clash": {
    "Enabled": true,
@@ -249,7 +244,8 @@
   },
   "Knockback": {
    "BaseSpeed": 23,
-   "SpeedBonusPerStud": 0.38,
+   "SpeedBonusPerStud": 0.7,
+   "SpeedBonusMax": 40,
    "UpwardFraction": 0.18,
    "UpwardMax": 16,
    "AirborneUpwardFraction": 0,
@@ -675,6 +671,11 @@
    "FinisherLift": 45,
    "FinisherStunSeconds": 0.45,
    "FinisherShake": 1.3,
+   "AimReachMax": 90,
+   "AimFlightMin": 0.3,
+   "AimFlightMax": 0.8,
+   "AimStandHeight": 3,
+   "AimSpeedMin": 110,
    "CrashSeconds": 4,
    "CrashDistance": 5,
    "CrashTall": 6,
@@ -745,7 +746,7 @@
    "AssistInputDegrees": 50,
    "AssistInputShare": 0.35,
    "AssistPunchDegrees": 45,
-   "AssistPunchReach": 9,
+   "AssistPunchReach": 8,
    "ReleaseRange": 85,
    "LookDegrees": 12,
    "LookReleaseDegrees": 18,
@@ -991,7 +992,8 @@
    "DashFovPunch": 8,
    "DashFovChargeBonus": 1,
    "GroundBlastReach": 12,
-   "GroundBlastScale": 1
+   "GroundBlastScale": 1.6,
+   "GroundBreakBlastScale": 1.6
   }
  },
  "plan": {

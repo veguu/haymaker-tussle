@@ -36,9 +36,6 @@ local KICK_FADE = 0.016 -- the kick's first frame is its big pose: it has to arr
 local FAST_FADE = 0.05
 local STRIKE_EVENT = AnimSequence.STRIKE_EVENT
 local TIP_LIFE = 0.5 -- seconds the fist's position stays useful after the strike
--- A charging punch holds the swing this far into its pull-back, about the arm's furthest back.
-local HOLD_SHARE = 0.4
-local CHARGE_ATTRIBUTE = "HT_PunchCharge"
 
 -- The kick's phases, from the server's attribute on the character.
 local SKILL_CLIPS: { [string]: string } = {
@@ -93,8 +90,6 @@ type Fighter = {
 	tiltAngle: number,
 	tiltSpeed: number,
 	skidding: boolean,
-	heldSwing: string?, -- the swing track held in its pull-back while a punch charges
-	chargeSeen: string?, -- someone else's charge, from the server's attribute
 }
 
 local animations: { [string]: Animation } = {}
@@ -320,22 +315,6 @@ local function updateFighter(model: Model, dt: number)
 	end
 
 	updateSkill(model, fighter)
-	if model ~= game:GetService("Players").LocalPlayer.Character then
-		local charging = model:GetAttribute(CHARGE_ATTRIBUTE) :: string?
-		if charging ~= fighter.chargeSeen then
-			fighter.chargeSeen = charging
-			if charging then
-				AnimController:HoldWindup(model, charging)
-			else
-				-- The swing itself takes over from the hold if it's thrown; otherwise this lets go.
-				task.delay(0.25, function()
-					if fighter.chargeSeen == nil and fighter.heldSwing then
-						AnimController:DropWindup(model)
-					end
-				end)
-			end
-		end
-	end
 
 	local now = os.clock()
 	local velocity = root.AssemblyLinearVelocity
@@ -489,11 +468,6 @@ function AnimController:PlaySwing(model: Model, side: string)
 		speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 	end
 	local chosen = if speed >= cfg.RunVariantSpeed then `{clip}Run` else clip
-	local held = fighter.heldSwing
-	fighter.heldSwing = nil
-	if held and held ~= chosen and fighter.tracks[held] then
-		fighter.tracks[held]:Stop(SWING_FADE)
-	end
 	for name in SWING_CLIPS do
 		local base = SWING_CLIPS[name]
 		for _, variant in { base, `{base}Run` } do
@@ -519,55 +493,10 @@ function AnimController:PlaySwing(model: Model, side: string)
 		fighter.strikePending = {}
 		fighter.strikeTip = nil
 		-- The lead-in to the strike is stretched over the whole windup, so the fist lands when the server
-		-- decides the hit. A held pull-back carries on from where it's held instead of starting over.
+		-- decides the hit.
 		local strike = (AnimClips :: any)[chosen].strike or 0
 		local windup = math.max(GameConfig.Punch.Windup, 0.01)
-		if held == chosen and track.IsPlaying then
-			track:AdjustSpeed(math.max(strike - track.TimePosition, 0.01) / windup)
-		else
-			track:Play(SWING_FADE, 1, if strike > 0 then math.min(strike / windup, 1) else 1)
-		end
-	end
-end
-
---- A punch being charged: the swing it will be is held in its pull-back, arm drawn back, until the
---- punch is thrown (PlaySwing carries on from here) or the charge is dropped (DropWindup).
-function AnimController:HoldWindup(model: Model, side: string)
-	local clip = SWING_CLIPS[side]
-	local fighter = fighters[model]
-	if not clip or not fighter then
-		return
-	end
-	local root = model:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local speed = 0
-	if root then
-		local velocity = root.AssemblyLinearVelocity
-		speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
-	end
-	local chosen = if speed >= cfg.RunVariantSpeed then `{clip}Run` else clip
-	local track = fighter.tracks[chosen]
-	local strike = (AnimClips :: any)[chosen] and (AnimClips :: any)[chosen].strike
-	if not track or not strike then
-		return
-	end
-	if fighter.heldSwing and fighter.heldSwing ~= chosen and fighter.tracks[fighter.heldSwing] then
-		fighter.tracks[fighter.heldSwing]:Stop(SWING_FADE)
-	end
-	fighter.heldSwing = chosen
-	track:Play(SWING_FADE, 1, 0)
-	track.TimePosition = strike * HOLD_SHARE
-end
-
---- A charge that was dropped without a punch: the held pull-back lets go.
-function AnimController:DropWindup(model: Model)
-	local fighter = fighters[model]
-	local held = fighter and fighter.heldSwing
-	if fighter and held then
-		fighter.heldSwing = nil
-		local track = fighter.tracks[held]
-		if track and track.IsPlaying and track.Speed == 0 then
-			track:Stop(SWING_FADE)
-		end
+		track:Play(SWING_FADE, 1, if strike > 0 then math.min(strike / windup, 1) else 1)
 	end
 end
 

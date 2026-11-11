@@ -59,6 +59,22 @@ return {
 		assert(fast > still * 1.5, `expected much stronger at speed: {still} vs {fast}`)
 	end,
 
+	["speed's bonus stops at SpeedBonusMax"] = function()
+		local capped = table.clone(KNOCK)
+		capped.SpeedBonusMax = 40
+		assert(Combat.punchStrength(capped, STAGGER, 1000, 0) == 95, "the bonus wasn't capped")
+		assert(Combat.punchStrength(capped, STAGGER, 10, 0) == 64, "a small bonus was changed")
+	end,
+
+	["the real settings: running more than doubles a standing punch"] = function()
+		local GameConfig = require("../src/shared/Config/GameConfig")
+		local knock: any = GameConfig.Knockback
+		local stagger: any = GameConfig.Stagger
+		local still = Combat.punchStrength(knock, stagger, 0, 0)
+		local running = Combat.punchStrength(knock, stagger, 36, 0)
+		assert(running >= still * 2, `running {running} vs standing {still}`)
+	end,
+
 	["stagger raises knockback up to its cap"] = function()
 		assert(Combat.staggerMultiplier(STAGGER, 0) == 1, "expected 1 at no stagger")
 		assert(near(Combat.staggerMultiplier(STAGGER, 50), 1.75, 0.001), "expected a straight line")
