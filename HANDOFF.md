@@ -533,3 +533,15 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   ServerStorage.HT_Maps.Gnomon; ids + rollback (`previous_light1`) in ground_ids.json. Checked in Play: Workspace.HT_Map
   carries the new ids. User decision: the arena does NOT shrink (gap 3 dropped).
 - Optimisation rule from the user for every piece: extremely optimised, tested for phones (measure ms; touch/low path).
+
+## sway-1 (2026-11-12): map plants move in the wind (user: "everything should feel like the wind is blowing on it")
+- `Shared/PlantField` (client, beside GrassField, same wind + gust bands) moves the map's own HT_Dressing placements
+  locally with one BulkMoveTo a frame; rules in `Core/Foliage` (tests/Foliage.spec). Flowers lean most, then plants,
+  bushes, tree crowns (bark never moves); lilies bob and turn; rocks/ruins never move. Characters push flowers,
+  plants and bushes over (eased). Ranges: small plants 110 studs, bushes 130, trees 320 (phones/quality 1-3: 70/80/200),
+  fading to rest at the edge; past 40% of range a placement updates every 3rd frame.
+- MEASURED in Play (this PC): nearest flower 4.7 deg, tree crown at 150 studs 1.6 deg; 0.03-0.06 ms/frame worst case
+  (26 of 158 placements in range at the arena centre). NOT TESTED on a real phone. Rigid per clump (no per-stem bend:
+  that would need bone-rigged re-exports).
+- Also bots-1: owner-only Bots button (Studio or group owner) stops/restarts every bot (workspace HT_BotsFrozen).
+- NEXT (user asked): ground-slam ground-break debris should take the colour/texture of the ground it broke.

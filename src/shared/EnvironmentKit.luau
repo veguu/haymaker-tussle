@@ -22,6 +22,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Environment = require(script.Parent.Core.Environment)
 local GrassField = require(script.Parent.GrassField)
+local PlantField = require(script.Parent.PlantField)
 local Envs = require(script.Parent.Config.MapEnvironments)
 
 local EnvironmentKit = {}
@@ -309,6 +310,7 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 
 	local bobs: { Bob } = {}
 	local grass: GrassField.Field? = nil
+	local plants: PlantField.Field? = nil
 
 	-- every moving part, in one list for a single BulkMoveTo per frame
 	local parts: { BasePart } = {}
@@ -353,9 +355,15 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 			local sway = (b.rule.sway or 0) * math.sin(w * 0.5)
 			b.part.CFrame = b.home + Vector3.new(wx * sway, rise, wz * sway)
 		end
-		if grass then
+		if grass or plants then
 			local camera = workspace.CurrentCamera
-			grass:step(t, camera and camera.CFrame.Position)
+			local at = camera and camera.CFrame.Position
+			if grass then
+				grass:step(t, at)
+			end
+			if plants then
+				plants:step(t, at)
+			end
 		end
 	end
 
@@ -377,6 +385,11 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 		end
 		-- the map's low grass tufts, built on this client from its layout (nil when the map has none)
 		grass = GrassField.new(mapModel, mapId, p.wind)
+		-- its flowers, plants, bushes, tree crowns and lilies, moved in the same wind (nil when it has none)
+		if plants then
+			plants:destroy()
+		end
+		plants = PlantField.new(mapModel, p.wind)
 		if not mapModel then
 			return
 		end
@@ -412,6 +425,10 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 		if grass then
 			grass:destroy()
 			grass = nil
+		end
+		if plants then
+			plants:destroy()
+			plants = nil
 		end
 		folder:Destroy()
 	end
