@@ -193,7 +193,7 @@ local function ellipsoid(name: string, size: Vector3, colour: Color3): Part
 	return part
 end
 
-type Piece = { part: BasePart, offset: Vector3 }
+type Piece = { part: BasePart, offset: Vector3, role: string? }
 type Cloud = { entry: any, pieces: { Piece } }
 type Mote = { part: BasePart, spot: any, spotIndex: number, i: number }
 type Bob = { part: BasePart, home: CFrame, rule: any, phase: number }
@@ -230,19 +230,40 @@ local function buildCloud(
 			local w =
 				ellipsoid(`Wisp{k}`, Vector3.new(m.r * 3, m.r * 0.9, m.r * 2), top:Lerp(under, 0.5))
 			w.Parent = model
-			table.insert(pieces, { part = w, offset = Vector3.new(m.x, m.y + m.r * 0.15, m.z) })
+			table.insert(
+				pieces,
+				{ part = w, offset = Vector3.new(m.x, m.y + m.r * 0.15, m.z), role = "wisp" }
+			)
 		else
 			local b = ball(`Mass{k}`, m.r, top)
 			b.Parent = model
-			table.insert(pieces, { part = b, offset = Vector3.new(m.x, m.y, m.z) })
+			table.insert(pieces, { part = b, offset = Vector3.new(m.x, m.y, m.z), role = "top" })
 			local flat = m.y - m.r * 0.55
 			local base = ellipsoid(`Under{k}`, Vector3.new(m.r * 1.8, m.r * 0.94, m.r * 1.8), under)
 			base.Parent = model
-			table.insert(pieces, { part = base, offset = Vector3.new(m.x, flat, m.z) })
+			table.insert(
+				pieces,
+				{ part = base, offset = Vector3.new(m.x, flat, m.z), role = "under" }
+			)
 		end
 	end
 	model.Parent = folder
 	return pieces
+end
+
+-- A drifting cloud's colours for its distance now (it changes as it crosses): the same softening as a fixed one.
+local function recolour(pieces: { Piece }, d: number, clouds: any, atmoColour: Color3)
+	local fade = Environment.cloudFade(clouds, d)
+	local top = rgb(clouds.top)
+	local under = rgb(clouds.under):Lerp(top, fade)
+	top = top:Lerp(atmoColour, fade * 0.35)
+	under = under:Lerp(atmoColour, fade * 0.35)
+	for _, piece in pieces do
+		piece.part.Color = if piece.role == "under"
+			then under
+			elseif piece.role == "wisp" then top:Lerp(under, 0.5)
+			else top
+	end
 end
 
 -- A cloud mesh supplied with the map (ReplicatedStorage.HT_MapAssets.<id>.Clouds.Cloud_<n>), placed whole.
@@ -291,6 +312,34 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 			else buildCloud(entry, index, p.clouds, atmoColour, folder)
 		table.insert(clouds, { entry = entry, pieces = pieces })
 	end
+
+	-- drifting clouds (Environment.driftCloud): one per lane, rebuilt as a new cloud each crossing
+	type Drifter = {
+		lane: any,
+		index: number,
+		cycle: number,
+		pieces: { Piece },
+		model: Instance?,
+		alpha: number,
+	}
+	local drift = p.clouds.drift
+	local drifters: { Drifter } = {}
+	if drift then
+		for li, lane in drift.lanes do
+			local d: Drifter = {
+				lane = lane,
+				index = li,
+				cycle = -math.huge,
+				pieces = {},
+				model = nil,
+				alpha = -1,
+			}
+			table.insert(drifters, d)
+		end
+	end
+	local driftParts: { BasePart } = {}
+	local driftFrames: { CFrame } = {}
+	local nextRecolour = -math.huge
 
 	local motes: { Mote } = {}
 	for si, spot in p.motes.list do
@@ -348,6 +397,73 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 		end
 		if n > 0 then
 			workspace:BulkMoveTo(parts, frames, Enum.BulkMoveMode.FireCFrameChanged)
+		end
+		if drift then
+			local recolourNow = t >= nextRecolour or t < nextRecolour - 2
+			if recolourNow then
+				nextRecolour = t + 0.5
+			end
+			local dn = 0
+			for _, d in drifters do
+				local entry, alpha, cycle =
+					Environment.driftCloud(drift, d.lane, d.index, wx, wz, t)
+				if cycle ~= d.cycle then
+					-- a new crossing: a new cloud (the old one had faded to nothing at the far end)
+					if d.model then
+						d.model:Destroy()
+					end
+					local holder = Instance.new("Folder")
+					holder.Name = `Drift_{d.index}`
+					d.pieces = buildCloud(
+						entry,
+						d.index * 1000 + cycle % 997,
+						p.clouds,
+						atmoColour,
+						holder
+					)
+					holder.Parent = folder
+					d.model = holder
+					d.cycle = cycle
+					d.alpha = -1
+					recolour(
+						d.pieces,
+						math.sqrt(entry.x * entry.x + entry.z * entry.z),
+						p.clouds,
+						atmoColour
+					)
+				elseif recolourNow then
+					recolour(
+						d.pieces,
+						math.sqrt(entry.x * entry.x + entry.z * entry.z),
+						p.clouds,
+						atmoColour
+					)
+				end
+				-- fade in and out at the ends (only touched while it changes)
+				if
+					math.abs(alpha - d.alpha) > 0.02
+					or (alpha >= 1 and d.alpha < 1)
+					or (alpha <= 0 and d.alpha > 0)
+				then
+					d.alpha = alpha
+					for _, piece in d.pieces do
+						piece.part.Transparency = 1 - alpha
+					end
+				end
+				local centre = anchor + Vector3.new(entry.x, entry.y, entry.z)
+				for _, piece in d.pieces do
+					dn += 1
+					driftParts[dn] = piece.part
+					driftFrames[dn] = CFrame.new(centre + piece.offset)
+				end
+			end
+			for k = #driftParts, dn + 1, -1 do
+				driftParts[k] = nil
+				driftFrames[k] = nil
+			end
+			if dn > 0 then
+				workspace:BulkMoveTo(driftParts, driftFrames, Enum.BulkMoveMode.FireCFrameChanged)
+			end
 		end
 		for _, b in bobs do
 			local w = 2 * math.pi * t / b.rule.period + b.phase
@@ -438,7 +554,7 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 		if grass then
 			tufts = grass:count()
 		end
-		return #clouds, #motes, #bobs, tufts
+		return #clouds + #drifters, #motes, #bobs, tufts
 	end
 
 	return scene :: Scene

@@ -192,6 +192,90 @@ function Environment.cloudMasses(cloud: any, index: number): { Mass }
 	return out
 end
 
+--- DRIFTING CLOUDS (2026-11-12, user: "drift continuously in one consistent direction ... smoothly spawn new
+--- ones ... never stops"). A preset's `clouds.drift` is a set of lanes running down-wind. Each lane carries one
+--- cloud across `span` studs at its own speed; near either end it fades (fully gone at the ends), and at the
+--- down-wind end it comes back up-wind as a NEW cloud: every crossing (`cycle`) draws its own size, height,
+--- side offset, shape and heading from a hash, so no two passes look alike. Still a pure function of time:
+--- every player sees the same sky. Returns the cloud as an entry (x, y, z, length, kind, heading, like a fixed
+--- one), how visible it is (0..1), and which crossing it is.
+function Environment.driftCloud(
+	drift: any,
+	lane: any,
+	laneIndex: number,
+	wx: number,
+	wz: number,
+	t: number
+): (any, number, number)
+	local span = drift.span
+	local speed = drift.speed * (lane.speed or 1)
+	local u = t * speed / span + (lane.phase or 0)
+	local cycle = math.floor(u)
+	local f = u - cycle
+	local function h(k: number): number
+		return Environment.hash(laneIndex * 7.31, cycle * 1.137, k)
+	end
+	local along = (f - 0.5) * span
+	local across = lane.across + (h(1) - 0.5) * 2 * (drift.acrossJitter or 0)
+	local y = lane.y + (h(2) - 0.5) * 2 * (drift.yJitter or 0)
+	local length = lane.length * (1 + (h(3) - 0.5) * 2 * (drift.sizeJitter or 0))
+	local kind = if h(4) < (lane.stretched or 0.5) then "stretched" else "compact"
+	local windDeg = math.deg(math.atan2(wz, wx))
+	local heading = windDeg + (h(5) - 0.5) * 2 * (drift.headingJitter or 0)
+	-- a slow rise and fall while it crosses
+	y += (drift.rise or 0) * math.sin(2 * math.pi * (t / (drift.risePeriod or 90) + h(6)))
+	local ax, az = -wz, wx
+	local entry = {
+		x = wx * along + ax * across,
+		y = y,
+		z = wz * along + az * across,
+		length = length,
+		kind = kind,
+		heading = heading,
+	}
+	local edge = math.max(drift.edge or 0.12, 1e-3)
+	local function smooth(v: number): number
+		local k = math.clamp(v / edge, 0, 1)
+		return k * k * (3 - 2 * k)
+	end
+	return entry, smooth(f) * smooth(1 - f), cycle
+end
+
+--- The jitter-free worst cases of one lane for the checks: the lowest, biggest, furthest-in and furthest-out
+--- cloud it can ever draw, at each of `steps` points along its crossing.
+function Environment.driftExtremes(
+	drift: any,
+	lane: any,
+	wx: number,
+	wz: number,
+	steps: number
+): { any }
+	local out = {}
+	local ax, az = -wz, wx
+	local windDeg = math.deg(math.atan2(wz, wx))
+	local lowY = lane.y - (drift.yJitter or 0) - (drift.rise or 0)
+	local bigL = lane.length * (1 + (drift.sizeJitter or 0))
+	for s = 0, steps do
+		local along = (s / steps - 0.5) * drift.span
+		for _, side in { -1, 1 } do
+			local across = lane.across + side * (drift.acrossJitter or 0)
+			for _, kind in { "compact", "stretched" } do
+				for _, turn in { -1, 0, 1 } do
+					table.insert(out, {
+						x = wx * along + ax * across,
+						y = lowY,
+						z = wz * along + az * across,
+						length = bigL,
+						kind = kind,
+						heading = windDeg + turn * (drift.headingJitter or 0),
+					})
+				end
+			end
+		end
+	end
+	return out
+end
+
 --- How much a cloud at horizontal distance `d` gives up its contrast (0 near, up to `fadeMost` far).
 function Environment.cloudFade(clouds: any, d: number): number
 	local a, b = clouds.fadeStart or 350, clouds.fadeEnd or 1100
@@ -394,6 +478,38 @@ function Environment.problems(preset: any, lobby: any, arena: any): { string }
 				for _, c in corridors do
 					if Environment.inCorridor(c, px, py, pz, m.r) then
 						note(`in the {c.name} view`)
+					end
+				end
+			end
+		end
+	end
+	local drift = preset.clouds.drift
+	if drift then
+		for li, lane in drift.lanes do
+			local seen: { [string]: boolean } = {}
+			for _, cloud in Environment.driftExtremes(drift, lane, wx, wz, 60) do
+				for _, m in Environment.cloudMasses(cloud, li) do
+					local px, py, pz = cloud.x + m.x, cloud.y + m.y, cloud.z + m.z
+					local d = math.sqrt(px * px + pz * pz)
+					local function note(what: string)
+						if not seen[what] then
+							seen[what] = true
+							table.insert(out, `drift lane {li}: {what}`)
+						end
+					end
+					if d - m.r < L.cloudMinDistance then
+						note(`closer than {L.cloudMinDistance} studs`)
+					end
+					if (py - m.r) < d * minElev then
+						note("below the sky band (sits behind fighters or the platform edge)")
+					end
+					if Environment.inFightSpace(px, py, pz, m.r, arena) then
+						note("in the fighting space")
+					end
+					for _, c in corridors do
+						if Environment.inCorridor(c, px, py, pz, m.r) then
+							note(`in the {c.name} view`)
+						end
 					end
 				end
 			end

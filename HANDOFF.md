@@ -554,3 +554,13 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   (Texture HT_Skin per pooled piece). Dust uses the same colour. Plain parts/terrain unchanged.
 - MEASURED in Play via server-fired DiveLanded for a bot: grass hit -> green pieces matching the grid cell, earth patch
   -> sandy pieces, skin on. Not watched by eye in a real fight.
+
+## clouds-1 (2026-11-12): clouds drift one way forever (user request)
+- Gnomon's 6 fixed swaying clouds -> `clouds.drift` (MapEnvironments): 11 lanes, span 3000 studs, 5.5 studs/s x lane
+  speed 0.8-1.2 (8-11 min a crossing). `Environment.driftCloud`: pure function of time; fades in/out over the end 14%
+  of a crossing and returns up-wind as a NEW cloud (per-crossing hash: size +-15%, height +-25, side +-60, shape,
+  heading +-20 deg; slow rise 6 studs). EnvironmentKit rebuilds a lane's parts on each new crossing, recolours by
+  distance at 2 Hz, one BulkMoveTo a frame (~236 parts). Environment.problems checks every lane's whole path at its
+  extremes (fight space, lobby views, landmarks, min distance, sky band): clean.
+- MEASURED in Play: 11 lanes, 10 visible, 590-1640 studs out, moving ~5.5 studs/s down-wind; a lane wrapped while
+  invisible. First try (lanes 1000-2000 out) read too small; lanes pulled in. NOT TESTED: a full crossing by eye, phones.

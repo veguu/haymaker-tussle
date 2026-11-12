@@ -22,8 +22,19 @@ return {
 
 	["the sky stays spacious: a few modest clouds per map"] = function()
 		for id in Envs.Maps do
-			local list = Environment.resolve(Envs, id).clouds.list
-			assert(#list >= 3 and #list <= 7, `{id} has {#list} clouds`)
+			local clouds = Environment.resolve(Envs, id).clouds
+			local list = clouds.list
+			if clouds.drift then
+				-- drifting lanes: spread over a whole crossing, so a few more of them still read as a few
+				local drift = clouds.drift
+				assert(#drift.lanes >= 6 and #drift.lanes <= 14, `{id} has {#drift.lanes} drift lanes`)
+				for i, lane in drift.lanes do
+					local most = lane.length * (1 + (drift.sizeJitter or 0))
+					assert(most <= 190, `{id} drift lane {i} can be {most} long`)
+				end
+			else
+				assert(#list >= 3 and #list <= 7, `{id} has {#list} clouds`)
+			end
 			for i, c in list do
 				assert(c.length <= 160, `{id} cloud {i} is {c.length} long`)
 			end
@@ -75,16 +86,47 @@ return {
 	["the same time gives the same sky: clouds and leaves are pure functions of time"] = function()
 		local p = Environment.resolve(Envs, "gnomon")
 		local wx, wz = Environment.wind(p.wind.direction)
-		local c = p.clouds.list[1]
-		local ax, ay, az = Environment.cloudCentre(c, wx, wz, 37.5)
-		local bx, by, bz = Environment.cloudCentre(c, wx, wz, 37.5)
-		assert(ax == bx and ay == by and az == bz)
+		local drift = p.clouds.drift
+		local c1 = Environment.driftCloud(drift, drift.lanes[1], 1, wx, wz, 37.5)
+		local c2 = Environment.driftCloud(drift, drift.lanes[1], 1, wx, wz, 37.5)
+		assert(c1.x == c2.x and c1.y == c2.y and c1.z == c2.z and c1.length == c2.length)
+		local c = c1
 		local m1 = Environment.cloudMasses(c, 1)
 		local m2 = Environment.cloudMasses(c, 1)
 		assert(#m1 == #m2 and m1[3].r == m2[3].r)
 		local x1 = Environment.mote(p.motes.list[1], 1, 2, 12.3, wx, wz)
 		local x2 = Environment.mote(p.motes.list[1], 1, 2, 12.3, wx, wz)
 		assert(x1 == x2)
+	end,
+
+	["drifting clouds move one way, fade at the ends and come back as a new cloud"] = function()
+		local p = Environment.resolve(Envs, "gnomon")
+		local wx, wz = Environment.wind(p.wind.direction)
+		local drift = p.clouds.drift
+		local lane = drift.lanes[1]
+		local speed = drift.speed * (lane.speed or 1)
+		local crossing = drift.span / speed
+		-- always down-wind, never back
+		local prev: any = nil
+		local start = (1 - lane.phase) * crossing + 1 -- just after a fresh cloud appears
+		for k = 0, 40 do
+			local c, _, cycle = Environment.driftCloud(drift, lane, 1, wx, wz, start + k * crossing / 50)
+			local along = c.x * wx + c.z * wz
+			if prev and prev.cycle == cycle then
+				assert(along > prev.along, "moves down-wind")
+			end
+			prev = { along = along, cycle = cycle }
+		end
+		-- invisible at the ends, fully there in the middle
+		local _, aStart = Environment.driftCloud(drift, lane, 1, wx, wz, start - 1)
+		local _, aMid = Environment.driftCloud(drift, lane, 1, wx, wz, start - 1 + crossing / 2)
+		assert(aStart < 0.01 and aMid > 0.99)
+		-- the next crossing is a different cloud
+		local a = Environment.driftCloud(drift, lane, 1, wx, wz, start + 5)
+		local b = Environment.driftCloud(drift, lane, 1, wx, wz, start + 5 + crossing)
+		assert(a.length ~= b.length or a.y ~= b.y or a.kind ~= b.kind)
+		-- gentle: under 8 studs a second
+		assert(speed < 8)
 	end,
 
 	["the corridor check finds what's between the lobby and the arena, and ignores what's beside it"] = function()
