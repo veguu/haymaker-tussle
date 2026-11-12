@@ -263,7 +263,10 @@ function CombatController:KnitStart()
 		recovery = 0
 		anim:PlaySwing(character, side)
 		fx:Swing(character)
-		movement:HeavyKickStarted(move.cfg.Windup + move.cfg.RootAfter)
+		-- The launching kick roots you through its windup. The uppercut doesn't: you keep running.
+		if move.cfg.Roots ~= false then
+			movement:HeavyKickStarted(move.cfg.Windup + move.cfg.RootAfter)
+		end
 		move.remote:FireServer()
 		self.PunchEvent:Fire("thrown")
 		return true

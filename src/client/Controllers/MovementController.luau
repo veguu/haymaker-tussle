@@ -795,7 +795,10 @@ function MovementController:_bind(
 	end
 
 	trove:BindToRenderStep(STEP_NAME, STEP_PRIORITY, function(dt: number)
-		checkBumps(os.clock())
+		-- Off (user, 2026-11-11): running or dashing into someone does nothing at all.
+		if bumpCfg.BumpsEnabled then
+			checkBumps(os.clock())
+		end
 		local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
 		local hud = self.Hud
 		local flatVelocity = root.AssemblyLinearVelocity

@@ -97,6 +97,7 @@ local GameConfig = {
 	},
 	Uppercut = {
 		Windup = 0.3,
+		Roots = false,
 		RootAfter = 0.15,
 		Cooldown = 5,
 		Range = 6,
@@ -165,6 +166,7 @@ local GameConfig = {
 		UpwardMax = 16,
 		AirborneUpwardFraction = 0,
 		UppercutLift = 125,
+		BumpsEnabled = false,
 		BumpBasePush = 12,
 		BumpPushPerSpeed = 0.45,
 		BumpDashSpeed = 70,

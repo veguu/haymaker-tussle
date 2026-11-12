@@ -97,12 +97,13 @@ Every adjustable value in the game. All numbers are **starting guesses to tune b
 
 ## Uppercut
 
-R (L2). A slow, telegraphed uppercut on its own cooldown, rooted through its windup. It always throws the target up and away in an arc, with a trail behind them, and never launches them for an Air Kick.
+R (L2). A slow, telegraphed uppercut on its own cooldown. You keep your momentum through it. It always throws the target up and away in an arc, with a trail behind them, and never launches them for an Air Kick.
 
 | Setting | Value | What it does |
 |---|---|---|
 | `Windup` | 0.3 | Seconds from the press to the uppercut landing: the telegraph. |
-| `RootAfter` | 0.15 | The thrower stays rooted this long after the strike too. |
+| `Roots` | false | Whether the uppercut holds you still through its windup and costs you speed afterwards, the way the launching kick does. Off: you keep running the whole time, and a hit or a miss takes no speed and gives no recoil. |
+| `RootAfter` | 0.15 | Only when `Roots` is on: the thrower stays rooted this long after the strike too. |
 | `Cooldown` | 5 | Seconds between uppercuts. An uppercut also starts the punch cooldown. |
 | `Range` | 6 | Its reach, the same way a punch's `Range` works (plus `Punch.TargetRadius`). |
 | `Degrees` | 35 | Its arc either side of straight ahead. |
@@ -208,6 +209,7 @@ Two opponents whose punches land at effectively the same moment, and would each 
 | `UpwardMax` | 16 | Hard cap on upward launch speed. |
 | `AirborneUpwardFraction` | 0 | Share added upward if the target is already airborne; 0 stops punches juggling anyone into the sky. |
 | `UppercutLift` | 125 | Studs/s upward from an uppercut, on top of its normal punch push. With `Kick.AirGravityScale` that's about 57 studs high (measured +56 to +57), and about 1.7 s in the air with the falling rule in `AirRecovery`: 0.9 s up, 0.8 s down. |
+| `BumpsEnabled` | false | Whether running into someone does anything. Off: no knock, no stagger, no stun, at any speed, dashing included, and every `Bump...` setting below does nothing. Fighters pass through each other either way. |
 | `BumpBasePush` | 12 | Both players are bumped when they run into each other, each by how fast the OTHER was going. This is the knock from someone standing still... | In a round each player's own client applies its own bump the instant it touches someone (src/shared/BumpPredict.luau), so it lands exactly on contact. |
 | `BumpPushPerSpeed` | 0.45 | ...plus this per stud/s of the other's speed: about 28 from someone running at 36, 35 at 50. |
 | `BumpDashSpeed` | 70 | The other going at least this fast (a dash) is a real hit instead... |

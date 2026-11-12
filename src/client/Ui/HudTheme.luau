@@ -154,7 +154,7 @@ HudTheme.Guide = {
 		},
 		{
 			key = "R",
-			action = "Uppercut: roots you, then throws them up and away. Further the faster you ran in.",
+			action = "Uppercut: throws them up and away. You keep your speed. Further the faster you ran in.",
 		},
 		{
 			key = "Q",
@@ -179,7 +179,7 @@ HudTheme.Guide = {
 		},
 		{
 			key = "L2",
-			action = "Uppercut: roots you, then throws them up and away. Further the faster you ran in.",
+			action = "Uppercut: throws them up and away. You keep your speed. Further the faster you ran in.",
 		},
 		{ key = "B", action = "Dash: a short burst the way you're going. Hard to steer." },
 		{
@@ -199,7 +199,7 @@ HudTheme.Guide = {
 			action = "Punch: left and right hooks. Hold to draw it back, let go to throw it fast.",
 		},
 		{ key = "Propel", action = "Dash: a short burst the way you're going. 3 s to recharge." },
-		{ key = "Upper", action = "Uppercut: roots you, then throws them up and away." },
+		{ key = "Upper", action = "Uppercut: throws them up and away. You keep your speed." },
 		{
 			key = "Kick",
 			action = "Jump. Tap again in the air to dive kick. Holding Punch, it kicks them up.",

@@ -454,3 +454,13 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
 - NOT VERIFIED: any of it by eye (animations: uppercut clip, KickDown pose on the dive, the jump has no clip of its
   own), the follow-up jump after the launching kick on this build, a dive aimed with a real cursor at a distance
   (tested straight down), touch and gamepad, two real players. Bots use none of the new moves.
+
+## move-15 (2026-11-11): bumps off
+- Knockback.BumpsEnabled = false (user: "no hit or stun, even if you dash"). Gates both the server's
+  KnockbackService:_checkBumps and the client's predicted bumps (MovementController checkBumps). The bump code,
+  settings and tests stay, unused. A kicked body crashing into others (Kick.Crash...) is a different rule, still on.
+
+## move-16 (2026-11-11): the uppercut keeps your momentum
+- Uppercut.Roots = false (user: "only the upwards kick (click + space) should slow u"). R no longer roots through
+  the windup (client skips HeavyKickStarted, server sets no HT_KickWindup) and finishPunch skips the thrower's
+  aftermath for it, so a hit gives no stop and no recoil and a miss no slowdown. The launching kick is unchanged.

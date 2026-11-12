@@ -325,7 +325,10 @@ function KnockbackService:KnitStart()
 		elapsed += dt
 		if elapsed >= BUMP_CHECK_SECONDS then
 			elapsed = 0
-			self:_checkBumps()
+			-- Off (user, 2026-11-11): running or dashing into someone does nothing at all.
+			if GameConfig.Knockback.BumpsEnabled then
+				self:_checkBumps()
+			end
 		end
 	end)
 end

@@ -25,8 +25,9 @@
 -- THE LAUNCHING KICK (Space while holding punch, HeavyKickRequest, no arguments): the rising kick with
 -- side "Kick", on its own cooldown. It throws the target into the air for an air kick (at LaunchSpeed or
 -- more, which is 0: always); a target that can't be launched gets its arc instead.
--- Both root the thrower through the windup (the client keeps itself still; HT_KickWindup marks it), and
--- the server measures how fast they were going at the press.
+-- The kick roots the thrower through the windup (the client keeps itself still; HT_KickWindup marks it).
+-- The uppercut doesn't (Uppercut.Roots false): they keep running, and it costs them no speed, hit or miss.
+-- For both, the server measures how fast they were going at the press.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -300,7 +301,10 @@ local function finishPunch(self: any, punch: Punch)
 	end
 	-- The puncher pays either way: a miss slows them, a hit stops them and pushes them back. A
 	-- repel has already thrown them, which this would otherwise wipe out.
-	if not punch.repelled then
+	-- A heavy move that doesn't root (the uppercut) costs nothing either: its thrower keeps their momentum.
+	local heavy = HEAVY[punch.side]
+	local keepsMomentum = heavy ~= nil and heavy.cfg.Roots == false
+	if not punch.repelled and not keepsMomentum then
 		local flat = punch.flat or Vector3.new(0, 0, -1)
 		local pushX, pushZ, keep =
 			Combat.punchAftermath(punchCfg, punch.hits, punch.awayX, punch.awayZ, flat.X, flat.Z)
@@ -827,12 +831,14 @@ function CombatService:KnitStart()
 		record.recovery = 0
 		-- How fast they were going at the press, before the windup roots them.
 		local speed = Knit.GetService("SpeedAuditService"):GetTrustedSpeed(attacker)
-		attacker:SetAttribute(KICK_WINDUP_ATTRIBUTE, true)
-		task.delay(move.cfg.Windup + move.cfg.RootAfter, function()
-			if attacker.Parent then
-				attacker:SetAttribute(KICK_WINDUP_ATTRIBUTE, nil)
-			end
-		end)
+		if move.cfg.Roots ~= false then
+			attacker:SetAttribute(KICK_WINDUP_ATTRIBUTE, true)
+			task.delay(move.cfg.Windup + move.cfg.RootAfter, function()
+				if attacker.Parent then
+					attacker:SetAttribute(KICK_WINDUP_ATTRIBUTE, nil)
+				end
+			end)
+		end
 		self._punchStarted:FireAllClients(attacker, side)
 		trace(`{player.Name} heavy {side} at speed {math.floor(speed)}`)
 		startPunch(
