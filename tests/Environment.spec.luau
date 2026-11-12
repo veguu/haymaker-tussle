@@ -40,7 +40,7 @@ return {
 		local p = Environment.resolve(Envs, "gnomon")
 		assert(p.sun.clockTime == Envs.Maps.gnomon.environment.sun.clockTime)
 		assert(
-			p.bloom.threshold == Envs.Default.bloom.threshold,
+			p.wind.global == Envs.Default.wind.global,
 			"unnamed values come from the default"
 		)
 		assert(

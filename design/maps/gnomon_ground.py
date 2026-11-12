@@ -24,13 +24,16 @@ import paint as P
 
 # --- the main arena's palette (image 1), linear ---------------------------------------------------
 G = {
-    "deep": P.rgb(58, 108, 48),
-    "shade": P.rgb(69, 122, 53),
-    "mid": P.rgb(82, 136, 56),
-    "light": P.rgb(97, 150, 61),
-    "high": P.rgb(121, 162, 74),
-    "stroke_dark": P.rgb(52, 98, 44),
-    "stroke_light": P.rgb(124, 166, 76),
+    # 2026-11-12 lighting pass (user, Genshin-style daylight): under the brighter sun the old even mid-green read as
+    # one flat lime field. Now a wider HUE range: warm sunlit yellow-greens against cool blue-green shade, slightly
+    # less saturated, so the light carries the freshness and the ground keeps its variation and brushwork.
+    "deep": P.rgb(50, 96, 60),
+    "shade": P.rgb(64, 116, 70),
+    "mid": P.rgb(90, 136, 62),
+    "light": P.rgb(124, 158, 70),
+    "high": P.rgb(148, 172, 84),
+    "stroke_dark": P.rgb(52, 98, 54),
+    "stroke_light": P.rgb(142, 172, 88),
     "earth_dark": P.rgb(128, 112, 74),
     "earth": P.rgb(170, 154, 100),
     "earth_light": P.rgb(204, 189, 128),
@@ -40,9 +43,9 @@ G = {
 
 # the turf_field keys style.py's rim, lip and caps read, for the arena (image 1's greens)
 ARENA_PAL = {
-    "leaf": P.rgb(80, 134, 55), "warm": P.rgb(94, 146, 58), "cool": P.rgb(66, 120, 54),
-    "lip": P.rgb(96, 148, 62), "lip_hi": P.rgb(128, 168, 82),
-    "drape": P.rgb(60, 108, 50), "drape_dark": P.rgb(44, 84, 42),
+    "leaf": P.rgb(90, 136, 62), "warm": P.rgb(118, 154, 68), "cool": P.rgb(66, 118, 70),
+    "lip": P.rgb(104, 150, 66), "lip_hi": P.rgb(138, 170, 86),
+    "drape": P.rgb(60, 108, 56), "drape_dark": P.rgb(44, 84, 48),
 }
 LIP_ROWS = [(128, 168, 82), (96, 148, 62), (80, 134, 55), (60, 108, 50), (44, 84, 42)]
 
@@ -210,20 +213,24 @@ def meadow(X, Y, earth=True, pal=None):
     """The arena floor: (colour linear (...,3), height studs, roughness). `pal` swaps the greens (an islet's
     isle_ground); the earth always uses the arena's sand."""
     g = pal or G
-    # broad soft patches: lighter and deeper greens, edges soft but present (painted areas, not noise)
+    # broad soft swaths (about a hundred studs): warm sunlit yellow-green against cool blue-green, graded softly
+    # like painted areas; then medium patches of lighter and deeper green with soft but present edges; a mottle
+    w0 = P.fbm2(X * 0.009 + 13, Y * 0.009 - 5, 300, 3)
     w1 = P.fbm2(X * 0.016, Y * 0.016, 301, 4)
     w2 = P.fbm2(X * 0.031 + 40, Y * 0.031 - 12, 302, 3)
     wob = 0.06 * (P.fbm2(X * 0.16, Y * 0.16, 303, 2) - 0.5)
     col = P.fill(X.shape, g["mid"])
-    col = P.mix(col, g["light"], 0.7 * P.smoothstep(0.54, 0.58, w1 + wob))
-    col = P.mix(col, g["shade"], 0.65 * P.smoothstep(0.56, 0.60, w2 - wob))
-    col = P.mix(col, g["deep"], 0.35 * P.smoothstep(0.65, 0.69, w2 - wob))
-    col = P.mix(col, g["high"], 0.3 * P.smoothstep(0.67, 0.71, w1 + wob))
+    col = P.mix(col, g["light"], 0.8 * P.smoothstep(0.46, 0.64, w0 + wob))
+    col = P.mix(col, g["shade"], 0.7 * P.smoothstep(0.54, 0.36, w0 - wob))
+    col = P.mix(col, g["high"], 0.45 * P.smoothstep(0.55, 0.60, w1 + wob))
+    col = P.mix(col, g["shade"], 0.55 * P.smoothstep(0.56, 0.60, w2 - wob))
+    col = P.mix(col, g["deep"], 0.4 * P.smoothstep(0.65, 0.69, w2 - wob))
+    col = col * (1.0 + 0.12 * (P.fbm2(X * 0.22, Y * 0.22, 304, 3) - 0.5))[..., None]
     # painted grass masses (lit tops, shaded undersides), two sizes
     for cell, keep, radius, seed, k in ((4.2, 0.55, 1.9, 320, 1.0), (2.3, 0.5, 1.05, 330, 0.8)):
         lit, shade = mounds(X, Y, cell, seed, keep, radius)
-        col = P.mix(col, g["shade"], 0.55 * k * shade)
-        col = P.mix(col, g["light"], 0.42 * k * lit)
+        col = P.mix(col, g["shade"], 0.62 * k * shade)
+        col = P.mix(col, g["light"], 0.5 * k * lit)
     height = np.zeros(X.shape)
     E = np.zeros(X.shape)
     if earth:

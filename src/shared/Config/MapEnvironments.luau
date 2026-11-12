@@ -128,23 +128,38 @@ MapEnvironments.Maps = {
 			-- Sunny grass pass (2026-11-11): modest saturation lift, clear greens, and a gentle
 			-- sun, lighter and softer shade, a little more haze; the sky is kept blue (desaturating further
 			-- turned it grey).
-			sun = { clockTime = 15.1, latitude = 50, colour = { 255, 240, 222 }, brightness = 2.05 },
+			-- LIGHTING PASS 2026-11-12 (user brief, five references: bright airy daylight with warm sun, cool readable
+			-- shade and gentle distance haze). The sun is higher and warmer and the shade cooler and bluer, so lit and
+			-- shaded sides separate by hue as well as value; a soft shadow edge; more sky light in the shade so it stays
+			-- readable; exposure near neutral (no global brightening); the atmosphere's haze is raised and its offset
+			-- pushed out, so the battlefield stays clear while the distant islets soften toward the sky colour; very
+			-- light bloom with a threshold above 1, so white flowers, pale rocks and clouds keep their detail.
+			sun = { clockTime = 14.6, latitude = 50, colour = { 255, 234, 204 }, brightness = 2.45 },
 			ambient = {
-				ambient = { 104, 112, 132 },
-				outdoor = { 132, 140, 160 },
-				bottom = { 18, 24, 14 },
-				shadowSoftness = 0.55,
-				diffuse = 0.45,
+				ambient = { 98, 114, 146 },
+				outdoor = { 124, 142, 178 },
+				bottom = { 26, 34, 20 },
+				shadowSoftness = 0.38,
+				diffuse = 0.55,
+				specular = 0.08,
 			},
-			exposure = -0.12,
+			exposure = 0,
 			grade = {
-				saturation = 0.06,
-				contrast = 0.04,
-				brightness = 0.01,
+				saturation = 0.02,
+				contrast = 0.16,
+				brightness = 0,
 				tint = { 255, 252, 246 },
 			},
-			bloom = { intensity = 0.25 },
-			atmosphere = { haze = 0.45, colour = { 200, 222, 246 } },
+			bloom = { intensity = 0.3, size = 28, threshold = 1.35 },
+			sunRays = { intensity = 0.02, spread = 0.12 },
+			atmosphere = {
+				density = 0.3,
+				offset = 0.3,
+				colour = { 206, 228, 250 },
+				decay = { 150, 186, 232 },
+				glare = 0.15,
+				haze = 1.3,
+			},
 			-- a summer breeze across the meadow from the lobby's left. Raised 2026-11-10 (user: "too subtle",
 			-- wanted "a teeny bit stronger"): about half again the lean and gusts, a livelier shiver, gust
 			-- bands passing a little faster so the waves read across the meadow.

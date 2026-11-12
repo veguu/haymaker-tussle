@@ -13,7 +13,7 @@ return {
 		{ name = "Tuft_Round", offset = Vector3.new(-0.0006, 0.0061, 0.0003), size = Vector3.new(0.6689, 0.1741, 0.8061) },
 		{ name = "Tuft_Sprig", offset = Vector3.new(0.0424, 0.2735, -0.0027), size = Vector3.new(0.7593, 0.627, 0.8791) },
 	},
-	colours = { Color3.fromRGB(132, 172, 80), Color3.fromRGB(118, 160, 72), Color3.fromRGB(146, 182, 90), Color3.fromRGB(172, 196, 88), Color3.fromRGB(104, 168, 124), Color3.fromRGB(176, 184, 108), Color3.fromRGB(136, 204, 98), Color3.fromRGB(134, 184, 102) },
+	colours = { Color3.fromRGB(144, 180, 82), Color3.fromRGB(128, 168, 76), Color3.fromRGB(160, 190, 92), Color3.fromRGB(172, 196, 88), Color3.fromRGB(104, 168, 124), Color3.fromRGB(176, 184, 108), Color3.fromRGB(136, 204, 98), Color3.fromRGB(134, 184, 102) },
 	stride = 7,
 	data = {
 		-207.15,0,-8.27,5.996,1.06,1,3, -202.69,0,34.65,3.56,1.2,3,1, -203.27,0,35.2,1.525,0.98,5,1, -201.35,0,33.02,5.152,1.06,1,1, -202.19,0,33.02,0.266,0.96,3,1, -203.75,0,20.71,5.818,0.87,4,3,

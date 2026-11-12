@@ -46,7 +46,7 @@ TEMPLATE_ORDER = list(TUFTS)
 
 # the arena's tuft colours (sRGB, the colour of a tip; the atlas darkens toward the root): three tones of image 1's
 # greens, picked by the same broad field that lightens and deepens the ground, so tufts sit in their patch
-ARENA_TONES = [(132, 172, 80), (118, 160, 72), (146, 182, 90)]
+ARENA_TONES = [(144, 180, 82), (128, 168, 76), (160, 190, 92)]  # light-1 (2026-11-12): lifted to sit in the sunlit swaths
 ATLAS_COLUMNS = 4
 
 

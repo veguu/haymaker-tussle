@@ -501,3 +501,24 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   Build: still built in gnomon_sights.build_horizon (keeps every later random draw identical), then deleted in
   gnomon.py; its plantings skipped via gnomon_dress.DROPPED. placements.json 213 -> 192; .blend updated. Studio:
   `design/maps/out/gnomon/upload/studio_drop_mesa.luau` (moves them to HT_MapsArchive.Gnomon_far_mesa_20261112), RUN; checked in Play: no mesa parts, nothing past z 1000; saved v240.
+
+## light-1 (2026-11-12): Gnomon + lobby lighting pass (user brief, five Genshin references; images 1 and 3 lead)
+- PRESET (MapEnvironments.gnomon.environment; the lobby shares it, EnvironmentController reapplies it every map
+  swap): sun clock 14.6, brightness 2.45, warm top (255,234,204); cool shade ambient (98,114,146) / outdoor
+  (124,142,178), bottom bounce (26,34,20); ShadowSoftness 0.38; EnvironmentDiffuseScale 0.55, specular 0.08;
+  exposure 0; grade contrast 0.16, saturation 0.02, tint (255,252,246); bloom 0.3 / size 28 / threshold 1.35 (white
+  flowers, pale rocks, clouds keep detail); sun rays 0.02; atmosphere density 0.3, offset 0.3, colour (206,228,250),
+  decay (150,186,232), glare 0.15, haze 1.3: the hard blue horizon band is gone and the far islets soften with distance
+  while the battlefield stays clear. tests/Environment.spec: the "unnamed values come from the default" check now uses
+  wind.global (Gnomon names its bloom on purpose now).
+- TERRAIN: judged under the new light first; the even mid-green read as one flat lime field, so the painter changed
+  (gnomon_ground: wider hue range, ~100-stud warm yellow-green vs cool blue-green swaths, stronger grass masses, a
+  mottle, slightly lower saturation). Only the 12 floor tiles were repainted, by the new `design/maps/repaint_meadow.py`
+  (pure numpy, 6 processes, ~8 min; `--check` proves it reproduces the build's tiles: 2/255 mean difference), and
+  re-uploaded via Studio upload_image; ids + rollback in ground_ids.json. ARENA_PAL (rim, lip, tree-less caps) is
+  updated in code but those textures are NOT repainted yet (needs the full Blender build); they still match closely.
+- GRASS: arena tuft tones lifted to (144,180,82) (128,168,76) (160,190,92) in gnomon_grass and the layout; .blend updated.
+  Islet palettes untouched.
+- Before/after (same cameras): design/maps/out/gnomon/lighting/{before,after}_{gameplay,lobby}.jpg. Frame time after:
+  lobby 13.5 ms, gameplay 14.3 ms (earlier session ~12 ms with different bot activity; no lights or effects added,
+  only values). Saved v242. NOT TESTED: phones (shadow-less quality levels), the islets close up under the new haze.
