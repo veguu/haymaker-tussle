@@ -1,1 +1,2 @@
 src/shared/Config/AnimClips.luau
+src/shared/Config/GrassLayouts/*.luau

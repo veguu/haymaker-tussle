@@ -3,15 +3,17 @@ boulders, ONE shallow pond in the middle, and the decorative islands planted fro
 (props_kit.py: trees, bushes, plants, flowers, rocks, ruins). Called from gnomon.py's build.
 
 WHAT IS MAP GEOMETRY (exported with the map): the pond's basin (the two middle floor tiles rebuilt on a 2-stud grid
-and carved), its water, and the grass (low-poly versions of the six kit plants, merged into chunks named Grass_*,
-one shared palette texture, so GrassWind sways their tips in game).
+and carved) and its water. 2026-11-11 b: the grass is no longer map geometry: gnomon_grass.py scatters very low tufts
+that the client builds from a layout (Shared/GrassField); scatter_grass below is kept only for the record.
+
+ISLET PALETTES (2026-11-11 b): each decorative islet is planted with ONE tree family, and its bushes and plants carry
+that islet's tint and its own flowers (gnomon_ground.ISLES), so the islet reads as coordinated with its trees.
 
 WHAT IS PLACED (placements.json, cloned in Studio from the kit's uploaded models, one shared mesh per asset):
 every tree, bush, plant, flower cluster, rock, ruin and lily. They are also instanced into the Blender scene
 (collection "Dressing", never exported) so the assembly can be reviewed here.
 
-PERFORMANCE: the grass is about 5,500 tufts of about 70 triangles in ~30 chunks (each under Roblox's 20,000), one
-texture for all of it; everything else repeats a few dozen kit meshes, which Roblox draws as instances.
+PERFORMANCE: everything placed repeats a few dozen kit meshes, which Roblox draws as instances.
 """
 import json
 import math
@@ -27,6 +29,7 @@ import common as C
 import paint as P
 import surfaces as S
 import style as ST
+import gnomon_ground as GG
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 KIT_BLEND = os.path.join(HERE, "out", "gnomon", "props", "gnomon_props.blend")
@@ -305,8 +308,8 @@ def scatter_grass(tex_dir, avoid):
 PLACEMENTS = []  # dicts: asset, x, y, z (Blender), rot (about up), scale, collide, zone
 
 
-def place(asset, x, y, z, rot, scale=1.0, collide=False, zone="island"):
-    PLACEMENTS.append(dict(asset=asset, x=float(x), y=float(y), z=float(z), rot=float(rot), scale=float(scale), collide=collide, zone=zone))
+def place(asset, x, y, z, rot, scale=1.0, collide=False, zone="island", tint=None, isle=None):
+    PLACEMENTS.append(dict(asset=asset, x=float(x), y=float(y), z=float(z), rot=float(rot), scale=float(scale), collide=collide, zone=zone, tint=tint, isle=isle))
 
 
 def battlefield(rng):
@@ -388,6 +391,7 @@ def battlefield(rng):
 
 # --- the islands: the old procedural plants become kit placements ----------------------------------
 SLOTS = []  # (kind, x, y, z, size, cap) recorded while the backdrop builds
+ISLETS = []  # (cx, cy, cz, rx, ry) of every islet cap, in layout coordinates (before push_backdrop)
 TREE_H = {"Tree_A": 30, "Tree_B": 42, "Tree_C": 24, "Tree_D": 52, "Tree_E": 34}
 
 
@@ -411,6 +415,18 @@ def begin_islands():
     ST.bush = rec("bush")
     ST.sprout = rec("sprout")
     ST.flowers = rec_flowers
+    real_islet = ST.islet
+
+    def rec_islet(G, centre, rx, ry, *args, **kw):
+        ISLETS.append((float(centre[0]), float(centre[1]), float(centre[2]), float(rx), float(ry)))
+        return real_islet(G, centre, rx, ry, *args, **kw)
+
+    ST.islet = rec_islet
+
+
+def tinted(asset):
+    """Bushes and leafy plants carry their islet's tint; trees keep their own colours, flowers their petals."""
+    return asset.startswith(("Bush_", "Plant_"))
 
 
 # extra scenery per islet in its ORIGINAL layout coordinates (pushed out with it): ruins, large rocks, lush clusters
@@ -444,9 +460,18 @@ def finish_islands(push, rng):
         cx, cy, cz, rx, ry = cap
         return ((x - cx) / (rx * margin)) ** 2 + ((y - cy) / (ry * margin)) ** 2 <= 1
 
+    def isle_flower(x, y, fallback):
+        isle = GG.isle_of(x, y)
+        if not isle:
+            return fallback
+        pick = GG.ISLES[isle]["flowers"]
+        return pick[int(abs(x * 7.31 + y * 3.17)) % len(pick)]
+
     for kind, x, y, z, size, cap in SLOTS:
         if kind in ("twin", "umbrella", "tiered"):
-            asset = rng.choice(trees_tall if kind == "tiered" else trees_round)
+            drawn = rng.choice(trees_tall if kind == "tiered" else trees_round)  # drawn as before; the islet decides
+            isle = GG.isle_of(x, y)
+            asset = GG.ISLES[isle]["tree"] if isle else drawn
             raw.append((asset, x, y, z, rng.uniform(0, math.tau), max(0.55, min(1.7, size / TREE_H[asset]))))
             for _ in range(rng.randint(3, 5)):
                 for _ in range(20):
@@ -455,6 +480,8 @@ def finish_islands(push, rng):
                     if on_cap(cap, px, py):
                         pick = rng.random()
                         asset2 = rng.choice(bushes if pick < 0.4 else plants if pick < 0.75 else flowers)
+                        if asset2.startswith("Flowers_"):
+                            asset2 = isle_flower(px, py, asset2)
                         raw.append((asset2, px, py, z, rng.uniform(0, math.tau), rng.uniform(0.8, 1.2)))
                         break
         elif kind == "bush":
@@ -462,12 +489,15 @@ def finish_islands(push, rng):
         elif kind == "sprout":
             raw.append((rng.choice(["Plant_Tall_Blade", "Plant_Spiky", "Plant_Broadleaf"]), x, y, z, rng.uniform(0, math.tau), 1.0))
         elif kind == "flowers":
-            raw.append((rng.choice(flowers), x, y, z, rng.uniform(0, math.tau), 1.0))
+            drawn = rng.choice(flowers)
+            raw.append((isle_flower(x, y, drawn), x, y, z, rng.uniform(0, math.tau), 1.0))
     for asset, x, y, z, rot, s in EXTRAS:
         raw.append((asset, x, y, z, rot, s))
     for asset, x, y, z, rot, s in raw:
         dx, dy, dz = push(x, y, z)
-        place(asset, x + dx, y + dy, z + dz - 0.15, rot, s, zone="island")
+        isle = GG.isle_of(x, y)
+        tint = list(GG.ISLES[isle]["bush"]) if isle and tinted(asset) else None
+        place(asset, x + dx, y + dy, z + dz - 0.15, rot, s, zone="island", tint=tint, isle=isle)
     print(f"ISLANDS {len(SLOTS)} slots -> {len(raw)} placements", flush=True)
 
 
@@ -494,6 +524,11 @@ def instance_dressing(kit):
     if col.name not in bpy.context.scene.collection.children:
         bpy.context.scene.collection.children.link(col)
     missing = set()
+    for _, parts in kit.items():
+        for _, me in parts:
+            for mat in me.materials:
+                if mat and mat.use_nodes and "tinted" not in mat:
+                    _multiply_object_colour(mat)
     for i, p in enumerate(PLACEMENTS):
         parts = kit.get(p["asset"])
         if not parts:
@@ -503,9 +538,28 @@ def instance_dressing(kit):
         for name, me in parts:
             o = bpy.data.objects.new(f"D{i:03d}_{name}", me)
             o.matrix_world = m
+            if p.get("tint"):
+                o.color = tuple(float(v) for v in P.srgb_to_linear(np.array(p["tint"]) / 255.0)) + (1.0,)
             col.objects.link(o)
     if missing:
         print("MISSING KIT ASSETS", sorted(missing), flush=True)
+
+
+def _multiply_object_colour(mat):
+    """Base colour x the object's colour (white by default), as Roblox multiplies a MeshPart's texture by its Color."""
+    nt = mat.node_tree
+    bsdf = next((n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"), None)
+    if not bsdf or not bsdf.inputs["Base Color"].is_linked:
+        return
+    link = bsdf.inputs["Base Color"].links[0]
+    info = nt.nodes.new("ShaderNodeObjectInfo")
+    mul = nt.nodes.new("ShaderNodeMix")
+    mul.data_type, mul.blend_type = "RGBA", "MULTIPLY"
+    mul.inputs["Factor"].default_value = 1.0
+    nt.links.new(link.from_socket, mul.inputs[6])
+    nt.links.new(info.outputs["Color"], mul.inputs[7])
+    nt.links.new(mul.outputs[2], bsdf.inputs["Base Color"])
+    mat["tinted"] = True
 
 
 def write_placements(out_dir, lobby_view):
@@ -513,7 +567,7 @@ def write_placements(out_dir, lobby_view):
     about up (Roblox's own sign), the scale; and a check that nothing tall stands in the lobby's view."""
     rows = []
     for p in PLACEMENTS:
-        rows.append(dict(asset=p["asset"], x=round(p["x"], 3), y=round(p["z"], 3), z=round(-p["y"], 3), rot=round(p["rot"], 4), scale=round(p["scale"], 3), collide=p["collide"], zone=p["zone"]))
+        rows.append(dict(asset=p["asset"], x=round(p["x"], 3), y=round(p["z"], 3), z=round(-p["y"], 3), rot=round(p["rot"], 4), scale=round(p["scale"], 3), collide=p["collide"], zone=p["zone"], tint=p.get("tint")))
     with open(os.path.join(out_dir, "placements.json"), "w", encoding="utf-8") as f:
         json.dump(rows, f, indent=1)
     v = lobby_view

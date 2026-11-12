@@ -11,6 +11,6 @@ Knit.AddControllers(script.Controllers)
 Knit.Start()
 	:andThen(function()
 		-- BUILD STAMP - see the note in the server boot.
-		print("[Haymaker Tussle] Client started - BUILD move-16")
+		print("[Haymaker Tussle] Client started - BUILD ground-1")
 	end)
 	:catch(warn)

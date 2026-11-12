@@ -62,7 +62,7 @@ for asset, m in models do
 	m.Parent = kit
 	count += 1
 end
-kit:SetAttribute("Source", "design/maps/props_kit.py -> out/gnomon/upload/kit_*.glb, Open Cloud (no vertex colour) 85222884425358 rocks, 91332757835787 ruins, 137877609538394 trees, 75300608976315 plants, 134762157942175 flowers (2026-11-11)")
+kit:SetAttribute("Source", "design/maps/props_kit.py -> out/gnomon/upload/kit_*.glb")
 kit.Parent = SS
 report.assets = count
 return report

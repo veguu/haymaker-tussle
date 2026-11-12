@@ -1,6 +1,6 @@
 --!strict
 -- EnvironmentKit - turns a resolved environment preset (Core/Environment.resolve over Config/MapEnvironments)
--- into the place: Lighting and its effects, the wind (GlobalWind and the grass sway, GrassWind), the
+-- into the place: Lighting and its effects, the wind (GlobalWind and the grass, GrassField), the
 -- drifting cartoon clouds, the falling leaves, and the slow bob of a map's floating scenery. Used by EnvironmentController at runtime and by the Edit-mode preview.
 --
 -- ONE OWNER: this is the only thing that writes Lighting. It adopts the first Sky / Atmosphere / Bloom /
@@ -21,8 +21,7 @@ local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Environment = require(script.Parent.Core.Environment)
-local GrassWind = require(script.Parent.GrassWind)
-local GrassClumps = require(script.Parent.GrassClumps)
+local GrassField = require(script.Parent.GrassField)
 local Envs = require(script.Parent.Config.MapEnvironments)
 
 local EnvironmentKit = {}
@@ -309,8 +308,7 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 	end
 
 	local bobs: { Bob } = {}
-	local grass: GrassWind.Swayer? = nil
-	local clumps: GrassClumps.Animator? = nil
+	local grass: GrassField.Field? = nil
 
 	-- every moving part, in one list for a single BulkMoveTo per frame
 	local parts: { BasePart } = {}
@@ -355,10 +353,6 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 			local sway = (b.rule.sway or 0) * math.sin(w * 0.5)
 			b.part.CFrame = b.home + Vector3.new(wx * sway, rise, wz * sway)
 		end
-		if clumps then
-			local camera = workspace.CurrentCamera
-			clumps:step(t, camera and camera.CFrame.Position)
-		end
 		if grass then
 			local camera = workspace.CurrentCamera
 			grass:step(t, camera and camera.CFrame.Position)
@@ -381,11 +375,8 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 		if grass then
 			grass:destroy()
 		end
-		grass = GrassWind.new(mapModel, p.wind)
-		if clumps then
-			clumps:destroy()
-		end
-		clumps = GrassClumps.new(mapModel, p.wind)
+		-- the map's low grass tufts, built on this client from its layout (nil when the map has none)
+		grass = GrassField.new(mapModel, mapId, p.wind)
 		if not mapModel then
 			return
 		end
@@ -422,20 +413,15 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 			grass:destroy()
 			grass = nil
 		end
-		if clumps then
-			clumps:destroy()
-			clumps = nil
-		end
 		folder:Destroy()
 	end
 
 	function scene.counts(_self: Scene): (number, number, number, number)
-		local tips = 0
+		local tufts = 0
 		if grass then
-			local _, n = grass:count()
-			tips = n
+			tufts = grass:count()
 		end
-		return #clouds, #motes, #bobs, tips
+		return #clouds, #motes, #bobs, tufts
 	end
 
 	return scene :: Scene
@@ -464,7 +450,7 @@ function EnvironmentKit.preview(mapId: string, anchor: Vector3, mapModel: Instan
 	scene:show(workspace)
 	G.HT_EnvPreviewState = { restore = restore, created = created, scene = scene }
 	local c, m, b, g = scene:counts()
-	return `previewing {mapId}: {c} clouds, {m} leaves, {b} bobbing parts, {g} grass tips in the wind`
+	return `previewing {mapId}: {c} clouds, {m} leaves, {b} bobbing parts, {g} grass tufts`
 end
 
 --- Move the Edit preview's clouds and leaves to time `t` (to look at another moment of the sway).

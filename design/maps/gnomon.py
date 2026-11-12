@@ -60,6 +60,8 @@ import sights as K  # noqa: E402
 import obstacles as OB  # noqa: E402
 import gnomon_dress as DR  # noqa: E402
 import meadow_grass as MG  # noqa: E402
+import gnomon_ground as GG  # noqa: E402
+import gnomon_grass as GR  # noqa: E402
 
 CAP = 4.0  # the grass cap's thickness: the rim's outer face and the surface tiles' depth
 TEX = os.path.join(HERE, "out", "gnomon", "textures")
@@ -85,11 +87,94 @@ assert (OB.A, OB.B) == (C.A, C.B), "obstacles.py and common.OVALS disagree on Gn
 
 
 def meadow_painter(X, Y):
-    """Vibrant-green matte turf with gentle variation; sparse 3D tufts supply the detail."""
-    col = ST.turf_field(X, Y)
-    col = col * (1 + 0.06 * (P.fbm2(X * 0.045, Y * 0.045, 71, 3) - 0.5))[..., None]
+    """2026-11-11 b (user brief, two references): the illustrated meadow of gnomon_ground (image 1's greens, image
+    2's painted treatment), then the pond's bank and bed. Flat normals: the look is painted, as in the references."""
+    col, _, rough = GG.meadow(X, Y)
     col = DR.pond_paint(X, Y, col)  # 2026-11-11: the central pond's bank and bed
-    return col, np.zeros(X.shape), np.full(X.shape, 0.95)
+    return col, np.zeros(X.shape), rough
+
+
+def islet_cap_painter(reg, haze=0.0):
+    """2026-11-11 b: an islet's cap follows ITS trees' palette (gnomon_ground.ISLES, nearest planted islet); caps with
+    no planted islet near (sundial, launch isle, fragments) keep the arena's greens. Top: the meadow treatment in that
+    palette (no earth); skirt: the palette's drape."""
+    base = ST.cap_painter_original(reg, haze)
+
+    def painter(Pw, N, obj):
+        x, y, z = Pw[..., 0], Pw[..., 1], Pw[..., 2]
+        col = base(Pw, N, obj)  # arena palette, lit and hazed
+        names = np.empty(x.shape, dtype=object)
+        re = np.full(x.shape, 1e9)
+        zc = np.zeros(x.shape)
+        cidx = np.full(x.shape, -1)
+        for k, (cx, cy, cz, rx, ry) in enumerate(reg):
+            r = np.sqrt(((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2)
+            near = r < re
+            re = np.where(near, r, re)
+            zc = np.where(near, cz, zc)
+            cidx = np.where(near, k, cidx)
+        top_face = N[..., 2] > 0.6
+        for k, (cx, cy, cz, rx, ry) in enumerate(reg):
+            isle = GG.isle_of(cx, cy)
+            sel = cidx == k
+            if not isle or not sel.any():
+                continue
+            pal = GG.isle_ground(isle)
+            xs, ys = x[sel], y[sel]
+            top, _, _ = GG.meadow(xs, ys, earth=False, pal=pal)
+            top = P.mix(top, pal["lip"], P.smoothstep(0.86, 0.9, re[sel] + 0.05 * (P.fbm2(xs * 0.2, ys * 0.2, 61, 2) - 0.5)))
+            down = np.clip((zc[sel] - z[sel]) / 3.6, 0, 1)
+            skirt = P.mix(P.fill(xs.shape, pal["drape"]), pal["drape_dark"], P.smoothstep(0.25, 0.9, down))
+            mine = np.where(top_face[sel][..., None], top, skirt)
+            col[sel] = ST.hz(ST.lit(mine, N[sel], top=0.0, under=0.8), haze)
+        return col
+
+    return painter
+
+
+def save_rgba(path, rgba):
+    """An (h, w, 4) sRGB+alpha array (row 0 = top) to an 8-bit RGBA PNG through Blender."""
+    h, w = rgba.shape[:2]
+    img = bpy.data.images.new(os.path.basename(path), w, h, alpha=True)
+    img.pixels.foreach_set(np.ascontiguousarray(rgba[::-1], dtype=np.float32).ravel())
+    img.filepath_raw = path
+    img.file_format = "PNG"
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    img.save()
+    bpy.data.images.remove(img)
+    return path
+
+
+def overlay_preview(prefixes=("Meadow_",), path=None):
+    """Shows the Studio overlay (GG.DETAIL_STUDS per tile, alpha over the painted colour) on the floor in Blender, so
+    the saved scene is the finished look. Nodes are named GroundOverlay*; export_roblox.py strips them."""
+    img = bpy.data.images.load(path, check_existing=True)
+    img.colorspace_settings.name = "sRGB"
+    img.alpha_mode = "STRAIGHT"
+    for obj in C.collection("Export").objects:
+        if not obj.name.startswith(prefixes) or not obj.data.materials:
+            continue
+        mat = obj.data.materials[0]
+        nt = mat.node_tree
+        if nt.nodes.get("GroundOverlay"):
+            continue
+        bsdf = nt.nodes.get("Principled BSDF")
+        if not bsdf.inputs["Base Color"].is_linked:
+            continue
+        src = bsdf.inputs["Base Color"].links[0].from_socket
+        tc = nt.nodes.new("ShaderNodeTexCoord"); tc.name = "GroundOverlay_Coord"
+        mp = nt.nodes.new("ShaderNodeMapping"); mp.name = "GroundOverlay_Map"
+        mp.inputs["Scale"].default_value = (1 / GG.DETAIL_STUDS,) * 3
+        tex = nt.nodes.new("ShaderNodeTexImage"); tex.name = "GroundOverlay_Tex"
+        tex.image = img
+        mix = nt.nodes.new("ShaderNodeMix"); mix.name = "GroundOverlay"
+        mix.data_type = "RGBA"
+        nt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
+        nt.links.new(mp.outputs["Vector"], tex.inputs["Vector"])
+        nt.links.new(src, mix.inputs[6])
+        nt.links.new(tex.outputs["Color"], mix.inputs[7])
+        nt.links.new(tex.outputs["Alpha"], mix.inputs["Factor"])
+        nt.links.new(mix.outputs[2], bsdf.inputs["Base Color"])
 
 
 # --- the rim: the grass cap's lip and skirt --------------------------------------------------------
@@ -511,13 +596,18 @@ def build(out):
         "drape": P.rgb(44, 90, 54), "drape_dark": P.rgb(32, 70, 46),
         "blade": P.rgb(66, 124, 74), "blade_dark": P.rgb(42, 88, 52),
     })
-    D.LIP_ROWS = [(118, 170, 106), (74, 130, 74), (54, 104, 60), (44, 90, 54), (32, 70, 46)]
+    # 2026-11-11 b (user brief, image 1): the arena's rim, lip and tree-less caps take image 1's natural greens
+    ST.PAL.update(GG.ARENA_PAL)
+    D.LIP_ROWS = GG.LIP_ROWS
+    if not hasattr(ST, "cap_painter_original"):
+        ST.cap_painter_original = ST.cap_painter
+    ST.cap_painter = islet_cap_painter
     rng = random.Random(11)
     C.reset()
     C.sky_and_sun(*SUN)
     tex = os.path.join(out, "textures")
-    if C.SCALE > 1:  # a plain matte ground needs no fine detail: bigger tiles, 4 px a stud, the same 12 pieces
-        S.TILE, S.TILE_PX = 128.0, (128 if ST.FAST else 512)
+    if C.SCALE > 1:  # the same 12 pieces of 128 studs; 2026-11-11 b: painted at 8 px a stud (1024) for the meadow
+        S.TILE, S.TILE_PX = 128.0, (256 if ST.FAST else 1024)
     S.surface_tiles("Meadow", -CAP, meadow_painter, tex)
     S.rim_strip("Rim_Turf", C.RIM, CAP, 0.3, rim_painter, tex, px=ST._px(1024))
     strata = build_strata(rng)
@@ -539,7 +629,28 @@ def build(out):
     drng = random.Random(4242)
     DR.finish_islands(push_point, drng)
     avoid = DR.battlefield(drng)
-    DR.scatter_grass(tex, avoid)
+    # 2026-11-11 b: very low tufts, fewer, client-built (gnomon_grass) instead of DR.scatter_grass's merged chunks
+    meshes, _, info, _ = GR.build_templates(tex)
+    grng = random.Random(2611)
+    tufts = GR.scatter_arena(avoid, grng)
+    near = []
+    for cx, cy, cz, rx, ry in DR.ISLETS:
+        isle = GG.isle_of(cx, cy)
+        if isle and math.hypot(cx, cy) < 360:  # the four garden islets; the far ones are hazed specks
+            dx, dy, dz = push_point(cx, cy, cz)
+            near.append((cx + dx, cy + dy, cz + dz, rx, ry, isle))
+    islet_tufts = GR.scatter_islets(near, [p for p in DR.PLACEMENTS if p["zone"] == "island"], grng)
+    GR.instance_scene(tufts + islet_tufts, meshes)
+    path, size = GR.write_layout(tufts + islet_tufts, info)
+    tris = sum(info[GR.TEMPLATE_ORDER[t[5]]]["tris"] for t in tufts + islet_tufts)
+    print(f"GRASS {len(tufts)} arena + {len(islet_tufts)} islet tufts, {tris} triangles; layout {size} chars -> {path}", flush=True)
+    for name in GR.TEMPLATE_ORDER:
+        print("TUFT", name, info[name], flush=True)
+    up = os.path.join(out, "upload")
+    print("TEMPLATES", GR.export_templates(meshes, up), flush=True)
+    det_path = save_rgba(os.path.join(up, "ground_detail.png"), GG.detail_tile(1024))
+    overlay_preview(path=det_path)
+    print("DETAIL", det_path, flush=True)
     DR.instance_dressing(DR.load_kit())
     DR.write_placements(out, D.LOBBY_VIEW)
     # no outlines (user decision 2026-11-10): shapes read from geometry, colour, lighting and contact shadow

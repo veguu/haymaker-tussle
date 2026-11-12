@@ -143,6 +143,44 @@ User brief with four references, Gnomon only.
 - **Studio** (`studio_dress.py` -> `studio_map.luau`, `studio_dressing.luau`): joins the uploaded halves as
   HT_Maps.Gnomon and clones the kit (ServerStorage.HT_PropKit) into its HT_Dressing folder.
 
+## Gnomon ground and low grass (2026-11-11 b): painted meadow, very low tufts, islet palettes
+
+User brief with two references: image 2's soft hand-painted meadow treatment, image 1's subdued natural greens for
+the MAIN ARENA; islets coordinated with their own trees. Gnomon only.
+
+- **Ground** (`gnomon_ground.py`, pure numpy; `python ground_preview.py` shows a close patch, a full tile and the
+  overlay in about a minute): broad soft lighter and deeper patches, mid-scale grass masses lit on top and shaded
+  underneath, painted blade fans and loose blades, a few worn sandy patches with pale pebbles and a grassy shade
+  round them (about 4% of the field, broken up). No painted shadows. Floor tiles are now 1024 px for 128 studs (8 px a stud),
+  flat normals. Palette sampled from image 1 (sRGB): deep 58,108,48 / mid 82,136,56 / light 97,150,61; earth
+  170,154,100 with pebbles 218,206,170.
+- **Close-up overlay**: `upload/ground_detail.png`, a seamless 1024 px tile of fine blades (deep and pale green with
+  alpha), laid on every floor tile's top in Studio as a Texture every `DETAIL_STUDS` (14) studs, so the brushwork
+  holds up under the camera where 8 px a stud would blur. The .blend shows it too (nodes `GroundOverlay*`,
+  stripped by `export_roblox.py`).
+- **Rim, lip, tree-less caps**: image 1's greens (`gnomon_ground.ARENA_PAL`, `LIP_ROWS`).
+- **Islets** (`gnomon_ground.ISLES`, `ISLE_AT`): each planted islet has ONE tree family and a palette from it: the
+  north-east grove Tree_C lime, the south-west hollow log Tree_B deep cool, the west pair Tree_D pale olive, the
+  north pennant islet Tree_E bright, the far south-west Tree_A mid, the far north grove deep cool. Its cap is
+  painted in the meadow treatment in that palette (`gnomon.islet_cap_painter`), its bushes and leafy plants carry
+  the palette's tint (`placements.json` `tint`, set as the clone's Color), its flowers are picked to suit, and its
+  tufts take the palette's grass colour. Trees keep their own colours. Every random draw of the old islet planting is
+  kept, so the battlefield's rocks, boulders and flowers are where they were.
+- **Grass** (`gnomon_grass.py`): five very low tufts adapted from the kit plants (`Tuft_Fine`, `Tuft_Fan`,
+  `Tuft_Leaf`, `Tuft_Round`, `Tuft_Sprig`), 0.28-0.8 studs tall, blades leaning out at low angles, 5 triangles a
+  blade with a raised midrib, modelled round their ROOT (the pivot the game bends them about). NO texture: a
+  per-vertex greyscale shade (dark root, pale tip, lighter rib) times the part's Color, which is the palette.
+  MEASURED in Studio: a MeshPart's TextureID is not tinted by Color (a greyscale atlas drew white) and its
+  transparent areas don't show the Color (grey-lavender); vertex colours ARE multiplied by Color. Scattered on a jittered
+  5.6-stud grid kept by a soft density field, 1-3 per spot, off the water, rocks, flowers and mostly off the earth.
+  Not map geometry any more: `upload/grass_templates.glb` holds the five meshes; the layout is generated into
+  `src/shared/Config/GrassLayouts/Gnomon.luau`, and `Shared/GrassField` builds and animates it on each client.
+  The .blend shows every tuft (collection Grass, linked duplicates coloured per tuft).
+- **Studio** (`studio_dress.py` -> `studio_ground.luau`, needs `upload/ground_ids.json`): sets the new colour maps on
+  the existing parts (the geometry and UVs are unchanged, so no re-import), adds the overlay Textures, moves the old
+  `Grass_Scatter_*` chunks to `HT_MapsArchive.Gnomon_grass_chunks_20261111`, and makes `ReplicatedStorage.HT_GrassKit`
+  from the uploaded templates.
+
 ## Files
 
 - `common.py`: the shared oval, sky, sun, clouds, cameras (Gameplay, Floor, Edge, Recovery, Overview),

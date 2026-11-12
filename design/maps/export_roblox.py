@@ -43,6 +43,26 @@ bake.use_pass_color = True
 bake.margin = 16
 
 
+def strip_preview_overlays():
+    """gnomon.py lays the Studio-only close-up overlay (a node named GroundOverlay) over the floor's painted colour so
+    the .blend shows the finished look; the GLB must carry the painted image alone (Studio adds the overlay as a
+    Texture), so the colour image is wired straight back to the shader here."""
+    for mat in bpy.data.materials:
+        if not (mat.use_nodes and mat.node_tree.nodes.get("GroundOverlay")):
+            continue
+        nt = mat.node_tree
+        mix = nt.nodes["GroundOverlay"]
+        bsdf = nt.nodes.get("Principled BSDF")
+        src = mix.inputs[6].links[0].from_socket if mix.inputs[6].is_linked else None
+        for n in [n for n in nt.nodes if n.name.startswith("GroundOverlay")]:
+            nt.nodes.remove(n)
+        if src is not None and bsdf is not None:
+            nt.links.new(src, bsdf.inputs["Base Color"])
+
+
+strip_preview_overlays()
+
+
 def is_flat_colour(mat):
     """True if the material's base colour isn't driven by any node (a single colour)."""
     bsdf = mat.node_tree.nodes.get("Principled BSDF") if mat and mat.use_nodes else None

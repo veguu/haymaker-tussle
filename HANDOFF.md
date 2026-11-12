@@ -464,3 +464,36 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
 - Uppercut.Roots = false (user: "only the upwards kick (click + space) should slow u"). R no longer roots through
   the windup (client skips HeavyKickStarted, server sets no HT_KickWindup) and finishPunch skips the thrower's
   aftermath for it, so a hit gives no stop and no recoil and a miss no slowdown. The launching kick is unchanged.
+
+## ground-1 (2026-11-12): Gnomon's painted ground, very low grass, islet palettes (user brief, two references)
+- GROUND: `design/maps/gnomon_ground.py` (pure numpy; `python design/maps/ground_preview.py` = close patch, full tile,
+  overlay in ~1 min). Image 1's natural greens (sampled: deep 58,108,48 / mid 82,136,56 / light 97,150,61) painted
+  with image 2's treatment: soft broad patches, lit/shaded grass masses, blade fans and loose blades, ~4% small worn
+  sandy patches with pebbles (13% in big blotches read as camouflage at the first review; tuned). Floor tiles now
+  1024 px per 128 studs, flat normals; rim, lip and tree-less caps in the same greens. CLOSE-UP OVERLAY: Texture
+  `HT_GroundDetail` (rbxassetid://138334844439577, seamless, 14 studs a tile) on every Meadow_ tile's top in Studio.
+- Geometry and UVs UNCHANGED (checked against the dress-1 .blend: every repainted part identical), so only images
+  changed: ids + the dress-1 ids for rollback in `design/maps/out/gnomon/upload/ground_ids.json`; `studio_dress.py`
+  writes `studio_ground.luau`. The colour maps went up through Studio's `upload_image` (the textures folder isn't an
+  approved Open Cloud upload folder; the user could approve `design/maps/out/gnomon/textures` in Assistant Settings ->
+  MCP Permissions so future maps are group-owned like the rest). Overlay and tuft models via Open Cloud, group 2970443.
+- ISLETS: one tree family per planted islet (NE grove Tree_C lime, SW hollow log Tree_B deep cool, W pair Tree_D pale
+  olive, N pennant Tree_E bright, far SW Tree_A, far N Tree_B); cap painted in that palette; bushes/plants carry the
+  palette tint (placements.json `tint` -> clone Color, attribute Tint); flowers chosen per islet; islet tufts in its
+  grass colour. Trees keep their colours. Every old random draw kept: shore, lilies, boulders, field flowers identical.
+- GRASS: `design/maps/gnomon_grass.py`. 5 very low tufts (`ReplicatedStorage.HT_GrassKit`, Open Cloud 118099472869556:
+  Tuft_Fine/Fan/Leaf/Round/Sprig, 0.17-0.63 studs tall at scale 1, 20-35 tris, root at the pivot), NO texture: vertex
+  shade x part Color (MEASURED: TextureID is not tinted by Color and its alpha doesn't show Color; vertex colours are).
+  4,561 tufts (3,508 arena + 1,053 on the four near islets), ~132k tris (was 10,105 tufts / 47 chunks / ~568k tris).
+  Layout generated: `src/shared/Config/GrassLayouts/Gnomon.luau` (stylua-ignored). Old chunks moved to
+  `ServerStorage.HT_MapsArchive.Gnomon_grass_chunks_20261111`.
+- RUNTIME: `Shared/GrassField` (replaces GrassWind + GrassClumps, both deleted): built per client from the layout
+  (never replicated, Archivable false), BulkMoveTo once a frame; wind sway inside 45 studs of the camera, fading to
+  nothing at 75 (55 on touch), so leaving the range is invisible; tufts past 30 studs update every 4th frame;
+  bend away from every character root (players and bots) within 3.2 studs, up to 38 deg, in 1/16 s, back in ~0.6 s.
+- MEASURED in Play (build ground-1, ~20 bots): all 4,561 built on the floor; a near tuft swayed 0.5-10 deg; walking
+  through one: 6 -> 9 -> 30 deg at the root, back to its sway (1-5 deg) within ~0.6 s; GrassField ~0.45 ms/frame steady,
+  <1 ms on live frames (~450 tufts in range), 0 with none in range. Frame time on this PC equal within noise old vs new
+  (~12 ms both, gameplay and lobby views; old chunks measured static), i.e. the grass wasn't this PC's bottleneck.
+- Saved v239. NOT TESTED: phones/low-end GPUs (where the -77% triangles and no EditableMesh copies should matter),
+  more than one real player, how the overlay looks at very shallow angles, tree/bush/flower sway (still Blender-only).
