@@ -32,6 +32,7 @@ local Clash = require(ReplicatedStorage.Shared.Core.Clash)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local DiveKick = require(ReplicatedStorage.Shared.Core.DiveKick)
 local Momentum = require(ReplicatedStorage.Shared.Core.Momentum)
+local Net = require(ReplicatedStorage.Shared.Net)
 local Round = require(ReplicatedStorage.Shared.Core.Round)
 local Pond = require(ReplicatedStorage.Shared.Core.Pond)
 local TrainingLayout = require(ReplicatedStorage.Shared.Core.TrainingLayout)
@@ -51,6 +52,11 @@ local PATROL_ARRIVE = 1.5
 local LABEL_DISTANCE = 140
 local FIGHTER_TAG = "HT_Fighter" -- RoundService's tag for everyone still in the round
 local FILL_ATTRIBUTE = "HT_FillBot"
+-- BOTS FROZEN (workspace attribute, set only by the owner's Bots button): every bot stops where it is - no
+-- walking, no punching - so the map can be looked at in peace. Physics still applies (a flying bot lands).
+local FROZEN_ATTRIBUTE = "HT_BotsFrozen"
+local CAN_FREEZE_ATTRIBUTE = "HT_CanFreezeBots" -- on a player: they may press the Bots button
+local FREEZE_TOGGLE_SECONDS = 0.3
 
 local PHYSICS_COLOUR = Color3.fromRGB(255, 140, 40)
 local STATIONARY_COLOUR = Color3.fromRGB(150, 205, 255)
@@ -821,7 +827,48 @@ function DummyService:Remove(model: Model)
 	model:Destroy()
 end
 
+-- Studio, or the place's owner (the group's owner rank, or the user who owns it).
+local function mayFreeze(player: Player): boolean
+	if RunService:IsStudio() then
+		return true
+	end
+	if game.CreatorType == Enum.CreatorType.Group then
+		local ok, rank = pcall(player.GetRankInGroup, player, game.CreatorId)
+		return ok and rank == 255
+	end
+	return player.UserId == game.CreatorId
+end
+
 function DummyService:KnitStart()
+	local freezeToggle = Net.server("BotsFreezeToggle")
+	local lastFreeze: { [Player]: number } = {}
+	local function grant(player: Player)
+		if mayFreeze(player) then
+			player:SetAttribute(CAN_FREEZE_ATTRIBUTE, true)
+		end
+	end
+	Players.PlayerAdded:Connect(grant)
+	for _, player in Players:GetPlayers() do
+		task.spawn(grant, player)
+	end
+	Players.PlayerRemoving:Connect(function(player)
+		lastFreeze[player] = nil
+	end)
+	freezeToggle.OnServerEvent:Connect(function(player: Player)
+		if player:GetAttribute(CAN_FREEZE_ATTRIBUTE) ~= true then
+			return
+		end
+		local now = os.clock()
+		if now - (lastFreeze[player] or -math.huge) < FREEZE_TOGGLE_SECONDS then
+			return
+		end
+		lastFreeze[player] = now
+		workspace:SetAttribute(
+			FROZEN_ATTRIBUTE,
+			if workspace:GetAttribute(FROZEN_ATTRIBUTE) then nil else true
+		)
+	end)
+
 	-- The 1v1 arena's bot is only for someone alone in the server. Anyone else has real people to fight.
 	if GameConfig.Debug.TestFloor then
 		local bot: Model? = nil
@@ -868,11 +915,17 @@ function DummyService:KnitStart()
 
 	RunService.Heartbeat:Connect(function(dt)
 		local now = os.clock()
+		local frozen = workspace:GetAttribute(FROZEN_ATTRIBUTE) == true
 		for model, dummy in dummies do
 			local root = Combatants.rootOf(model)
 			local humanoid = model:FindFirstChildOfClass("Humanoid")
 			if root and humanoid and humanoid.Health > 0 and model.Parent then
-				stepDummy(self, dummy, root, humanoid, now, dt)
+				if frozen then
+					humanoid.WalkSpeed = 0
+					humanoid:Move(Vector3.zero, false)
+				else
+					stepDummy(self, dummy, root, humanoid, now, dt)
+				end
 				playClip(dummy, humanoid.FloorMaterial ~= Enum.Material.Air)
 			else
 				-- Never left permanently broken: a new body takes over the same spot. (A fill bot is just

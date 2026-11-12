@@ -46,6 +46,7 @@ export type EventName =
 	| "ClashRepelled" -- server to all: this character's punch bounced off this clashing target
 	| "BodyReset" -- server to a player's client: you've been moved: drop all momentum, face this way, and why
 	| "AfkToggle" -- client to server: switch my AFK (sit out rounds) on or off. No arguments, ever.
+	| "BotsFreezeToggle" -- client to server: stop or restart every bot (inspection; Studio or the place's owner only). No arguments, ever.
 
 local Net = {}
 

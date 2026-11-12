@@ -234,4 +234,12 @@ HudTheme.Spectate = {
 	ReleaseSeconds = 0.16,
 }
 
+-- The owner's Bots button (Studio or the place's owner only) sits under the Spectate button.
+HudTheme.BotsFreeze = {
+	Width = 132,
+	Height = 52,
+	Gap = 8,
+	Corner = 6,
+}
+
 return HudTheme
