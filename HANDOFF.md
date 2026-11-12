@@ -522,3 +522,14 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
 - Before/after (same cameras): design/maps/out/gnomon/lighting/{before,after}_{gameplay,lobby}.jpg. Frame time after:
   lobby 13.5 ms, gameplay 14.3 ms (earlier session ~12 ms with different bot activity; no lights or effects added,
   only values). Saved v242. NOT TESTED: phones (shadow-less quality levels), the islets close up under the new haze.
+
+## light-2 (2026-11-12): rim, lip and tree-less caps in the new greens (user picked gaps 1 + 2; arena shrink NOT wanted)
+- Full `bash rebuild.sh gnomon` (24 min, ALL WITHIN LIMITS, 86 meshes). Geometry unchanged (triangle counts per mesh
+  identical; only the already-archived Grass_Scatter_* and far mesa are gone from the build). Pixel diff vs the light-1
+  build (backup in design/maps/out/gnomon/before_light2, untracked): Meadow tiles and Lip_Palette unchanged; changed:
+  Rim_Turf_1/2 (now carry the warm/cool meadow swaths), Sundial_Cap, Sight_LaunchIsle_Cap, Fragments_Cap, Garden_Cap
+  (mixed). Islands_Cap 0.19/255 = noise, not re-uploaded.
+- Those 6 colour maps uploaded through Studio upload_image (copies in design/maps/out/gnomon/upload/light2), set on
+  ServerStorage.HT_Maps.Gnomon; ids + rollback (`previous_light1`) in ground_ids.json. Checked in Play: Workspace.HT_Map
+  carries the new ids. User decision: the arena does NOT shrink (gap 3 dropped).
+- Optimisation rule from the user for every piece: extremely optimised, tested for phones (measure ms; touch/low path).

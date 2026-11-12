@@ -4,7 +4,7 @@
 -- Templates: ReplicatedStorage.HT_GrassKit.<name> (MeshParts modelled round their root; `offset` is the
 -- bounding-box centre from the root and `size` the mesh size at scale 1, both in studs, Roblox axes).
 -- Data: 7 numbers per tuft: x, y, z from the arena centre on the floor's top, turn about up (radians), scale,
--- template index, colour index (tip colour; the shared atlas darkens toward the root).
+-- template index, colour index (tip colour; each mesh's vertex shade darkens toward the root).
 return {
 	templates = {
 		{ name = "Tuft_Fine", offset = Vector3.new(0.0092, 0.2035, 0.0268), size = Vector3.new(1.0292, 0.487, 0.839) },

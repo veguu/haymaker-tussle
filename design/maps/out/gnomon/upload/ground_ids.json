@@ -1,5 +1,5 @@
 {
- "note": "2026-11-11 b ground pass: colour maps uploaded through Studio upload_image (the textures folder is not an approved Open Cloud upload directory); overlay and grass templates through Open Cloud under group 2970443; 2026-11-12 light-1: the 12 Meadow tiles repainted (repaint_meadow.py, warm/cool swaths) and re-uploaded the same way",
+ "note": "2026-11-11 b ground pass: colour maps uploaded through Studio upload_image (the textures folder is not an approved Open Cloud upload directory); overlay and grass templates through Open Cloud under group 2970443; 2026-11-12 light-1: the 12 Meadow tiles repainted (repaint_meadow.py, warm/cool swaths) and re-uploaded the same way; 2026-11-12 light-2: full Blender rebuild with ARENA_PAL, rim + tree-less/mixed caps re-uploaded the same way (previous ids in previous_light1)",
  "detail": "138334844439577",
  "detail_studs": 14,
  "grass_templates_model": "73579718035355",
@@ -16,13 +16,13 @@
   "Meadow_21": "120328229720122",
   "Meadow_22": "111338553407710",
   "Meadow_23": "121827552206126",
-  "Rim_Turf_1": "87714423069827",
-  "Rim_Turf_2": "71805152762596",
-  "Garden_Cap": "87628517930217",
+  "Rim_Turf_1": "132927265939901",
+  "Rim_Turf_2": "78320960704434",
+  "Garden_Cap": "83795036453437",
   "Islands_Cap": "71858249135644",
-  "Fragments_Cap": "92424633852291",
-  "Sight_LaunchIsle_Cap": "107143536236742",
-  "Sundial_Cap": "95016490648358",
+  "Fragments_Cap": "132111558999974",
+  "Sight_LaunchIsle_Cap": "139049501975766",
+  "Sundial_Cap": "128795817260529",
   "Lip_Turf": "92012978281590"
  },
  "previous_dress1": {
@@ -60,5 +60,13 @@
   "Meadow_21": "76253983813523",
   "Meadow_22": "104608720753933",
   "Meadow_23": "91794125547810"
+ },
+ "previous_light1": {
+  "Rim_Turf_1": "87714423069827",
+  "Rim_Turf_2": "71805152762596",
+  "Fragments_Cap": "92424633852291",
+  "Garden_Cap": "87628517930217",
+  "Sight_LaunchIsle_Cap": "107143536236742",
+  "Sundial_Cap": "95016490648358"
  }
 }

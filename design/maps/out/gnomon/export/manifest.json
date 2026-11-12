@@ -10,7 +10,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 512,
+   "texture_size": 1024,
    "can_collide": true,
    "within_limits": true
   },
@@ -22,7 +22,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 512,
+   "texture_size": 1024,
    "can_collide": true,
    "within_limits": true
   },
@@ -34,7 +34,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 512,
+   "texture_size": 1024,
    "can_collide": true,
    "within_limits": true
   },
@@ -46,7 +46,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 512,
+   "texture_size": 1024,
    "can_collide": true,
    "within_limits": true
   },
@@ -58,7 +58,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 512,
+   "texture_size": 1024,
    "can_collide": true,
    "within_limits": true
   },
@@ -70,7 +70,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 512,
+   "texture_size": 1024,
    "can_collide": true,
    "within_limits": true
   },
@@ -82,7 +82,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 512,
+   "texture_size": 1024,
    "can_collide": true,
    "within_limits": true
   },
@@ -94,7 +94,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 512,
+   "texture_size": 1024,
    "can_collide": true,
    "within_limits": true
   },
@@ -106,7 +106,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 512,
+   "texture_size": 1024,
    "can_collide": true,
    "within_limits": true
   },
@@ -118,7 +118,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 512,
+   "texture_size": 1024,
    "can_collide": true,
    "within_limits": true
   },
@@ -130,7 +130,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 512,
+   "texture_size": 1024,
    "can_collide": true,
    "within_limits": true
   },
@@ -142,7 +142,7 @@
     "normal": "",
     "mr": ""
    },
-   "texture_size": 512,
+   "texture_size": 1024,
    "can_collide": true,
    "within_limits": true
   },
@@ -813,22 +813,6 @@
    "within_limits": true
   },
   {
-   "name": "Sight_FarMesa_Cap",
-   "triangles": 80,
-   "texture": "gnomon_Sight_FarMesa_Cap.png",
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Sight_FarMesa_Stone",
-   "triangles": 320,
-   "texture": "gnomon_Sight_FarMesa_Stone.png",
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
    "name": "Fragments_Cap",
    "triangles": 800,
    "textures": {
@@ -845,476 +829,6 @@
     "colour": ""
    },
    "texture_size": 512,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_00",
-   "triangles": 3044,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_01",
-   "triangles": 18976,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_02",
-   "triangles": 1972,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_03",
-   "triangles": 18920,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_04",
-   "triangles": 8508,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_05",
-   "triangles": 14720,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_06",
-   "triangles": 356,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_07",
-   "triangles": 18948,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_08",
-   "triangles": 492,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_09",
-   "triangles": 18936,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_10",
-   "triangles": 9252,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_11",
-   "triangles": 18972,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_12",
-   "triangles": 7968,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_13",
-   "triangles": 18968,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_14",
-   "triangles": 8508,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_15",
-   "triangles": 12744,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_16",
-   "triangles": 18992,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_17",
-   "triangles": 7036,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_18",
-   "triangles": 18948,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_19",
-   "triangles": 7104,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_20",
-   "triangles": 18992,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_21",
-   "triangles": 5524,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_22",
-   "triangles": 18956,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_23",
-   "triangles": 8996,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_24",
-   "triangles": 15952,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_25",
-   "triangles": 18984,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_26",
-   "triangles": 4792,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_27",
-   "triangles": 18940,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_28",
-   "triangles": 7476,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_29",
-   "triangles": 18964,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_30",
-   "triangles": 8436,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_31",
-   "triangles": 18984,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_32",
-   "triangles": 7428,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_33",
-   "triangles": 17560,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_34",
-   "triangles": 13780,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_35",
-   "triangles": 19000,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_36",
-   "triangles": 8624,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_37",
-   "triangles": 18932,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_38",
-   "triangles": 7384,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_39",
-   "triangles": 18996,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_40",
-   "triangles": 4004,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_41",
-   "triangles": 9728,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_42",
-   "triangles": 960,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_43",
-   "triangles": 13704,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_44",
-   "triangles": 18976,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_45",
-   "triangles": 2192,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
-   "can_collide": false,
-   "within_limits": true
-  },
-  {
-   "name": "Grass_Scatter_46",
-   "triangles": 8552,
-   "textures": {
-    "colour": ""
-   },
-   "texture_size": 64,
    "can_collide": false,
    "within_limits": true
   }
