@@ -827,14 +827,14 @@ function DummyService:Remove(model: Model)
 	model:Destroy()
 end
 
--- Studio, or the place's owner (the group's owner rank, or the user who owns it).
+-- Studio, or the place's owners: group rank 254+ (the group's owner and its top admins), or the user who owns it.
 local function mayFreeze(player: Player): boolean
 	if RunService:IsStudio() then
 		return true
 	end
 	if game.CreatorType == Enum.CreatorType.Group then
 		local ok, rank = pcall(player.GetRankInGroup, player, game.CreatorId)
-		return ok and rank == 255
+		return ok and rank >= 254
 	end
 	return player.UserId == game.CreatorId
 end

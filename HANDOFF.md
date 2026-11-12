@@ -564,3 +564,10 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   extremes (fight space, lobby views, landmarks, min distance, sky band): clean.
 - MEASURED in Play: 11 lanes, 10 visible, 590-1640 studs out, moving ~5.5 studs/s down-wind; a lane wrapped while
   invisible. First try (lanes 1000-2000 out) read too small; lanes pulled in. NOT TESTED: a full crossing by eye, phones.
+
+## perf-1 (2026-11-12): owner stats readout + first real phone test
+- `PerfController`: owner-only panel under the Bots button (fps + avg ms, worst frame in 2 s, client MB, graphics
+  level, "phone" when touch without keyboard); tap toggles the detail line. Owner tools (Bots button, readout) now
+  show for group rank 254+ (the user is rank 254, not the 255 owner) - DummyService.mayFreeze.
+- PHONE TEST (user, published, iPhone 16 or 17): "it's good" - lobby and a bot-filled round. No numbers reported.
+  Still untested: low-end/older Android, graphics level 1.
