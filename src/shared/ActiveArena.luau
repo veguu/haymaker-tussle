@@ -26,7 +26,7 @@ function ActiveArena.forMap(id: string?): Round.ArenaSettings
 		found = Round.arenaFor(
 			GameConfig.Arena :: any,
 			if id then Envs.Maps[id] else nil,
-			if id then MapObstacles[id] else nil
+			if id and (Envs.Maps[id] or {}).codeObstacles ~= false then MapObstacles[id] else nil
 		)
 		cache[key] = found
 	end

@@ -98,6 +98,23 @@ MapEnvironments.Maps = {
 		-- never a multiplier, so nothing can double it twice. The original oval was 106.5 x 88 (213 x 176
 		-- studs; design/maps/common.py ORIGINAL_OVAL); the Blender build is common.OVALS.gnomon. Spawns sit
 		-- on the oval at spawnShare of it; Round.isOut is this oval plus Arena.PlayAreaMargin.
+		-- 2026-11-11 (user): the props are placed by hand in Studio, each with its own collision, so the game adds
+		-- none of Config/MapObstacles' colliders here (they were invisible walls once the meshes came out).
+		codeObstacles = false,
+		-- THE POND (user, 2026-11-11): a shallow basin in the middle of the battlefield, carved by the Blender build
+		-- from these same numbers (design/maps/gnomon_dress.py POND) and read by Core/Pond for the wading slowdown.
+		-- x, z from the arena's centre; semi-axes in studs; wobble = { cycles, amount, phase } round the shore;
+		-- the bed is `depth` deep inside rho `inner`; the water's surface is `water` below the floor.
+		pond = {
+			x = 0,
+			z = 0,
+			semiX = 24,
+			semiZ = 18,
+			wobble = { { 3, 0.08, 0.6 }, { 5, 0.05, 2.1 } },
+			depth = 1.6,
+			inner = 0.68,
+			water = 0.55,
+		},
 		arena = {
 			semiX = 213,
 			semiZ = 176,

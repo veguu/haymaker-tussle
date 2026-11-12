@@ -1,0 +1,2132 @@
+[
+ {
+  "asset": "Tree_D",
+  "x": 332.788,
+  "y": 7.85,
+  "z": -157.194,
+  "rot": 0.8279,
+  "scale": 0.885,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Double",
+  "x": 328.463,
+  "y": 7.85,
+  "z": -160.76,
+  "rot": 0.1504,
+  "scale": 0.988,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf",
+  "x": 337.147,
+  "y": 7.85,
+  "z": -163.681,
+  "rot": 0.7966,
+  "scale": 0.857,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Big",
+  "x": 330.266,
+  "y": 7.85,
+  "z": -161.345,
+  "rot": 3.5793,
+  "scale": 1.052,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Round",
+  "x": 336.4,
+  "y": 7.85,
+  "z": -154.852,
+  "rot": 2.0041,
+  "scale": 0.867,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Tall",
+  "x": 329.808,
+  "y": 7.85,
+  "z": -162.145,
+  "rot": 4.6385,
+  "scale": 1.115,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_C",
+  "x": 312.788,
+  "y": 7.85,
+  "z": -143.194,
+  "rot": 3.7782,
+  "scale": 1.25,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Tulip",
+  "x": 312.293,
+  "y": 7.85,
+  "z": -147.56,
+  "rot": 1.6123,
+  "scale": 1.19,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Round",
+  "x": 315.509,
+  "y": 7.85,
+  "z": -147.868,
+  "rot": 5.5485,
+  "scale": 1.091,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Spiky",
+  "x": 316.194,
+  "y": 7.85,
+  "z": -136.704,
+  "rot": 3.107,
+  "scale": 0.842,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Spiky",
+  "x": 306.439,
+  "y": 7.85,
+  "z": -145.396,
+  "rot": 2.2931,
+  "scale": 0.886,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_C",
+  "x": 338.788,
+  "y": 7.85,
+  "z": -137.194,
+  "rot": 0.53,
+  "scale": 0.792,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Groundcover",
+  "x": 340.078,
+  "y": 7.85,
+  "z": -143.174,
+  "rot": 3.4877,
+  "scale": 1.039,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Double",
+  "x": 331.744,
+  "y": 7.85,
+  "z": -133.473,
+  "rot": 3.0564,
+  "scale": 0.887,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Tulip",
+  "x": 334.17,
+  "y": 7.85,
+  "z": -139.631,
+  "rot": 5.045,
+  "scale": 1.194,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Double",
+  "x": 332.896,
+  "y": 7.85,
+  "z": -137.011,
+  "rot": 5.0323,
+  "scale": 1.045,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Double",
+  "x": 304.788,
+  "y": 7.85,
+  "z": -159.194,
+  "rot": 2.3498,
+  "scale": 1.6,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Lily",
+  "x": 320.788,
+  "y": 7.85,
+  "z": -133.194,
+  "rot": 0.6903,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf",
+  "x": -410.677,
+  "y": 16.322,
+  "z": 205.798,
+  "rot": 4.3572,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Tall_Blade",
+  "x": -394.437,
+  "y": 16.434,
+  "z": 196.838,
+  "rot": 0.1596,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Tall_Blade",
+  "x": -374.717,
+  "y": 16.57,
+  "z": 185.958,
+  "rot": 0.3113,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_C",
+  "x": -379.117,
+  "y": -0.15,
+  "z": 205.558,
+  "rot": 0.8102,
+  "scale": 1.375,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Wide",
+  "x": -382.66,
+  "y": -0.15,
+  "z": 198.337,
+  "rot": 2.892,
+  "scale": 1.197,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Tall",
+  "x": -375.49,
+  "y": -0.15,
+  "z": 207.427,
+  "rot": 1.5498,
+  "scale": 1.187,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf_Small",
+  "x": -373.064,
+  "y": -0.15,
+  "z": 201.405,
+  "rot": 0.836,
+  "scale": 1.074,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Wide",
+  "x": -411.117,
+  "y": -0.15,
+  "z": 189.558,
+  "rot": 0.4803,
+  "scale": 1.6,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Lily",
+  "x": -395.117,
+  "y": -0.15,
+  "z": 179.558,
+  "rot": 5.1745,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_B",
+  "x": -359.954,
+  "y": 10.85,
+  "z": -71.127,
+  "rot": 4.7079,
+  "scale": 1.143,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Spiky",
+  "x": -360.682,
+  "y": 10.85,
+  "z": -76.074,
+  "rot": 1.2012,
+  "scale": 1.15,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Double",
+  "x": -365.597,
+  "y": 10.85,
+  "z": -68.528,
+  "rot": 0.6331,
+  "scale": 0.845,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Groundcover",
+  "x": -359.457,
+  "y": 10.85,
+  "z": -79.514,
+  "rot": 4.9153,
+  "scale": 1.111,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_D",
+  "x": -347.954,
+  "y": 10.85,
+  "z": -53.127,
+  "rot": 3.8388,
+  "scale": 0.635,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": -344.829,
+  "y": 10.85,
+  "z": -60.235,
+  "rot": 0.1124,
+  "scale": 1.165,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Roundleaf",
+  "x": -353.613,
+  "y": 10.85,
+  "z": -53.203,
+  "rot": 1.035,
+  "scale": 0.853,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": -342.625,
+  "y": 10.85,
+  "z": -59.799,
+  "rot": 4.1491,
+  "scale": 0.942,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": -342.722,
+  "y": 10.85,
+  "z": -57.134,
+  "rot": 4.8486,
+  "scale": 0.887,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_C",
+  "x": -343.954,
+  "y": 10.85,
+  "z": -77.127,
+  "rot": 4.2987,
+  "scale": 0.875,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Double",
+  "x": -344.476,
+  "y": 10.85,
+  "z": -70.922,
+  "rot": 4.5165,
+  "scale": 1.086,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Round",
+  "x": -339.969,
+  "y": 10.85,
+  "z": -79.129,
+  "rot": 1.5397,
+  "scale": 0.856,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf_Small",
+  "x": -339.931,
+  "y": 10.85,
+  "z": -73.194,
+  "rot": 3.114,
+  "scale": 0.963,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Wide",
+  "x": -365.954,
+  "y": 10.85,
+  "z": -55.127,
+  "rot": 4.1973,
+  "scale": 1.6,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_E",
+  "x": -41.906,
+  "y": 5.85,
+  "z": -313.757,
+  "rot": 3.3517,
+  "scale": 0.882,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Roundleaf",
+  "x": -48.677,
+  "y": 5.85,
+  "z": -312.509,
+  "rot": 5.5483,
+  "scale": 0.816,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Lily",
+  "x": -38.93,
+  "y": 5.85,
+  "z": -317.777,
+  "rot": 1.2836,
+  "scale": 0.975,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Big",
+  "x": -43.406,
+  "y": 5.85,
+  "z": -317.514,
+  "rot": 0.761,
+  "scale": 0.988,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Big",
+  "x": -41.891,
+  "y": 5.85,
+  "z": -307.523,
+  "rot": 1.5744,
+  "scale": 0.895,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_C",
+  "x": -11.906,
+  "y": 5.85,
+  "z": -317.757,
+  "rot": 2.8137,
+  "scale": 1.417,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": -18.369,
+  "y": 5.85,
+  "z": -318.346,
+  "rot": 5.6065,
+  "scale": 0.836,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Tulip",
+  "x": -15.485,
+  "y": 5.85,
+  "z": -313.795,
+  "rot": 0.1482,
+  "scale": 1.17,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Roundleaf",
+  "x": -12.697,
+  "y": 5.85,
+  "z": -322.074,
+  "rot": 0.7439,
+  "scale": 0.909,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Round",
+  "x": -18.672,
+  "y": 5.85,
+  "z": -316.717,
+  "rot": 1.1013,
+  "scale": 1.012,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Coral",
+  "x": -21.906,
+  "y": 5.85,
+  "z": -293.757,
+  "rot": 0.032,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_A",
+  "x": -324.462,
+  "y": -0.15,
+  "z": 501.495,
+  "rot": 3.3093,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Bell",
+  "x": -319.974,
+  "y": -0.15,
+  "z": 502.053,
+  "rot": 0.2345,
+  "scale": 0.888,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Lily",
+  "x": -323.317,
+  "y": -0.15,
+  "z": 494.782,
+  "rot": 2.4835,
+  "scale": 1.058,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Wide",
+  "x": -331.083,
+  "y": -0.15,
+  "z": 502.556,
+  "rot": 2.8812,
+  "scale": 1.164,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Round",
+  "x": -321.139,
+  "y": -0.15,
+  "z": 496.752,
+  "rot": 3.6839,
+  "scale": 0.875,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_D",
+  "x": -340.462,
+  "y": -0.15,
+  "z": 515.495,
+  "rot": 3.0247,
+  "scale": 0.731,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Wide",
+  "x": -343.729,
+  "y": -0.15,
+  "z": 509.414,
+  "rot": 3.4132,
+  "scale": 0.98,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Tall",
+  "x": -348.871,
+  "y": -0.15,
+  "z": 512.81,
+  "rot": 2.66,
+  "scale": 1.02,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Tall",
+  "x": -338.121,
+  "y": -0.15,
+  "z": 521.347,
+  "rot": 5.1622,
+  "scale": 1.151,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_D",
+  "x": -59.316,
+  "y": 23.85,
+  "z": -573.792,
+  "rot": 4.9576,
+  "scale": 0.962,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": -57.309,
+  "y": 23.85,
+  "z": -569.697,
+  "rot": 1.8916,
+  "scale": 0.993,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Tulip",
+  "x": -55.632,
+  "y": 23.85,
+  "z": -569.614,
+  "rot": 2.8546,
+  "scale": 1.1,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": -62.5,
+  "y": 23.85,
+  "z": -566.085,
+  "rot": 5.81,
+  "scale": 1.071,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Bell",
+  "x": -61.833,
+  "y": 23.85,
+  "z": -568.297,
+  "rot": 4.9251,
+  "scale": 0.902,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_B",
+  "x": -37.316,
+  "y": 23.85,
+  "z": -557.792,
+  "rot": 2.2396,
+  "scale": 0.857,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Spiky",
+  "x": -32.87,
+  "y": 23.85,
+  "z": -554.019,
+  "rot": 4.8428,
+  "scale": 0.976,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf",
+  "x": -31.995,
+  "y": 23.85,
+  "z": -554.108,
+  "rot": 4.1522,
+  "scale": 0.904,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Tall_Blade",
+  "x": -39.586,
+  "y": 23.85,
+  "z": -563.344,
+  "rot": 4.4525,
+  "scale": 0.925,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_E",
+  "x": -21.316,
+  "y": 23.85,
+  "z": -579.792,
+  "rot": 3.0165,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf",
+  "x": -21.332,
+  "y": 23.85,
+  "z": -573.576,
+  "rot": 5.1977,
+  "scale": 0.821,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf",
+  "x": -23.304,
+  "y": 23.85,
+  "z": -576.298,
+  "rot": 3.1387,
+  "scale": 0.887,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Daisy_Big",
+  "x": -24.137,
+  "y": 23.85,
+  "z": -583.746,
+  "rot": 1.5626,
+  "scale": 0.814,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_C",
+  "x": -77.316,
+  "y": 23.85,
+  "z": -555.792,
+  "rot": 2.5806,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Wide",
+  "x": -79.946,
+  "y": 23.85,
+  "z": -561.753,
+  "rot": 3.1558,
+  "scale": 0.823,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Tall",
+  "x": -78.768,
+  "y": 23.85,
+  "z": -551.278,
+  "rot": 1.6775,
+  "scale": 1.142,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Double",
+  "x": -72.538,
+  "y": 23.85,
+  "z": -556.916,
+  "rot": 1.0125,
+  "scale": 1.103,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Coral",
+  "x": -70.997,
+  "y": 23.85,
+  "z": -560.404,
+  "rot": 5.0349,
+  "scale": 1.074,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf",
+  "x": -81.576,
+  "y": 23.85,
+  "z": -556.954,
+  "rot": 5.6789,
+  "scale": 1.132,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_A",
+  "x": 456.017,
+  "y": -25.15,
+  "z": -82.37,
+  "rot": 4.8036,
+  "scale": 0.867,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Big",
+  "x": 460.515,
+  "y": -25.15,
+  "z": -78.381,
+  "rot": 5.992,
+  "scale": 0.807,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Round",
+  "x": 457.757,
+  "y": -25.15,
+  "z": -78.762,
+  "rot": 0.072,
+  "scale": 0.908,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Round",
+  "x": 452.922,
+  "y": -25.15,
+  "z": -74.642,
+  "rot": 3.4328,
+  "scale": 0.876,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Low",
+  "x": 461.466,
+  "y": -25.15,
+  "z": -82.933,
+  "rot": 5.4078,
+  "scale": 1.064,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_E",
+  "x": 510.017,
+  "y": -25.15,
+  "z": -88.37,
+  "rot": 2.0798,
+  "scale": 0.882,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Tall_Blade",
+  "x": 513.336,
+  "y": -25.15,
+  "z": -81.14,
+  "rot": 4.0085,
+  "scale": 0.988,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Big",
+  "x": 508.66,
+  "y": -25.15,
+  "z": -82.679,
+  "rot": 3.7085,
+  "scale": 0.985,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf_Small",
+  "x": 511.624,
+  "y": -25.15,
+  "z": -80.606,
+  "rot": 0.6829,
+  "scale": 0.916,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_B",
+  "x": 526.017,
+  "y": -25.15,
+  "z": 1.63,
+  "rot": 5.8423,
+  "scale": 0.952,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Tulip",
+  "x": 525.19,
+  "y": -25.15,
+  "z": -7.23,
+  "rot": 2.518,
+  "scale": 1.04,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Low",
+  "x": 525.234,
+  "y": -25.15,
+  "z": -4.107,
+  "rot": 4.7042,
+  "scale": 0.956,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": 523.844,
+  "y": -25.15,
+  "z": -4.416,
+  "rot": 0.1294,
+  "scale": 1.157,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Groundcover",
+  "x": 524.64,
+  "y": -25.15,
+  "z": -4.786,
+  "rot": 5.9492,
+  "scale": 0.898,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Wide",
+  "x": 442.017,
+  "y": -25.15,
+  "z": -4.37,
+  "rot": 3.6988,
+  "scale": 1.6,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Daisy_Big",
+  "x": 436.318,
+  "y": -25.15,
+  "z": -66.722,
+  "rot": 2.5656,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": 429.943,
+  "y": -25.15,
+  "z": -24.315,
+  "rot": 3.9204,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Tulip",
+  "x": 452.677,
+  "y": -25.15,
+  "z": 6.635,
+  "rot": 0.2445,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_C",
+  "x": 440.071,
+  "y": -48.15,
+  "z": 315.854,
+  "rot": 6.1037,
+  "scale": 0.833,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Lily",
+  "x": 432.597,
+  "y": -48.15,
+  "z": 317.963,
+  "rot": 4.4734,
+  "scale": 1.025,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Round",
+  "x": 437.767,
+  "y": -48.15,
+  "z": 309.336,
+  "rot": 0.5177,
+  "scale": 1.039,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Round",
+  "x": 435.412,
+  "y": -48.15,
+  "z": 312.797,
+  "rot": 3.8641,
+  "scale": 0.925,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_B",
+  "x": 450.071,
+  "y": -48.15,
+  "z": 295.854,
+  "rot": 0.451,
+  "scale": 0.571,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Flowers_Daisy_Big",
+  "x": 446.408,
+  "y": -48.15,
+  "z": 293.035,
+  "rot": 3.3661,
+  "scale": 1.145,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Roundleaf",
+  "x": 444.971,
+  "y": -48.15,
+  "z": 293.871,
+  "rot": 5.1464,
+  "scale": 1.104,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf_Small",
+  "x": 441.964,
+  "y": -48.15,
+  "z": 298.106,
+  "rot": 4.9453,
+  "scale": 0.984,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_E",
+  "x": 310.071,
+  "y": -48.15,
+  "z": 279.854,
+  "rot": 3.154,
+  "scale": 0.55,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf_Small",
+  "x": 314.676,
+  "y": -48.15,
+  "z": 281.711,
+  "rot": 1.1433,
+  "scale": 1.046,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Round",
+  "x": 317.511,
+  "y": -48.15,
+  "z": 276.961,
+  "rot": 3.6983,
+  "scale": 0.865,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Tall",
+  "x": 315.711,
+  "y": -48.15,
+  "z": 276.946,
+  "rot": 2.0365,
+  "scale": 0.964,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Wide",
+  "x": 312.8,
+  "y": -48.15,
+  "z": 274.545,
+  "rot": 2.241,
+  "scale": 0.934,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Roundleaf",
+  "x": 314.13,
+  "y": -48.15,
+  "z": 283.16,
+  "rot": 4.6775,
+  "scale": 1.179,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_E",
+  "x": -620.335,
+  "y": 59.85,
+  "z": 1111.445,
+  "rot": 0.5882,
+  "scale": 1.7,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Low",
+  "x": -620.362,
+  "y": 59.85,
+  "z": 1116.739,
+  "rot": 2.9459,
+  "scale": 0.996,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf",
+  "x": -611.99,
+  "y": 59.85,
+  "z": 1108.765,
+  "rot": 0.6554,
+  "scale": 1.153,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Tall",
+  "x": -626.12,
+  "y": 59.85,
+  "z": 1114.975,
+  "rot": 3.7877,
+  "scale": 1.007,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Tall_Blade",
+  "x": -623.976,
+  "y": 59.85,
+  "z": 1104.361,
+  "rot": 2.0724,
+  "scale": 1.039,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Tall_Blade",
+  "x": -616.322,
+  "y": 59.85,
+  "z": 1106.104,
+  "rot": 2.6716,
+  "scale": 1.183,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_D",
+  "x": -550.335,
+  "y": 59.85,
+  "z": 1161.445,
+  "rot": 0.4482,
+  "scale": 1.46,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Big",
+  "x": -550.21,
+  "y": 59.85,
+  "z": 1166.714,
+  "rot": 6.1918,
+  "scale": 1.136,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf_Small",
+  "x": -549.983,
+  "y": 59.85,
+  "z": 1168.643,
+  "rot": 0.5148,
+  "scale": 0.957,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Tall_Blade",
+  "x": -546.248,
+  "y": 59.85,
+  "z": 1165.81,
+  "rot": 4.0,
+  "scale": 1.133,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf",
+  "x": -553.173,
+  "y": 59.85,
+  "z": 1158.325,
+  "rot": 0.4854,
+  "scale": 1.133,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Big",
+  "x": -547.026,
+  "y": 59.85,
+  "z": 1155.941,
+  "rot": 1.6589,
+  "scale": 1.046,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_A",
+  "x": -490.335,
+  "y": 59.85,
+  "z": 1101.445,
+  "rot": 4.9131,
+  "scale": 1.7,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Tall",
+  "x": -485.363,
+  "y": 59.85,
+  "z": 1104.143,
+  "rot": 3.4727,
+  "scale": 0.873,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf_Small",
+  "x": -495.441,
+  "y": 59.85,
+  "z": 1096.751,
+  "rot": 3.0011,
+  "scale": 1.178,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf",
+  "x": -494.882,
+  "y": 59.85,
+  "z": 1105.587,
+  "rot": 4.2871,
+  "scale": 0.972,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Groundcover",
+  "x": -490.051,
+  "y": 59.85,
+  "z": 1095.293,
+  "rot": 6.1901,
+  "scale": 1.048,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Tree_B",
+  "x": -530.335,
+  "y": 59.85,
+  "z": 1081.445,
+  "rot": 5.2332,
+  "scale": 1.7,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Tall_Blade",
+  "x": -526.457,
+  "y": 59.85,
+  "z": 1076.979,
+  "rot": 3.0257,
+  "scale": 1.103,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Wide",
+  "x": -526.768,
+  "y": 59.85,
+  "z": 1077.281,
+  "rot": 2.7092,
+  "scale": 0.956,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Plant_Broadleaf",
+  "x": -534.138,
+  "y": 59.85,
+  "z": 1085.975,
+  "rot": 6.1146,
+  "scale": 1.137,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Ruin_Arch",
+  "x": -347.954,
+  "y": 10.85,
+  "z": -51.127,
+  "rot": 0.6,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Ruin_Column_Broken",
+  "x": -365.954,
+  "y": 10.85,
+  "z": -81.127,
+  "rot": 2.0,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Rock_Split_Big",
+  "x": -341.954,
+  "y": 10.85,
+  "z": -79.127,
+  "rot": 0.4,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Ruin_Wall",
+  "x": -17.906,
+  "y": 5.85,
+  "z": -323.757,
+  "rot": 0.2,
+  "scale": 0.9,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Rock_Wide_Cluster",
+  "x": -49.906,
+  "y": 5.85,
+  "z": -301.757,
+  "rot": 1.1,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Big",
+  "x": 4.094,
+  "y": 5.85,
+  "z": -301.757,
+  "rot": 0.0,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Ruin_Column_Tall",
+  "x": 316.788,
+  "y": 7.85,
+  "z": -165.194,
+  "rot": 0.3,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Rock_Pillar",
+  "x": 344.788,
+  "y": 7.85,
+  "z": -143.194,
+  "rot": 0.0,
+  "scale": 1.2,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Wide",
+  "x": 306.788,
+  "y": 7.85,
+  "z": -139.194,
+  "rot": 1.4,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Rock_Flat_Slab",
+  "x": -409.117,
+  "y": -0.15,
+  "z": 183.558,
+  "rot": 0.8,
+  "scale": 1.2,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Rock_Twin",
+  "x": -367.117,
+  "y": -0.15,
+  "z": 211.558,
+  "rot": 2.2,
+  "scale": 1.1,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Bush_Round",
+  "x": -381.117,
+  "y": -0.15,
+  "z": 177.558,
+  "rot": 0.0,
+  "scale": 1.0,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Ruin_Column_Broken",
+  "x": 458.017,
+  "y": -25.15,
+  "z": -74.37,
+  "rot": 1.0,
+  "scale": 1.1,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Rock_Pillar",
+  "x": 518.017,
+  "y": -25.15,
+  "z": -10.37,
+  "rot": 0.5,
+  "scale": 1.4,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Rock_Wide_Cluster",
+  "x": 452.017,
+  "y": -25.15,
+  "z": 3.63,
+  "rot": 2.0,
+  "scale": 1.2,
+  "collide": false,
+  "zone": "island"
+ },
+ {
+  "asset": "Rock_Round",
+  "x": 24.39,
+  "y": -0.25,
+  "z": -8.377,
+  "rot": 0.9067,
+  "scale": 0.976,
+  "collide": true,
+  "zone": "shore"
+ },
+ {
+  "asset": "Rock_Pebbles",
+  "x": 17.114,
+  "y": -0.25,
+  "z": -13.987,
+  "rot": 5.3641,
+  "scale": 1.127,
+  "collide": false,
+  "zone": "shore"
+ },
+ {
+  "asset": "Rock_Wedge",
+  "x": 8.986,
+  "y": -0.25,
+  "z": -17.221,
+  "rot": 0.5427,
+  "scale": 0.8,
+  "collide": true,
+  "zone": "shore"
+ },
+ {
+  "asset": "Rock_Round",
+  "x": -13.311,
+  "y": -0.25,
+  "z": -17.754,
+  "rot": 5.3117,
+  "scale": 1.224,
+  "collide": true,
+  "zone": "shore"
+ },
+ {
+  "asset": "Rock_Small_B",
+  "x": -22.051,
+  "y": -0.25,
+  "z": -12.34,
+  "rot": 1.4188,
+  "scale": 1.094,
+  "collide": true,
+  "zone": "shore"
+ },
+ {
+  "asset": "Rock_Small_B",
+  "x": -21.852,
+  "y": -0.25,
+  "z": 6.137,
+  "rot": 1.4457,
+  "scale": 1.122,
+  "collide": true,
+  "zone": "shore"
+ },
+ {
+  "asset": "Rock_Twin",
+  "x": -19.462,
+  "y": -0.25,
+  "z": 10.561,
+  "rot": 2.8464,
+  "scale": 1.176,
+  "collide": true,
+  "zone": "shore"
+ },
+ {
+  "asset": "Rock_Small_A",
+  "x": -13.636,
+  "y": -0.25,
+  "z": 17.303,
+  "rot": 3.0578,
+  "scale": 0.94,
+  "collide": true,
+  "zone": "shore"
+ },
+ {
+  "asset": "Rock_Pebbles",
+  "x": 9.683,
+  "y": -0.25,
+  "z": 18.089,
+  "rot": 2.7239,
+  "scale": 1.066,
+  "collide": false,
+  "zone": "shore"
+ },
+ {
+  "asset": "Rock_Small_B",
+  "x": 13.873,
+  "y": -0.25,
+  "z": 12.453,
+  "rot": 1.9686,
+  "scale": 0.971,
+  "collide": true,
+  "zone": "shore"
+ },
+ {
+  "asset": "Rock_Pebbles",
+  "x": 18.515,
+  "y": -0.25,
+  "z": 9.034,
+  "rot": 5.8851,
+  "scale": 0.837,
+  "collide": false,
+  "zone": "shore"
+ },
+ {
+  "asset": "Lily_Pad_Big",
+  "x": 1.693,
+  "y": -0.53,
+  "z": -6.892,
+  "rot": 2.5944,
+  "scale": 1.511,
+  "collide": false,
+  "zone": "water"
+ },
+ {
+  "asset": "Lily_Pad",
+  "x": 3.818,
+  "y": -0.53,
+  "z": 3.153,
+  "rot": 5.74,
+  "scale": 1.837,
+  "collide": false,
+  "zone": "water"
+ },
+ {
+  "asset": "Lily_Pad_Small",
+  "x": -3.285,
+  "y": -0.53,
+  "z": 6.292,
+  "rot": 2.946,
+  "scale": 1.77,
+  "collide": false,
+  "zone": "water"
+ },
+ {
+  "asset": "Lily_Lotus",
+  "x": 13.211,
+  "y": -0.53,
+  "z": 3.177,
+  "rot": 4.5531,
+  "scale": 1.677,
+  "collide": false,
+  "zone": "water"
+ },
+ {
+  "asset": "Lily_Pad",
+  "x": -8.369,
+  "y": -0.53,
+  "z": 0.182,
+  "rot": 5.0194,
+  "scale": 1.645,
+  "collide": false,
+  "zone": "water"
+ },
+ {
+  "asset": "Lily_Lotus",
+  "x": 8.031,
+  "y": -0.53,
+  "z": -7.773,
+  "rot": 6.0874,
+  "scale": 1.538,
+  "collide": false,
+  "zone": "water"
+ },
+ {
+  "asset": "Lily_Pad_Small",
+  "x": -14.377,
+  "y": -0.53,
+  "z": 0.803,
+  "rot": 5.5854,
+  "scale": 1.722,
+  "collide": false,
+  "zone": "water"
+ },
+ {
+  "asset": "Lily_Pad_Big",
+  "x": 5.622,
+  "y": -0.53,
+  "z": 9.491,
+  "rot": 5.5682,
+  "scale": 1.548,
+  "collide": false,
+  "zone": "water"
+ },
+ {
+  "asset": "Flowers_Daisy_Big",
+  "x": -2.719,
+  "y": -0.0,
+  "z": -23.311,
+  "rot": 3.2909,
+  "scale": 0.995,
+  "collide": false,
+  "zone": "shore"
+ },
+ {
+  "asset": "Flowers_Bell",
+  "x": -0.0,
+  "y": -0.0,
+  "z": 23.4,
+  "rot": 5.3163,
+  "scale": 1.072,
+  "collide": false,
+  "zone": "shore"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": -31.2,
+  "y": -0.0,
+  "z": -0.0,
+  "rot": 0.2266,
+  "scale": 0.963,
+  "collide": false,
+  "zone": "shore"
+ },
+ {
+  "asset": "Rock_Small_B",
+  "x": 75.359,
+  "y": -0.2,
+  "z": 24.224,
+  "rot": 4.3707,
+  "scale": 1.09,
+  "collide": true,
+  "zone": "field"
+ },
+ {
+  "asset": "Rock_Medium",
+  "x": 168.898,
+  "y": -0.2,
+  "z": 12.39,
+  "rot": 4.0262,
+  "scale": 0.939,
+  "collide": true,
+  "zone": "field"
+ },
+ {
+  "asset": "Rock_Pebbles",
+  "x": -89.807,
+  "y": -0.2,
+  "z": -119.514,
+  "rot": 4.2402,
+  "scale": 1.019,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Rock_Wedge",
+  "x": 41.251,
+  "y": -0.2,
+  "z": -81.987,
+  "rot": 3.0926,
+  "scale": 1.045,
+  "collide": true,
+  "zone": "field"
+ },
+ {
+  "asset": "Rock_Round",
+  "x": 63.895,
+  "y": -0.2,
+  "z": 68.65,
+  "rot": 5.0319,
+  "scale": 0.87,
+  "collide": true,
+  "zone": "field"
+ },
+ {
+  "asset": "Rock_Small_A",
+  "x": -3.018,
+  "y": -0.2,
+  "z": -135.932,
+  "rot": 3.7202,
+  "scale": 0.948,
+  "collide": true,
+  "zone": "field"
+ },
+ {
+  "asset": "Rock_Small_B",
+  "x": 116.53,
+  "y": -0.2,
+  "z": -1.987,
+  "rot": 4.9215,
+  "scale": 0.911,
+  "collide": true,
+  "zone": "field"
+ },
+ {
+  "asset": "Rock_Medium",
+  "x": -147.616,
+  "y": -0.2,
+  "z": -51.088,
+  "rot": 3.2173,
+  "scale": 1.103,
+  "collide": true,
+  "zone": "field"
+ },
+ {
+  "asset": "Rock_Pebbles",
+  "x": -38.932,
+  "y": -0.2,
+  "z": 34.103,
+  "rot": 0.9979,
+  "scale": 0.832,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Rock_Wedge",
+  "x": 161.419,
+  "y": -0.2,
+  "z": 58.591,
+  "rot": 2.666,
+  "scale": 1.128,
+  "collide": true,
+  "zone": "field"
+ },
+ {
+  "asset": "Rock_Round",
+  "x": 158.085,
+  "y": -0.2,
+  "z": -45.642,
+  "rot": 1.6586,
+  "scale": 0.806,
+  "collide": true,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Coral",
+  "x": -41.377,
+  "y": 0.0,
+  "z": -76.987,
+  "rot": 0.9036,
+  "scale": 1.085,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Daisy_Big",
+  "x": 45.272,
+  "y": 0.0,
+  "z": -13.999,
+  "rot": 4.8021,
+  "scale": 0.882,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": 172.182,
+  "y": 0.0,
+  "z": 19.748,
+  "rot": 1.3913,
+  "scale": 0.892,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Coral",
+  "x": -175.778,
+  "y": 0.0,
+  "z": 64.613,
+  "rot": 1.3638,
+  "scale": 0.97,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Coral",
+  "x": 18.079,
+  "y": 0.0,
+  "z": -110.589,
+  "rot": 5.2907,
+  "scale": 0.885,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Tulip",
+  "x": -54.614,
+  "y": 0.0,
+  "z": -47.771,
+  "rot": 5.8521,
+  "scale": 0.933,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": -54.052,
+  "y": 0.0,
+  "z": -48.702,
+  "rot": 1.8592,
+  "scale": 0.936,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Lily",
+  "x": -52.154,
+  "y": 0.0,
+  "z": -46.919,
+  "rot": 5.8288,
+  "scale": 0.923,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Lily",
+  "x": 104.086,
+  "y": 0.0,
+  "z": 26.78,
+  "rot": 1.5661,
+  "scale": 0.935,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Bell",
+  "x": -31.568,
+  "y": 0.0,
+  "z": 91.555,
+  "rot": 2.4294,
+  "scale": 0.987,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Tulip",
+  "x": -60.298,
+  "y": 0.0,
+  "z": -106.705,
+  "rot": 2.3282,
+  "scale": 0.945,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Lily",
+  "x": 104.005,
+  "y": 0.0,
+  "z": -110.531,
+  "rot": 6.0474,
+  "scale": 0.997,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Bell",
+  "x": 105.091,
+  "y": 0.0,
+  "z": -110.781,
+  "rot": 1.3267,
+  "scale": 0.951,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Lily",
+  "x": 104.103,
+  "y": 0.0,
+  "z": -111.22,
+  "rot": 1.132,
+  "scale": 0.831,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": 55.336,
+  "y": 0.0,
+  "z": 102.299,
+  "rot": 1.9725,
+  "scale": 0.898,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Lily",
+  "x": -10.525,
+  "y": 0.0,
+  "z": -43.401,
+  "rot": 5.0889,
+  "scale": 0.9,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": -12.051,
+  "y": 0.0,
+  "z": -41.528,
+  "rot": 0.3013,
+  "scale": 0.979,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": -12.285,
+  "y": 0.0,
+  "z": -42.189,
+  "rot": 4.1471,
+  "scale": 1.022,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Daisy_Big",
+  "x": -95.456,
+  "y": 0.0,
+  "z": 37.574,
+  "rot": 4.7817,
+  "scale": 0.914,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Bell",
+  "x": 13.948,
+  "y": 0.0,
+  "z": 85.824,
+  "rot": 0.6562,
+  "scale": 0.853,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Lily",
+  "x": -140.0,
+  "y": 0.0,
+  "z": 90.125,
+  "rot": 3.425,
+  "scale": 0.912,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Lily",
+  "x": -141.37,
+  "y": 0.0,
+  "z": 87.919,
+  "rot": 4.9976,
+  "scale": 0.838,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Lily",
+  "x": -139.084,
+  "y": 0.0,
+  "z": 92.152,
+  "rot": 1.6269,
+  "scale": 0.965,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": -37.752,
+  "y": 0.0,
+  "z": 18.974,
+  "rot": 1.597,
+  "scale": 0.822,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Tulip",
+  "x": -134.544,
+  "y": 0.0,
+  "z": -81.7,
+  "rot": 1.1796,
+  "scale": 0.979,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": -135.545,
+  "y": 0.0,
+  "z": -84.142,
+  "rot": 0.162,
+  "scale": 0.849,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Bell",
+  "x": -14.272,
+  "y": 0.0,
+  "z": 157.593,
+  "rot": 0.3453,
+  "scale": 0.901,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Tulip",
+  "x": -90.124,
+  "y": 0.0,
+  "z": 140.671,
+  "rot": 5.7782,
+  "scale": 1.034,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Tulip",
+  "x": -88.909,
+  "y": 0.0,
+  "z": 141.133,
+  "rot": 0.1782,
+  "scale": 0.898,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Daisy_Big",
+  "x": -94.712,
+  "y": 0.0,
+  "z": -10.508,
+  "rot": 4.2409,
+  "scale": 1.03,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Lily",
+  "x": -179.286,
+  "y": 0.0,
+  "z": -11.1,
+  "rot": 5.8457,
+  "scale": 0.961,
+  "collide": false,
+  "zone": "field"
+ },
+ {
+  "asset": "Flowers_Daisy_Small",
+  "x": -28.94,
+  "y": 0.0,
+  "z": 125.697,
+  "rot": 2.8645,
+  "scale": 0.885,
+  "collide": false,
+  "zone": "field"
+ }
+]

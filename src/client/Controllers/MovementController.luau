@@ -31,6 +31,7 @@ local Signal = require(ReplicatedStorage.Packages.Signal)
 local Trove = require(ReplicatedStorage.Packages.Trove)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local ActiveArena = require(ReplicatedStorage.Shared.ActiveArena)
+local Pond = require(ReplicatedStorage.Shared.Core.Pond)
 local AirRecovery = require(ReplicatedStorage.Shared.Core.AirRecovery)
 local Clash = require(ReplicatedStorage.Shared.Core.Clash)
 local BumpPredict = require(ReplicatedStorage.Shared.BumpPredict)
@@ -246,6 +247,7 @@ function MovementController:_bind(
 	local kickReadyAt = 0
 	local steerX, steerZ = 0, 0 -- a launched body's own steering, on top of its push
 	local speedShare = 1 -- how much of running speed stagger leaves
+	local pondShare = 1 -- how much of it wading in a pond leaves (Core/Pond), eased on its own
 	-- After a missed jump or a kick's rebound: ordinary movement, but in the air.
 	local airRun: { t: number, gravityScale: number, keep: number? }? = nil
 	local wasSideSteering = false
@@ -532,7 +534,7 @@ function MovementController:_bind(
 			slammed = false
 		end
 		pushX, pushZ = 0, 0
-		local vx, vz = Momentum.velocity(state, speedShare)
+		local vx, vz = Momentum.velocity(state, speedShare * pondShare)
 		-- A grounded Humanoid holds itself to the floor, which would cancel the lift.
 		if rise > MIN_LIFT then
 			humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
@@ -838,6 +840,26 @@ function MovementController:_bind(
 		local wantShare =
 			Combat.staggerSpeedShare(GameConfig.Stagger, character:GetAttribute("HT_Stagger") or 0)
 		speedShare += (wantShare - speedShare) * math.min(GameConfig.Stagger.SpeedShareEase * dt, 1)
+		-- Wading: worked out from where the body is every frame, so it can't stack, and a death or respawn
+		-- (away from the water) clears it at once. It multiplies with stagger and every other speed rule.
+		do
+			local pondCfg: any = GameConfig.Pond
+			local live = ActiveArena.get()
+			local wantPond = 1
+			if pondCfg.Enabled and live.Pond then
+				local at = root.Position
+				wantPond = Pond.speedShare(
+					live.Pond,
+					pondCfg.SpeedMultiplier,
+					pondCfg.MaxRootAboveFloor,
+					at.X - live.CenterX,
+					at.Z - live.CenterZ,
+					at.Y - live.CenterY
+				)
+			end
+			pondShare += (wantPond - pondShare) * math.min(pondCfg.Ease * dt, 1)
+			character:SetAttribute("HT_Wading", if wantPond < 1 then true else nil)
+		end
 		-- A round's countdown holds you on your spawn the same way a stun does, without the stun's look.
 		local stunned = character:GetAttribute("HT_Stunned") ~= nil
 			or character:GetAttribute("HT_RoundHold") ~= nil
@@ -1280,7 +1302,7 @@ function MovementController:_bind(
 		end
 		local realSpeed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 		-- Stagger doesn't shorten a rebound: where it lands was worked out at full speed.
-		local travelShare = if airRun and airRun.keep then 1 else speedShare
+		local travelShare = if airRun and airRun.keep then 1 else speedShare * pondShare
 		local wantX, wantZ = Momentum.velocity(state, travelShare)
 		pushX, pushZ = AirRecovery.fade(airCfg, pushX, pushZ, dt)
 		pushX, pushZ = AirRecovery.limit(airCfg, pushX, pushZ, wantX + steerX, wantZ + steerZ)

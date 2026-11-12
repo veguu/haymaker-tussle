@@ -113,7 +113,8 @@ end
 -- dashing into one slides round it instead of sticking; flat-topped and unqueryable, so nothing launches off it and runners bump instead of stepping up. The
 -- visible meshes (Obstacles_*) never collide.
 local function addObstacles(model: Model, id: string)
-	local list = MapObstacles[id]
+	local entry = Envs.Maps[id]
+	local list = if entry and entry.codeObstacles == false then nil else MapObstacles[id]
 	for _, inst in model:GetDescendants() do
 		if inst:IsA("BasePart") and inst.Name:match("^Obstacles_") then
 			inst.CanCollide = false

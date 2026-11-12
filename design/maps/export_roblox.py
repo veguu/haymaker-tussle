@@ -198,16 +198,30 @@ print("ALL WITHIN LIMITS", manifest["all_within_limits"])
 # lip, cliff, timber, obstacles) and the backdrop. Each half's meshes and their expected centres (Roblox
 # axes: x, y up, z = -Blender y; studs from the arena's centre on the floor's top) go to upload/, so the
 # halves can be put back exactly in Studio whatever offset or turn the import gives them.
-ARENA_PARTS = ("Meadow_", "Rim_", "Lip_", "Strata_", "Cliff_", "Obstacles_")
+ARENA_PARTS = ("Meadow_", "Rim_", "Lip_", "Strata_", "Cliff_", "Obstacles_", "MeadowTuft_", "Pond_", "Grass_")
 up_dir = os.path.join(os.path.dirname(OUT), "upload")
 os.makedirs(up_dir, exist_ok=True)
 centres = {}
 # the sand cliff layers ride with the backdrop: the arena half alone came to 21 MB (2026-11-10 b)
 def first_half(o):
-    return o.name.startswith(ARENA_PARTS) and not o.name.startswith("Strata_Sand")
+    return o.name.startswith(ARENA_PARTS) and not o.name.startswith(("Strata_Sand", "Grass_"))
 
 
-for i, part in ((1, [o for o in export_objs if first_half(o)]), (2, [o for o in export_objs if not first_half(o)])):
+# grass (2026-11-11): thousands of thin blades, so it goes out on its own: smooth normals (shared vertices, not one
+# copy per face) and no tangents (no normal map), split over two files to stay under the upload limit
+grass = sorted([o for o in export_objs if o.name.startswith("Grass_")], key=lambda o: o.name)
+for o in grass:
+    for poly in o.data.polygons:
+        poly.use_smooth = True
+halves = [
+    (1, [o for o in export_objs if first_half(o)], True),
+    (2, [o for o in export_objs if not first_half(o) and not o.name.startswith("Grass_")], True),
+    (3, grass[0::2], False),
+    (4, grass[1::2], False),
+]
+for i, part, tangents in halves:
+    if not part:
+        continue
     for o in bpy.context.view_layer.objects:
         o.select_set(o in part)
     path = os.path.join(up_dir, f"{NAME}_{i}.glb")
@@ -219,7 +233,7 @@ for i, part in ((1, [o for o in export_objs if first_half(o)]), (2, [o for o in 
         export_yup=True,
         export_texcoords=True,
         export_normals=True,
-        export_tangents=True,
+        export_tangents=tangents,
         export_materials="EXPORT",
         export_image_format="AUTO",
     )

@@ -33,6 +33,7 @@ local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local DiveKick = require(ReplicatedStorage.Shared.Core.DiveKick)
 local Momentum = require(ReplicatedStorage.Shared.Core.Momentum)
 local Round = require(ReplicatedStorage.Shared.Core.Round)
+local Pond = require(ReplicatedStorage.Shared.Core.Pond)
 local TrainingLayout = require(ReplicatedStorage.Shared.Core.TrainingLayout)
 local Combatants = require(script.Parent.Parent.Combatants)
 
@@ -706,9 +707,22 @@ local function stepDummy(
 	elseif patrol and patrol.speed <= 0 and not dummy.state.knockX then
 		dummy.state = Momentum.stopped(dummy.state)
 	end
+	local pondCfg: any = GameConfig.Pond
+	local live = ActiveArena.get()
+	local wade = if pondCfg.Enabled
+		then Pond.speedShare(
+			live.Pond,
+			pondCfg.SpeedMultiplier,
+			pondCfg.MaxRootAboveFloor,
+			root.Position.X - live.CenterX,
+			root.Position.Z - live.CenterZ,
+			root.Position.Y - live.CenterY
+		)
+		else 1
 	local x, z = Momentum.velocity(
 		dummy.state,
 		Combat.staggerSpeedShare(GameConfig.Stagger, dummy.model:GetAttribute("HT_Stagger") or 0)
+			* wade
 	)
 	if grounded then
 		dummy.slammed = false

@@ -1,0 +1,1089 @@
+{
+ "meshes": {
+  "Rock_Pillar_Stone": {
+   "family": "rocks",
+   "asset": "Rock_Pillar",
+   "x": 1.004,
+   "y": 2.168,
+   "z": -0.047,
+   "tris": 860
+  },
+  "Rock_Split_Big_Stone": {
+   "family": "rocks",
+   "asset": "Rock_Split_Big",
+   "x": 11.013,
+   "y": 2.948,
+   "z": 0.05,
+   "tris": 3276
+  },
+  "Rock_Wide_Cluster_Stone": {
+   "family": "rocks",
+   "asset": "Rock_Wide_Cluster",
+   "x": 22.753,
+   "y": 1.283,
+   "z": 0.165,
+   "tris": 2942
+  },
+  "Rock_Round_Stone": {
+   "family": "rocks",
+   "asset": "Rock_Round",
+   "x": 1.912,
+   "y": 1.67,
+   "z": 10.809,
+   "tris": 1096
+  },
+  "Rock_Wedge_Stone": {
+   "family": "rocks",
+   "asset": "Rock_Wedge",
+   "x": 8.65,
+   "y": 1.059,
+   "z": 10.826,
+   "tris": 1098
+  },
+  "Rock_Medium_Stone": {
+   "family": "rocks",
+   "asset": "Rock_Medium",
+   "x": 14.814,
+   "y": 0.903,
+   "z": 10.771,
+   "tris": 858
+  },
+  "Rock_Twin_Stone": {
+   "family": "rocks",
+   "asset": "Rock_Twin",
+   "x": 22.606,
+   "y": 1.058,
+   "z": 10.65,
+   "tris": 1164
+  },
+  "Rock_Small_A_Stone": {
+   "family": "rocks",
+   "asset": "Rock_Small_A",
+   "x": 29.729,
+   "y": 0.549,
+   "z": 10.805,
+   "tris": 1210
+  },
+  "Rock_Small_B_Stone": {
+   "family": "rocks",
+   "asset": "Rock_Small_B",
+   "x": 0.553,
+   "y": 0.599,
+   "z": 20.375,
+   "tris": 940
+  },
+  "Rock_Pebbles_Stone": {
+   "family": "rocks",
+   "asset": "Rock_Pebbles",
+   "x": 6.251,
+   "y": 0.239,
+   "z": 19.93,
+   "tris": 3702
+  },
+  "Rock_Flat_Slab_Stone": {
+   "family": "rocks",
+   "asset": "Rock_Flat_Slab",
+   "x": 13.077,
+   "y": 0.575,
+   "z": 20.338,
+   "tris": 790
+  },
+  "Ruin_Arch_Stone": {
+   "family": "ruins",
+   "asset": "Ruin_Arch",
+   "x": 6.477,
+   "y": 6.167,
+   "z": 54.092,
+   "tris": 3382
+  },
+  "Ruin_Arch_Ivy": {
+   "family": "ruins",
+   "asset": "Ruin_Arch",
+   "x": 6.364,
+   "y": 6.912,
+   "z": 53.89,
+   "tris": 2608
+  },
+  "Ruin_Arch_Flower": {
+   "family": "ruins",
+   "asset": "Ruin_Arch",
+   "x": 1.581,
+   "y": 5.481,
+   "z": 53.106,
+   "tris": 120
+  },
+  "Ruin_Wall_Stone": {
+   "family": "ruins",
+   "asset": "Ruin_Wall",
+   "x": 26.019,
+   "y": 3.46,
+   "z": 52.463,
+   "tris": 3344
+  },
+  "Ruin_Wall_Ivy": {
+   "family": "ruins",
+   "asset": "Ruin_Wall",
+   "x": 22.343,
+   "y": 3.627,
+   "z": 53.926,
+   "tris": 1872
+  },
+  "Ruin_Wall_Flower": {
+   "family": "ruins",
+   "asset": "Ruin_Wall",
+   "x": 22.273,
+   "y": 4.022,
+   "z": 53.033,
+   "tris": 160
+  },
+  "Ruin_Column_Tall_Stone": {
+   "family": "ruins",
+   "asset": "Ruin_Column_Tall",
+   "x": 38.429,
+   "y": 5.099,
+   "z": 53.962,
+   "tris": 488
+  },
+  "Ruin_Column_Tall_Ivy": {
+   "family": "ruins",
+   "asset": "Ruin_Column_Tall",
+   "x": 38.384,
+   "y": 5.43,
+   "z": 54.084,
+   "tris": 724
+  },
+  "Ruin_Column_Tall_Flower": {
+   "family": "ruins",
+   "asset": "Ruin_Column_Tall",
+   "x": 38.078,
+   "y": 7.61,
+   "z": 54.229,
+   "tris": 40
+  },
+  "Ruin_Column_Broken_Stone": {
+   "family": "ruins",
+   "asset": "Ruin_Column_Broken",
+   "x": 50.047,
+   "y": 1.915,
+   "z": 53.842,
+   "tris": 280
+  },
+  "Ruin_Column_Broken_Ivy": {
+   "family": "ruins",
+   "asset": "Ruin_Column_Broken",
+   "x": 48.65,
+   "y": 1.756,
+   "z": 54.079,
+   "tris": 238
+  },
+  "Tree_A_Bark": {
+   "family": "trees",
+   "asset": "Tree_A",
+   "x": 13.736,
+   "y": 12.4,
+   "z": 88.245,
+   "tris": 334
+  },
+  "Tree_A_Leaf": {
+   "family": "trees",
+   "asset": "Tree_A",
+   "x": 16.478,
+   "y": 18.07,
+   "z": 88.308,
+   "tris": 1726
+  },
+  "Tree_B_Bark": {
+   "family": "trees",
+   "asset": "Tree_B",
+   "x": 45.565,
+   "y": 17.901,
+   "z": 90.452,
+   "tris": 436
+  },
+  "Tree_B_Leaf": {
+   "family": "trees",
+   "asset": "Tree_B",
+   "x": 43.175,
+   "y": 26.311,
+   "z": 89.384,
+   "tris": 2130
+  },
+  "Tree_C_Bark": {
+   "family": "trees",
+   "asset": "Tree_C",
+   "x": 81.049,
+   "y": 9.931,
+   "z": 89.54,
+   "tris": 296
+  },
+  "Tree_C_Leaf": {
+   "family": "trees",
+   "asset": "Tree_C",
+   "x": 79.57,
+   "y": 14.846,
+   "z": 91.409,
+   "tris": 1978
+  },
+  "Tree_D_Bark": {
+   "family": "trees",
+   "asset": "Tree_D",
+   "x": 120.031,
+   "y": 20.438,
+   "z": 89.551,
+   "tris": 436
+  },
+  "Tree_D_Leaf": {
+   "family": "trees",
+   "asset": "Tree_D",
+   "x": 117.86,
+   "y": 30.387,
+   "z": 87.281,
+   "tris": 2420
+  },
+  "Tree_E_Bark": {
+   "family": "trees",
+   "asset": "Tree_E",
+   "x": 155.899,
+   "y": 14.373,
+   "z": 92.156,
+   "tris": 318
+  },
+  "Tree_E_Leaf": {
+   "family": "trees",
+   "asset": "Tree_E",
+   "x": 154.869,
+   "y": 21.621,
+   "z": 93.086,
+   "tris": 1858
+  },
+  "Bush_Round_Leaf": {
+   "family": "plants",
+   "asset": "Bush_Round",
+   "x": 2.666,
+   "y": 3.095,
+   "z": 158.802,
+   "tris": 540
+  },
+  "Bush_Wide_Leaf": {
+   "family": "plants",
+   "asset": "Bush_Wide",
+   "x": 14.877,
+   "y": 2.339,
+   "z": 158.481,
+   "tris": 1140
+  },
+  "Bush_Tall_Leaf": {
+   "family": "plants",
+   "asset": "Bush_Tall",
+   "x": 25.58,
+   "y": 3.692,
+   "z": 158.893,
+   "tris": 820
+  },
+  "Bush_Double_Leaf": {
+   "family": "plants",
+   "asset": "Bush_Double",
+   "x": 33.796,
+   "y": 2.631,
+   "z": 158.666,
+   "tris": 560
+  },
+  "Bush_Low_Leaf": {
+   "family": "plants",
+   "asset": "Bush_Low",
+   "x": 2.037,
+   "y": 1.175,
+   "z": 170.131,
+   "tris": 760
+  },
+  "Bush_Big_Leaf": {
+   "family": "plants",
+   "asset": "Bush_Big",
+   "x": 13.47,
+   "y": 4.122,
+   "z": 170.172,
+   "tris": 1080
+  },
+  "Plant_Spiky_Leaf": {
+   "family": "plants",
+   "asset": "Plant_Spiky",
+   "x": 1.098,
+   "y": 1.546,
+   "z": 207.554,
+   "tris": 264
+  },
+  "Plant_Broadleaf_Leaf": {
+   "family": "plants",
+   "asset": "Plant_Broadleaf",
+   "x": 8.37,
+   "y": 0.704,
+   "z": 207.646,
+   "tris": 336
+  },
+  "Plant_Broadleaf_Flower": {
+   "family": "plants",
+   "asset": "Plant_Broadleaf",
+   "x": 8.244,
+   "y": 1.387,
+   "z": 207.441,
+   "tris": 60
+  },
+  "Plant_Broadleaf_Small_Leaf": {
+   "family": "plants",
+   "asset": "Plant_Broadleaf_Small",
+   "x": 15.639,
+   "y": 0.454,
+   "z": 207.318,
+   "tris": 288
+  },
+  "Plant_Roundleaf_Leaf": {
+   "family": "plants",
+   "asset": "Plant_Roundleaf",
+   "x": 22.051,
+   "y": 0.373,
+   "z": 207.599,
+   "tris": 168
+  },
+  "Plant_Tall_Blade_Leaf": {
+   "family": "plants",
+   "asset": "Plant_Tall_Blade",
+   "x": 0.779,
+   "y": 1.812,
+   "z": 217.533,
+   "tris": 168
+  },
+  "Plant_Groundcover_Leaf": {
+   "family": "plants",
+   "asset": "Plant_Groundcover",
+   "x": 6.999,
+   "y": 0.242,
+   "z": 218.022,
+   "tris": 528
+  },
+  "Flowers_Daisy_Big_Petal": {
+   "family": "flowers",
+   "asset": "Flowers_Daisy_Big",
+   "x": 1.094,
+   "y": 2.162,
+   "z": 250.735,
+   "tris": 1164
+  },
+  "Flowers_Daisy_Big_Centre": {
+   "family": "flowers",
+   "asset": "Flowers_Daisy_Big",
+   "x": 1.097,
+   "y": 2.074,
+   "z": 250.691,
+   "tris": 140
+  },
+  "Flowers_Daisy_Big_Stem": {
+   "family": "flowers",
+   "asset": "Flowers_Daisy_Big",
+   "x": 1.153,
+   "y": 1.098,
+   "z": 250.346,
+   "tris": 278
+  },
+  "Flowers_Daisy_Small_Petal": {
+   "family": "flowers",
+   "asset": "Flowers_Daisy_Small",
+   "x": 8.105,
+   "y": 1.435,
+   "z": 250.789,
+   "tris": 468
+  },
+  "Flowers_Daisy_Small_Centre": {
+   "family": "flowers",
+   "asset": "Flowers_Daisy_Small",
+   "x": 8.102,
+   "y": 1.371,
+   "z": 250.843,
+   "tris": 60
+  },
+  "Flowers_Daisy_Small_Stem": {
+   "family": "flowers",
+   "asset": "Flowers_Daisy_Small",
+   "x": 8.01,
+   "y": 0.662,
+   "z": 250.376,
+   "tris": 174
+  },
+  "Flowers_Lily_Petal": {
+   "family": "flowers",
+   "asset": "Flowers_Lily",
+   "x": 1.6,
+   "y": 2.735,
+   "z": 259.742,
+   "tris": 216
+  },
+  "Flowers_Lily_Centre": {
+   "family": "flowers",
+   "asset": "Flowers_Lily",
+   "x": 1.597,
+   "y": 2.804,
+   "z": 259.625,
+   "tris": 60
+  },
+  "Flowers_Lily_Stem": {
+   "family": "flowers",
+   "asset": "Flowers_Lily",
+   "x": 1.81,
+   "y": 1.262,
+   "z": 259.4,
+   "tris": 174
+  },
+  "Flowers_Tulip_Petal": {
+   "family": "flowers",
+   "asset": "Flowers_Tulip",
+   "x": 8.971,
+   "y": 2.45,
+   "z": 259.343,
+   "tris": 288
+  },
+  "Flowers_Tulip_Centre": {
+   "family": "flowers",
+   "asset": "Flowers_Tulip",
+   "x": 8.952,
+   "y": 2.279,
+   "z": 259.301,
+   "tris": 80
+  },
+  "Flowers_Tulip_Stem": {
+   "family": "flowers",
+   "asset": "Flowers_Tulip",
+   "x": 8.602,
+   "y": 1.044,
+   "z": 259.246,
+   "tris": 200
+  },
+  "Flowers_Bell_Petal": {
+   "family": "flowers",
+   "asset": "Flowers_Bell",
+   "x": 1.691,
+   "y": 2.03,
+   "z": 268.244,
+   "tris": 360
+  },
+  "Flowers_Bell_Centre": {
+   "family": "flowers",
+   "asset": "Flowers_Bell",
+   "x": 1.703,
+   "y": 2.106,
+   "z": 268.307,
+   "tris": 100
+  },
+  "Flowers_Bell_Stem": {
+   "family": "flowers",
+   "asset": "Flowers_Bell",
+   "x": 1.461,
+   "y": 1.193,
+   "z": 268.52,
+   "tris": 210
+  },
+  "Flowers_Coral_Petal": {
+   "family": "flowers",
+   "asset": "Flowers_Coral",
+   "x": 8.346,
+   "y": 1.614,
+   "z": 268.089,
+   "tris": 672
+  },
+  "Flowers_Coral_Centre": {
+   "family": "flowers",
+   "asset": "Flowers_Coral",
+   "x": 8.339,
+   "y": 1.569,
+   "z": 268.114,
+   "tris": 80
+  },
+  "Flowers_Coral_Stem": {
+   "family": "flowers",
+   "asset": "Flowers_Coral",
+   "x": 8.268,
+   "y": 0.847,
+   "z": 268.946,
+   "tris": 200
+  },
+  "Lily_Pad_Small_Pad": {
+   "family": "flowers",
+   "asset": "Lily_Pad_Small",
+   "x": 29.861,
+   "y": 0.11,
+   "z": 301.919,
+   "tris": 60
+  },
+  "Lily_Pad_Pad": {
+   "family": "flowers",
+   "asset": "Lily_Pad",
+   "x": 36.256,
+   "y": 0.11,
+   "z": 301.923,
+   "tris": 60
+  },
+  "Lily_Pad_Big_Pad": {
+   "family": "flowers",
+   "asset": "Lily_Pad_Big",
+   "x": 1.877,
+   "y": 0.11,
+   "z": 328.004,
+   "tris": 60
+  },
+  "Lily_Lotus_Pad": {
+   "family": "flowers",
+   "asset": "Lily_Lotus",
+   "x": 9.666,
+   "y": 0.11,
+   "z": 328.151,
+   "tris": 60
+  },
+  "Lily_Lotus_Petal": {
+   "family": "flowers",
+   "asset": "Lily_Lotus",
+   "x": 9.383,
+   "y": 0.872,
+   "z": 327.98,
+   "tris": 368
+  },
+  "Lily_Lotus_Centre": {
+   "family": "flowers",
+   "asset": "Lily_Lotus",
+   "x": 9.365,
+   "y": 0.602,
+   "z": 328.015,
+   "tris": 28
+  }
+ },
+ "assets": {
+  "Rock_Pillar": {
+   "family": "rocks",
+   "spot": [
+    0.929,
+    0.0,
+    -0.0
+   ],
+   "tris": 860,
+   "parts": [
+    "Rock_Pillar_Stone"
+   ]
+  },
+  "Rock_Split_Big": {
+   "family": "rocks",
+   "spot": [
+    10.033,
+    0.0,
+    -0.0
+   ],
+   "tris": 3276,
+   "parts": [
+    "Rock_Split_Big_Stone"
+   ]
+  },
+  "Rock_Wide_Cluster": {
+   "family": "rocks",
+   "spot": [
+    22.894,
+    0.0,
+    -0.0
+   ],
+   "tris": 2942,
+   "parts": [
+    "Rock_Wide_Cluster_Stone"
+   ]
+  },
+  "Rock_Round": {
+   "family": "rocks",
+   "spot": [
+    1.822,
+    0.0,
+    10.817
+   ],
+   "tris": 1096,
+   "parts": [
+    "Rock_Round_Stone"
+   ]
+  },
+  "Rock_Wedge": {
+   "family": "rocks",
+   "spot": [
+    8.547,
+    0.0,
+    10.817
+   ],
+   "tris": 1098,
+   "parts": [
+    "Rock_Wedge_Stone"
+   ]
+  },
+  "Rock_Medium": {
+   "family": "rocks",
+   "spot": [
+    14.859,
+    0.0,
+    10.817
+   ],
+   "tris": 858,
+   "parts": [
+    "Rock_Medium_Stone"
+   ]
+  },
+  "Rock_Twin": {
+   "family": "rocks",
+   "spot": [
+    22.651,
+    0.0,
+    10.817
+   ],
+   "tris": 1164,
+   "parts": [
+    "Rock_Twin_Stone"
+   ]
+  },
+  "Rock_Small_A": {
+   "family": "rocks",
+   "spot": [
+    29.705,
+    0.0,
+    10.817
+   ],
+   "tris": 1210,
+   "parts": [
+    "Rock_Small_A_Stone"
+   ]
+  },
+  "Rock_Small_B": {
+   "family": "rocks",
+   "spot": [
+    0.457,
+    0.0,
+    20.378
+   ],
+   "tris": 940,
+   "parts": [
+    "Rock_Small_B_Stone"
+   ]
+  },
+  "Rock_Pebbles": {
+   "family": "rocks",
+   "spot": [
+    6.073,
+    0.0,
+    20.378
+   ],
+   "tris": 3702,
+   "parts": [
+    "Rock_Pebbles_Stone"
+   ]
+  },
+  "Rock_Flat_Slab": {
+   "family": "rocks",
+   "spot": [
+    12.915,
+    0.0,
+    20.378
+   ],
+   "tris": 790,
+   "parts": [
+    "Rock_Flat_Slab_Stone"
+   ]
+  },
+  "Ruin_Arch": {
+   "family": "ruins",
+   "spot": [
+    6.451,
+    0.0,
+    53.962
+   ],
+   "tris": 6110,
+   "parts": [
+    "Ruin_Arch_Stone",
+    "Ruin_Arch_Ivy",
+    "Ruin_Arch_Flower"
+   ]
+  },
+  "Ruin_Wall": {
+   "family": "ruins",
+   "spot": [
+    24.678,
+    0.0,
+    53.962
+   ],
+   "tris": 5376,
+   "parts": [
+    "Ruin_Wall_Stone",
+    "Ruin_Wall_Ivy",
+    "Ruin_Wall_Flower"
+   ]
+  },
+  "Ruin_Column_Tall": {
+   "family": "ruins",
+   "spot": [
+    38.435,
+    0.0,
+    53.962
+   ],
+   "tris": 1252,
+   "parts": [
+    "Ruin_Column_Tall_Stone",
+    "Ruin_Column_Tall_Ivy",
+    "Ruin_Column_Tall_Flower"
+   ]
+  },
+  "Ruin_Column_Broken": {
+   "family": "ruins",
+   "spot": [
+    47.889,
+    0.0,
+    53.962
+   ],
+   "tris": 518,
+   "parts": [
+    "Ruin_Column_Broken_Stone",
+    "Ruin_Column_Broken_Ivy"
+   ]
+  },
+  "Tree_A": {
+   "family": "trees",
+   "spot": [
+    11.846,
+    0.0,
+    90.315
+   ],
+   "tris": 2060,
+   "parts": [
+    "Tree_A_Bark",
+    "Tree_A_Leaf"
+   ]
+  },
+  "Tree_B": {
+   "family": "trees",
+   "spot": [
+    46.219,
+    0.0,
+    90.315
+   ],
+   "tris": 2566,
+   "parts": [
+    "Tree_B_Bark",
+    "Tree_B_Leaf"
+   ]
+  },
+  "Tree_C": {
+   "family": "trees",
+   "spot": [
+    81.389,
+    0.0,
+    90.315
+   ],
+   "tris": 2274,
+   "parts": [
+    "Tree_C_Bark",
+    "Tree_C_Leaf"
+   ]
+  },
+  "Tree_D": {
+   "family": "trees",
+   "spot": [
+    118.264,
+    0.0,
+    90.315
+   ],
+   "tris": 2856,
+   "parts": [
+    "Tree_D_Bark",
+    "Tree_D_Leaf"
+   ]
+  },
+  "Tree_E": {
+   "family": "trees",
+   "spot": [
+    156.001,
+    0.0,
+    90.315
+   ],
+   "tris": 2176,
+   "parts": [
+    "Tree_E_Bark",
+    "Tree_E_Leaf"
+   ]
+  },
+  "Bush_Round": {
+   "family": "plants",
+   "spot": [
+    2.866,
+    0.0,
+    158.802
+   ],
+   "tris": 540,
+   "parts": [
+    "Bush_Round_Leaf"
+   ]
+  },
+  "Bush_Wide": {
+   "family": "plants",
+   "spot": [
+    14.665,
+    0.0,
+    158.802
+   ],
+   "tris": 1140,
+   "parts": [
+    "Bush_Wide_Leaf"
+   ]
+  },
+  "Bush_Tall": {
+   "family": "plants",
+   "spot": [
+    25.681,
+    0.0,
+    158.802
+   ],
+   "tris": 820,
+   "parts": [
+    "Bush_Tall_Leaf"
+   ]
+  },
+  "Bush_Double": {
+   "family": "plants",
+   "spot": [
+    33.816,
+    0.0,
+    158.802
+   ],
+   "tris": 560,
+   "parts": [
+    "Bush_Double_Leaf"
+   ]
+  },
+  "Bush_Low": {
+   "family": "plants",
+   "spot": [
+    2.148,
+    0.0,
+    170.06
+   ],
+   "tris": 760,
+   "parts": [
+    "Bush_Low_Leaf"
+   ]
+  },
+  "Bush_Big": {
+   "family": "plants",
+   "spot": [
+    13.622,
+    0.0,
+    170.06
+   ],
+   "tris": 1080,
+   "parts": [
+    "Bush_Big_Leaf"
+   ]
+  },
+  "Plant_Spiky": {
+   "family": "plants",
+   "spot": [
+    1.001,
+    0.0,
+    207.388
+   ],
+   "tris": 264,
+   "parts": [
+    "Plant_Spiky_Leaf"
+   ]
+  },
+  "Plant_Broadleaf": {
+   "family": "plants",
+   "spot": [
+    8.218,
+    0.0,
+    207.388
+   ],
+   "tris": 396,
+   "parts": [
+    "Plant_Broadleaf_Leaf",
+    "Plant_Broadleaf_Flower"
+   ]
+  },
+  "Plant_Broadleaf_Small": {
+   "family": "plants",
+   "spot": [
+    15.601,
+    0.0,
+    207.388
+   ],
+   "tris": 288,
+   "parts": [
+    "Plant_Broadleaf_Small_Leaf"
+   ]
+  },
+  "Plant_Roundleaf": {
+   "family": "plants",
+   "spot": [
+    21.972,
+    0.0,
+    207.388
+   ],
+   "tris": 168,
+   "parts": [
+    "Plant_Roundleaf_Leaf"
+   ]
+  },
+  "Plant_Tall_Blade": {
+   "family": "plants",
+   "spot": [
+    0.929,
+    0.0,
+    217.947
+   ],
+   "tris": 168,
+   "parts": [
+    "Plant_Tall_Blade_Leaf"
+   ]
+  },
+  "Plant_Groundcover": {
+   "family": "plants",
+   "spot": [
+    7.08,
+    0.0,
+    217.947
+   ],
+   "tris": 528,
+   "parts": [
+    "Plant_Groundcover_Leaf"
+   ]
+  },
+  "Flowers_Daisy_Big": {
+   "family": "flowers",
+   "spot": [
+    1.345,
+    0.0,
+    250.441
+   ],
+   "tris": 1582,
+   "parts": [
+    "Flowers_Daisy_Big_Petal",
+    "Flowers_Daisy_Big_Centre",
+    "Flowers_Daisy_Big_Stem"
+   ]
+  },
+  "Flowers_Daisy_Small": {
+   "family": "flowers",
+   "spot": [
+    8.108,
+    0.0,
+    250.441
+   ],
+   "tris": 702,
+   "parts": [
+    "Flowers_Daisy_Small_Petal",
+    "Flowers_Daisy_Small_Centre",
+    "Flowers_Daisy_Small_Stem"
+   ]
+  },
+  "Flowers_Lily": {
+   "family": "flowers",
+   "spot": [
+    1.571,
+    0.0,
+    259.643
+   ],
+   "tris": 450,
+   "parts": [
+    "Flowers_Lily_Petal",
+    "Flowers_Lily_Centre",
+    "Flowers_Lily_Stem"
+   ]
+  },
+  "Flowers_Tulip": {
+   "family": "flowers",
+   "spot": [
+    8.749,
+    0.0,
+    259.643
+   ],
+   "tris": 568,
+   "parts": [
+    "Flowers_Tulip_Petal",
+    "Flowers_Tulip_Centre",
+    "Flowers_Tulip_Stem"
+   ]
+  },
+  "Flowers_Bell": {
+   "family": "flowers",
+   "spot": [
+    1.445,
+    0.0,
+    268.623
+   ],
+   "tris": 670,
+   "parts": [
+    "Flowers_Bell_Petal",
+    "Flowers_Bell_Centre",
+    "Flowers_Bell_Stem"
+   ]
+  },
+  "Flowers_Coral": {
+   "family": "flowers",
+   "spot": [
+    8.266,
+    0.0,
+    268.623
+   ],
+   "tris": 952,
+   "parts": [
+    "Flowers_Coral_Petal",
+    "Flowers_Coral_Centre",
+    "Flowers_Coral_Stem"
+   ]
+  },
+  "Lily_Pad_Small": {
+   "family": "flowers",
+   "spot": [
+    29.872,
+    0.0,
+    301.922
+   ],
+   "tris": 60,
+   "parts": [
+    "Lily_Pad_Small_Pad"
+   ]
+  },
+  "Lily_Pad": {
+   "family": "flowers",
+   "spot": [
+    36.254,
+    0.0,
+    301.922
+   ],
+   "tris": 60,
+   "parts": [
+    "Lily_Pad_Pad"
+   ]
+  },
+  "Lily_Pad_Big": {
+   "family": "flowers",
+   "spot": [
+    1.884,
+    0.0,
+    327.996
+   ],
+   "tris": 60,
+   "parts": [
+    "Lily_Pad_Big_Pad"
+   ]
+  },
+  "Lily_Lotus": {
+   "family": "flowers",
+   "spot": [
+    9.367,
+    0.0,
+    327.996
+   ],
+   "tris": 456,
+   "parts": [
+    "Lily_Lotus_Pad",
+    "Lily_Lotus_Petal",
+    "Lily_Lotus_Centre"
+   ]
+  }
+ }
+}

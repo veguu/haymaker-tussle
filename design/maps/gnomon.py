@@ -58,6 +58,7 @@ import gnomon_sights as GS  # noqa: E402
 import detail as D  # noqa: E402
 import sights as K  # noqa: E402
 import obstacles as OB  # noqa: E402
+import gnomon_dress as DR  # noqa: E402
 import meadow_grass as MG  # noqa: E402
 
 CAP = 4.0  # the grass cap's thickness: the rim's outer face and the surface tiles' depth
@@ -87,6 +88,7 @@ def meadow_painter(X, Y):
     """Vibrant-green matte turf with gentle variation; sparse 3D tufts supply the detail."""
     col = ST.turf_field(X, Y)
     col = col * (1 + 0.06 * (P.fbm2(X * 0.045, Y * 0.045, 71, 3) - 0.5))[..., None]
+    col = DR.pond_paint(X, Y, col)  # 2026-11-11: the central pond's bank and bed
     return col, np.zeros(X.shape), np.full(X.shape, 0.95)
 
 
@@ -425,7 +427,15 @@ def pushed(x, y, z=0.0):
     return x + x / r * (C.SCALE - 1), y + y / r * (C.SCALE - 1), z
 
 
-ARENA_PARTS = ("Meadow_", "Rim_", "Lip_", "Strata_", "Cliff_", "Obstacles_", "MeadowTuft_")
+ARENA_PARTS = ("Meadow_", "Rim_", "Lip_", "Strata_", "Cliff_", "Obstacles_", "MeadowTuft_", "Pond_", "Grass_")
+
+
+def push_point(x, y, z):
+    """How far a point laid out round the original oval moves with its nearest backdrop cluster (push_backdrop)."""
+    if C.SCALE == 1:
+        return 0.0, 0.0, 0.0
+    best = min(_anchors(), key=lambda a: (a[0] - x) ** 2 + (a[1] - y) ** 2)
+    return tuple(np.subtract(pushed(*best), best))
 
 
 def push_backdrop():
@@ -485,18 +495,23 @@ def cameras():
     cams["LobbyEdgeE"] = C.camera("LobbyEdgeE", (86, -252, 15.5), (-10, -20, -2), 24)
     cams["Underside"] = C.camera("Underside", (520, -300, -230), (0, 10, -90), 22)
     cams["Obstacles"] = C.camera("Obstacles", (-150, -60, 6), (40, 40, 0), 24)
+    cams["Pond"] = C.camera("Pond", (-46, -40, 9), (0, 0, -1), 26)
+    cams["Island"] = C.camera("Island", (150, 10, 30), (324, 151, 20), 26)
     return cams
 
 
 def build(out):
     # Local to this map build. Other map palettes retain their own settings.
+    # 2026-11-11 (user's image 4): the ground is a green from the grass's own family (medium natural green about
+    # (64, 120, 74)), a little deeper so the grass reads on it; islet caps, rim and lip follow. Replaces the
+    # saturated "vibrant" values of the previous pass.
     ST.PAL.update({
-        "leaf": P.rgb(10, 221, 8), "warm": P.rgb(32, 226, 15), "cool": P.rgb(9, 205, 32),
-        "lip": P.rgb(50, 218, 20), "lip_hi": P.rgb(111, 230, 48),
-        "drape": P.rgb(24, 158, 19), "drape_dark": P.rgb(15, 105, 23),
-        "blade": P.rgb(102, 206, 36), "blade_dark": P.rgb(17, 98, 22),
+        "leaf": P.rgb(54, 104, 60), "warm": P.rgb(60, 112, 62), "cool": P.rgb(48, 98, 62),
+        "lip": P.rgb(74, 130, 74), "lip_hi": P.rgb(118, 170, 106),
+        "drape": P.rgb(44, 90, 54), "drape_dark": P.rgb(32, 70, 46),
+        "blade": P.rgb(66, 124, 74), "blade_dark": P.rgb(42, 88, 52),
     })
-    D.LIP_ROWS = [(111, 230, 48), (40, 211, 16), (24, 158, 19), (17, 128, 22), (15, 105, 23)]
+    D.LIP_ROWS = [(118, 170, 106), (74, 130, 74), (54, 104, 60), (44, 90, 54), (32, 70, 46)]
     rng = random.Random(11)
     C.reset()
     C.sky_and_sun(*SUN)
@@ -512,10 +527,21 @@ def build(out):
         S.paint_scenery(S.split_sectors(soffits, 2), ST.stone_painter(kind), tex, px=ST._px(512), roughness=0.95, **ST.AO)
     build_cliff_timber(rng, tex)
     D.turf_lip(tex, rng=rng)
-    # Sparse, individually pivoted clumps reuse the old Fairy grass motion in Roblox.
-    MG.build(tex)
+    # 2026-11-11 (user brief, four references): the central pond's basin and water; the islands planted from the
+    # scenery kit (their old procedural plants are recorded and replaced); grass from the kit's six plants over
+    # the whole battlefield (replaces MeadowTuft clumps), sparse flowers, small boulders and the shore. Everything
+    # placed is written to placements.json for Studio.
+    DR.carve_basin()
+    DR.build_water()
+    DR.begin_islands()
     build_backdrop(random.Random(BACKDROP_SEED), tex)
     push_backdrop()
+    drng = random.Random(4242)
+    DR.finish_islands(push_point, drng)
+    avoid = DR.battlefield(drng)
+    DR.scatter_grass(tex, avoid)
+    DR.instance_dressing(DR.load_kit())
+    DR.write_placements(out, D.LOBBY_VIEW)
     # no outlines (user decision 2026-11-10): shapes read from geometry, colour, lighting and contact shadow
     for name, n in D.corridor_report():
         print("CORRIDOR", name, n)

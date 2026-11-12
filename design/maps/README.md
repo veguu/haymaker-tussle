@@ -122,6 +122,27 @@ User brief, Gnomon only. Kitestead and Saltcrest are untouched (their oval stays
 - **Upload**: `export_roblox.py` also writes `out/<map>/upload/<map>_1.glb` (arena) and `_2.glb` (backdrop)
   under the 20 MB limit, and `<map>_centres.json` (each mesh's expected centre) to align the halves in Studio.
 
+## Gnomon dressing (2026-11-11): scenery kit, grass, central pond
+
+User brief with four references, Gnomon only.
+
+- **Kit** (`props_kit.py` -> `out/gnomon/props/gnomon_props.blend`): 11 rocks, 4 ruins, 5 trees, 6 bushes, 6 leafy
+  plants, 6 flower clusters, lily pads and a lotus, in the boulder reference's treatment (cut-plane chunks, bevelled
+  edges that catch the light, a tone per facet, occlusion). Every foliage piece has a wind rig and a 4-second loop
+  (`rig_all`); rocks, ruins, water and stone never move. `props_review.py` renders a sheet per family.
+  `export_kit.py` writes `out/gnomon/upload/kit_*.glb` (rest pose) and `kit_manifest.json`.
+- **Palette**: image 4's green, about (64, 120, 74) overall, for every foliage key; the ground is a deeper green of
+  the same family (gnomon.py `build`).
+- **Map dressing** (`gnomon_dress.py`, called by gnomon.py's build): the pond's basin carved into the two middle
+  floor tiles on a 2-stud grid (`POND`, the same numbers as MapEnvironments.gnomon.pond and Core/Pond), its water,
+  grass from the kit's six plants as low-poly scatter merged into `Grass_Scatter_*` chunks (one atlas texture;
+  GrassWind sways their tips in game), and `placements.json`: shore rocks in four arcs with wide openings, lilies,
+  small boulders, sparse flowers, and the islands' plants (the old procedural trees are recorded and replaced by
+  kit trees, with bushes, plants and flowers round them, plus ruins and big rocks). The Blender scene shows the
+  placements in collection Dressing (never exported).
+- **Studio** (`studio_dress.py` -> `studio_map.luau`, `studio_dressing.luau`): joins the uploaded halves as
+  HT_Maps.Gnomon and clones the kit (ServerStorage.HT_PropKit) into its HT_Dressing folder.
+
 ## Files
 
 - `common.py`: the shared oval, sky, sun, clouds, cameras (Gameplay, Floor, Edge, Recovery, Overview),

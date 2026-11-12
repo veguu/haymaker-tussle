@@ -172,6 +172,12 @@ local GameConfig = {
 		SpeedPenaltyCurve = 1.32,
 		SpeedShareEase = 5,
 	},
+	Pond = {
+		Enabled = true,
+		SpeedMultiplier = 0.6,
+		MaxRootAboveFloor = 4.5,
+		Ease = 12,
+	},
 	Arena = {
 		CenterX = 3000,
 		CenterY = 100,

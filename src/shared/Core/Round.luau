@@ -28,6 +28,8 @@ export type ArenaSettings = {
 	SpawnSemiZ: number?,
 	-- Colliding obstacles on the floor, from the centre (Config/MapObstacles): x, z, radius, height.
 	Obstacles: { { x: number, z: number, r: number, h: number } }?,
+	-- The map's shallow pond (MapEnvironments `pond`, Core/Pond), if it has one.
+	Pond: any?,
 }
 
 export type RoundSettings = {
@@ -68,6 +70,7 @@ function Round.arenaFor(base: ArenaSettings, entry: any?, obstacles: { any }?): 
 		out.SpawnRadius = math.min(out.SpawnSemiX, out.SpawnSemiZ)
 	end
 	out.Obstacles = obstacles
+	out.Pond = entry and entry.pond
 	return out :: ArenaSettings
 end
 

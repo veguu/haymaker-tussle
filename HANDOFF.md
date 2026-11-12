@@ -405,3 +405,30 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   previous model is ServerStorage.HT_MapsArchive.Gnomon_before_vibrant_grass_20261111. OPEN: that pass dropped the
   Obstacles_Stone / Obstacles_Wood meshes from the live map, but MapService still adds their 20 colliders from
   Config/MapObstacles, so the rocks are invisible walls until the meshes go back (they're in the archived model).
+
+### dress-1: Gnomon dressing from the scenery kit (2026-11-11, user brief with four references)
+- KIT: design/maps/props_kit.py -> out/gnomon/props/gnomon_props.blend: 11 rocks, 4 ruins (arch, wall, two columns,
+  ivy), 5 branching trees, 6 bushes, 6 leafy plants, 6 flower clusters, lily pads + lotus. Boulder-reference treatment
+  (cut-plane chunks, bevel highlights, facet tones, AO). Every foliage asset has a wind rig + 4 s loop in Blender
+  (rocks/ruins/water/stone never move). Exported static (rest pose) by export_kit.py WITHOUT vertex colours (the
+  bake's facet mask turned rocks bright green in Roblox) -> Open Cloud 85222884425358 rocks, 91332757835787 ruins,
+  137877609538394 trees, 75300608976315 plants, 134762157942175 flowers -> ServerStorage.HT_PropKit (42 templates).
+- PALETTE: image 4's green ~ (64, 120, 74) for every foliage key; ground a deeper green of the same family.
+- MAP: gnomon_dress.py (called by gnomon.py build): central pond basin carved into Meadow_11/12 (2-stud grid,
+  PreciseConvexDecomposition), Pond_Water, Grass_Scatter_* (10,105 low-poly tufts of the six kit plants, 47 chunks,
+  568k tris, one atlas texture, double-sided, no shadow; GrassWind sways their tips), placements.json (213: shore
+  rocks in four arcs with openings, 8 lilies, 11 small boulders, 22 flower spots, 147 island pieces replacing the old
+  procedural trees, plus ruins and big rocks). Open Cloud 127598119804203, 83914346795076, 84367739528469,
+  139889708431034 (the map in four files: grass exported smooth without tangents). studio_dress.py writes the three
+  Studio scripts (studio_kit / studio_map / studio_dressing .luau). Old model: HT_MapsArchive.Gnomon_before_kit_dressing_20261111.
+- COLLISION: floor tiles hull, the two pond tiles AND the rim strips precise (a rim hull filled the half-oval and
+  floored over the pond). Shore rocks and field boulders hull; all plants and flowers decorative.
+- COLOUR: imported MeshParts keep a grey Color (0.64) that multiplies their texture: everything set to white.
+- POND SLOWDOWN: Core/Pond (+ tests/Pond.spec) on MapEnvironments.gnomon.pond (same numbers as the basin);
+  GameConfig.Pond SpeedMultiplier 0.6, Ease 12/s, MaxRootAboveFloor 4.5. MovementController multiplies a separately
+  eased pondShare into travel (stacks with stagger, recomputed each frame from position, so no lingering after
+  death); bots wade too (DummyService). MEASURED in Play: 43 -> 30 studs/s entering, back to 49 within ~0.2 s after
+  leaving, root sinks ~1.5 into the basin, crossing through the openings between shore rocks.
+- Code colliders off for Gnomon (MapEnvironments.gnomon.codeObstacles = false).
+- NOT DONE / NOT VERIFIED: in-game sway of trees/bushes/flowers (Blender rigs only; grass sways via GrassWind);
+  grass LOD at distance (RenderFidelity Automatic); phones; more than one real player.
