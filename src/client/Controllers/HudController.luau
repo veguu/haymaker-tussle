@@ -1074,6 +1074,7 @@ function HudController:KnitStart()
 				or model:GetAttribute("HT_Air") == "hold"
 				or model:GetAttribute("HT_Clash") ~= nil
 			local punchReady, punchTotal, canPunch = combat:GetPunchTiming()
+			local upperReady, upperTotal, canUpper = combat:GetUppercutTiming()
 			local timings = {
 				punch = { readyAt = punchReady, total = punchTotal, usable = canPunch },
 				propel = {
@@ -1081,10 +1082,18 @@ function HudController:KnitStart()
 					total = moveCfg.PropelCooldown,
 					usable = not blocked,
 				},
-				kick = {
-					readyAt = hud.kickReadyAt,
-					total = kickCfg.Cooldown,
-					usable = hud.kickTarget or hud.kicking,
+				-- Space: the air kick while there's someone to follow up (or one is under way), else the jump.
+				kick = if hud.kickTarget or hud.kicking
+					then { readyAt = hud.kickReadyAt, total = kickCfg.Cooldown, usable = true }
+					else {
+						readyAt = hud.jumpReadyAt,
+						total = GameConfig.Jump.Cooldown,
+						usable = not blocked,
+					},
+				uppercut = {
+					readyAt = upperReady,
+					total = upperTotal,
+					usable = canUpper,
 				},
 			}
 			for _, action in HudTheme.Actions do

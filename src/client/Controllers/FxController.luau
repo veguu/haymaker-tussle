@@ -802,6 +802,33 @@ function FxController:GroundBlast(body: Model, at: Vector3, power: number)
 	end
 end
 
+--- A body an uppercut has thrown: a wide streak behind it for the first of its arc.
+function FxController:LaunchTrail(target: Model)
+	local torso = target:FindFirstChild("Torso") or target:FindFirstChild("HumanoidRootPart")
+	if torso and torso:IsA("BasePart") then
+		local upper = GameConfig.Uppercut
+		ImpactFx.fistTrail(torso, upper.TrailSeconds, upper.TrailWidth, 0.45)
+	end
+end
+
+--- A dive kick reaching the floor: the floor breaks and a blast goes off under the kicker.
+function FxController:DiveLanded(character: Model, at: Vector3, hit: boolean)
+	self:GroundBlast(character, at, if hit then 1 else 0.6)
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if root then
+		Sfx.play("ground_break", root, PITCH_VARY)
+	end
+	local mine = Players.LocalPlayer.Character
+	local myRoot = mine and mine:FindFirstChild("HumanoidRootPart")
+	if
+		myRoot
+		and myRoot:IsA("BasePart")
+		and (myRoot.Position - at).Magnitude <= cfg.KickShakeRange
+	then
+		self:CameraKick(if character == mine then 0.6 else 0.35)
+	end
+end
+
 function FxController:JumpBreak(character: Model, floorReach: number)
 	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked on the next line)
 	if not root then
@@ -918,6 +945,15 @@ function FxController:KnitStart()
 			if dasher and target and dasher.Parent and target.Parent then
 				Knit.GetController("AnimController"):HitLanded(dasher, target, strength)
 				self:HitBurst(target, dasher, strength)
+			end
+		end)
+	end
+	local diveLanded = Net.client("DiveLanded")
+	if diveLanded then
+		diveLanded.OnClientEvent:Connect(function(character: Model, at: Vector3, hit: boolean)
+			-- Your own landing already showed, the moment your feet reached the floor.
+			if character and character.Parent and character ~= Players.LocalPlayer.Character then
+				self:DiveLanded(character, at, hit == true)
 			end
 		end)
 	end

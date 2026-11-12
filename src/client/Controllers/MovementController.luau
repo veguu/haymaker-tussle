@@ -38,6 +38,7 @@ local BumpPredict = require(ReplicatedStorage.Shared.BumpPredict)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local DiveKick = require(ReplicatedStorage.Shared.Core.DiveKick)
 local AimAssist = require(ReplicatedStorage.Shared.Core.AimAssist)
+local Jump = require(ReplicatedStorage.Shared.Core.Jump)
 local Momentum = require(ReplicatedStorage.Shared.Core.Momentum)
 local TrainingLayout = require(ReplicatedStorage.Shared.Core.TrainingLayout)
 local Lobby = require(ReplicatedStorage.Shared.Core.Lobby)
@@ -57,6 +58,9 @@ local UNDO_SECONDS = 1 -- a refused punch's push is taken back only if the answe
 local cfg = GameConfig.Movement
 local kickCfg = GameConfig.Kick
 local airCfg = GameConfig.AirRecovery
+local jumpCfg = GameConfig.Jump
+local diveCfg = GameConfig.Dive
+local DIVE_LAND_SECONDS = 0.05 -- a dive can't count as landed this soon
 
 local MovementController = Knit.CreateController({
 	Name = "MovementController",
@@ -73,6 +77,7 @@ local MovementController = Knit.CreateController({
 		kickReadyAt = 0,
 		kickTarget = false, -- someone in the air this body could jump at right now
 		kicking = false,
+		jumpReadyAt = 0, -- when Space can jump again
 	},
 })
 
@@ -245,6 +250,13 @@ function MovementController:_bind(
 	local kickClicked = false -- the timed kick, once attached: a left click (R2), the punch button
 	local kickAwaiting = false -- the timing is over, and waiting for the server's verdict
 	local kickReadyAt = 0
+	-- THE JUMP (Space, with nobody to follow up and no punch held): up, and forward in an arc that grows
+	-- with speed (Core/Jump), flown as an air run. A click in the air is THE DIVE: straight down onto the
+	-- spot the cursor is on, where the server hits whoever is close around the landing.
+	local jumping = false
+	local jumpReadyAt = 0
+	local dive: { x: number, y: number, z: number, t: number }? = nil
+	local diveRemote = Net.client("DiveRequest")
 	local steerX, steerZ = 0, 0 -- a launched body's own steering, on top of its push
 	local speedShare = 1 -- how much of running speed stagger leaves
 	local pondShare = 1 -- how much of it wading in a pond leaves (Core/Pond), eased on its own
@@ -307,6 +319,8 @@ function MovementController:_bind(
 		kickAwaiting = false
 		kickAccepted = false
 		airRun = nil
+		jumping = false
+		dive = nil
 		prompt:Hide()
 	end
 	trove:Add(endKick)
@@ -388,6 +402,34 @@ function MovementController:_bind(
 		end
 		local viewing = camera.CFrame.LookVector
 		return if viewing.Magnitude > 0.01 then viewing.Unit else nil
+	end
+
+	-- Where a dive kick is aimed: the spot the cursor is on (the floor, or anything solid). Without a
+	-- mouse, a little ahead of where the camera looks.
+	local function diveSpot(): Vector3
+		local camera = workspace.CurrentCamera
+		local from = root.Position
+		if not camera then
+			return from - Vector3.yAxis * 10
+		end
+		if UserInputService.MouseEnabled then
+			local mouse = UserInputService:GetMouseLocation()
+			local ray = camera:ViewportPointToRay(mouse.X, mouse.Y)
+			local hit = workspace:Raycast(ray.Origin, ray.Direction * 1000, solidParams())
+			if hit then
+				return hit.Position
+			end
+			if ray.Direction.Y < -0.01 then
+				local reach = (GameConfig.Arena.CenterY - ray.Origin.Y) / ray.Direction.Y
+				if reach > 0 then
+					return ray.Origin + ray.Direction * reach
+				end
+			end
+		end
+		local viewing = camera.CFrame.LookVector
+		local level = Vector3.new(viewing.X, 0, viewing.Z)
+		local ahead = if level.Magnitude > 0.01 then level.Unit else Vector3.zero
+		return from + ahead * diveCfg.Range * 0.5 - Vector3.yAxis * 10
 	end
 
 	-- The server's pick for the follow-up. It only counts for a squat waiting on it, so a late answer
@@ -636,7 +678,8 @@ function MovementController:_bind(
 		ContextActionService:UnbindAction(PROPEL_ACTION)
 	end)
 
-	-- Space jumps at someone in the air. The timed press once attached is a left click (below).
+	-- Space: jumps at someone you launched; else, holding punch, the launching kick; else an ordinary jump.
+	-- The timed press once attached, and the dive out of a jump, are a left click (below).
 	ContextActionService:BindActionAtPriority(
 		KICK_ACTION,
 		function(_name: string, inputState: Enum.UserInputState)
@@ -655,12 +698,13 @@ function MovementController:_bind(
 		ContextActionService:UnbindAction(KICK_ACTION)
 	end)
 
-	-- Once a jump is under way, the punch button is the timed kick instead: the press is taken here, above
-	-- the punch, and the punch never sees it. Any other time it passes straight through to the punch.
+	-- Once a jump is under way, the punch button is the timed kick (or, out of an ordinary jump, the dive)
+	-- instead: the press is taken here, above the punch, and the punch never sees it. Any other time it
+	-- passes straight through to the punch.
 	ContextActionService:BindActionAtPriority(
 		KICK_CLICK_ACTION,
 		function(_name: string, inputState: Enum.UserInputState)
-			if not kick then
+			if not kick and not jumping then
 				return Enum.ContextActionResult.Pass
 			end
 			if inputState == Enum.UserInputState.Begin then
@@ -758,6 +802,7 @@ function MovementController:_bind(
 		hud.speed = Vector3.new(flatVelocity.X, 0, flatVelocity.Z).Magnitude
 		hud.propelLeft = state.propelCooldownLeft or 0
 		hud.kickReadyAt = kickReadyAt
+		hud.jumpReadyAt = jumpReadyAt
 		hud.kicking = kick ~= nil
 		hud.kickTarget = false
 		local inputX, inputZ = worldInput(input)
@@ -897,6 +942,17 @@ function MovementController:_bind(
 			end
 		end
 
+		-- Out of a jump, the click is the dive: straight down onto the spot the cursor is on.
+		if jumping and not dive and timedPress and not grounded and not stunned then
+			local offset = diveSpot() - root.Position
+			local x, y, z = Jump.diveWay(diveCfg, offset.X, offset.Y, offset.Z)
+			dive = { x = x, y = y, z = z, t = 0 }
+			airRun = nil
+			if diveRemote then
+				diveRemote:FireServer()
+			end
+		end
+
 		if not kick then
 			local canJump = grounded and not floating and kickRemotes.request ~= nil
 			local target = if canJump and now >= kickReadyAt then jumpTarget(root.Position) else nil
@@ -916,6 +972,35 @@ function MovementController:_bind(
 				end
 			else
 				prompt:Hide()
+				if
+					pressed
+					and grounded
+					and not floating
+					and not stunned
+					and not rooted
+					and not chargeAt
+					and not jumping
+				then
+					local combat = Knit.GetController("CombatController")
+					if combat:IsHolding() then
+						-- Holding punch: the launching kick, which the air kick follows.
+						combat:ThrowLaunchKick()
+					elseif now >= jumpReadyAt then
+						-- An ordinary jump: up, and forward with the speed you had.
+						local moving = root.AssemblyLinearVelocity
+						local level = Vector3.new(moving.X, 0, moving.Z)
+						local up, forward = Jump.launch(jumpCfg, level.Magnitude)
+						jumpReadyAt = now + jumpCfg.Cooldown
+						jumping = true
+						if forward then
+							state = Momentum.moving(state, level.X, level.Z, forward)
+						end
+						airRun = { t = 0, gravityScale = jumpCfg.GravityScale, keep = forward }
+						humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+						local vx, vz = Momentum.velocity(state)
+						root.AssemblyLinearVelocity = Vector3.new(vx, up, vz)
+					end
+				end
 			end
 		elseif timedPress and kick.phase == "attach" then
 			if kickRemotes.commit then
@@ -972,6 +1057,7 @@ function MovementController:_bind(
 					state = Momentum.landed(state, cfg)
 				end
 				airRun = nil
+				jumping = false
 				kickTarget = nil
 			elseif
 				kickTarget
@@ -995,6 +1081,48 @@ function MovementController:_bind(
 						kickRemotes.attach:FireServer()
 					end
 				end
+			end
+		end
+
+		-- A jump that lost its air run some other way is over once it's back on the floor.
+		if jumping and not dive and not airRun and grounded then
+			jumping = false
+		end
+
+		if dive then
+			dive.t += dt
+			propelRequested, punchRequested = false, false
+			dropCharge()
+			pushX, pushZ, lift = 0, 0, 0
+			steerX, steerZ = 0, 0
+			local landed = grounded and dive.t >= DIVE_LAND_SECONDS
+			local level = Vector3.new(dive.x, 0, dive.z)
+			if landed or stunned or dive.t >= diveCfg.MaxSeconds then
+				-- Down: it stops dead where it lands, facing the way it came in. Off the edge or cut
+				-- short, it's just a fall from here.
+				state = if level.Magnitude > 0.05
+					then Momentum.moving(state, level.X, level.Z, 0)
+					else Momentum.stopped(state)
+				if landed then
+					root.AssemblyLinearVelocity = Vector3.zero
+					fx:DiveLanded(character, root.Position, true)
+				end
+				dive = nil
+				jumping = false
+			else
+				humanoid.WalkSpeed = 0
+				humanoid:Move(Vector3.zero, false)
+				root.AssemblyLinearVelocity = Vector3.new(dive.x, dive.y, dive.z) * diveCfg.Speed
+				if level.Magnitude > 0.05 then
+					align.CFrame = CFrame.lookAt(Vector3.zero, level)
+				end
+				if rootJoint then
+					rootJoint.C0 = baseC0
+				end
+				if readout then
+					readout.Text = `Dive   Stagger {character:GetAttribute("HT_Stagger") or 0}`
+				end
+				return
 			end
 		end
 

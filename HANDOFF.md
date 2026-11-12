@@ -432,3 +432,25 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
 - Code colliders off for Gnomon (MapEnvironments.gnomon.codeObstacles = false).
 - NOT DONE / NOT VERIFIED: in-game sway of trees/bushes/flowers (Blender rigs only; grass sways via GrassWind);
   grass LOD at distance (RenderFidelity Automatic); phones; more than one real player.
+
+## move-14 (2026-11-11): R uppercut, running jump, dive kick, hold + Space launcher, 5 s hold cap
+- R (L2) is THE HEAVY UPPERCUT (UppercutRequest, side "Uppercut", GameConfig.Uppercut): always an arc
+  (Combat.uppercutArc: fixed Lift 85, outward by speed), never MarkLaunched, a trail on the thrown body
+  (FxController:LaunchTrail). Right click does nothing now.
+- SPACE: follow-up jump if someone you launched is in reach (unchanged); else, with punch held, the launching kick
+  (the old heavy kick, HeavyKick.LaunchSpeed 0 = always launches; CombatController:ThrowLaunchKick); else THE JUMP
+  (Core/Jump + tests/Jump.spec, GameConfig.Jump, 3 s cooldown): flown as an air run, height and length grow with speed.
+- CLICK IN THE AIR after a jump is THE DIVE (GameConfig.Dive): the client flies the body down onto the cursor's spot
+  (Jump.diveWay, within Range); DiveRequest (no args) marks HT_Skill "dive"; KickService watches the body land and
+  hits everyone within Radius (push, lift, stagger), then DiveLanded for everyone's ground blast.
+- Punch.HoldMaxSeconds 5: a held punch goes by itself at 5 s and needs a new press. ReadyMaxSeconds 5.5.
+- HUD: new Uppercut row (R / L2, punch icon for now), the Space row is "Jump" and shows the jump cooldown unless a
+  follow-up is on offer. Guide text updated. Touch gets an "Upper" button from the bound action.
+- Gates: rojo build OK, 398 Lune tests, selene 0, stylua clean. MEASURED IN PLAY (lobby, Practice Dummy 1):
+  standing jump 6.3 studs; running jump from 60 studs/s 10.7 high, 40 long, 0.68 s; a second Space inside 3 s did
+  nothing. R: dummy rose 18.2, trail on, no HT_Air. Dive: HT_Skill "dive" seen, dummy stagger 0 -> 8, knocked 16.
+  Hold: HT_PunchReady lasted 5.00 s then thrown, no new hold while still pressed. Hold + Space: no jump, dummy
+  HT_Air float, rose 57.
+- NOT VERIFIED: any of it by eye (animations: uppercut clip, KickDown pose on the dive, the jump has no clip of its
+  own), the follow-up jump after the launching kick on this build, a dive aimed with a real cursor at a distance
+  (tested straight down), touch and gamepad, two real players. Bots use none of the new moves.

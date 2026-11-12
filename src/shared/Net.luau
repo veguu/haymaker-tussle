@@ -21,6 +21,9 @@ export type EventName =
 	"PunchRequest" -- client to server: I pressed punch. No arguments, ever.
 	| "PunchReady" -- client to server: I'm holding a punch back. No arguments, ever.
 	| "HeavyKickRequest" -- client to server: I pressed the heavy kick. No arguments, ever.
+	| "UppercutRequest" -- client to server: I pressed the heavy uppercut. No arguments, ever.
+	| "DiveRequest" -- client to server: I started a dive kick out of a jump. No arguments, ever.
+	| "DiveLanded" -- server to all: this character's dive kick landed here, and whether it hit anyone
 	| "PunchStarted" -- server to all: this character started a swing: Left, Right, Uppercut or Kick
 	| "HitConfirmed" -- server to all: this character's punch hit this target
 	| "Knockback" -- server to the target's client: launch velocity, and lift if airborne

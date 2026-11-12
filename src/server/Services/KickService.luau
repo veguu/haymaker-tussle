@@ -26,6 +26,12 @@
 -- KnockdownSeconds after landing, or a green slam's (when green isn't a finisher) until they've landed
 -- from the bounce. Every path out of it clears on a timer too.
 --
+-- THE DIVE KICK. Out of a jump, a click dives the jumper down onto the spot they point at; their own
+-- client flies the body. The client only says "I dived" (DiveRequest, no arguments). The server marks the
+-- body (HT_Skill "dive"), watches it itself, and when it sees it reach the floor hits everyone it may
+-- fight within Dive.Radius of where it landed: a small push outward, a little lift and stagger. No more
+-- often than a jump's cooldown.
+--
 -- KNOWN GAP, the same as all movement here: the client owns its body, so a cheat could fly
 -- somewhere false during the chase, or ignore its own HT_Air. The clock limits for how long.
 
@@ -96,6 +102,12 @@ local active: { [Player]: Record } = {}
 local lockedOn: { [Player]: Model } = setmetatable({}, { __mode = "k" }) :: any
 local lastUse: { [Player]: number } = {}
 local launched: { [Model]: number } = {}
+-- Dive kicks on their way down: whose, since when, and whether the server has seen them off the floor.
+type Dive = { character: Model, startedAt: number, leftFloor: boolean }
+local diveCfg = GameConfig.Dive
+local dives: { [Player]: Dive } = {}
+local lastDive: { [Player]: number } = {}
+local DIVE_SETTLE_SECONDS = 0.3 -- a dive never seen off the floor still lands after this long
 local stunTokens: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
 local nextStunToken = 0
 
@@ -195,7 +207,59 @@ function KickService:Cancel(model: Model)
 	local player = Combatants.playerOf(model)
 	if player then
 		finish(player)
+		local dive = dives[player]
+		if dive then
+			dives[player] = nil
+			dive.character:SetAttribute(SKILL_ATTRIBUTE, nil)
+		end
 	end
+end
+
+-- A dive kick reaches the floor: everyone it may fight, close around where it landed, is knocked outward.
+function KickService:_diveImpact(player: Player, dive: Dive)
+	local character = dive.character
+	dives[player] = nil
+	character:SetAttribute(SKILL_ATTRIBUTE, nil)
+	local root = Combatants.rootOf(character)
+	if not root then
+		return
+	end
+	local combat = Knit.GetService("CombatService")
+	local stagger = Knit.GetService("StaggerService")
+	local knockback = Knit.GetService("KnockbackService")
+	local at = root.Position
+	local look = root.CFrame.LookVector
+	local hits = 0
+	for _, target in Combatants.all() do
+		local targetRoot = Combatants.rootOf(target)
+		if
+			target ~= character
+			and targetRoot
+			and Combatants.isAlive(target)
+			and combat:CanFight(character, target)
+		then
+			local offset = targetRoot.Position - at
+			local flat = Vector3.new(offset.X, 0, offset.Z)
+			if flat.Magnitude <= diveCfg.Radius and math.abs(offset.Y) <= diveCfg.Tall then
+				local push = diveCfg.Push
+					* Combat.staggerMultiplier(staggerCfg, stagger:Get(target))
+				local away = if flat.Magnitude > 0.01
+					then flat.Unit
+					else Vector3.new(look.X, 0, look.Z)
+				stagger:AddAmount(target, diveCfg.Stagger)
+				combat:MarkHit(target)
+				Knit.GetService("RoundService"):NoteHit(target, character)
+				knockback:Launch(target, away.X * push, away.Z * push, diveCfg.Lift, 0)
+				self._hitConfirmed:FireAllClients(character, target, math.floor(push))
+				hits += 1
+			end
+		end
+	end
+	if hits > 0 then
+		stagger:Relieve(character)
+	end
+	trace(`{player.Name}'s dive kick landed: {hits} hit(s)`)
+	self._diveLanded:FireAllClients(character, at, hits > 0)
 end
 
 --- An uppercut landed: this target now floats, and can be jumped at, until it lands.
@@ -703,6 +767,8 @@ function KickService:KnitInit()
 	self._accepted = Net.server("KickAccepted")
 	self._lockOn = Net.server("LockOnState")
 	self._crash = Net.server("DashHit")
+	self._dive = Net.server("DiveRequest")
+	self._diveLanded = Net.server("DiveLanded")
 end
 
 function KickService:KnitStart()
@@ -773,6 +839,32 @@ function KickService:KnitStart()
 		end
 		setPhase(record, "chase")
 		self._accepted:FireClient(player, target, snap)
+	end)
+
+	self._dive.OnServerEvent:Connect(function(player: Player, ...)
+		if select("#", ...) ~= 0 or dives[player] or active[player] then
+			return
+		end
+		local now = os.clock()
+		local character = player.Character
+		local root = character and Combatants.rootOf(character)
+		if
+			not character
+			or not root
+			or not Combatants.isAlive(character)
+			or character:GetAttribute("HT_RoundHold")
+			or self:IsBusy(character)
+		then
+			return
+		end
+		-- One per jump, and a jump has a cooldown.
+		local last = lastDive[player]
+		if last and now - last < GameConfig.Jump.Cooldown - GameConfig.Punch.CooldownTolerance then
+			return
+		end
+		lastDive[player] = now
+		dives[player] = { character = character, startedAt = now, leftFloor = false }
+		character:SetAttribute(SKILL_ATTRIBUTE, "dive")
 	end)
 
 	self._attach.OnServerEvent:Connect(function(player: Player, ...)
@@ -871,6 +963,24 @@ function KickService:KnitStart()
 				clearAir(target)
 			end
 		end
+		for player, dive in dives do
+			local root = Combatants.rootOf(dive.character)
+			local waited = now - dive.startedAt
+			if
+				player.Character ~= dive.character
+				or not root
+				or not Combatants.isAlive(dive.character)
+				or waited >= diveCfg.MaxSeconds + CLOCK_TOLERANCE
+			then
+				-- Gone, or never came down (off the edge): nothing lands.
+				dives[player] = nil
+				dive.character:SetAttribute(SKILL_ATTRIBUTE, nil)
+			elseif not touchingFloor(root) then
+				dive.leftFloor = true
+			elseif dive.leftFloor or waited >= DIVE_SETTLE_SECONDS then
+				self:_diveImpact(player, dive)
+			end
+		end
 		for player, record in active do
 			local root = Combatants.rootOf(record.character)
 			local gone = player.Character ~= record.character
@@ -916,6 +1026,8 @@ function KickService:KnitStart()
 	Players.PlayerRemoving:Connect(function(player)
 		finish(player)
 		lastUse[player] = nil
+		dives[player] = nil
+		lastDive[player] = nil
 	end)
 end
 

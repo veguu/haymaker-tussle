@@ -92,11 +92,61 @@ Every adjustable value in the game. All numbers are **starting guesses to tune b
 | `SweepStep` | 0.008 | Seconds between the moments a swing checks, back to the last check, using where the server saw both bodies. Catches contact that happens entirely between two server frames. Smaller is finer and costs more. |
 | `PointBlankRadius` | 0.75 | Closer than this, centre to centre, a landed punch throws the target the way the attacker faces instead of along their (noisy) offset, so exact overlap gets a steady shove. |
 | `ReleaseWindup` | 0.07 | Holding punch draws it back and keeps it there (no power). Let go after holding at least `Windup` - `ReleaseWindup` (0.09 s, by the server's clock) and the punch lands after only this much. The hook clip waits at its hold point (0.09) and strikes this long after the release. |
-| `ReadyMaxSeconds` | 5 | A hold the server saw start longer ago than this no longer counts: the release takes the full `Windup`. |
+| `ReadyMaxSeconds` | 5.5 | A hold the server saw start longer ago than this no longer counts: the release takes the full `Windup`. Keep it a little above `HoldMaxSeconds`. |
+| `HoldMaxSeconds` | 5 | The longest a punch can be held back. At this many seconds it goes by itself, and the button has to be pressed again to hold another. |
+
+## Uppercut
+
+R (L2). A slow, telegraphed uppercut on its own cooldown, rooted through its windup. It always throws the target up and away in an arc, with a trail behind them, and never launches them for an Air Kick.
+
+| Setting | Value | What it does |
+|---|---|---|
+| `Windup` | 0.3 | Seconds from the press to the uppercut landing: the telegraph. |
+| `RootAfter` | 0.15 | The thrower stays rooted this long after the strike too. |
+| `Cooldown` | 5 | Seconds between uppercuts. An uppercut also starts the punch cooldown. |
+| `Range` | 6 | Its reach, the same way a punch's `Range` works (plus `Punch.TargetRadius`). |
+| `Degrees` | 35 | Its arc either side of straight ahead. |
+| `Lift` | 85 | Upward speed it gives, at any speed: about 18 studs high (measured 18.2 on a dummy). |
+| `ArcBase` | 25 | Outward speed when thrown standing still... |
+| `ArcPerStud` | 1.3 | ...plus this per stud/s the thrower was going at the press... |
+| `ArcMax` | 90 | ...up to this. Stagger multiplies it like any hit. |
+| `TrailSeconds` | 1.2 | How long the streak behind the thrown body keeps drawing. |
+| `TrailWidth` | 2.4 | How wide that streak is, in studs. |
+
+## Jump
+
+Space, when there's nobody you launched to jump at and punch isn't held. Standing, a hop straight up. Moving, an arc that is higher and longer the faster you were going. The controls still steer in the air.
+
+| Setting | Value | What it does |
+|---|---|---|
+| `Cooldown` | 3 | Seconds from one jump to the next. |
+| `UpBase` | 50 | Upward speed of a standing jump: about 6 studs high (measured 6.3). |
+| `UpPerStud` | 0.5 | Extra upward speed per stud/s you were going... |
+| `UpMax` | 80 | ...up to this. At a full run (50) it's 75: about 11 studs high and 40 studs long (measured 10.7 and 40). |
+| `ForwardShare` | 1.2 | The flat speed held through the air, as a multiple of the speed you jumped at... |
+| `ForwardMax` | 90 | ...up to this. A body already going faster (a dash) keeps its speed and gets no boost. |
+| `MoveMinSpeed` | 4 | Slower than this counts as standing: straight up, nothing carried. |
+| `GravityScale` | 1 | Gravity on the way up, as a share of normal. The fall uses `AirRecovery`'s rule like every other body. |
+
+## Dive
+
+A click (R2) in the air after a jump: a kick straight down onto the spot the cursor is on. Everyone close around the landing is knocked outward. One per jump.
+
+| Setting | Value | What it does |
+|---|---|---|
+| `Range` | 32 | The furthest along the floor a dive can go from where you are. A spot further away is pulled in to this. |
+| `Speed` | 130 | Studs/s of the dive. |
+| `MinDrop` | 0.45 | The dive never goes flatter than this much down per stud along, so it's always a kick downward. |
+| `MaxSeconds` | 1.2 | A dive that hasn't reached a floor by now (off the edge) ends, and hits nobody. |
+| `Radius` | 9 | Studs along the floor around the landing that get hit. |
+| `Tall` | 7 | Studs of height difference that still get hit. |
+| `Push` | 45 | Outward speed given to everyone hit. Stagger multiplies it like any hit. |
+| `Lift` | 22 | Upward speed given to everyone hit on the floor. |
+| `Stagger` | 8 | Stagger added to everyone hit. A punch adds 7.2. |
 
 ## HeavyKick
 
-Right click (L2). A slow, telegraphed rising kick on its own cooldown. Through its windup the kicker is rooted to the spot.
+Space while holding punch (R2 + Y). A slow, telegraphed rising kick on its own cooldown that throws the target straight up for an Air Kick: Space again jumps at them, then a click as the ring meets the key. Through its windup the kicker is rooted to the spot.
 
 | Setting | Value | What it does |
 |---|---|---|
@@ -105,7 +155,7 @@ Right click (L2). A slow, telegraphed rising kick on its own cooldown. Through i
 | `Cooldown` | 5 | Seconds between heavy kicks, the same as the air kick's. A kick also starts the punch cooldown. |
 | `Range` | 6 | The kick's reach, the same way a punch's `Range` works (plus `Punch.TargetRadius`). |
 | `Degrees` | 35 | The kick's arc either side of straight ahead. |
-| `LaunchSpeed` | 30 | Going at least this fast (studs/s, measured by the server at the press) launches the target into the air for an Air Kick, as the uppercut used to. Slower, it's an arc instead. |
+| `LaunchSpeed` | 0 | Going at least this fast (studs/s, measured by the server at the press) launches the target into the air for an Air Kick. At 0 it always launches; a target that can't be launched (stunned) gets the arc below instead. |
 | `LaunchLift` | 125 | Upward speed of a launch. |
 | `LaunchPush` | 20 | Outward speed of a launch. |
 | `ArcBase` | 25 | A slower kick's outward speed when standing still... |

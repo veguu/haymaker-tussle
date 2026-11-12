@@ -276,6 +276,21 @@ return {
 		assert(punch.ReleaseWindup < punch.Windup, "the release is quicker than a full swing")
 	end,
 
+	["the heavy uppercut always arcs: a fixed lift, further out with speed"] = function()
+		local GameConfig = require("../src/shared/Config/GameConfig")
+		local upper: any = GameConfig.Uppercut
+		local slowOut, slowUp = Combat.uppercutArc(upper, 0, 1)
+		local fastOut, fastUp = Combat.uppercutArc(upper, 40, 1)
+		assert(fastOut > slowOut, "faster throws them further")
+		assert(slowUp == upper.Lift and fastUp == upper.Lift, "the lift is the same at any speed")
+		assert(Combat.uppercutArc(upper, 1000, 1) == upper.ArcMax, "capped")
+		assert(Combat.uppercutArc(upper, 0 / 0, 1) == upper.ArcBase, "NaN counts as standing")
+		assert(Combat.uppercutArc(upper, 0, 2) == upper.ArcBase * 2, "stagger scales the push")
+		assert(upper.Windup > GameConfig.Punch.Windup, "telegraphed: slower than a punch")
+		local punch: any = GameConfig.Punch
+		assert(punch.HoldMaxSeconds < punch.ReadyMaxSeconds, "a full hold still releases fast")
+	end,
+
 	["a heavy kick launches only from speed; slower, its arc grows with speed"] = function()
 		local GameConfig = require("../src/shared/Config/GameConfig")
 		local kick: any = GameConfig.HeavyKick

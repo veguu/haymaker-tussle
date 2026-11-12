@@ -43,6 +43,7 @@ local SKILL_CLIPS: { [string]: string } = {
 	attach = "KickAim",
 	flip = "KickSpin",
 	kick = "KickDown",
+	dive = "KickDown", -- the dive kick out of a jump: the same heel-down pose, all the way to the floor
 }
 local SWING_ARMS: { [string]: string } = {
 	Left = "Left Arm",
@@ -545,7 +546,10 @@ function AnimController:PlaySwing(model: Model, side: string)
 		-- decides the hit.
 		local strike = (AnimClips :: any)[chosen].strike or 0
 		local windup = math.max(
-			if side == "Kick" then GameConfig.HeavyKick.Windup else GameConfig.Punch.Windup,
+			if side == "Kick"
+				then GameConfig.HeavyKick.Windup
+				elseif side == "Uppercut" then GameConfig.Uppercut.Windup
+				else GameConfig.Punch.Windup,
 			0.01
 		)
 		if held == chosen and track.IsPlaying then
@@ -639,6 +643,12 @@ end
 
 --- Where the fist was at the strike, if that was just now.
 --- The arm this fighter's current (or last) swing is thrown with, for effects that ride the fist.
+--- The last swing this fighter threw: Left, Right, Uppercut or Kick.
+function AnimController:LastSwing(model: Model?): string?
+	local fighter = model and fighters[model]
+	return fighter and fighter.lastSide
+end
+
 function AnimController:SwingArm(model: Model?): BasePart?
 	local fighter = model and fighters[model]
 	local arm = fighter and fighter.strikeArm and (model :: Model):FindFirstChild(fighter.strikeArm)

@@ -110,10 +110,11 @@ HudTheme.Icons = {
 	punch = "rbxassetid://93989680466321",
 	propel = "rbxassetid://108732937698089",
 	kick = "rbxassetid://113416372768113",
+	uppercut = "rbxassetid://93989680466321", -- the punch's fist, until it has its own drawing
 	mouse = "rbxassetid://118394725313773",
 }
 
--- The three combat actions, in the order they're listed, with their bindings per device and the
+-- The combat actions, in the order they're listed, with their bindings per device and the
 -- touch button each mirrors. "M1" draws a mouse.
 HudTheme.Actions = {
 	{
@@ -123,6 +124,12 @@ HudTheme.Actions = {
 		touchAction = "HaymakerPunch",
 	},
 	{
+		id = "uppercut",
+		name = "Uppercut",
+		keys = { mouse = "R", gamepad = "L2" },
+		touchAction = "HaymakerUppercut",
+	},
+	{
 		id = "propel",
 		name = "Dash",
 		keys = { mouse = "Q", gamepad = "B" },
@@ -130,7 +137,7 @@ HudTheme.Actions = {
 	},
 	{
 		id = "kick",
-		name = "Air Kick",
+		name = "Jump",
 		keys = { mouse = "SPACE", gamepad = "Y" },
 		touchAction = "HaymakerKick",
 	},
@@ -146,8 +153,8 @@ HudTheme.Guide = {
 			action = "Punch: left and right hooks. Hold to draw it back, let go to throw it fast.",
 		},
 		{
-			key = "Right click",
-			action = "Heavy kick: roots you, then kicks them up. At 30+ speed, up for an Air Kick.",
+			key = "R",
+			action = "Uppercut: roots you, then throws them up and away. Further the faster you ran in.",
 		},
 		{
 			key = "Q",
@@ -155,7 +162,11 @@ HudTheme.Guide = {
 		},
 		{
 			key = "Space",
-			action = "Air Kick: jump at someone launched, then click as the ring meets the key.",
+			action = "Jump: further and higher the faster you run. Click in the air to dive kick where you point.",
+		},
+		{
+			key = "Click + Space",
+			action = "Holding punch, Space kicks them up. Space again to jump at them, then click on the ring.",
 		},
 		{ key = "Ctrl", action = "Shift lock. The camera aims your kick." },
 		{ key = lockKey, action = "Lock on to the nearest opponent." },
@@ -168,12 +179,16 @@ HudTheme.Guide = {
 		},
 		{
 			key = "L2",
-			action = "Heavy kick: roots you, then kicks them up. At 30+ speed, up for an Air Kick.",
+			action = "Uppercut: roots you, then throws them up and away. Further the faster you ran in.",
 		},
 		{ key = "B", action = "Dash: a short burst the way you're going. Hard to steer." },
 		{
 			key = "Y",
-			action = "Air Kick: jump at someone launched, then R2 as the ring meets the key.",
+			action = "Jump: further and higher the faster you run. R2 in the air to dive kick.",
+		},
+		{
+			key = "R2 + Y",
+			action = "Holding punch, Y kicks them up. Y again to jump at them, then R2 on the ring.",
 		},
 		{ key = "L1", action = "Lock on to the nearest opponent." },
 		{ key = "Select", action = "Show or hide this guide." },
@@ -184,7 +199,11 @@ HudTheme.Guide = {
 			action = "Punch: left and right hooks. Hold to draw it back, let go to throw it fast.",
 		},
 		{ key = "Propel", action = "Dash: a short burst the way you're going. 3 s to recharge." },
-		{ key = "Kick", action = "Air Kick at someone launched. Tap as the ring meets the key." },
+		{ key = "Upper", action = "Uppercut: roots you, then throws them up and away." },
+		{
+			key = "Kick",
+			action = "Jump. Tap again in the air to dive kick. Holding Punch, it kicks them up.",
+		},
 		{ key = "Lock", action = "Lock on to the nearest opponent." },
 	},
 }

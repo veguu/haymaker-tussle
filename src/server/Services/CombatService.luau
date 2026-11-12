@@ -19,11 +19,14 @@
 -- short ReleaseWindup left, since the arm is already back. It adds no power. While held, the body carries
 -- HT_PunchReady (the swing it will be), for others to see it coming.
 --
--- THE HEAVY KICK (right click, HeavyKickRequest, no arguments): a slow, telegraphed rising kick on its
--- own cooldown, through the same swing machinery with side "Kick". The kicker is rooted through the
--- windup (the client keeps itself still; HT_KickWindup marks it). At the press, the server measures how
--- fast they were going: at LaunchSpeed or more it throws the target into the air for an air kick, the
--- same launch the uppercut used to give; slower, it's an upward arc whose strength grows with speed.
+-- THE HEAVY UPPERCUT (R, UppercutRequest, no arguments): a slow, telegraphed uppercut on its own cooldown,
+-- through the same swing machinery with side "Uppercut". It always throws the target up and away in an
+-- arc (Combat.uppercutArc) and never marks them launched, so there's no air kick to follow it.
+-- THE LAUNCHING KICK (Space while holding punch, HeavyKickRequest, no arguments): the rising kick with
+-- side "Kick", on its own cooldown. It throws the target into the air for an air kick (at LaunchSpeed or
+-- more, which is 0: always); a target that can't be launched gets its arc instead.
+-- Both root the thrower through the windup (the client keeps itself still; HT_KickWindup marks it), and
+-- the server measures how fast they were going at the press.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -48,6 +51,15 @@ local KICK_WINDUP_ATTRIBUTE = "HT_KickWindup"
 local kickHitbox = table.clone(punchCfg) :: any
 kickHitbox.Range = kickCfg.Range
 kickHitbox.UppercutDegrees = kickCfg.Degrees
+local upperCfg = GameConfig.Uppercut
+local upperHitbox = table.clone(punchCfg) :: any
+upperHitbox.Range = upperCfg.Range
+upperHitbox.UppercutDegrees = upperCfg.Degrees
+-- The two heavy moves: their own button, windup, hitbox and cooldown, measured at the press.
+local HEAVY: { [string]: { cfg: any, hitbox: any } } = {
+	Kick = { cfg = kickCfg, hitbox = kickHitbox },
+	Uppercut = { cfg = upperCfg, hitbox = upperHitbox },
+}
 -- The drawing is sent whenever it could be wanted, and each client decides whether to show it.
 local SHOW_DEBUG = GameConfig.Debug.ShowHitbox or GameConfig.Training.Enabled
 
@@ -58,7 +70,7 @@ type PunchRecord = {
 	nextSide: string,
 	refused: number,
 	readyAt: number?, -- when the server saw this player start holding a punch
-	lastKick: number?,
+	lastHeavy: { [string]: number }?, -- when each heavy move (Kick, Uppercut) was last thrown
 }
 
 -- Someone a swing has reached, waiting on whether it's a hit or a clash.
@@ -218,7 +230,7 @@ local function landHit(self: any, punch: Punch, target: Model, at: Vector3, from
 	local stagger = Knit.GetService("StaggerService")
 	local knockback = Knit.GetService("KnockbackService")
 	local flat = punch.flat :: Vector3
-	local attackerSpeed = if punch.side == "Kick"
+	local attackerSpeed = if HEAVY[punch.side]
 		then punch.pressSpeed
 		else audit:GetTrustedSpeed(punch.attacker)
 	local before = stagger:Get(target)
@@ -247,10 +259,14 @@ local function landHit(self: any, punch: Punch, target: Model, at: Vector3, from
 			strength, up = kickCfg.LaunchPush, kickCfg.LaunchLift
 		end
 		airUp = up
-	elseif punch.side == "Uppercut" and kicks:CanLaunch(target) then
-		kicks:MarkLaunched(target, punch.attacker)
 	elseif punch.side == "Uppercut" then
-		up, airUp = 0, 0
+		-- Up and away in an arc, further with speed. Never a launch: nothing follows it.
+		strength, up = Combat.uppercutArc(
+			upperCfg,
+			attackerSpeed,
+			Combat.staggerMultiplier(staggerCfg, before)
+		)
+		airUp = up
 	end
 	knockback:Launch(target, away.X * strength, away.Z * strength, up, airUp)
 	self._hitConfirmed:FireAllClients(punch.attacker, target, math.floor(strength))
@@ -434,7 +450,7 @@ end
 -- rule for everyone, and the other swing has to really reach back. If so, both swings end here.
 local function tryClash(self: any, punch: Punch, target: Model): boolean
 	local other = punches[target]
-	if not other or other.wild or punch.wild or punch.side == "Kick" or other.side == "Kick" then
+	if not other or other.wild or punch.wild or HEAVY[punch.side] or HEAVY[other.side] then
 		return false
 	end
 	if not Clash.simultaneous(clashCfg, punch.impactAt, other.impactAt, punch.ping, other.ping) then
@@ -686,6 +702,7 @@ function CombatService:KnitInit()
 	self._punchRequest = Net.server("PunchRequest")
 	self._punchReady = Net.server("PunchReady")
 	self._heavyKickRequest = Net.server("HeavyKickRequest")
+	self._uppercutRequest = Net.server("UppercutRequest")
 	self._punchStarted = Net.server("PunchStarted")
 	self._hitConfirmed = Net.server("HitConfirmed")
 	self._punchResult = Net.server("PunchResult")
@@ -786,7 +803,9 @@ function CombatService:KnitStart()
 		startPunch(self, attacker, player, side, now, windup, player:GetNetworkPing(), false)
 	end)
 
-	self._heavyKickRequest.OnServerEvent:Connect(function(player: Player, ...)
+	-- A heavy move (the launching kick, or the uppercut): its own cooldown on top of the punch's.
+	local function heavy(side: string, player: Player, ...)
+		local move = HEAVY[side]
 		local record = recordFor(player)
 		local now = os.clock()
 		dropReady(player, record)
@@ -794,40 +813,46 @@ function CombatService:KnitStart()
 		if not attacker then
 			return
 		end
-		if
-			record.lastKick
-			and now - record.lastKick < kickCfg.Cooldown - punchCfg.CooldownTolerance
-		then
+		local lastHeavy = record.lastHeavy or {}
+		record.lastHeavy = lastHeavy
+		local last = lastHeavy[side]
+		if last and now - last < move.cfg.Cooldown - punchCfg.CooldownTolerance then
 			record.refused += 1
-			trace(`{player.Name} refused: kick cooldown`)
+			trace(`{player.Name} refused: {side} cooldown`)
 			self._punchResult:FireClient(player, attacker, "refused")
 			return
 		end
-		record.lastKick = now
+		lastHeavy[side] = now
 		record.lastPunch = now
 		record.recovery = 0
 		-- How fast they were going at the press, before the windup roots them.
 		local speed = Knit.GetService("SpeedAuditService"):GetTrustedSpeed(attacker)
 		attacker:SetAttribute(KICK_WINDUP_ATTRIBUTE, true)
-		task.delay(kickCfg.Windup + kickCfg.RootAfter, function()
+		task.delay(move.cfg.Windup + move.cfg.RootAfter, function()
 			if attacker.Parent then
 				attacker:SetAttribute(KICK_WINDUP_ATTRIBUTE, nil)
 			end
 		end)
-		self._punchStarted:FireAllClients(attacker, "Kick")
-		trace(`{player.Name} heavy kick at speed {math.floor(speed)}`)
+		self._punchStarted:FireAllClients(attacker, side)
+		trace(`{player.Name} heavy {side} at speed {math.floor(speed)}`)
 		startPunch(
 			self,
 			attacker,
 			player,
-			"Kick",
+			side,
 			now,
-			kickCfg.Windup,
+			move.cfg.Windup,
 			player:GetNetworkPing(),
 			false,
-			kickHitbox,
+			move.hitbox,
 			speed
 		)
+	end
+	self._heavyKickRequest.OnServerEvent:Connect(function(player: Player, ...)
+		heavy("Kick", player, ...)
+	end)
+	self._uppercutRequest.OnServerEvent:Connect(function(player: Player, ...)
+		heavy("Uppercut", player, ...)
 	end)
 
 	RunService.Heartbeat:Connect(function()

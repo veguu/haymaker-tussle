@@ -342,6 +342,15 @@ function Combat.heavyKickArc(cfg: any, speed: number, staggerMultiplier: number)
 	return out, out * cfg.ArcLiftShare
 end
 
+--- The heavy uppercut (R): always an arc, never a launch for an air kick. A fixed lift, and an outward
+--- speed that grows with how fast the thrower was going (ArcBase + ArcPerStud a stud/s, up to ArcMax) and
+--- with the target's stagger like any hit. Returns outward speed, then lift.
+function Combat.uppercutArc(cfg: any, speed: number, staggerMultiplier: number): (number, number)
+	local fast = if speed == speed then math.max(speed, 0) else 0
+	local out = math.min(cfg.ArcBase + cfg.ArcPerStud * fast, cfg.ArcMax) * staggerMultiplier
+	return out, cfg.Lift
+end
+
 --- The swing to throw now: the next in the order, or back to the first after a pause.
 function Combat.comboSwing(
 	cfg: PunchSettings,

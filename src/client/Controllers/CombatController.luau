@@ -22,8 +22,9 @@ local Net = require(ReplicatedStorage.Shared.Net)
 
 local punchCfg = GameConfig.Punch
 local ACTION = "HaymakerPunch"
-local KICK_ACTION = "HaymakerHeavyKick"
+local UPPERCUT_ACTION = "HaymakerUppercut"
 local kickCfg = GameConfig.HeavyKick
+local upperCfg = GameConfig.Uppercut
 local COMBATANT_TAG = "HT_Combatant"
 local FLASH_SECONDS = 0.12
 
@@ -227,45 +228,68 @@ function CombatController:KnitStart()
 	)
 	ContextActionService:SetTitle(ACTION, "Punch")
 
-	-- THE HEAVY KICK: right click (or L2). A slow, telegraphed rising kick that roots you through its
-	-- windup. Fast enough at the press, it throws them up for an air kick; slower, an arc that grows with
-	-- your speed. It has its own cooldown and also counts as a swing for the punch's.
-	local lastKick = -math.huge
+	-- THE HEAVY MOVES. Both are slow and telegraphed, root you through the windup, have their own cooldown
+	-- and also count as a swing for the punch's.
+	-- The uppercut: R (or L2). Throws them up and away in an arc, further the faster you were going.
+	-- Nothing follows it.
+	-- The launching kick: Space while holding punch (MovementController asks for it). Throws them straight
+	-- up for an air kick.
+	local heavies: { [string]: { cfg: any, remote: RemoteEvent?, last: number } } = {
+		Kick = { cfg = kickCfg, remote = kickRemote, last = -math.huge },
+		Uppercut = { cfg = upperCfg, remote = Net.client("UppercutRequest"), last = -math.huge },
+	}
+	local function throwHeavy(side: string): boolean
+		local move = heavies[side]
+		local now = os.clock()
+		local character = player.Character
+		-- A punch being held back doesn't have to wait out the punch's cooldown again.
+		if
+			not character
+			or not canPunch(character)
+			or (holdAt == nil and now < readyAt())
+			or now - move.last < move.cfg.Cooldown
+			or not move.remote
+		then
+			self.PunchEvent:Fire("blocked")
+			return false
+		end
+		-- The held punch becomes this instead, and the button has to be pressed again to hold another.
+		holdAt = nil
+		held, heldBy = false, nil
+		buffered = nil
+		move.last = now
+		undoPress, undoSide = lastPress, nextSide
+		lastPress = now
+		recovery = 0
+		anim:PlaySwing(character, side)
+		fx:Swing(character)
+		movement:HeavyKickStarted(move.cfg.Windup + move.cfg.RootAfter)
+		move.remote:FireServer()
+		self.PunchEvent:Fire("thrown")
+		return true
+	end
+	self._throwKick = function(): boolean
+		return throwHeavy("Kick")
+	end
+	-- For the HUD: when the uppercut can be thrown again, and whether the body can swing at all.
+	self._uppercutTiming = function(): (number, number, boolean)
+		return math.max(heavies.Uppercut.last + upperCfg.Cooldown, readyAt()),
+			upperCfg.Cooldown,
+			canPunch(player.Character)
+	end
 	ContextActionService:BindAction(
-		KICK_ACTION,
+		UPPERCUT_ACTION,
 		function(_name: string, inputState: Enum.UserInputState)
-			if inputState ~= Enum.UserInputState.Begin then
-				return Enum.ContextActionResult.Pass
+			if inputState == Enum.UserInputState.Begin then
+				throwHeavy("Uppercut")
 			end
-			local now = os.clock()
-			local character = player.Character
-			if
-				not character
-				or not canPunch(character)
-				or now < readyAt()
-				or now - lastKick < kickCfg.Cooldown
-				or not kickRemote
-			then
-				self.PunchEvent:Fire("blocked")
-				return Enum.ContextActionResult.Pass
-			end
-			dropHold(character)
-			buffered = nil
-			lastKick = now
-			undoPress, undoSide = lastPress, nextSide
-			lastPress = now
-			recovery = 0
-			anim:PlaySwing(character, "Kick")
-			movement:HeavyKickStarted(kickCfg.Windup + kickCfg.RootAfter)
-			kickRemote:FireServer()
-			self.PunchEvent:Fire("thrown")
 			return Enum.ContextActionResult.Pass
 		end,
 		true,
-		Enum.UserInputType.MouseButton2,
+		Enum.KeyCode.R,
 		Enum.KeyCode.ButtonL2
 	)
-	ContextActionService:SetTitle(KICK_ACTION, "Kick")
+	ContextActionService:SetTitle(UPPERCUT_ACTION, "Upper")
 
 	-- Anything that could swallow the release lets go: the window losing focus, and a new body.
 	UserInputService.WindowFocusReleased:Connect(function()
@@ -290,13 +314,20 @@ function CombatController:KnitStart()
 		return true -- touch has no polled state; End and Cancel cover it
 	end
 
+	-- Is the punch button down right now (drawn back, or waiting to be)? Space then kicks, not jumps.
+	self._holding = function(): boolean
+		return holdAt ~= nil or stillHeld()
+	end
+
 	RunService.Heartbeat:Connect(function()
 		local now = os.clock()
 		local character = player.Character
 		if holdAt then
 			if not character or not canPunch(character) then
 				dropHold(character)
-			elseif not stillHeld() then
+			elseif not stillHeld() or now - holdAt >= punchCfg.HoldMaxSeconds then
+				-- Let go, or held as long as it can be (HoldMaxSeconds): it goes, and after a full hold
+				-- the button has to be pressed again.
 				held, heldBy = false, nil
 				throw(now, character)
 			end
@@ -375,6 +406,10 @@ function CombatController:KnitStart()
 			-- Shown the moment this client's swing reaches its Hit event, at the fist.
 			anim:AtStrike(attacker, function()
 				if target.Parent then
+					-- An uppercut's arc leaves a trail behind the body it threw.
+					if anim:LastSwing(attacker) == "Uppercut" then
+						fx:LaunchTrail(target)
+					end
 					flash(target)
 					anim:HitLanded(attacker, target, strength)
 					fx:HitBurst(target, attacker, strength, anim:StrikeTip(attacker))
@@ -420,6 +455,24 @@ function CombatController:GetPunchTiming(): (number, number, boolean)
 		return self._timing()
 	end
 	return 0, punchCfg.Cooldown, true
+end
+
+--- The same for the heavy uppercut (R): when it's ready, its whole cooldown, and whether the body can swing.
+function CombatController:GetUppercutTiming(): (number, number, boolean)
+	if self._uppercutTiming then
+		return self._uppercutTiming()
+	end
+	return 0, upperCfg.Cooldown, true
+end
+
+--- Is the punch button being held (a punch drawn back, or waiting to be)?
+function CombatController:IsHolding(): boolean
+	return self._holding ~= nil and self._holding()
+end
+
+--- The launching kick, for Space pressed while holding punch. False when it couldn't be thrown.
+function CombatController:ThrowLaunchKick(): boolean
+	return self._throwKick ~= nil and self._throwKick()
 end
 
 return CombatController
