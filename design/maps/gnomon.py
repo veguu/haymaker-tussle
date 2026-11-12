@@ -552,6 +552,9 @@ def build_backdrop(rng, tex=TEX):
     build_islands(rng, tex)
     build_sundial(rng, tex)
     GS.build(rng, tex)
+    # USER 2026-11-12: the far mesa is gone; built above only so the random draws after it don't change
+    for obj in [o for o in C.collection("Export").objects if o.name.startswith("Sight_FarMesa")]:
+        bpy.data.objects.remove(obj, do_unlink=True)
     build_fragments(rng, tex)
     # clouds are no longer baked into the map: the game's environment system (src/shared/EnvironmentKit) builds
     # and drifts them from the map's preset in Config/MapEnvironments. build_clouds is kept for reference.

@@ -497,3 +497,7 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   (~12 ms both, gameplay and lobby views; old chunks measured static), i.e. the grass wasn't this PC's bottleneck.
 - Saved v239. NOT TESTED: phones/low-end GPUs (where the -77% triangles and no EditableMesh copies should matter),
   more than one real player, how the overlay looks at very shallow angles, tree/bush/flower sway (still Blender-only).
+- FAR MESA REMOVED (user 2026-11-12, "doesn't provide anything"): `Sight_FarMesa_*` and its 21 plantings (z > 1000).
+  Build: still built in gnomon_sights.build_horizon (keeps every later random draw identical), then deleted in
+  gnomon.py; its plantings skipped via gnomon_dress.DROPPED. placements.json 213 -> 192; .blend updated. Studio:
+  `design/maps/out/gnomon/upload/studio_drop_mesa.luau` (moves them to HT_MapsArchive.Gnomon_far_mesa_20261112), RUN; checked in Play: no mesa parts, nothing past z 1000; saved v240.

@@ -429,6 +429,12 @@ def tinted(asset):
     return asset.startswith(("Bush_", "Plant_"))
 
 
+# islets left out of the scene, in layout coordinates (centre, radius). USER 2026-11-12: the far mesa (Sight_FarMesa,
+# gnomon_sights.build_horizon) "doesn't provide anything": still built so every random draw after it is unchanged, then
+# its meshes are deleted (gnomon.py) and its plantings skipped here.
+DROPPED = [((-520.0, -1050.0), 260.0)]
+
+
 # extra scenery per islet in its ORIGINAL layout coordinates (pushed out with it): ruins, large rocks, lush clusters
 EXTRAS = [
     # west, the tall pair: an overgrown arch and a column among the trees
@@ -494,6 +500,8 @@ def finish_islands(push, rng):
     for asset, x, y, z, rot, s in EXTRAS:
         raw.append((asset, x, y, z, rot, s))
     for asset, x, y, z, rot, s in raw:
+        if any((x - cx) ** 2 + (y - cy) ** 2 < r * r for (cx, cy), r in DROPPED):
+            continue
         dx, dy, dz = push(x, y, z)
         isle = GG.isle_of(x, y)
         tint = list(GG.ISLES[isle]["bush"]) if isle and tinted(asset) else None
