@@ -545,3 +545,12 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   that would need bone-rigged re-exports).
 - Also bots-1: owner-only Bots button (Studio or group owner) stops/restarts every bot (workspace HT_BotsFrozen).
 - NEXT (user asked): ground-slam ground-break debris should take the colour/texture of the ground it broke.
+
+## slam-1 (2026-11-12): ground-break debris takes the ground's painted colour (user request)
+- `design/maps/ground_colours.py` samples Gnomon's 12 painted floor tiles into a 4-stud colour grid (107 x 88, 55 KB)
+  plus one turf colour per rim/lip/cap part -> `src/shared/Config/GroundColours/Gnomon.luau` (re-run after any floor
+  repaint). FxController.floorLook: a hit on a map with GroundColours (map Model's MapId) gives the grid colour
+  (Meadow_ tiles) or the part's colour, SmoothPlastic, and the floor's HT_GroundDetail texture on slab/chunk tops
+  (Texture HT_Skin per pooled piece). Dust uses the same colour. Plain parts/terrain unchanged.
+- MEASURED in Play via server-fired DiveLanded for a bot: grass hit -> green pieces matching the grid cell, earth patch
+  -> sandy pieces, skin on. Not watched by eye in a real fight.
