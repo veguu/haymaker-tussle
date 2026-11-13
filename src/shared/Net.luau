@@ -47,6 +47,9 @@ export type EventName =
 	| "BodyReset" -- server to a player's client: you've been moved: drop all momentum, face this way, and why
 	| "AfkToggle" -- client to server: switch my AFK (sit out rounds) on or off. No arguments, ever.
 	| "BotsFreezeToggle" -- client to server: stop or restart every bot (inspection; Studio or the place's owner only). No arguments, ever.
+	| "AbilityBuy" -- client to server: buy this ability kit (a kit id string) with Coins
+	| "AbilityEquip" -- client to server: wear this owned ability kit (a kit id string)
+	| "AbilityResult" -- server to client: how your buy or equip went: action, kit id, "ok" or why not
 
 local Net = {}
 

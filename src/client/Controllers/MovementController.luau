@@ -46,7 +46,6 @@ local Lobby = require(ReplicatedStorage.Shared.Core.Lobby)
 local Net = require(ReplicatedStorage.Shared.Net)
 
 local STEP_NAME = "HaymakerMovement"
-local PROPEL_ACTION = "HaymakerPropel"
 local KICK_ACTION = "HaymakerKick"
 local KICK_CLICK_ACTION = "HaymakerKickClick"
 local STEP_PRIORITY = Enum.RenderPriority.Input.Value + 1
@@ -239,12 +238,8 @@ function MovementController:_bind(
 	flat = if flat.Magnitude > 0.001 then flat.Unit else Vector3.new(0, 0, -1)
 	local state = Momentum.new(flat.X, flat.Z)
 	local lean = 0
+	-- The dash goes on the press, always a plain one: there is no charging it (user, 2026-11-12).
 	local propelRequested = false
-	-- Holding the propel key charges it: when the hold began, whether the key is still down, and whether
-	-- the rules have had their say on it yet. The dash goes on release, or at a full charge.
-	local chargeAt: number? = nil
-	local chargeHeld = false
-	local chargeChecked = false
 	local knockGraceUntil = 0
 	local kick: DiveKick.State? = nil
 	local kickTarget: Model? = nil
@@ -292,15 +287,6 @@ function MovementController:_bind(
 		commit = Net.client("KickCommit"),
 		lockOn = Net.client("LockOnState"),
 	}
-
-	-- A charge that was building is dropped, along with what shows it.
-	local function dropCharge()
-		if chargeAt then
-			chargeAt = nil
-			fx:PropelCharge(character, nil)
-		end
-	end
-	trove:Add(dropCharge)
 
 	-- Who you're locked onto, where their body is, if they're close enough for the aim assist to help.
 	local function assistTarget(): BasePart?
@@ -600,7 +586,6 @@ function MovementController:_bind(
 		slammed = false
 		steerX, steerZ, pushX, pushZ, lift = 0, 0, 0, 0, 0
 		punchRequested, propelRequested, kickRequested = false, false, false
-		dropCharge()
 		lastPush = nil
 		lifts, liftUntil, liftSet = AirRecovery.newLifts(), 0, false
 		state = if face and face.Magnitude > 0.01
@@ -661,30 +646,13 @@ function MovementController:_bind(
 		end
 	end
 
-	-- Pressing starts the charge and letting go dashes: a tap is the plain dash, a longer hold a harder
-	-- one, up to PropelChargeSeconds, when it goes by itself.
-	ContextActionService:BindActionAtPriority(
-		PROPEL_ACTION,
-		function(_name: string, inputState: Enum.UserInputState)
-			if inputState == Enum.UserInputState.Begin then
-				propelRequested = true
-				chargeHeld = true
-			elseif
-				inputState == Enum.UserInputState.End
-				or inputState == Enum.UserInputState.Cancel
-			then
-				chargeHeld = false
-			end
-			return Enum.ContextActionResult.Sink
-		end,
-		true,
-		Enum.ContextActionPriority.High.Value,
-		Enum.KeyCode.Q,
-		Enum.KeyCode.ButtonB
-	)
-	ContextActionService:SetTitle(PROPEL_ACTION, "Propel")
+	-- The Dash skill (the Base kit's mobility, Q / B). AbilityController owns the key and calls
+	-- RequestDash; the dash goes on the next step.
+	self._requestDash = function()
+		propelRequested = true
+	end
 	trove:Add(function()
-		ContextActionService:UnbindAction(PROPEL_ACTION)
+		self._requestDash = nil
 	end)
 
 	-- Space: jumps at someone you launched; else, holding punch, the launching kick; else an ordinary jump.
@@ -850,7 +818,6 @@ function MovementController:_bind(
 		-- Hung in the air while someone is attached. The kick's own knock takes over at once.
 		if air == "hold" and now >= knockGraceUntil then
 			kickRequested, propelRequested, punchRequested = false, false, false
-			dropCharge()
 			pushX, pushZ, lift = 0, 0, 0
 			state = Momentum.stopped(state)
 			humanoid.WalkSpeed = 0
@@ -872,7 +839,6 @@ function MovementController:_bind(
 		local clashAt = character:GetAttribute("HT_ClashAt") :: Vector3?
 		if clashAt and now >= knockGraceUntil then
 			kickRequested, propelRequested, punchRequested = false, false, false
-			dropCharge()
 			pushX, pushZ, lift = 0, 0, 0
 			local face = character:GetAttribute("HT_ClashFace") :: Vector3?
 			if face then
@@ -924,7 +890,6 @@ function MovementController:_bind(
 			or character:GetAttribute("HT_Spectating") ~= nil
 		if stunned then
 			kickRequested, propelRequested, punchRequested = false, false, false
-			dropCharge()
 			inputX, inputZ = 0, 0
 			drive, side = "side", 0
 		end
@@ -990,7 +955,6 @@ function MovementController:_bind(
 					and not floating
 					and not stunned
 					and not rooted
-					and not chargeAt
 					and not jumping
 				then
 					local combat = Knit.GetController("CombatController")
@@ -1105,7 +1069,6 @@ function MovementController:_bind(
 		if dive then
 			dive.t += dt
 			propelRequested, punchRequested = false, false
-			dropCharge()
 			pushX, pushZ, lift = 0, 0, 0
 			steerX, steerZ = 0, 0
 			local landed = grounded and dive.t >= DIVE_LAND_SECONDS
@@ -1146,7 +1109,6 @@ function MovementController:_bind(
 				and kickTarget:FindFirstChild("HumanoidRootPart") :: BasePart?
 			local before = kick.phase
 			propelRequested = false -- no propel during the committed jump or the kick
-			dropCharge()
 			punchRequested = false
 			pushX, pushZ, lift = 0, 0, 0
 			-- The jump is a jump, and lasts until you land, whatever happens to anyone else. Once
@@ -1315,37 +1277,18 @@ function MovementController:_bind(
 
 		if propelRequested then
 			propelRequested = false
-			chargeAt = now
-			chargeChecked = false
-		end
-		if chargeAt and not chargeChecked then
-			chargeChecked = true
-			-- Still cooling down, or one already running: turned down at the press, with nothing to charge.
-			if (state.propelCooldownLeft or 0) > 0 or (state.propelLeft or 0) > 0 then
-				chargeAt = nil
+			-- A burst the way you're already going; from a standstill, the way the keys point. Always a
+			-- plain one (power 0): the dash can't be charged.
+			local propelled = Momentum.tryPropel(state, cfg, inputX, inputZ, drive, 0)
+			if not propelled then
 				self.PropelBlocked:Fire()
-			end
-		end
-		if chargeAt then
-			local power = Momentum.chargePower(cfg, now - chargeAt)
-			if chargeHeld and power < 1 then
-				fx:PropelCharge(character, power)
 			else
-				chargeAt = nil
-				fx:PropelCharge(character, nil)
-				-- A burst the way you're already going; from a standstill, the way the keys point.
-				local propelled = Momentum.tryPropel(state, cfg, inputX, inputZ, drive, power)
-				if not propelled then
-					self.PropelBlocked:Fire()
-				end
-				if propelled then
-					state = propelled
-					self.Propelled:Fire()
-					fx:PropelGust(character, state.dashSeconds, power)
-					fx:DashZoom(state.dashSeconds or cfg.PropelSeconds, power)
-					if propelRemote then
-						propelRemote:FireServer(power)
-					end
+				state = propelled
+				self.Propelled:Fire()
+				fx:PropelGust(character, state.dashSeconds, 0)
+				fx:DashZoom(state.dashSeconds or cfg.PropelSeconds, 0)
+				if propelRemote then
+					propelRemote:FireServer(0)
 				end
 			end
 		end
@@ -1404,10 +1347,6 @@ function MovementController:_bind(
 				drive,
 				side
 			)
-			-- Charging a dash roots you to a creep.
-			if chargeAt then
-				state = Momentum.chargeSlow(state, cfg, dt)
-			end
 			if rooted then
 				state = Momentum.rootSlow(state, cfg, dt)
 			end
@@ -1536,6 +1475,16 @@ end
 
 --- A punch has just been thrown. In the air it pushes the body, once. `swing` is Left, Right or
 --- Uppercut; only an uppercut can give the falling lift.
+--- The Dash skill: asks for a dash on the next movement step. False when there's no body to dash with.
+function MovementController:RequestDash(): boolean
+	local request = self._requestDash
+	if request then
+		request()
+		return true
+	end
+	return false
+end
+
 function MovementController:PunchThrown(swing: string?)
 	if self._punchThrown then
 		self._punchThrown(swing)

@@ -605,3 +605,28 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   design/game.json mirrored from GameConfig (KickMeter added, KickText and 13 Kick timing keys removed), and the
   Settings Guide's KickMeter section. If the author's own versions of these turn up, theirs win.
 - NOT VERIFIED: the meter by eye; whether the author had further unsynced changes.
+
+## kits-1 (2026-11-12, spicy; NOT COMMITTED, NOT TRIED BY THE USER YET)
+- ASKED: Q (dash) and R (uppercut) become the Base ability kit, not universal moves; the dash can't be charged;
+  a framework of ability kits (each a mobility skill on Q and an attack skill on R); a menu with the ability
+  inventory, a shop, and placeholder Passes and Settings tabs. User picked: Coins saved in a DataStore,
+  placeholder kits that can be bought and equipped, M to open.
+- NEW: Config/Abilities (the catalogue: Base = Dash + Uppercut, free; Tempest 300, Bruiser 500, Trickster 750,
+  all four skills each `built = false`; StarterCoins 1000 as a test balance), Core/AbilityKit (pure rules, tests/
+  AbilityKit.spec, 9 tests), PlayerDataService (DataStore HT_PlayerData_v1, session lock with a 90 s lease, 30 s
+  autosave, BindToClose; no access -> plays on an unsaved profile, HT_DataTemp), AbilityService (AbilityBuy /
+  AbilityEquip / AbilityResult remotes, validated, rate limited, no equip in a round; HasSkill), AbilityController
+  (owns Q/B and R/L2, sends a press to the equipped kit's skill handler; placeholders say "not built yet"),
+  MenuController (M or the left-edge Menu button; X, outside click or gamepad B while open closes it).
+- CHANGED: MovementController (charge removed: the dash goes on the press at power 0, no charge slow; the Q
+  binding moved out, RequestDash in), CombatController (R binding moved out, ThrowUppercut in), CombatService
+  (UppercutRequest refused unless the kit has Uppercut), PropelService (no broadcast unless the kit has Dash),
+  HudController (Q/R rows named after the kit's skills; a placeholder skill shows unavailable), HudTheme.Menu, Net.
+- KEPT, UNUSED: Momentum's charge functions and their tests, the PropelCharge effect, Movement.PropelCharge*.
+- MEASURED in Play (Studio, no DataStore access): data falls back to unsaved at once (1000 Coins, Base); M opens
+  the menu; buying Tempest 1000 -> 700, card says Owned, toast; equipping it renames the HUD rows Blink/Cyclone
+  and Q shows "Blink isn't built yet"; a hand-fired UppercutRequest with Tempest on started no swing; back on Base,
+  a Q tap reached 80.8 studs/s and R threw an uppercut the server started. No script errors.
+- NOT TESTED: real saving (place has no Studio API access; needs a published server or API access on), a lock
+  held by a second server, touch and gamepad menus, the shift-lock cursor while the menu is open, phone size.
+- NOTHING EARNS COINS YET: rounds paying out would touch RoundService (the other dev's): ask first.

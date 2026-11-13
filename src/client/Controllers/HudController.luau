@@ -338,6 +338,7 @@ function HudController:KnitStart()
 	local playerGui = player:WaitForChild("PlayerGui")
 	local movement = Knit.GetController("MovementController")
 	local combat = Knit.GetController("CombatController")
+	local ability = Knit.GetController("AbilityController")
 	local lockOn = Knit.GetController("LockOnController")
 	local kickPrompt = Knit.GetController("KickPromptController")
 	local hud = movement.Hud
@@ -486,6 +487,14 @@ function HudController:KnitStart()
 	for index, action in HudTheme.Actions do
 		rows[action.id] = makeRow(actions.fade, action, index)
 	end
+	-- The Q and R rows are the equipped kit's two skills: their names follow the kit. (The rows keep
+	-- the ids "propel" and "uppercut", the Base kit's skills, for their icons.)
+	local function kitRows()
+		rows.propel.name.Text = ability:GetSkill("mobility").name
+		rows.uppercut.name.Text = ability:GetSkill("attack").name
+	end
+	ability.KitChanged:Connect(kitRows)
+	kitRows()
 
 	-- The help chip, just above the actions, and the full guide it opens above itself.
 	local help = make("Frame", gui, {
@@ -1075,12 +1084,15 @@ function HudController:KnitStart()
 				or model:GetAttribute("HT_Clash") ~= nil
 			local punchReady, punchTotal, canPunch = combat:GetPunchTiming()
 			local upperReady, upperTotal, canUpper = combat:GetUppercutTiming()
+			-- A kit skill that isn't the Base one has no timing yet: shown as unavailable.
+			local hasDash = ability:GetSkill("mobility").id == "Dash"
+			local hasUpper = ability:GetSkill("attack").id == "Uppercut"
 			local timings = {
 				punch = { readyAt = punchReady, total = punchTotal, usable = canPunch },
 				propel = {
-					readyAt = now + hud.propelLeft,
+					readyAt = if hasDash then now + hud.propelLeft else 0,
 					total = moveCfg.PropelCooldown,
-					usable = not blocked,
+					usable = hasDash and not blocked,
 				},
 				-- Space: the air kick while there's someone to follow up (or one is under way), else the jump.
 				kick = if hud.kickTarget or hud.kicking
@@ -1091,9 +1103,9 @@ function HudController:KnitStart()
 						usable = not blocked,
 					},
 				uppercut = {
-					readyAt = upperReady,
+					readyAt = if hasUpper then upperReady else 0,
 					total = upperTotal,
-					usable = canUpper,
+					usable = hasUpper and canUpper,
 				},
 			}
 			for _, action in HudTheme.Actions do

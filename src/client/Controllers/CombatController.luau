@@ -22,7 +22,6 @@ local Net = require(ReplicatedStorage.Shared.Net)
 
 local punchCfg = GameConfig.Punch
 local ACTION = "HaymakerPunch"
-local UPPERCUT_ACTION = "HaymakerUppercut"
 local kickCfg = GameConfig.HeavyKick
 local upperCfg = GameConfig.Uppercut
 local COMBATANT_TAG = "HT_Combatant"
@@ -280,19 +279,10 @@ function CombatController:KnitStart()
 			upperCfg.Cooldown,
 			canPunch(player.Character)
 	end
-	ContextActionService:BindAction(
-		UPPERCUT_ACTION,
-		function(_name: string, inputState: Enum.UserInputState)
-			if inputState == Enum.UserInputState.Begin then
-				throwHeavy("Uppercut")
-			end
-			return Enum.ContextActionResult.Pass
-		end,
-		true,
-		Enum.KeyCode.R,
-		Enum.KeyCode.ButtonL2
-	)
-	ContextActionService:SetTitle(UPPERCUT_ACTION, "Upper")
+	-- The Uppercut skill (the Base kit's attack, R / L2). AbilityController owns the key.
+	self._throwUppercut = function(): boolean
+		return throwHeavy("Uppercut")
+	end
 
 	-- Anything that could swallow the release lets go: the window losing focus, and a new body.
 	UserInputService.WindowFocusReleased:Connect(function()
@@ -466,6 +456,14 @@ function CombatController:GetUppercutTiming(): (number, number, boolean)
 		return self._uppercutTiming()
 	end
 	return 0, upperCfg.Cooldown, true
+end
+
+--- The Uppercut skill: throws the heavy uppercut if it can. False when it was turned down.
+function CombatController:ThrowUppercut(): boolean
+	if self._throwUppercut then
+		return self._throwUppercut()
+	end
+	return false
 end
 
 --- Is the punch button being held (a punch drawn back, or waiting to be)?

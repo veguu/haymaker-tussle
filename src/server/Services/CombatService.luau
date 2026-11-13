@@ -858,6 +858,11 @@ function CombatService:KnitStart()
 		heavy("Kick", player, ...)
 	end)
 	self._uppercutRequest.OnServerEvent:Connect(function(player: Player, ...)
+		-- The uppercut is the Base kit's attack skill: only someone wearing a kit with it can throw it.
+		if not Knit.GetService("AbilityService"):HasSkill(player, "Uppercut") then
+			trace(`{player.Name} refused: no Uppercut in their kit`)
+			return
+		end
 		heavy("Uppercut", player, ...)
 	end)
 

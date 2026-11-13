@@ -2,7 +2,8 @@
 -- PropelService - tells other players that someone propelled, so they see and hear it. The
 -- propel itself runs on the player's own client. The request carries at most one thing: how charged
 -- the dash was, 0 to 1. It only picks the colour and strength of the effect others see, and anything
--- that isn't a plain number in that range is treated as a tap. The server's own cooldown stops a
+-- that isn't a plain number in that range is treated as a tap. Since 2026-11-12 the dash can't be
+-- charged and the client always sends 0. It's the Base kit's mobility skill (AbilityService). The server's own cooldown stops a
 -- client spamming everyone's effects.
 
 local Players = game:GetService("Players")
@@ -57,6 +58,10 @@ function PropelService:KnitStart()
 		end
 		local character = player.Character
 		if not character or not Combatants.isAlive(character) then
+			return
+		end
+		-- The dash is the Base kit's mobility skill: no one else's is shown.
+		if not Knit.GetService("AbilityService"):HasSkill(player, "Dash") then
 			return
 		end
 		lastPropel[player] = now

@@ -242,4 +242,26 @@ HudTheme.BotsFreeze = {
 	Corner = 6,
 }
 
+-- The menu (M, or the Menu button at the left edge): ability inventory, shop, passes, settings.
+-- The panel takes most of a phone screen and stops growing at MaxWidth x MaxHeight.
+HudTheme.Menu = {
+	ButtonWidth = 132,
+	ButtonHeight = 52,
+	Corner = 8,
+	MaxWidth = 780,
+	MaxHeight = 500,
+	ScreenShare = Vector2.new(0.92, 0.86), -- of the screen, before MaxWidth/MaxHeight
+	Header = 48,
+	Rail = 150, -- the tab column
+	Tab = 44, -- tab and button height: the touch-target minimum
+	Gap = 8,
+	Pad = 14,
+	CardButton = 136,
+	Coin = Color3.fromRGB(255, 196, 61),
+	Good = Color3.fromRGB(120, 220, 140),
+	Backdrop = 0.45,
+	Open = 0.16,
+	Toast = 2.4, -- seconds a notice stays
+}
+
 return HudTheme
