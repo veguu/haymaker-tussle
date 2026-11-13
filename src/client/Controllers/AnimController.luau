@@ -356,6 +356,29 @@ local function updateFighter(model: Model, dt: number)
 	local now = os.clock()
 	local velocity = root.AssemblyLinearVelocity
 	local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+	-- A held punch follows how you're moving NOW, not how you were when you pressed. The standing clip poses
+	-- the legs and torso too (a planted stance), and it waits frozen above the run's priority, so held while
+	-- you then ran it pinned the legs still. Once the hold has settled, moving swaps it for the arms-and-head
+	-- variant (the run moves the legs) and stopping swaps it back, cross-faded at the same drawn-back pose.
+	if heldTrack and holdAt and heldTrack.IsPlaying and heldTrack.Speed == 0 then
+		local name = fighter.heldSwing :: string
+		local base = if string.sub(name, -3) == "Run" then string.sub(name, 1, -4) else name
+		local want = name
+		if speed >= cfg.HoldMoveSpeed then
+			want = `{base}Run`
+		elseif speed <= cfg.HoldStandSpeed then
+			want = base
+		end
+		local other = fighter.tracks[want]
+		local otherHold = other and (AnimClips :: any)[want].hold
+		if want ~= name and other and otherHold then
+			other:Play(cfg.HoldSwapFade, 1, 0)
+			other.TimePosition = otherHold
+			heldTrack:Stop(cfg.HoldSwapFade)
+			fighter.heldSwing = want
+			fighter.swingName = want
+		end
+	end
 	local state = humanoid:GetState()
 	local grounded = state ~= Enum.HumanoidStateType.Freefall
 		and state ~= Enum.HumanoidStateType.FallingDown

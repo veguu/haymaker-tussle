@@ -571,3 +571,21 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   show for group rank 254+ (the user is rank 254, not the 255 owner) - DummyService.mayFreeze.
 - PHONE TEST (user, published, iPhone 16 or 17): "it's good" - lobby and a bot-filled round. No numbers reported.
   Still untested: low-end/older Android, graphics level 1.
+
+## anim-1 (2026-11-12): legs froze while holding M1 and running (user's big brief, piece 1 of 5)
+- THE BRIEF (user, 2026-11-12, one piece at a time): 1 this fix; 2+3 kick timing meter redesigned as a horizontal
+  red-orange-yellow-GREEN-yellow-orange-red bar, score = distance from centre, whole bar animates in/out (options
+  E1 X1 C1 F1 M1); 4 lobby: study Blade Ball + 2 others, three concepts, pick and build one without asking; 5 cyan
+  hexagon barrier drifting up-right with a separate upward sweep and a player-centred glow the hexes move THROUGH
+  (D1 R1); 6 all settings central; 7 test + summary. Reference images were pasted in chat (not saved to disk).
+- CAUSE: HoldSwing picked the clip once, from the speed at the press. Below RunVariantSpeed (18) that is the
+  standing HookLeft/HookRight, which keys legs + torso at Action2 and then waits FROZEN (speed 0) at its hold point,
+  above Sprint (Movement) and the stock walk (Core). Run after pressing and the frozen clip pinned the legs.
+  MEASURED before: held + running, Left Hip swing 0 deg (115 free).
+- FIX (AnimController.updateFighter): once the hold has settled, the held clip follows current speed: >=
+  Animation.HoldMoveSpeed (3) -> the arms-and-head `...Run` variant, <= HoldStandSpeed (1.5) -> the standing one,
+  cross-faded over HoldSwapFade (0.12) at the same hold pose; heldSwing/swingName updated so release and cancel act
+  on the live track. Applies to every fighter (others via HT_PunchReady). Controls, speeds, combat untouched.
+- MEASURED after (real key + mouse input in Play): held + run 117 deg, held + walk 101 deg; stop -> back to the
+  standing clip; release, 4 quick clicks, S->A direction change, jump + land, respawn then hold + run: legs move,
+  no Hook/Uppercut/Kick track left playing. NOT TESTED: by eye, a hold dropped by a stun or clash, gamepad, touch.
