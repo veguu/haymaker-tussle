@@ -11,6 +11,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
+local KickMeter = require(ReplicatedStorage.Shared.Core.KickMeter)
 local TrainingLayout = require(ReplicatedStorage.Shared.Core.TrainingLayout)
 local Net = require(ReplicatedStorage.Shared.Net)
 local TrainingPanel = require(script.Parent.Parent.Ui.TrainingPanel)
@@ -148,7 +149,17 @@ function TrainingController:KnitStart()
 		watching = character:GetAttributeChangedSignal("HT_KickGrade"):Connect(function()
 			local grade = character:GetAttribute("HT_KickGrade")
 			if grade then
-				panel:Set("Kick", string.upper(tostring(grade)))
+				-- the meter's named result and how close to the middle it was
+				local score = character:GetAttribute("HT_KickScore")
+				local text = string.upper(tostring(grade))
+				if typeof(score) == "Vector3" then
+					text = if score.Z < 0.5
+						then "TOO LATE"
+						else `{string.upper(KickMeter.tierAt(score.Z))} {math.floor(
+							KickMeter.accuracy(score.X) * 100 + 0.5
+						)}%`
+				end
+				panel:Set("Kick", text)
 			end
 		end)
 	end

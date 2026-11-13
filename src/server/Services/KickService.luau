@@ -44,22 +44,27 @@ local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local DiveKick = require(ReplicatedStorage.Shared.Core.DiveKick)
+local KickMeter = require(ReplicatedStorage.Shared.Core.KickMeter)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Combatants = require(script.Parent.Parent.Combatants)
 
 local cfg = GameConfig.Kick
 local staggerCfg = GameConfig.Stagger
+local meterCfg = GameConfig.KickMeter
 local SKILL_ATTRIBUTE = "HT_Skill"
 local AIR_ATTRIBUTE = "HT_Air"
 local AIR_BY_ATTRIBUTE = "HT_AirBy" -- the launcher's user id, or 0 for a server-run fighter
 local FACE_ATTRIBUTE = "HT_HoldFace" -- which way a held body turns, to face whoever locked on
-local QTE_ATTRIBUTE = "HT_KickAt" -- seconds after touching that this jump's ring meets the key
+local METER_ATTRIBUTE = "HT_KickMeter" -- this jump's timing marker: Vector3(start position, first direction, 0)
+-- The recorded timing, set just before the grade: Vector3(marker position -1..1, quality 0..1, tier 1 poor to
+-- 4 perfect, or 0 when the meter ran out with no press).
+local SCORE_ATTRIBUTE = "HT_KickScore"
 local STUN_ATTRIBUTE = "HT_Stunned"
-local GRADE_ATTRIBUTE = "HT_KickGrade" -- red, orange or green, once the kick's timing is known
+local GRADE_ATTRIBUTE = "HT_KickGrade" -- red (poor), orange (okay, good) or green (perfect): the all-or-nothing parts
 local HOLD_UNTIL_ATTRIBUTE = "HT_HoldUntil" -- server time a hold ends by, whatever else happens
 local FACE_EVERY = 0.1 -- how often a held body turns to follow whoever is aiming around it
 local CLOCK_TOLERANCE = 0.3 -- forgives honest lag between the client's clock and ours
-local RING_RUN_OUT_LAG = 0.06 -- an unpressed ring waits this much longer, for a press on its way
+local RING_RUN_OUT_LAG = 0.06 -- an unpressed meter waits this much longer, for a press on its way
 local FLOOR_CONTACT_STUDS = 4.5 -- a body's centre this close to the floor has hit it
 local RANGE_TOLERANCE = 8 -- forgives both bodies being slightly old on the server
 -- A jumper's own client is ahead of what the server sees, and it sees the target a moment late, so
@@ -89,9 +94,10 @@ type Record = {
 	heldAt: number,
 	snap: boolean, -- the locked-on follow-up: held and snapped to. Otherwise a free jump they steer.
 	startGap: number,
-	qteAt: number,
+	meter: KickMeter.Plan,
 	facedAt: number,
 	grade: DiveKick.Grade,
+	quality: number, -- 0 to 1 from the meter (KickMeter.quality): what the kick's force, stop and rebound scale by
 	stopUntil: number,
 	aim: Vector3?, -- from the target toward where the kicker's cursor pointed at the press, unit length
 }
@@ -155,7 +161,8 @@ local function finish(player: Player)
 	local record = active[player]
 	if record then
 		record.character:SetAttribute(SKILL_ATTRIBUTE, nil)
-		record.character:SetAttribute(QTE_ATTRIBUTE, nil)
+		record.character:SetAttribute(METER_ATTRIBUTE, nil)
+		record.character:SetAttribute(SCORE_ATTRIBUTE, nil)
 		record.character:SetAttribute(GRADE_ATTRIBUTE, nil)
 		if record.held then
 			-- Let go without a kick: they carry on falling.
@@ -468,7 +475,7 @@ function KickService:_impact(player: Player, record: Record)
 		return
 	end
 	local finisher = (cfg.FinisherGrades :: { [string]: boolean })[record.grade] == true
-	local share = DiveKick.gradeShare(cfg, record.grade)
+	local share = KickMeter.strength(meterCfg, record.quality)
 	local stagger = Knit.GetService("StaggerService")
 	local before = stagger:Get(target)
 	local push = Combat.punchStrength(GameConfig.Knockback, staggerCfg, 0, before) * share
@@ -478,7 +485,7 @@ function KickService:_impact(player: Player, record: Record)
 	stagger:AddAmount(target, math.floor(cfg.StaggerAdded * share + 0.5))
 	Knit.GetService("CombatService"):MarkHit(target)
 
-	local stop = DiveKick.gradeStop(cfg, record.grade)
+	local stop = KickMeter.stop(meterCfg, record.quality)
 	setPhase(record, "kick")
 	record.held = false
 	record.stopUntil = os.clock() + stop
@@ -687,11 +694,26 @@ function KickService:_impact(player: Player, record: Record)
 	end)
 end
 
--- The timing is settled: the flip starts, and the kick is coming whatever the result.
-local function beginFlip(record: Record, grade: DiveKick.Grade)
-	record.grade = grade
-	record.character:SetAttribute(GRADE_ATTRIBUTE, grade)
+-- The timing is settled: the flip starts, and the kick is coming whatever the result. `position` is where
+-- the marker was at the press (-1 to 1), or nil when the meter ran out: the weakest kick.
+local GRADE_OF: { [KickMeter.Tier]: DiveKick.Grade } =
+	{ perfect = "green", good = "orange", okay = "orange", poor = "red" }
+local function beginFlip(record: Record, position: number?): KickMeter.Tier
+	local accuracy = if position then KickMeter.accuracy(position) else 0
+	local tier = KickMeter.tier(meterCfg, accuracy)
+	record.quality = KickMeter.quality(meterCfg, accuracy)
+	record.grade = GRADE_OF[tier]
+	record.character:SetAttribute(
+		SCORE_ATTRIBUTE,
+		Vector3.new(
+			position or KickMeter.position(meterCfg, record.meter, KickMeter.endsAt(meterCfg)),
+			record.quality,
+			if position then KickMeter.tierIndex(tier) else 0
+		)
+	)
+	record.character:SetAttribute(GRADE_ATTRIBUTE, record.grade)
 	setPhase(record, "flip")
+	return tier
 end
 
 -- Is anything solid between these two points? Fighters and anything that doesn't collide don't count.
@@ -823,13 +845,17 @@ function KickService:KnitStart()
 			heldAt = now,
 			snap = snap,
 			startGap = (targetRoot.Position - root.Position).Magnitude,
-			qteAt = DiveKick.pickQte(cfg, math.random()),
+			meter = KickMeter.plan(meterCfg, math.random(), math.random()),
 			facedAt = 0,
 			grade = "red",
+			quality = 0,
 			stopUntil = 0,
 		}
 		trace(`{player.Name} follows up {target.Name} from {math.floor(record.startGap)} studs`)
-		character:SetAttribute(QTE_ATTRIBUTE, record.qteAt)
+		character:SetAttribute(
+			METER_ATTRIBUTE,
+			Vector3.new(record.meter.start, record.meter.dir, 0)
+		)
 		active[player] = record
 		-- Locked on: held from now, so they can't move out of the snap. A held target is nobody else's
 		-- to take. Not locked on: nothing is held, and the jumper has to get there on their own arc.
@@ -925,14 +951,15 @@ function KickService:KnitStart()
 		end
 		-- Both messages are delayed by the same trip, so the gap between them is the real timing.
 		local since = os.clock() - record.phaseAt
-		local grade = DiveKick.grade(cfg, since, record.qteAt)
+		-- Where the marker was then, by OUR clock: the client can't claim a better spot.
+		local position = KickMeter.pressedAt(meterCfg, record.meter, since)
+		local tier = beginFlip(record, position)
 		trace(
-			`{player.Name} pressed {string.format("%.2f", since)} s after touching, wanted {string.format(
+			`{player.Name} pressed {string.format("%.2f", since)} s after touching, marker at {string.format(
 				"%.2f",
-				record.qteAt
-			)}: {grade}`
+				position
+			)}: {tier}, quality {string.format("%.2f", record.quality)}`
 		)
-		beginFlip(record, grade)
 	end)
 
 	RunService.Heartbeat:Connect(function()
@@ -1005,9 +1032,9 @@ function KickService:KnitStart()
 					)
 			elseif record.phase == "attach" then
 				over = over or launched[record.target] == nil
-				if waited >= DiveKick.ringEnd(cfg, record.qteAt) + RING_RUN_OUT_LAG then
-					trace(`{player.Name} never pressed: red`)
-					beginFlip(record, "red")
+				if waited >= KickMeter.endsAt(meterCfg) + RING_RUN_OUT_LAG then
+					trace(`{player.Name} never pressed: the weakest kick`)
+					beginFlip(record, nil)
 				end
 				local targetRoot = Combatants.rootOf(record.target)
 				if root and targetRoot and now - record.facedAt >= FACE_EVERY then

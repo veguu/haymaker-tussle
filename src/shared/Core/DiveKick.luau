@@ -80,20 +80,7 @@ export type Settings = {
 	FlipAbove: number,
 	FlipSide: number,
 	FollowRate: number,
-	QteEarliest: number,
-	QteLatest: number,
-	GreenWindow: number,
-	OrangeWindow: number,
-	RedShare: number,
-	OrangeShare: number,
-	GreenShare: number,
-	RedStop: number,
-	OrangeStop: number,
-	GreenStop: number,
 	FlipSeconds: number,
-	ReboundRiseRed: number,
-	ReboundRiseOrange: number,
-	ReboundRiseGreen: number,
 	ReboundLandNear: number,
 	ReboundLandFar: number,
 	ReboundSpeedMax: number,
@@ -146,7 +133,7 @@ export type State = {
 	steerZ: number,
 	sideX: number,
 	sideZ: number,
-	qteAt: number,
+	cueEnd: number, -- seconds after touching at which an unpressed timing meter gives up (KickMeter.endsAt)
 	missAt: number,
 	-- The snap's length in seconds, while it runs.
 	approach: number?,
@@ -155,7 +142,6 @@ export type State = {
 }
 
 local FLIP_GRACE = 0.5 -- how long a flip waits for the server before giving up
-local RING_RUN_OUT = 0.04 -- how long after the last usable moment an unpressed ring gives up
 local SNAP_MIN_REMAINING = 1 / 30 -- the snap never aims to close the gap faster than this
 
 --- How a follow-up candidate scores: lower is better, nil if out of range (FollowUpOwnRange for your own
@@ -353,23 +339,6 @@ function DiveKick.launchSteerShare(cfg: Settings, stagger: number, staggerMax: n
 	return 1 - cfg.LaunchSteerStaggerLoss * math.clamp(stagger / staggerMax, 0, 1)
 end
 
---- When the ring meets the key, in seconds after touching. `roll` is a random 0 to 1.
-function DiveKick.pickQte(cfg: Settings, roll: number): number
-	return cfg.QteEarliest + (cfg.QteLatest - cfg.QteEarliest) * math.clamp(roll, 0, 1)
-end
-
---- How good a press was. `since` is seconds from touching to pressing. The server calls this with
---- its own clock, so a client can't claim a good press.
-function DiveKick.grade(cfg: Settings, since: number, qteAt: number): Grade
-	local off = math.abs(since - qteAt)
-	if off <= cfg.GreenWindow then
-		return "green"
-	elseif off <= cfg.OrangeWindow then
-		return "orange"
-	end
-	return "red"
-end
-
 --- A direction a client sent, made safe: flat, and exactly one stud long. Nil for anything that isn't a
 --- usable direction (not finite, or too short to point anywhere).
 function DiveKick.aimDirection(x: number, z: number): (number?, number?)
@@ -428,31 +397,6 @@ function DiveKick.aimWay(x: number, y: number, z: number): (number?, number?, nu
 	return x / size, y / size, z / size
 end
 
---- How much of the kick's full force this grade gets, for the outward push, the slam and stagger.
-function DiveKick.gradeShare(cfg: Settings, grade: Grade): number
-	if grade == "green" then
-		return cfg.GreenShare
-	elseif grade == "orange" then
-		return cfg.OrangeShare
-	end
-	return cfg.RedShare
-end
-
---- How long both are frozen when this grade lands. A bigger kick stops the world for longer.
-function DiveKick.gradeStop(cfg: Settings, grade: Grade): number
-	if grade == "green" then
-		return cfg.GreenStop
-	elseif grade == "orange" then
-		return cfg.OrangeStop
-	end
-	return cfg.RedStop
-end
-
---- How long an unpressed ring lasts before the kick goes anyway, as a red.
-function DiveKick.ringEnd(cfg: Settings, qteAt: number): number
-	return qteAt + cfg.OrangeWindow + RING_RUN_OUT
-end
-
 --- Space: down into the squat, feet still on the floor.
 function DiveKick.start(): State
 	return {
@@ -465,7 +409,7 @@ function DiveKick.start(): State
 		steerZ = 0,
 		sideX = 0,
 		sideZ = 1,
-		qteAt = 0,
+		cueEnd = 0,
 		missAt = math.huge,
 	}
 end
@@ -541,14 +485,14 @@ end
 
 --- Close enough. `dx`, `dz` is the flat offset from the target to the jumper: you align on the side
 --- you arrived on, so the way the kick will send them is the way you came.
-function DiveKick.attach(state: State, dx: number, dz: number, qteAt: number): State
+function DiveKick.attach(state: State, dx: number, dz: number, cueEnd: number): State
 	if state.phase ~= "chase" then
 		return state
 	end
 	local nextState = table.clone(state)
 	nextState.phase = "attach"
 	nextState.t = 0
-	nextState.qteAt = qteAt
+	nextState.cueEnd = cueEnd
 	local size = math.sqrt(dx * dx + dz * dz)
 	if size > 0.01 then
 		nextState.sideX, nextState.sideZ = dx / size, dz / size
@@ -616,7 +560,7 @@ function DiveKick.step(
 			)
 		end
 	elseif state.phase == "attach" then
-		if nextState.t >= DiveKick.ringEnd(cfg, state.qteAt) then
+		if nextState.t >= state.cueEnd then
 			return DiveKick.press(state)
 		end
 		nextState.sideX, nextState.sideZ =
@@ -697,16 +641,18 @@ function DiveKick.velocity(
 	return nil, nil, nil
 end
 
---- Where a kick throws you, worked out once as it connects. Only the height depends on the grade. The
+--- Where a kick throws you, worked out once as it connects. Only the height depends on the timing (`rise`,
+--- studs, from KickMeter.rise: it scales smoothly with how close to the middle the press was). The
 --- flat speed is a propel's and holds until you land, so a higher arc carries you further.
 --- Nothing throws you past the far side of the platform. A green also can't fall short, however far out
 --- you are: it speeds up to reach, and if backward doesn't lead to the platform at all it goes there
 --- instead. Red and orange get what their arc gives them.
-function DiveKick.planRebound(cfg: Settings, grade: Grade, at: ReboundFrom): ReboundPlan
-	local rise = if grade == "green"
-		then cfg.ReboundRiseGreen
-		elseif grade == "orange" then cfg.ReboundRiseOrange
-		else cfg.ReboundRiseRed
+function DiveKick.planRebound(
+	cfg: Settings,
+	grade: Grade,
+	at: ReboundFrom,
+	rise: number
+): ReboundPlan
 	local gravity = at.gravity
 	local up = math.sqrt(2 * gravity * rise)
 	local air = if at.fallTime

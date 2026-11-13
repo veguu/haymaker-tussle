@@ -37,6 +37,7 @@ local Clash = require(ReplicatedStorage.Shared.Core.Clash)
 local BumpPredict = require(ReplicatedStorage.Shared.BumpPredict)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local DiveKick = require(ReplicatedStorage.Shared.Core.DiveKick)
+local KickMeter = require(ReplicatedStorage.Shared.Core.KickMeter)
 local AimAssist = require(ReplicatedStorage.Shared.Core.AimAssist)
 local Jump = require(ReplicatedStorage.Shared.Core.Jump)
 local Momentum = require(ReplicatedStorage.Shared.Core.Momentum)
@@ -57,6 +58,7 @@ local UNDO_SECONDS = 1 -- a refused punch's push is taken back only if the answe
 
 local cfg = GameConfig.Movement
 local kickCfg = GameConfig.Kick
+local meterCfg = GameConfig.KickMeter
 local airCfg = GameConfig.AirRecovery
 local jumpCfg = GameConfig.Jump
 local diveCfg = GameConfig.Dive
@@ -469,6 +471,12 @@ function MovementController:_bind(
 							at.X,
 							at.Z
 						)
+					-- how high the kick throws you back scales with the timing the server recorded
+					local score = character:GetAttribute("HT_KickScore")
+					local kickRise = KickMeter.rise(
+						meterCfg :: any,
+						if typeof(score) == "Vector3" then score.Y else 0
+					)
 					local plan = DiveKick.planRebound(
 						kickCfg,
 						character:GetAttribute("HT_KickGrade") or "red",
@@ -494,7 +502,8 @@ function MovementController:_bind(
 									height
 								)
 							end,
-						}
+						},
+						kickRise
 					)
 					kick = nil
 					kickTarget = nil
@@ -1005,7 +1014,8 @@ function MovementController:_bind(
 					end
 				end
 			end
-		elseif timedPress and kick.phase == "attach" then
+		elseif timedPress and kick.phase == "attach" and prompt:MeterLive() then
+			-- (a press before the bar has settled doesn't count: the timing starts when it's readable)
 			if kickRemotes.commit then
 				local aimAt = kickTarget and kickTarget:FindFirstChild("HumanoidRootPart")
 				kickRemotes.commit:FireServer(
@@ -1014,7 +1024,8 @@ function MovementController:_bind(
 			end
 			kick = DiveKick.press(kick)
 			kickAwaiting = true
-			prompt:Hide()
+			-- the marker stops where it is at once; the bar then shows what the server recorded
+			prompt:FreezeMeter()
 		end
 
 		-- The server grades the timing. Only its answer shows, so both sides always agree.
@@ -1022,7 +1033,7 @@ function MovementController:_bind(
 			local skill = character:GetAttribute("HT_Skill")
 			if skill == "flip" or skill == "kick" then
 				kickAwaiting = false
-				prompt:ShowResult(character:GetAttribute("HT_KickGrade") or "red")
+				prompt:ShowScore(character:GetAttribute("HT_KickScore"))
 			elseif skill == nil then
 				endKick()
 			end
@@ -1071,12 +1082,11 @@ function MovementController:_bind(
 				local targetRoot = kickTarget:FindFirstChild("HumanoidRootPart") :: BasePart?
 				local offset = if targetRoot then root.Position - targetRoot.Position else nil
 				if offset and DiveKick.isTouching(kickCfg, offset.X, offset.Y, offset.Z) then
-					local qteAt = character:GetAttribute("HT_KickAt") :: number?
 					kick = DiveKick.attach(
 						DiveKick.spring(DiveKick.start(), 0, 0, 0),
 						offset.X,
 						offset.Z,
-						qteAt or DiveKick.pickQte(kickCfg, 0.5)
+						KickMeter.endsAt(meterCfg :: any)
 					)
 					airRun = nil
 					state = Momentum.stopped(state)
@@ -1183,9 +1193,9 @@ function MovementController:_bind(
 						else guidedJump(nextKick, targetRoot)
 				end
 				if before == "attach" and nextKick.phase == "flip" then
-					-- The ring ran out with no press. The kick still comes, as a red.
+					-- The meter ran out with no press. The kick still comes, at its weakest.
 					kickAwaiting = true
-					prompt:Hide()
+					prompt:FreezeMeter()
 				end
 				local position = root.Position
 				-- The server holds them from the moment it accepts, so "hold" is the usual case here.
@@ -1198,12 +1208,11 @@ function MovementController:_bind(
 				then
 					local offset = position - targetRoot.Position
 					if DiveKick.isTouching(kickCfg, offset.X, offset.Y, offset.Z) then
-						local qteAt = character:GetAttribute("HT_KickAt") :: number?
 						nextKick = DiveKick.attach(
 							nextKick,
 							offset.X,
 							offset.Z,
-							qteAt or DiveKick.pickQte(kickCfg, 0.5)
+							KickMeter.endsAt(meterCfg :: any)
 						)
 						if kickRemotes.attach then
 							kickRemotes.attach:FireServer()
@@ -1212,7 +1221,12 @@ function MovementController:_bind(
 				end
 				kick = nextKick
 				if nextKick.phase == "attach" then
-					prompt:UpdateAttach(nextKick.t, nextKick.qteAt)
+					-- this kick's marker, as the server rolled it (a centre start only if it hasn't arrived)
+					local rolled = character:GetAttribute("HT_KickMeter")
+					local plan = if typeof(rolled) == "Vector3"
+						then KickMeter.readPlan(rolled.X, rolled.Y)
+						else nil
+					prompt:UpdateMeter(nextKick.t, plan or { start = -1, dir = 1 })
 				end
 				local at = if targetRoot then targetRoot.Position else position
 				local moving = if targetRoot
