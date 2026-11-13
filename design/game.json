@@ -773,7 +773,7 @@
    "Passes": 2,
    "StartSpanMin": 0.7,
    "AccelPerSecond": 0.3,
-   "PressLagSeconds": 0.03,
+   "PressLagSeconds": 0.045,
    "PerfectAccuracy": 0.85,
    "GoodAccuracy": 0.6,
    "OkayAccuracy": 0.3,

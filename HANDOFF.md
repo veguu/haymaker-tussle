@@ -630,3 +630,15 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
 - NOT TESTED: real saving (place has no Studio API access; needs a published server or API access on), a lock
   held by a second server, touch and gamepad menus, the shift-lock cursor while the menu is open, phone size.
 - NOTHING EARNS COINS YET: rounds paying out would touch RoundService (the other dev's): ask first.
+
+## kits-1b (2026-11-13): meter press-lag 0.045, and a merge note
+- KickMeter.PressLagSeconds 0.03 -> 0.045 (measured 38-54 ms between the picture pressed on and the server's clock).
+- MERGE NOTE: spicy snapshotted meter-1 from Studio (f7b4fd7, 557d624) and built kits-1 (91cca15) on top while the
+  meter was still uncommitted locally. Local copy was identical apart from the lag value; took origin/main and
+  re-applied only that. For ~1 minute Studio held the pre-kits scripts (a push from the stale local copy); re-pushed
+  from the merged tree (144 instances, PASS) before any save. Lesson: `git fetch` and compare BEFORE every Rojo push,
+  not only `git pull` (a refused pull must stop the push).
+- The user confirmed the meter works and that "keep you in the air" during the timing bar is no longer a problem.
+- NEXT from the user's brief: piece 5 the hexagon barrier (cyan, ~90% transparent, hexes drift up-right D1, separate
+  upward sweep, player-centred glow the hexes move THROUGH, R1 ripple), then piece 4 the lobby (study Blade Ball + 2
+  others, three concepts, pick and build without asking), then piece 7 the final test + summary. Settings central.

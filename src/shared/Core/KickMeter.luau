@@ -21,7 +21,7 @@ export type Settings = {
 	StartSpanMin: number, -- the marker starts this far from the middle at least (0 to 1), up to an end
 	AccelPerSecond: number, -- M3: how much faster it gets each second (0.3 = 30%)
 	-- The server takes this much off the time it measured for a press: a press reaches it about a frame and a
-	-- network tick after the picture the player pressed on (measured ~35 ms in Studio), so without it a press
+	-- network tick after the picture the player pressed on (measured 38-54 ms in Studio), so without it a press
 	-- that looked dead centre scores a little late.
 	PressLagSeconds: number,
 	PerfectAccuracy: number,
