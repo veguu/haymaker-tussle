@@ -642,3 +642,47 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
 - NEXT from the user's brief: piece 5 the hexagon barrier (cyan, ~90% transparent, hexes drift up-right D1, separate
   upward sweep, player-centred glow the hexes move THROUGH, R1 ripple), then piece 4 the lobby (study Blade Ball + 2
   others, three concepts, pick and build without asking), then piece 7 the final test + summary. Settings central.
+
+## hex-1 (2026-11-13): the lobby's animated hexagon barrier (user's big brief, piece 5; NOT COMMITTED, awaiting approval)
+- WHERE: the only walls in the game are the lobby's four invisible ones (LobbyService `Barrier1-4`); the arena has
+  none (ring-out). The barrier is drawn on those four inner faces, 26 studs up from the floor, top fading out.
+  Collision untouched: `BarrierController` (client) makes thin local parts (workspace.HT_BarrierFx, collide with
+  nothing) carrying one unlit SurfaceGui a wall. Maths in `Core/HexBarrier` (tests/HexBarrier.spec, 11 tests).
+- HOW: Fill tint + a Drift frame (one pattern period bigger than the wall, wrapped at a period: seamless) holding
+  the tiled Lines image, the Sweep (same image through a UIGradient band whose Offset climbs) and pooled Cell
+  hexagons lit per player by 3D distance (so the glow stays on the player, hexagons drift through it; R1 ripple,
+  R2 plain, R3 sparks). GUI positions are whole pixels, so the frame takes the whole pixels and the wall part is
+  nudged by the fraction (BulkMoveTo) for a smooth slow drift. Off beyond MaxViewDistance (no frame work).
+- IMAGES: design/barrier/draw_barrier.py -> out/ (hex_tile, hex_cell, halo), uploaded through Studio upload_image:
+  tile 116017742377378, cell 133821336459940, halo 118818857382687 (first, thicker pass: 116062260683745,
+  82105233325855, unused). Like the ground colour maps, these are NOT group-owned Open Cloud uploads.
+- REFERENCE (user pasted 2026-11-13, not on disk): a wall of thin bright cyan hexagon lines, hexagons about half a
+  character wide, next to no fill, ragged faded edges. The GIF arrives as ONE STILL FRAME for Claude. Retuned to
+  it: HexSize 2.5 -> 1.5, line 0.075 -> 0.05 of a radius, Transparency 0.9 -> 0.95, LineTransparency 0.35.
+- SETTINGS: design/game.json -> config.Barrier (Settings Guide `## Barrier`): transparency, hex size, Drift D1-D4 +
+  speed, sweep speed/width/gap/strength, proximity radius/brightness/fade times, ProximityStyle R1-R3, phone path.
+- MEASURED in Play (Studio, PC, 190 fps): script cost (HT_BarrierFx attributes AvgMs/PeakMs) ~0.05 ms a frame with
+  nobody near a wall, ~0.17 ms with ~50 hexagons lit, peaks under 0.7 ms. UIGradient.Offset.Y with Rotation 90 is
+  a share of the object's height, positive = down (checked with a test frame). Render cost on/off could not be
+  measured (frame times too noisy while the user was playing).
+- NOT TESTED: the motion by eye by Claude (drift smoothness, no bobbing of the top fade, the sweep) - screenshots
+  only; R2/R3 and D2-D4; several real players at one wall; corners by eye; any phone (pixel 12, 2 players, glow
+  every 2nd frame); the ragged edge of the reference is a smooth fade here.
+- NEXT: piece 4 the lobby (study Blade Ball + 2 others, three concepts, build one), then piece 7 the final pass.
+- Pushed (146 instances, PASS) and the place saved as version 262. Build label hex-1.
+
+## hex-2 (2026-11-13): the barrier matched to the user's GIF (NOT COMMITTED, awaiting approval)
+- THE REFERENCE IS ON DISK: `LihFolk Vault V2/_assets/barrier-motion.gif` (800x500, 240 frames, 12 s). A pasted GIF
+  reaches Claude as one still; split the file with PIL to read it. What it shows: at rest the wall is a barely
+  visible hexagon grid; as the figure walks up, a wide patch of hexagon LINES fades in around them (3-4 character
+  heights across), the 1-2 hexagons nearest go white-cyan with a faint fill and a soft bloom; pattern drifts
+  up-right; all fades as they leave. Hexagons about half a character across, medium line weight. Also a soft light
+  pool on the floor and thin curved streaks near the figure: NOT built.
+- CHANGED: two-tier glow in HexBarrier.brightness (ProximityMidBrightness 0.45 over ProximityRadius 16, full
+  brightness inside ProximityCoreRadius 6); rest state near-invisible (Transparency 0.975, LineTransparency 0.86);
+  HexSize 1.6; line 0.07 of a radius; lit hexagon redrawn (bright rim, glow, 20% fill); SweepStrength 0.2,
+  HaloBrightness 0.3, RippleStrength 0.25. Images: tile 135568689839955, cell 73567244841968 (hex-1's unused now).
+- MEASURED in Play (Studio PC, ~180 fps): at the wall 72-84 hexagons lit, script 0.23-0.28 ms a frame, peak 0.54;
+  10 studs back the patch is faint (brightest hexagon 14%). Screenshot at the wall matches the GIF's structure.
+- NOT TESTED: motion by eye, phones, R2/R3, D2-D4, several players, corners. On the bright sky the white core has
+  less contrast than on the GIF's dark scene.

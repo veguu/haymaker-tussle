@@ -617,6 +617,41 @@ The air kick's timing. Once you're attached to them, a bar appears near the bott
 | `ShimmerStrength` | 0.2 | Strength of the quiet highlight running along the frame while timing is live. 0 turns it off. |
 | `ShimmerSeconds` | 1.6 | Seconds for one run of that highlight. |
 
+## Barrier
+
+The lobby's hexagon barrier: what you see on the lobby's four walls. It is drawn on each wall's inner face, on the player's own screen, and collides with nothing; the walls that stop you are still the invisible ones from `Lobby` (`WallHeight`, `WallThickness`), unchanged. The arena has no wall (leaving it is a ring-out), so there is no barrier there. The hexagon pattern slides across the wall and wraps exactly at one repeat of the pattern, so it never resets, gaps, reverses or bobs. A separate soft band sweeps upward. Near a player, the hexagons closest to them light up: the glow is worked out from where the player stands, so it stays with them while the hexagons drift through it. Far from the lobby (`MaxViewDistance`) it switches off and costs nothing. Images are drawn by `design/barrier/draw_barrier.py`.
+
+| Setting | Value | What it does |
+|---|---|---|
+| `Enabled` | true | Off: no barrier is drawn. The invisible walls still stop you. |
+| `Height` | 26 | Studs of wall that are drawn, up from the lobby floor. |
+| `TopFade` | 9 | Studs at the top over which it fades to nothing. |
+| `Transparency` | 0.975 | How see-through the flat tint is at rest (1 = no tint at all). |
+| `LineTransparency` | 0.86 | How see-through the hexagon edges are at rest. As in the reference GIF, the wall is nearly invisible until someone is near it. |
+| `FillColor` / `LineColor` / `GlowColor` | "3CC4FF" / "86DDFF" / "D2F8FF" | The tint, the edges, and the lit hexagons and sweep. |
+| `Glow` | 1.5 | Overall brightness of the whole barrier (1 = plain colour, higher blooms more). |
+| `HexSize` | 1.6 | Studs from a hexagon's centre to its corner. A hexagon is about 1.7 times this across. |
+| `Drift` | "D1" | Which way the pattern moves: D1 up-right, D2 up-left, D3 down-right, D4 down-left, as seen from inside the lobby. |
+| `DriftSpeed` | 0.5 | Studs a second. 0 holds it still. |
+| `SweepSpeed` | 9 | Studs a second the sweep band climbs. 0 turns the sweep off. |
+| `SweepWidth` | 7 | Studs from the band's middle to where it has faded out. |
+| `SweepGapSeconds` | 3.5 | Rest between one sweep leaving the top and the next starting at the bottom. |
+| `SweepStrength` | 0.2 | How bright the band's middle is, 0 to 1. 0 turns the sweep off. |
+| `ProximityStyle` | "R1" | R1 glow with a soft ripple travelling outward; R2 glow only; R3 glow with sparse sparks. |
+| `ProximityRadius` | 16 | Studs from a player within which hexagon lines show. Measured through the air, so stepping back from the wall shrinks and dims the patch. |
+| `ProximityCoreRadius` | 6 | Studs from a player within which hexagons go fully bright (white-cyan rim, faint fill). |
+| `ProximityMidBrightness` | 0.45 | How bright the wide patch of lines is next to the core, as a share of `ProximityBrightness`. |
+| `ProximityBrightness` | 1 | How bright the hexagon nearest a player gets, 0 to 1. |
+| `HaloBrightness` | 0.3 | A soft round glow behind the lit hexagons. 0 removes it. |
+| `FadeInSeconds` / `FadeOutSeconds` | 0.2 / 0.6 | How fast a player's glow comes up when they arrive in reach and dies away where they left it (a teleport into a match, say). |
+| `RippleSpeed` / `RippleLength` / `RippleStrength` | 7 / 6 / 0.25 | R1 only: studs a second the rings travel outward, studs between rings, and how much they brighten and dim the glow (0 = none). |
+| `SparkSeconds` / `SparkChance` | 0.4 / 0.12 | R3 only: how long one spark lasts, and the share of hexagons sparking at a time. |
+| `MaxGlowPlayers` | 6 | How many nearby players can light the walls at once (you always count first). |
+| `PixelsPerStud` | 20 | Drawing detail. It also sets the drift's smallest step. |
+| `MaxViewDistance` | 420 | Studs from the lobby beyond which the barrier is switched off (a fighter in the arena doesn't pay for it). |
+| `PhonePixelsPerStud` / `PhoneMaxGlowPlayers` / `PhoneGlowEveryFrames` / `PhoneSweep` | 12 / 2 / 2 / true | The phone path (touch, no keyboard): coarser drawing, fewer glowing players, the glow relit every 2nd frame, and whether phones get the sweep. |
+| `ImageTile` / `ImageCell` / `ImageHalo` | asset ids | The tiled pattern, one hexagon, and the soft blob. |
+
 ## AirRecovery
 
 Getting back to the platform. Each accepted punch in the air gives a push and a tiny lift, and falling is slower for everyone. There's no limit on how many punches: it's balanced by these values and the punch cooldown. Full details and test results are in the vault note `Air Recovery`. To try values without changing this file, use `RECOVERY_SET="BoostSpeed=30" lune run lune/recovery_sim`.
