@@ -148,7 +148,7 @@ return {
 		assert(KICK.CrashPush < KICK.FinisherMaxSpeed, "a crash throws harder than the kick itself")
 		assert(KICK.CrashStagger > 0, "a crash adds no stagger")
 		assert(
-			KICK.CrashMinSpeed < KICK.SlamSpeed * KICK.RedShare,
+			KICK.CrashMinSpeed < KICK.SlamSpeed * (GameConfig.KickMeter :: any).StrengthMin,
 			"a weak slam is too slow to crash"
 		)
 	end,

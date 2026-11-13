@@ -494,7 +494,7 @@ The 1v1 arena's opponent, which chases and punches like a player. It only exists
 
 ## Kick
 
-The air kick. An uppercut launches someone, who can steer and propel in the air. Space squats, and the server picks who you follow up: anyone launched within `FollowUpOwnRange` (your own uppercut) or `FollowUpRange` (anyone else's), with nothing solid in between, by distance and by how far off where you face they are. It holds them still from that moment, and you snap straight to beside them. Once close, a ring closes; Space as it meets the key. You curl, spin forward, and whip your heel down on them. The kick always connects, and the timing sets its force. Only a grade in `FinisherGrades` (green, a perfect press) is a finisher: they're launched hard away from you and up, with a moment's loss of control. Anything else (orange or red) knocks them down: slammed to the floor, with no control until `KnockdownSeconds` after landing. You get a boost of running momentum backward and a small hop, and carry on running.
+The air kick. An uppercut launches someone, who can steer and propel in the air. Space squats, and the server picks who you follow up: anyone launched within `FollowUpOwnRange` (your own uppercut) or `FollowUpRange` (anyone else's), with nothing solid in between, by distance and by how far off where you face they are. It holds them still from that moment, and you snap straight to beside them. Once close, the timing meter opens (see `KickMeter`): click as the marker crosses the middle of the bar. You curl, spin forward, and whip your heel down on them. The kick always connects, and the timing sets its force. Only a grade in `FinisherGrades` (green, a perfect press) is a finisher: they're launched hard away from you and up, with a moment's loss of control. Anything else (orange or red) knocks them down: slammed to the floor, with no control until `KnockdownSeconds` after landing. You get a boost of running momentum backward and a small hop, and carry on running.
 
 | Setting | Value | What it does |
 |---|---|---|
@@ -534,21 +534,8 @@ The air kick. An uppercut launches someone, who can steer and propel in the air.
 | `FlipAbove` | 4.5 | How far above them the spin takes you. |
 | `FlipSide` | 1.5 | How far beside them you are at the end of the spin. |
 | `FollowRate` | 16 | How fast aligning moves you into place. Higher snaps harder. |
-| `QteEarliest` | 0.25 | Soonest the ring can meet the key, in seconds after touching. |
-| `QteLatest` | 0.45 | Latest it can. Each jump picks a time between the two, so it has to be watched. |
-| `GreenWindow` | 0.05 | Seconds either side of that which give a green, the strongest kick. |
-| `OrangeWindow` | 0.12 | Seconds either side which give an orange. Anything else is a red, as is never pressing. |
-| `RedShare` | 0.5 | Share of full force for a red: outward push, slam and stagger together. |
-| `OrangeShare` | 0.85 | Share of full force for an orange. |
-| `GreenShare` | 1.3 | Share of full force for a green. |
-| `RedStop` | 0.05 | Seconds both are frozen when a red kick lands. |
-| `OrangeStop` | 0.083 | The same for an orange. |
-| `GreenStop` | 0.117 | The same for a green. |
 | `FlipSeconds` | 0.28 | How long the spin takes before the heel lands. Must match the `KickSpin` clip. |
 | `RecoverSeconds` | 0.45 | Seconds before you can punch again after the kick lands. |
-| `ReboundRiseRed` | 14 | Studs you rise above the kick after a MISTIMED! kick. The push backward is `Movement.PropelSpeed` at every grade and holds until you land, so a higher arc carries further. From 40 studs up that's about 102 studs of travel. |
-| `ReboundRiseOrange` | 30 | The same after a CLOSE! kick. About 127 studs of travel from 40 up. |
-| `ReboundRiseGreen` | 46 | The same after a PERFECT! kick. Keep it under the uppercut's 57. About 147 studs of travel from 40 up, and more if that's what it takes to reach the platform. |
 | `ReboundLandNear` | 15 | Studs inside the near edge that a PERFECT! rebound aims to land at least, when it needs more speed to get there. |
 | `ReboundLandFar` | 55 | Studs short of the far edge that any rebound is kept to, by slowing it, so your own rebound can't throw you off the far side. |
 | `ReboundSpeedMax` | 300 | Fastest a PERFECT! rebound can go to reach the platform. |
@@ -579,6 +566,56 @@ The air kick. An uppercut launches someone, who can steer and propel in the air.
 | `CrashPush` | 90 | How hard the one crashed into is thrown, the way the body was going. A regular punch at full run is about 55. |
 | `CrashLift` | 22 | Upward speed the crash gives someone standing on the floor. |
 | `CrashStagger` | 15 | Stagger the crash adds. Each flying body hits each player once. The kicker gets the credit. |
+
+## KickMeter
+
+The air kick's timing. Once you're attached to them, a bar appears near the bottom of the screen: red at both ends, through orange and yellow, to green in the exact middle, with a marker running along it. A click (R2) records where the marker is, and the closer to the middle, the better the kick. The server works the marker's position out on its own clock and scores the press; the bar then shows the server's answer. The result is PERFECT, GOOD, OKAY, POOR, or TOO LATE if the meter runs out with no press (the kick still lands, at its weakest). Only PERFECT counts as green for `Kick.FinisherGrades`; GOOD and OKAY are orange and POOR is red. This section was written from the code on 2026-11-12, not by the meter's author.
+
+| Setting | Value | What it does |
+|---|---|---|
+| `Entrance` | "E1" | How the bar arrives. E1 slides up, widens from the middle and overshoots a little; E2 is a crisp reveal from the middle with no movement; E3 draws the frame with a highlight first, then fills with colour. |
+| `Exit` | "X1" | How it leaves. X1 draws its colour in to the middle, squeezes, drops and fades; X2 collapses to a streak of light; X3 is a soft dissolve. |
+| `ColourStyle` | "C1" | How strong the glow and shimmer are. C1 as designed, C2 stronger, C3 restrained. |
+| `PerfectStyle` | "F1" | What a PERFECT does. F1 snaps the marker to the middle with a flash and a shockwave; F2 adds a bigger bounce; F3 is a small pulse with no flash. |
+| `MarkerStyle` | "M1" | How the marker moves. M1 bounces end to end at a steady speed; M2 sweeps one way and jumps back; M3 bounces and speeds up. |
+| `Width` | 440 | The bar's width in pixels on a 1280 x 720 screen, before fitting. |
+| `Height` | 36 | Its height in pixels. |
+| `ScreenX` | 0.5 | Where its centre sits across the screen (0 left, 1 right). |
+| `ScreenY` | 0.78 | Where its centre sits down the screen (0 top, 1 bottom). |
+| `MaxWidthShare` | 0.86 | On a narrow screen the bar is never wider than this share of it. |
+| `ScaleMin` | 0.7 | Smallest the bar is scaled to on a small screen. |
+| `ScaleMax` | 1.25 | Largest it is scaled to on a big one. |
+| `MarkerWidth` | 6 | The marker's width in pixels. |
+| `MarkerOverhang` | 9 | How far the marker sticks out above and below the bar, in pixels. |
+| `TargetWidth` | 4 | Width of the white line marking the exact middle. |
+| `SweepSeconds` | 0.7 | Seconds the marker takes from one end to the other (at its starting speed). Lower is harder. |
+| `Passes` | 2 | How many end-to-end runs an unpressed meter lasts before it gives up. With `EntranceSeconds` and `SweepSeconds` that's 1.65 s. |
+| `StartSpanMin` | 0.7 | The marker starts at least this far from the middle (0 middle, 1 an end), on a random side, heading inward. |
+| `AccelPerSecond` | 0.3 | Only for marker style M3: how much faster it gets each second (0.3 = 30%). |
+| `PressLagSeconds` | 0.03 | The server takes this much off the time it measured for a press, because a press reaches it a frame and a network tick after the picture you pressed on. Without it a press that looked dead centre scores a little late. |
+| `PerfectAccuracy` | 0.85 | A press this close to the middle or closer is PERFECT (1 is dead centre, 0 an end). The thin marks on the bar show these lines. |
+| `GoodAccuracy` | 0.6 | From here up to perfect is GOOD. |
+| `OkayAccuracy` | 0.3 | From here up to good is OKAY. Below it is POOR. |
+| `AccuracyCurve` | 1.2 | How accuracy turns into the kick's quality. 1 is a straight line; higher makes the middle matter more. |
+| `StrengthMin` | 0.5 | Share of the kick's full force (outward push, slam and stagger) for the worst press. |
+| `StrengthMax` | 1.3 | The same for a dead-centre press. Everything between scales smoothly. |
+| `StopMin` | 0.05 | Seconds both fighters freeze when the worst kick lands. |
+| `StopMax` | 0.117 | The same for a dead-centre kick. |
+| `RiseMin` | 14 | Studs you're thrown back up after the worst kick. The push backward is `Movement.PropelSpeed` at any quality and holds until you land, so a higher arc carries further. |
+| `RiseMax` | 46 | The same after a dead-centre kick. Keep it under the launch's 57. |
+| `EntranceSeconds` | 0.25 | How long the bar takes to arrive. The marker waits at its start until then, and a press before it doesn't count. |
+| `EntranceSlide` | 26 | Pixels the bar slides up as it arrives (E1). |
+| `EntranceOvershoot` | 0.06 | How far past full size it grows before settling (E1). |
+| `FeedbackSeconds` | 0.32 | How long the result's pulse and flash play. |
+| `ResultHoldSeconds` | 0.45 | How long the result stays up after that, before the bar leaves. |
+| `ExitSeconds` | 0.2 | How long the bar takes to leave after a result. |
+| `ExitSlide` | 18 | Pixels it drops as it leaves (X1). |
+| `CancelExitSeconds` | 0.12 | How long it takes to leave when the timing is called off with no result. |
+| `ColourIntensity` | 1 | How far the result's tint and flash go. It never changes the scoring colours. |
+| `FaintSaturation` | 0.25 | How washed out the colours are when the bar first appears, before they wake to full. |
+| `GlowStrength` | 1 | Strength of the glow around the bar. 0 turns it off. |
+| `ShimmerStrength` | 0.2 | Strength of the quiet highlight running along the frame while timing is live. 0 turns it off. |
+| `ShimmerSeconds` | 1.6 | Seconds for one run of that highlight. |
 
 ## AirRecovery
 
@@ -713,31 +750,6 @@ The camera while locked on. It only sets the view: it never touches a velocity, 
 | `CollisionMargin` | 0.4 | Extra gap it keeps from them. |
 | `PullOutRate` | 6 | How slowly it moves back out after a wall. It always comes in at once. |
 | `MinPull` | 3 | Closest a wall can bring it to you. |
-
-## KickText
-
-The word after an air kick's timing: MISTIMED!, CLOSE! or PERFECT!
-
-| Setting | Value | What it does |
-|---|---|---|
-| `ScreenX` | 0.5 | Where it sits across the screen, 0 to 1. |
-| `ScreenY` | 0.85 | Where it sits down the screen, 0 to 1. Above the bottom-screen controls. |
-| `WidthShare` | 0.7 | Share of the screen's width it can use. |
-| `HeightShare` | 0.1 | Share of the screen's height it can use. |
-| `MinTextSize` | 28 | Smallest the text gets, on small screens. |
-| `MaxTextSize` | 60 | Largest the text gets, on big screens. |
-| `StrokeThickness` | 3 | Dark outline, so it reads over anything. |
-| `StartScale` | 0.4 | Size it starts at, as a share of full size. |
-| `PeakScale` | 1.16 | Size it overshoots to. |
-| `DipScale` | 0.97 | Size it dips back to before settling at full. |
-| `PerfectPeakScale` | 1.34 | The overshoot for a PERFECT!. |
-| `PerfectDipScale` | 0.93 | The dip for a PERFECT!. |
-| `RiseSeconds` | 0.08 | How long the rise takes. |
-| `DipSeconds` | 0.07 | How long the dip takes. |
-| `SettleSeconds` | 0.08 | How long the settle takes. |
-| `HoldSeconds` | 0.55 | Seconds from appearing until it starts to fade. |
-| `PerfectHoldSeconds` | 0.65 | The same for a PERFECT!. |
-| `FadeSeconds` | 0.25 | How long the fade takes. |
 
 ## Animation
 

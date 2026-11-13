@@ -31,18 +31,8 @@ local CFG: DiveKick.Settings = {
 	FlipAbove = 4.5,
 	FlipSide = 1.5,
 	FollowRate = 16,
-	QteEarliest = 0.25,
-	QteLatest = 0.45,
-	GreenWindow = 0.05,
-	OrangeWindow = 0.12,
-	RedShare = 0.5,
-	OrangeShare = 0.85,
-	GreenShare = 1.3,
-	RedStop = 0.05,
-	OrangeStop = 0.083,
-	GreenStop = 0.117,
 	FlipSeconds = 0.28,
-}
+} :: any
 
 local DT = 1 / 60
 local GRAVITY = 196.2 * CFG.AirGravityScale
@@ -68,8 +58,9 @@ local function airborne(vx: number, vy: number, vz: number): DiveKick.State
 	return DiveKick.spring(DiveKick.start(), vx, vy, vz)
 end
 
-local function attached(qteAt: number): DiveKick.State
-	return DiveKick.attach(airborne(0, 100, 0), 3, 4, qteAt)
+-- Attached, with the timing meter giving up `cueEnd` seconds after touching (KickMeter.endsAt).
+local function attached(cueEnd: number): DiveKick.State
+	return DiveKick.attach(airborne(0, 100, 0), 3, 4, cueEnd)
 end
 
 return {
@@ -125,39 +116,12 @@ return {
 		assert((rise :: number) > 0, "the flip should rise over them")
 	end,
 
-	["the ring is quick"] = function()
-		assert(DiveKick.pickQte(CFG, 0) == 0.25, "earliest")
-		assert(DiveKick.pickQte(CFG, 1) == 0.45, "latest")
-		assert(DiveKick.ringEnd(CFG, 0.45) < 0.65, "the longest wait stays short")
-	end,
+	-- The timing itself (where the marker is, what a press is worth) is Core/KickMeter: tests/KickMeter.spec.
 
-	["timing gives three results"] = function()
-		assert(DiveKick.grade(CFG, 0.3, 0.3) == "green", "right on it")
-		assert(DiveKick.grade(CFG, 0.34, 0.3) == "green", "just late")
-		assert(DiveKick.grade(CFG, 0.39, 0.3) == "orange", "close")
-		assert(DiveKick.grade(CFG, 0.21, 0.3) == "orange", "close the other way")
-		assert(DiveKick.grade(CFG, 0.1, 0.3) == "red", "much too early")
-		assert(DiveKick.grade(CFG, 0.5, 0.3) == "red", "much too late")
-	end,
-
-	["better timing always hits harder"] = function()
-		local red = DiveKick.gradeShare(CFG, "red")
-		local orange = DiveKick.gradeShare(CFG, "orange")
-		local green = DiveKick.gradeShare(CFG, "green")
-		assert(red > 0 and red < orange and orange < green, `got {red}, {orange}, {green}`)
-	end,
-
-	["better timing also stops the world for longer"] = function()
-		local red = DiveKick.gradeStop(CFG, "red")
-		local orange = DiveKick.gradeStop(CFG, "orange")
-		local green = DiveKick.gradeStop(CFG, "green")
-		assert(red > 0 and red < orange and orange < green, `got {red}, {orange}, {green}`)
-	end,
-
-	["no press still kicks: the ring running out goes straight to the flip"] = function()
-		local state: any = run(attached(0.3), 0.3)
+	["no press still kicks: the meter running out goes straight to the flip"] = function()
+		local state: any = run(attached(0.5), 0.3)
 		assert(state.phase == "attach", "still waiting")
-		state = run(state, 0.2)
+		state = run(state, 0.3)
 		assert(state.phase == "flip", `expected the flip, got {state.phase}`)
 	end,
 

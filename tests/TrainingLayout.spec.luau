@@ -294,6 +294,13 @@ return {
 		local cx, cz, outX, outZ = TrainingLayout.stationCenter(CFG, station)
 		local atX, atZ = cx + outX * 20, cz + outZ * 20
 		local platform = TrainingLayout.platformAt(CFG, ARENA, atX, atZ)
+		-- the weakest, a middling and the best press on the timing meter
+		local meter: any = GameConfig.KickMeter
+		local rises = {
+			red = meter.RiseMin,
+			orange = (meter.RiseMin + meter.RiseMax) / 2,
+			green = meter.RiseMax,
+		}
 		for _, grade: any in { "red", "orange", "green" } do
 			local plan = DiveKick.planRebound(KICK, grade, {
 				x = atX,
@@ -306,7 +313,7 @@ return {
 				radius = platform.radius,
 				speed = GameConfig.Movement.PropelSpeed,
 				gravity = 196.2 * KICK.ReboundGravityScale,
-			})
+			}, rises[grade])
 			local landX = atX + plan.dirX * plan.speed * plan.air
 			local landZ = atZ + plan.dirZ * plan.speed * plan.air
 			local away = math.sqrt((landX - cx) ^ 2 + (landZ - cz) ^ 2)

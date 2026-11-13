@@ -108,7 +108,7 @@ return {
 			assert(wall.y + wall.sy / 2 >= CFG.FloorY + CFG.WallHeight)
 		end
 		-- taller than the highest thing that happens in the lobby: an uppercut launch and a kick rebound
-		assert(CFG.WallHeight >= 2 * (GameConfig.Kick :: any).ReboundRiseGreen + 100)
+		assert(CFG.WallHeight >= 2 * (GameConfig.KickMeter :: any).RiseMax + 100)
 	end,
 
 	["the rebound platform is the lobby when you're on it"] = function()

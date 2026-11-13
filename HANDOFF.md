@@ -589,3 +589,19 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
 - MEASURED after (real key + mouse input in Play): held + run 117 deg, held + walk 101 deg; stop -> back to the
   standing clip; release, 4 quick clicks, S->A direction change, jump + land, respawn then hold + run: legs move,
   no Hook/Uppercut/Kick track left playing. NOT TESTED: by eye, a hold dropped by a stun or clash, gamepad, touch.
+
+## meter-1 (2026-11-12): the air kick's timing meter, taken from the place
+- NOT written in this folder. The scripts were in the Team Create place (BUILD meter-1) and not on GitHub; their
+  author couldn't push. Copied out of Studio script by script and checked against Studio by length and checksum:
+  new Core/KickMeter + Ui/KickMeterBar; changed KickService, MovementController, KickPromptController,
+  TrainingController, DiveKick, GameConfig; removed Core/ResultPop, Ui/KickResultText.
+- WHAT IT IS: the ring timing is gone. Attached to the target, a bar opens (red ends, green middle) with a marker
+  running along it; the click records where the marker is. The server rolls the marker's start (HT_KickMeter),
+  scores the press on its own clock (KickMeter.pressedAt, PressLagSeconds) and publishes HT_KickScore
+  (position, quality, tier). Force, hit stop and the kicker's rebound height scale smoothly with quality;
+  perfect = green (the finisher), good/okay = orange, poor = red.
+- WRITTEN HERE to go with it, because they weren't in the place: tests/KickMeter.spec (new), DiveKick, Rebound,
+  TrainingLayout, FreeJump and Lobby specs updated to the new signatures, tests/ResultPop.spec removed,
+  design/game.json mirrored from GameConfig (KickMeter added, KickText and 13 Kick timing keys removed), and the
+  Settings Guide's KickMeter section. If the author's own versions of these turn up, theirs win.
+- NOT VERIFIED: the meter by eye; whether the author had further unsynced changes.

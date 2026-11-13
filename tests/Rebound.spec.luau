@@ -11,6 +11,21 @@ local CFG: DiveKick.Settings = {
 	ReboundSpeedMax = 300,
 } :: any
 
+-- The rise comes from the timing meter now (KickMeter.rise) and is passed in: its weakest, a middling
+-- and its best press, which go with the red, orange and green grades.
+local RISE: { [string]: number } = {
+	red = CFG.ReboundRiseRed,
+	orange = CFG.ReboundRiseOrange,
+	green = CFG.ReboundRiseGreen,
+}
+local function planRebound(
+	cfg: DiveKick.Settings,
+	grade: DiveKick.Grade,
+	at: DiveKick.ReboundFrom
+): DiveKick.ReboundPlan
+	return DiveKick.planRebound(cfg, grade, at, RISE[grade])
+end
+
 local RADIUS = 75
 local GRAVITY = 196.2 * 0.85
 local UPPERCUT_RISE = 57
@@ -41,14 +56,14 @@ local function landing(at: DiveKick.ReboundFrom, plan: DiveKick.ReboundPlan): (n
 end
 
 local function landsOn(grade: DiveKick.Grade, at: DiveKick.ReboundFrom): boolean
-	local x, z = landing(at, DiveKick.planRebound(CFG, grade, at))
+	local x, z = landing(at, planRebound(CFG, grade, at))
 	return math.sqrt(x * x + z * z) <= RADIUS
 end
 
 return {
 	["a better kick rises higher, and every grade stays under an uppercut"] = function()
 		local function rise(grade: DiveKick.Grade): number
-			local up = DiveKick.planRebound(CFG, grade, from(100)).up
+			local up = planRebound(CFG, grade, from(100)).up
 			return up * up / (2 * GRAVITY)
 		end
 		assert(rise("red") < rise("orange") and rise("orange") < rise("green"), "order")
@@ -60,7 +75,7 @@ return {
 	["only the height changes with the grade: the speed is the propel's"] = function()
 		local grades: { DiveKick.Grade } = { "red", "orange", "green" }
 		for _, grade in grades do
-			assert(DiveKick.planRebound(CFG, grade, from(RADIUS + 90)).speed == 84, grade)
+			assert(planRebound(CFG, grade, from(RADIUS + 90)).speed == 84, grade)
 		end
 	end,
 
@@ -85,13 +100,13 @@ return {
 	["perfect gets back even when backward leads away from the platform"] = function()
 		assert(landsOn("green", from(RADIUS + 60, 40, 1, 0)), "straight away")
 		assert(landsOn("green", from(RADIUS + 60, 40, 0, 1)), "sideways, missing it")
-		local plan = DiveKick.planRebound(CFG, "green", from(RADIUS + 60, 40, 1, 0))
+		local plan = planRebound(CFG, "green", from(RADIUS + 60, 40, 1, 0))
 		assert(plan.dirX == -1, "goes home instead")
 	end,
 
 	["perfect keeps backward when backward does lead to the platform"] = function()
 		local at = from(RADIUS + 20, 40, -0.8, 0.6)
-		local plan = DiveKick.planRebound(CFG, "green", at)
+		local plan = planRebound(CFG, "green", at)
 		assert(
 			math.abs(plan.dirX + 0.8) < 0.0001 and math.abs(plan.dirZ - 0.6) < 0.0001,
 			"still backward"
@@ -100,7 +115,7 @@ return {
 	end,
 
 	["red and close keep going backward even when that leads away"] = function()
-		local plan = DiveKick.planRebound(CFG, "orange", from(RADIUS + 60, 40, 1, 0))
+		local plan = planRebound(CFG, "orange", from(RADIUS + 60, 40, 1, 0))
 		assert(plan.dirX == 1 and plan.speed == 84, "as thrown")
 	end,
 
@@ -109,24 +124,24 @@ return {
 		for _, grade in grades do
 			for x = -70, 100, 10 do
 				local at = from(x)
-				local landX = landing(at, DiveKick.planRebound(CFG, grade, at))
+				local landX = landing(at, planRebound(CFG, grade, at))
 				assert(landX >= -RADIUS, `{grade} from {x} landed at {landX}`)
 			end
 		end
 	end,
 
 	["a landing with room stays at the propel's speed"] = function()
-		local plan = DiveKick.planRebound(CFG, "red", from(RADIUS + 100))
+		local plan = planRebound(CFG, "red", from(RADIUS + 100))
 		assert(plan.speed == 84, `speed {plan.speed}`)
 	end,
 
 	["being below the platform's top can't break the sums"] = function()
-		local plan = DiveKick.planRebound(CFG, "red", from(100, -20))
+		local plan = planRebound(CFG, "red", from(100, -20))
 		assert(plan.air > 0 and plan.air == plan.air, "air time")
 	end,
 
 	["exactly over the middle with no direction stays put safely"] = function()
-		local plan = DiveKick.planRebound(CFG, "green", from(0, 40, 0, 0))
+		local plan = planRebound(CFG, "green", from(0, 40, 0, 0))
 		assert(plan.dirX == 0 and plan.dirZ == 0, "no direction")
 		assert(plan.up > 0, "still rises")
 	end,
@@ -141,11 +156,11 @@ return {
 		} :: any
 		for _, grade: DiveKick.Grade in { "red", "orange", "green" } do
 			local at = from(RADIUS + 40)
-			local plain = DiveKick.planRebound(CFG, grade, at)
+			local plain = planRebound(CFG, grade, at)
 			at.fallTime = function(up: number, height: number): number
 				return AirRecovery.timeToDrop(air, 196.2, 0.85, up, height)
 			end
-			local slow = DiveKick.planRebound(CFG, grade, at)
+			local slow = planRebound(CFG, grade, at)
 			assert(slow.air > plain.air + 0.5, grade .. ": a slower fall stays up longer")
 			assert(slow.up == plain.up, grade .. ": the rise is unchanged")
 			local x = at.x + slow.dirX * slow.speed * slow.air

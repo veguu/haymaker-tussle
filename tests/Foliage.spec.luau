@@ -42,7 +42,11 @@ return {
 
 	["it stays gentle: flowers lean most, trees least, nothing past 15 degrees from wind alone"] = function()
 		local T = Foliage.Tuning
-		assert(T.flower.gust > T.plant.gust and T.plant.gust > T.bush.gust and T.bush.gust > T.tree.gust)
+		assert(
+			T.flower.gust > T.plant.gust
+				and T.plant.gust > T.bush.gust
+				and T.bush.gust > T.tree.gust
+		)
 		for kind, tune in T do
 			local most = tune.lean + tune.gust + tune.flutter + tune.side
 			assert(most <= math.rad(15), kind)

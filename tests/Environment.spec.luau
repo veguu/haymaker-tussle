@@ -27,7 +27,10 @@ return {
 			if clouds.drift then
 				-- drifting lanes: spread over a whole crossing, so a few more of them still read as a few
 				local drift = clouds.drift
-				assert(#drift.lanes >= 6 and #drift.lanes <= 14, `{id} has {#drift.lanes} drift lanes`)
+				assert(
+					#drift.lanes >= 6 and #drift.lanes <= 14,
+					`{id} has {#drift.lanes} drift lanes`
+				)
 				for i, lane in drift.lanes do
 					local most = lane.length * (1 + (drift.sizeJitter or 0))
 					assert(most <= 190, `{id} drift lane {i} can be {most} long`)
@@ -50,10 +53,7 @@ return {
 	["a map's preset overrides only what it names; lists are replaced, not merged"] = function()
 		local p = Environment.resolve(Envs, "gnomon")
 		assert(p.sun.clockTime == Envs.Maps.gnomon.environment.sun.clockTime)
-		assert(
-			p.wind.global == Envs.Default.wind.global,
-			"unnamed values come from the default"
-		)
+		assert(p.wind.global == Envs.Default.wind.global, "unnamed values come from the default")
 		assert(
 			p.clouds.under == Envs.Default.clouds.under,
 			"nested defaults survive a partial override"
@@ -110,7 +110,8 @@ return {
 		local prev: any = nil
 		local start = (1 - lane.phase) * crossing + 1 -- just after a fresh cloud appears
 		for k = 0, 40 do
-			local c, _, cycle = Environment.driftCloud(drift, lane, 1, wx, wz, start + k * crossing / 50)
+			local c, _, cycle =
+				Environment.driftCloud(drift, lane, 1, wx, wz, start + k * crossing / 50)
 			local along = c.x * wx + c.z * wz
 			if prev and prev.cycle == cycle then
 				assert(along > prev.along, "moves down-wind")
