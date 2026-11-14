@@ -942,3 +942,147 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   the commit message. NOT PLAYTESTED together.
 - The place's LobbyLayout and LobbyService, which were "not in Git" all session, are this lobby-1 work: they are in
   Git now, so Rojo from this folder no longer deletes them.
+## vfx-3 (2026-11-14): the hit's star made sharp and controlled; swing ribbon (NOT COMMITTED, awaiting the user's try)
+- WHY (the user, after trying vfx-2): the star's spikes were "kind of blunt at the ends instead of sharp", and "the
+  direction was random instead of controlled".
+- CAUSE: the spikes were thrown outward from a sphere, so they pointed anywhere in 3D: the ones aimed at the camera
+  drew short and blunt, and every hit was a different shape. The spike texture was also soft-edged and 256 px.
+- STAR: hit_needle.png redrawn at 512 px, hard-edged, straight sides to a true point. PunchHitFx now has a STAR table
+  (18 spikes: angle from the hit's direction, length). One emitter per spike on its own attachment; a hit turns the
+  star's part to face the camera with its right side along the hit, mirrored so 90 degrees is always up. Heavy hits
+  re-throw every other spike 8 times, 3 frames apart. Sparks fly off past every third spike.
+- ARCS: no random rotation any more. ArcA/ArcB (and the heavy hit's LateArcA/B) get a set tilt toward the hit's
+  direction and turn that way. StepBurstFx: two arcs opposite each other, same spin, like a pinwheel.
+- SWING RIBBON: new src/client/Fx/SwingTrailFx.luau, a replica of the slash ribbons in Scrippage "Weapon Switcher"
+  (UOoYfyJhQN8, 9.55-10.2 s, read at 60 fps): a Trail from the forearm/shin to 1.1 studs past the fist/foot with a
+  streaked texture (hit_ribbon.png), a thin bright tip line, and four upright four-point glints (hit_star.png) at the
+  strike. FxController:Swing calls it in place of ImpactFx.fistTrail (still used by the uppercut's torso trail).
+- MEASURED: VelocityParallel: the texture's +X is the direction of travel. Camera-facing particles: positive
+  Rotation turns ANTICLOCKWISE on screen. An emitter on an Attachment emits along the attachment's own axes.
+- VERIFIED in Play from disk through Rojo: four hits in four directions frozen at 1 f (same sharp star each time,
+  mirrored for a hit going left; line bands along each hit). The ribbon on a stand-in arm sweeping in a circle:
+  bright line on the outside, ribbon inside it, glints upright.
+- NOT VERIFIED: the ribbon on a real punch or kick (bots knocked the test character out; the one capture was taken
+  with a stretched lifetime and showed nothing useful), how faceted a fast swing's ribbon looks (a Trail adds one
+  straight piece a frame), the ribbon on the cream lobby floor (near invisible there), heavy hit's held star by eye.
+
+## vfx-4 (2026-11-14): tone and contrast in the hit (NOT COMMITTED, awaiting the user's try)
+- WHY (the user, after trying vfx-3): "a little too bright, i think there needs to be more contrast, a mix between
+  high glow, low glow, bright green, darker (not dark enough to stop glowing) green ... dont be afriad to use black
+  if needed for extra contrast/shading, it looks great if mixed well".
+- THE REFERENCE, read again at 760 px a frame: each spike is white-hot at its root, neon green along it and a deeper
+  green at its edge; thin black slivers sit between spikes and black lines run through the band; the floor under it
+  goes dark.
+- STAR: every spike has a tone. FULL = a deep green body (22% toward black, LightEmission 0.35) with a narrower
+  white-hot core down its middle (its own emitter, LightEmission 0.9); DIM = a thinner deep green spike only (40%
+  toward black, 0.3); INK = a thin near-black sliver behind the rest (LightEmission 0). 18 spikes + 6 ink.
+- LAYERS: Layer.dark / Layer.hot (set with tone() after a layer is made) take a tinted layer toward black or start it
+  white-hot. Lines are now LinesHot (4), Lines (6), LinesDeep (5) and 10 black. Halo and haze are deep green with
+  low glow. New FloorShade: a soft black patch on the floor. Core brightness 3 -> 2.2, dome fainter.
+- VERIFIED in Play from disk: frozen at about 2 f and 3 f (white core, bright cores, deep bodies, thin black
+  slivers, three-tone band) and at about 10 f (deep green haze, arcs, smoke). Gates at the end of the session.
+- NOT VERIFIED: by the user; the heavy hit's held star with the new tones; the swing ribbon and floor burst are
+  still one tone (white/pale blue, as their references are).
+
+## vfx-5 (2026-11-14): the hit rebuilt after re-reading the reference at 1080p (NOT COMMITTED, awaiting the user's try)
+- WHY (the user, after trying vfx-4): the spikes were all one size, too few ("quite thin compared to the reference"),
+  not sharp enough; use ZOffset so black sits behind; "a lot more shockwave and smoke effects"; and "review the
+  reference video again to catch any missed details". During the work: "dont make it too thin, some stars should be
+  thin but ... some of them are also thick"; "the dark things dont need to be perfectly aligned, i want diversity
+  instead of just outlines"; "some things might look better with black outlines, but dont overuse this ... just
+  follow the references".
+- THE REVIEW (yt-dlp at 1080p, crop 720x570, four frames a sheet, 24 frames). Missed before: (1) the star is about
+  40 spikes, no two alike: a few very long, broad blades near the middle, a crowd of small ones; (2) the middle is a
+  white-hot mass and the band has a thick white core; (3) the black is mostly thin speed lines BEHIND the band,
+  faster and longer than the green, so they show above, below and past its far end; the star itself has little
+  black; (4) the shock bubble is strong, with a bright rim; (5) from 4 f a big disc of radial dust races out along
+  the floor, twice the ring's width, there to 20 f; (6) the green over the one hit is flame-like wisps, not a
+  puff; (7) 2 f to 5 f: a ball of short spikes round the one hit; (8) late: three or four arcs, some of them dark.
+- STAR: STAR is now built in a `do` block: 8 LONG by hand, 12 MID, 22 SMALL stepped by the golden angle, 9 INK. Each
+  has angle, length and `fat` (thickness / length, 0.04 to 0.28). Thickness is a Squash worked out per spike
+  (s = 0.5 * log2(fat / 0.24)); play sets Size = length * 2^s. LONG and MID have a white-hot core emitter. INK
+  spikes are black, independent, behind everything (ZOffset 0.2; bodies 1, cores 1.6). Non-heavy hits throw the MID
+  and SMALL spikes again at 2 f and 4 f, shifted 1.2 studs onto the one hit. RIGS 6 -> 4 (about 100 emitters a rig).
+- NEW LAYERS: LinesCore (white middle of the band), ShockRing (CIRCLE racing out at 1 f), FloorDust (hit_dust.png,
+  flat, 5 -> 12.5 studs over 0.42 s), ArcDark1/2 (black arcs). Haze now uses the hit_wisp.png flipbook, upright.
+  Dome stronger and bigger; black lines 14, faster, longer-lived, ZOffset -0.5; floor smoke 22, longer.
+- TEXTURES: hit_dust.png and hit_wisp.png (a second flipbook: flame tongues that split into rising filaments; the
+  trick was taking only the thin crest of a ridged noise, power 9, not the ridge itself).
+- VERIFIED in Play from disk, on a dark stand-in floor like the reference's: the star frozen at its first frame, and
+  three hits side by side at about 2 f, 5 f and 12 f. Gates at the end of the session.
+- NOT VERIFIED: exact timing against the reference (Studio renders at 16-40 fps in the background, so freezes are
+  coarse), the heavy hit by eye, cost with 25 fighters, phones.
+- ADDED LAST (the user: "there are some black outlines and highlights inside the main star, but its spread thinly and doesnt comprise the entire thing"): six hair-thin black INK spikes with `front = true`, drawn over the green bodies and under the white cores (ZOffset 1.3). Seen in one close-up frozen at the first frame. Gates after this: build OK, 452 tests, selene src 0, stylua clean.
+
+## vfx-6 (2026-11-14): the star rebuilt as a burst (rotation, size curves, randomness); slow motion for study
+## *** NOT SEEN RUNNING: Studio's 3D view went black for captures before this could be photographed ***
+- WHY (the user, after trying vfx-5): "i dont think you have implemented particle rotation or increasing/decreasing
+  particle size thru time ... speed, size, rotation, randomness, are all very useful for making a burst, explosive
+  like effect", and asked whether I can truly watch a video. I can't: I only see stills. What I can do is MEASURE
+  motion off the frames and photograph my build at the same frame numbers.
+- MEASURED off the 1080p frames (30 px = 1 stud): longest spike 10 studs at 0 f, 6.7 at 1 f, 3.3 at 2 f, then a
+  3-stud spiky ball to 5 f. Shock bubble radius 3.2, 5, 5.8, 6.3, 6.7 studs at 1 f to 5 f. The old spikes shrank
+  evenly over 6 f, which is why the hit read as static.
+- STAR, rebuilt: no more one emitter per spike. New texture hit_blade.png: one blade with its colours BAKED IN
+  (white-hot middle, neon green, deep green edge), standing on the image's CENTRE and pointing up, so a
+  camera-facing particle turns about its base and stays on the contact as it grows or shrinks. StarBlades (26):
+  Rotation 0-360, RotSpeed +-30, a Size curve with envelopes (out in one frame, 2/3, 1/3, held, gone), a Squash
+  envelope (needles to broad blades), Lifetime 0.07-0.13. StarInk (9, black, behind). StarBall (14 at 2 f and 4 f on
+  the one hit). StarLong1-6: the six longest, one emitter each, AIMED: Rotation = screen angle - 90, mirrored
+  when the hit goes left. The STAR table, the camera-facing `burst` part and the 60-odd attachments are gone
+  (about 40 emitters a rig, down from about 100).
+- ELSEWHERE: every size is now a curve that goes out fast then eases (bubble, shock ring, floor ring, dust, arcs);
+  the bubble, floor ring and dust turn (RotSpeed); lines, sparks, wisps and smoke have envelopes on size and wide
+  ranges on speed and life. curve() makes keypoints with envelopes; scaled() keeps them.
+- SLOW MOTION: PunchHitFx.studySlow(factor) stretches every timer and sets every emitter's TimeScale to 1/factor.
+  For study only; nothing in the game calls it. Plan: studySlow(20), then capture at 0, 1, 2, 3, 5, 8, 12 f and
+  lay them beside the reference's frames.
+- NOT VERIFIED AT ALL BY EYE. Unknowns to check first: (1) whether Squash on a camera-facing particle scales along
+  the blade after Rotation (assumed) or along the screen (blades would shear); (2) that the blade stands upright at
+  Rotation 0 (assumed from the arc measurement); (3) lengths and brightness on the grass. The measurement snippet
+  for (1) and (2) is in this session: four emitters, Rotation 0 / 60 / 60 with Squash / random.
+- Gates: rojo build OK, selene src 0, stylua clean, tests at the end of the session.
+
+## vfx-7 (2026-11-14): vfx-6 seen running and tuned frame by frame in slow motion (NOT COMMITTED, awaiting the user's try)
+- Studio's view came back (the user: "It's visible now"). Everything vfx-6 assumed was MEASURED: a blade stands
+  upright at Rotation 0; a positive Rotation turns it anticlockwise about its base; Squash follows the blade's own
+  direction (no shear), positive = longer and thinner. 26 random blades from one point already read as a star.
+- THE SLOW-MOTION METHOD WORKS. studySlow(600) makes one reference frame last 10 s, longer than a tool round trip, so
+  each capture lands on a known frame (studySlow(60) was too fast: three captures in a row all landed at 22-24 f).
+  Captured at 0.45, 1.4, 2.5, 4.3, 5.4, 7.3 and 8.4 f and compared with the reference's 1080p frames.
+- WHAT THAT FOUND AND FIXED: (1) the star was about 1.7x too big: a blade's length is Size / 1.2 (BLADE_SIZE), not
+  Size / 2; sizes cut to match the measured 10 studs. (2) The early layers lingered about 3 frames too long: at 7 f
+  mine still had spikes, lines and the shock ring where the reference has only wisps, an arc and dust. Lifetimes
+  cut: blades 0.04-0.075 s, long spikes 0.035-0.05, band 0.035-0.065, its white core 0.04-0.06, black lines
+  0.07-0.11, ball 0.03-0.05 (thrown at 2 f and 3.5 f), bubble 0.09, shock ring 0.07, floor ring 0.15, dust 0.3.
+  (3) The shock ring drawn with the circle texture looked like an interface ring: it is a second, brighter bubble
+  now. (4) Blades fattened (Squash 0.2 +- 0.5; ball 0 +- 0.35). (5) Dust bigger (6 -> 14 studs); wisps deeper.
+- AFTER: 0.45 f a 10-11 stud star, thick and thin blades, black behind; 1.4 f the white-cored band and a small
+  bright bubble; 2.5 f band, spiky ball, strong bubble with a bright rim, dashed floor ring (close to the
+  reference's 2 f); 5.4 f only black lines, a small star, a faint big bubble; 8.4 f wisps, white and dark arcs,
+  sparks, floor dust and smoke.
+- NOT VERIFIED: the final sizes at 8-20 f after the last tweak (dust, wisps), the heavy hit, real punches on the
+  grass at full speed, 25 fighters, phones. Gates at the end of the session.
+
+## vfx-8 (2026-11-14): the hit's motion stretched so it bursts; brighter, with glints (NOT COMMITTED, awaiting the user's try)
+- WHY (the user, after trying vfx-7): "it looks like its flickering instead of bursting. i also dont see any
+  rotation, nor much size tweening that is significant and burst-like. also i think the particles became too dull,
+  it should be more bright and shiny".
+- CAUSE: vfx-7 copied the reference's frame counts. Its star lasts 2 frames and its early layers 5. In the game,
+  particles that live 2-4 frames can't show growth or spin, they pop on and off; the ball thrown again at 2 f and
+  3.5 f and the heavy hit's re-throws every 3 f made that worse. The tone work had also cut the glow too far.
+- NOW: the layers and their order are still the reference's, but each lives long enough to be seen moving.
+  Blades 0.16-0.28 s: a sixth of their length at birth, full length a quarter of the way through, then thinning to
+  a needle (Squash -0.2 -> 1.1 over life) and turning (RotSpeed +-110) as they fade. Long spikes 0.14-0.2 s, the
+  same way. One second burst on the one hit at 2 f (no re-throws). Band 0.09-0.17 s with Drag. Bubble 0.22 s,
+  shock 0.16, floor ring 0.26 (turning 110-170 deg/s), dust 0.45. Arcs turn 2.5x faster. Heavy hit: two more
+  bursts 7 f apart, overlapping, not eleven pops.
+- SHINE: core brightness 3 and a swelling glow round it; 12 sparks, faster; NEW Glints layer: nine four-point
+  stars (hit_star.png) thrown outward, swelling, shrinking and spinning at up to 260 deg/s.
+- SEEN in slow motion (studySlow(300)) on the dark floor at 0.025 s (blades just emerging), 0.07 s (full length,
+  bubble opening), 0.133 s (thinned to needles, bubble wide with a bright rim, sparks) and 0.21 s (last needles,
+  glints, wisps, arcs, dust). On the pale lobby floor the first try was a white blowout: bubble, halo and blades
+  were all near fully additive. Halo and blades are LightEmission 0.6 now, bubble fainter. Seen again on the arena
+  grass at 0.07 s: bright white middle and band, green blades with white cores, black behind.
+- NOT VERIFIED: how it feels at full speed (slow motion can't show flicker; the user must judge), the lobby floor
+  after the last change, the heavy hit, 25 fighters, phones. Gates at the end of the session.

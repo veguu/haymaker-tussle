@@ -21,6 +21,7 @@ local DashFx = require(script.Parent.Parent.Fx.DashFx)
 local ImpactFx = require(script.Parent.Parent.Fx.ImpactFx)
 local PunchHitFx = require(script.Parent.Parent.Fx.PunchHitFx)
 local StepBurstFx = require(script.Parent.Parent.Fx.StepBurstFx)
+local SwingTrailFx = require(script.Parent.Parent.Fx.SwingTrailFx)
 
 local cfg = GameConfig.Effects
 local LIGHT = Color3.fromRGB(226, 238, 252)
@@ -1008,17 +1009,19 @@ function FxController:JumpBreak(character: Model, floorReach: number)
 	end
 end
 
---- A swing: its sound, played as soon as the punch starts, and a thin streak behind the fist, the
---- after-image of the arm going through. The spark is kept for punches that land (HitBurst).
+local SWING_RIBBON_LIFE = 0.14 -- seconds each bit of a swing's ribbon lasts
+
+--- A swing: its sound, played as soon as the punch starts, and the ribbon its fist or foot leaves in
+--- the air (Fx/SwingTrailFx). The spark is kept for punches that land (HitBurst).
 function FxController:Swing(character: Model)
 	local arm = Knit.GetController("AnimController"):SwingArm(character)
 	if arm then
 		local punch = GameConfig.Punch
-		ImpactFx.fistTrail(
+		SwingTrailFx.play(
 			arm,
 			punch.Windup + punch.ActiveSeconds + cfg.FistTrailSeconds,
-			cfg.FistTrailWidth,
-			cfg.FistTrailSeconds
+			SWING_RIBBON_LIFE,
+			punch.Windup
 		)
 	end
 	local root = character:FindFirstChild("HumanoidRootPart")

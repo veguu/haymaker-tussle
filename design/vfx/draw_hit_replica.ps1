@@ -6,6 +6,12 @@
 #   hit_arc.png     one thin arc of a circle, tapered at both ends
 #   hit_crown.png   the floor crown of a step or landing: thin rings and spikes pointing outward
 #   hit_circle.png  a circle outline with a thinner one inside (the heavy hit's ring)
+#   hit_ribbon.png  the ribbon a swing leaves (a Trail texture): a bright tip edge and thinning streaks
+#   hit_star.png    a four-point glint
+#   hit_blade.png   one blade of the star in its own colours (white-hot middle, neon green, deep green edge),
+#                   standing on the image's centre, for camera-facing particles turned by Rotation
+#   hit_dust.png    the dust a hit blasts out along the floor: soft streaks fanning from an empty middle
+#   hit_wisp.png    a FLIPBOOK, 4 x 4: thin flame-like tongues rising and fraying
 #   hit_smoke.png   a FLIPBOOK, 1024 x 1024, 4 x 4 frames: one puff billowing out and fraying into wisps
 #                   (ParticleEmitter.FlipbookLayout Grid4x4, FlipbookMode OneShot)
 # Run: powershell -ExecutionPolicy Bypass -File design/vfx/draw_hit_replica.ps1
@@ -44,16 +50,18 @@ public static class HitTex {
         }
     }
 
-    // A spike lying along the image's width, its tip at the right (a VelocityParallel particle's width
-    // runs along the way it flies): widest a little behind the middle, pointed at both ends.
+    // A spike lying along the image's width, flying to the right (a VelocityParallel particle's width
+    // runs along the way it flies): a rounded base at the left, then straight sides down to a true
+    // point at the right. Hard-edged, with only a thin halo that stops short of the tip, so the point
+    // stays sharp at any size.
     public static double Needle(double u, double v) {
-        double t = (0.96 - u) / 1.92;                      // 0 at the tip, 1 at the tail
+        double t = (u + 0.97) / 1.94;                      // 0 at the base, 1 at the tip
         if (t <= 0 || t >= 1) return 0;
-        double w = 0.11 * (t < 0.6 ? t / 0.6 : (1 - t) / 0.4) + 0.004;
+        double w = 0.12 * (t < 0.1 ? Math.Sqrt(t / 0.1) : (1 - t) / 0.9);
         double d = Math.Abs(v);
-        double core = Math.Pow(Sat(1 - d / w), 0.7);
-        double glow = 0.4 * Math.Exp(-Math.Pow(d / (w * 2.6 + 0.012), 2)) * Smooth(0, 0.12, t) * Smooth(1, 0.88, t);
-        return Math.Max(core, glow);
+        double core = Sat((w - d) / 0.006) * (0.72 + 0.28 * Sat(1 - d / Math.Max(w, 0.001)));
+        double halo = 0.22 * Math.Exp(-Math.Pow(Math.Max(d - w, 0) / 0.03, 2)) * Smooth(0.0, 0.08, t) * Smooth(0.8, 0.5, t);
+        return Math.Max(core, halo);
     }
     // The shock bubble: a soft rim, a faint inside smeared outward in streaks.
     public static double Dome(double u, double v) {
@@ -170,11 +178,118 @@ public static class HitTex {
         return dense * body * fadeOut * Smooth(0.9, 0.7, r);             // clear border round each cell
     }
 
+    // The ribbon a swing leaves (for a Trail, stretched along it): u runs along the swing, v across it.
+    // A bright edge at the top (the tip of the fist or foot), then streaks thinning out toward the body.
+    public static double Ribbon(double u, double v) {
+        double across = (v + 1) / 2;                                       // 0 at the tip edge, 1 at the body edge
+        double edge = Math.Exp(-Math.Pow(across / 0.05, 2));
+        double body = 0.5 * Math.Pow(1 - across, 1.4);
+        double streak = 1 - Math.Abs(2 * Fbm(u * 0.8 + 4.0, across * 26.0, 1.7) - 1);   // long thin lines along u
+        streak = Math.Pow(streak, 2.2);
+        double fine = Fbm(u * 2.0 + 9.0, across * 60.0, 5.3);
+        double a = edge + body * (0.25 + 0.95 * streak) * (0.7 + 0.6 * fine);
+        return a * Smooth(1.0, 0.9, across);
+    }
+
+    // A four-point glint: long thin arms up, down, left and right, and a soft round middle.
+    public static double Star(double u, double v) {
+        double au = Math.Abs(u), av = Math.Abs(v);
+        double arms = Sat(1 - (Math.Sqrt(au) + Math.Sqrt(av)) / 0.98);
+        double core = Math.Pow(arms, 0.9) * 2.2;
+        double r = Math.Sqrt(u * u + v * v);
+        double glow = 0.35 * Math.Exp(-Math.Pow(r / 0.22, 2));
+        return Math.Max(core, glow) * Smooth(0.98, 0.8, Math.Max(au, av));
+    }
+
+    // The dust a hit blasts out along the floor: soft streaks fanning out from an empty middle, of
+    // uneven reach, brightest just outside the middle. Blurred on purpose: dust, not drawn lines.
+    public static double Dust(double u, double v) {
+        double r = Math.Sqrt(u * u + v * v), a = Math.Atan2(v, u);
+        double cx = Math.Cos(a), sy = Math.Sin(a);
+        double n1 = Fbm(cx * 1.6 + 5.0, sy * 1.6 + 5.0, 1.3);
+        double n2 = Fbm(cx * 5.0 + 9.0, sy * 5.0 + 9.0, 4.1);
+        double n3 = Fbm(cx * 13.0 + 2.0, sy * 13.0 + 2.0, 7.7);
+        double streak = Sat((0.45 * n1 + 0.33 * n2 + 0.22 * n3 - 0.36) / 0.26);
+        double reach = 0.62 + 0.36 * n1;
+        double radial = Smooth(0.16, 0.34, r) * Math.Pow(1 - Smooth(0.4, reach, r), 1.3);
+        double grain = 0.75 + 0.5 * Fbm(u * 9.0, v * 9.0, 3.3);
+        return (0.95 * streak * radial * grain + 0.14 * radial) * Smooth(0.99, 0.9, r);
+    }
+
+    // ---- The wisp flipbook: 16 frames (4 x 4) of thin flame-like tongues rising and fraying. ----
+    public static double Wisp(double u, double v) {
+        double gx = (u + 1) * 2, gy = (v + 1) * 2;
+        int cx = Math.Min(3, (int)gx), cy = Math.Min(3, (int)gy);
+        double lu = (gx - cx) * 2 - 1, lv = (gy - cy) * 2 - 1;
+        double t = (cy * 4 + cx) / 15.0;
+        double up = (1 - lv) / 2;                                           // 0 at the bottom of the cell, 1 at the top
+        double sway = (Fbm(lu * 1.4 + 2.0, lv * 1.2 + t * 1.6, t * 0.8) - 0.5) * (0.25 + 0.6 * up);
+        double x = lu + sway;
+        double width = 0.62 * Math.Pow(1 - 0.7 * up, 0.8) * (0.75 + 0.25 * t);
+        double column = Smooth(width, width * 0.15, Math.Abs(x));
+        double tongues = 1 - Math.Abs(2 * Fbm(x * 5.2 + 7.0, lv * 0.9 + t * 2.8, 2.0 + t * 0.6) - 1);   // filaments, scrolling up
+        tongues = Math.Pow(tongues, 9.0);                                 // only the thin crest of each ridge
+        double worn = 0.12 + 0.2 * t + 0.22 * up;
+        double dense = Sat((tongues * 1.2 + 0.16 * (1 - up) * (1 - t) - worn) / 0.3);
+        return dense * column * (1 - 0.5 * t * t) * Smooth(0.93, 0.74, Math.Abs(lv)) * Smooth(0.93, 0.78, Math.Abs(lu));
+    }
+
+    // ---- Coloured textures (the colours are baked in, so the emitter's Color stays white) ----
+    public delegate void Paint(double u, double v, double[] rgba);   // rgba each 0..1
+
+    public static void SaveColour(string path, int size, Paint paint) {
+        using (Bitmap bmp = new Bitmap(size, size, PixelFormat.Format32bppArgb)) {
+            BitmapData data = bmp.LockBits(new Rectangle(0, 0, size, size), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+            byte[] px = new byte[size * size * 4];
+            double[] c = new double[4];
+            for (int y = 0; y < size; y++) {
+                for (int x = 0; x < size; x++) {
+                    double u = (x + 0.5) / size * 2 - 1, v = (y + 0.5) / size * 2 - 1;
+                    c[0] = c[1] = c[2] = c[3] = 0;
+                    paint(u, v, c);
+                    int i = (y * size + x) * 4;
+                    px[i] = (byte)Math.Round(Sat(c[2]) * 255);        // blue
+                    px[i + 1] = (byte)Math.Round(Sat(c[1]) * 255);    // green
+                    px[i + 2] = (byte)Math.Round(Sat(c[0]) * 255);    // red
+                    px[i + 3] = (byte)Math.Round(Sat(c[3]) * 255);
+                }
+            }
+            Marshal.Copy(px, 0, data.Scan0, px.Length);
+            bmp.UnlockBits(data);
+            bmp.Save(path, ImageFormat.Png);
+        }
+    }
+
+    // One blade of the star, standing on the image's CENTRE and pointing up, so a camera-facing
+    // particle given any Rotation turns about the blade's base, and many of them at one point make a
+    // star. Shaded the way the reference's spikes are: white-hot down the middle (less of it toward
+    // the point), neon green, a deeper green edge. Hard-edged, a true point.
+    public static void Blade(double u, double v, double[] c) {
+        double t = -v / 0.97;                                 // 0 at the base (the centre), 1 at the point
+        if (t <= -0.02 || t >= 1) return;
+        double w = t < 0 ? 0.06 : 0.11 * (t < 0.07 ? 0.55 + 0.45 * Math.Sqrt(t / 0.07) : (1 - t) / 0.93);
+        double d = Math.Abs(u);
+        double a = Sat((w - d) / 0.005) * Smooth(-0.02, 0.0, t);
+        if (a <= 0) return;
+        double q = d / Math.Max(w, 0.0001);                   // 0 on the middle line, 1 at the edge
+        double hot = 0.46 * (1 - 0.55 * t);                   // how wide the white is, narrowing to the point
+        double white = Smooth(hot, hot * 0.45, q);
+        double deep = Smooth(0.62, 0.95, q);
+        double r = 0.22 + 0.78 * white, g = 1.0, b = 0.30 + 0.70 * white;      // neon green up to white
+        r = r * (1 - 0.72 * deep); g = g * (1 - 0.42 * deep); b = b * (1 - 0.6 * deep);   // down to deep green
+        c[0] = r; c[1] = g; c[2] = b; c[3] = a;
+    }
+
     public static void All(string dir) {
+        SaveColour(dir + "\\hit_blade.png", 512, Blade);
+        Save(dir + "\\hit_dust.png", 512, Dust);
+        Save(dir + "\\hit_wisp.png", 1024, Wisp);
+        Save(dir + "\\hit_ribbon.png", 512, Ribbon);
+        Save(dir + "\\hit_star.png", 256, Star);
         Save(dir + "\\hit_smoke.png", 1024, Smoke);
         Save(dir + "\\hit_crown.png", 512, Crown);
         Save(dir + "\\hit_circle.png", 256, Circle);
-        Save(dir + "\\hit_needle.png", 256, Needle);
+        Save(dir + "\\hit_needle.png", 512, Needle);
         Save(dir + "\\hit_dome.png", 256, Dome);
         Save(dir + "\\hit_floor.png", 512, Floor);
         Save(dir + "\\hit_arc.png", 256, Arc);
@@ -187,8 +302,8 @@ New-Item -ItemType Directory -Force $outDir | Out-Null
 [HitTex]::All($outDir)
 
 # The preview: all four on a mid-tone background (white on transparent looks empty in a viewer).
-$names = 'hit_needle', 'hit_dome', 'hit_floor', 'hit_arc', 'hit_crown', 'hit_circle'
-$sheet = New-Object System.Drawing.Bitmap 1560, 280
+$names = 'hit_needle', 'hit_dome', 'hit_floor', 'hit_arc', 'hit_crown', 'hit_circle', 'hit_ribbon', 'hit_star'
+$sheet = New-Object System.Drawing.Bitmap 2080, 280
 $canvas = [System.Drawing.Graphics]::FromImage($sheet)
 $canvas.Clear([System.Drawing.Color]::FromArgb(255, 40, 60, 90))
 $canvas.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic

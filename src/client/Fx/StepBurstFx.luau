@@ -126,14 +126,17 @@ local function buildRig(parent: Instance): Rig
 	crown.Brightness = 1.2
 	crown.Transparency = fade(0, 0.05, 0.5, 0.4, 1, 1)
 
-	-- 2 f. Thin arcs lying on the floor, spinning.
-	local arcs = layer(ground, "Arcs", ARC, 2, 2, 0, 4, 1, 7.5)
-	flat(arcs)
-	arcs.Lifetime = NumberRange.new(0.35, 0.5)
-	arcs.RotSpeed = NumberRange.new(300, 520)
-	arcs.Brightness = 2
-	arcs.Transparency = fade(0, 0.1, 0.6, 0.35, 1, 1)
-
+	-- 2 f. Two thin arcs lying on the floor, across from each other, spinning the same way at the
+	-- same speed, so they stay across from each other like a pinwheel.
+	for index = 1, 2 do
+		local arc = layer(ground, "Arc" .. index, ARC, 1, 2, 0, 4, 1, 7.5)
+		flat(arc)
+		arc.Rotation = NumberRange.new((index - 1) * 180)
+		arc.RotSpeed = NumberRange.new(420)
+		arc.Lifetime = NumberRange.new(0.42)
+		arc.Brightness = 2
+		arc.Transparency = fade(0, 0.1, 0.6, 0.35, 1, 1)
+	end
 	-- 3 f. Smoke round it: each puff plays the flipbook once, swelling and fraying into wisps.
 	local smoke = layer(floor, "Smoke", SMOKE, 12, 3, 0, 2.6, 1, 5)
 	smoke.FlipbookLayout = Enum.ParticleFlipbookLayout.Grid4x4
