@@ -247,6 +247,21 @@
    "TrailSeconds": 1.2,
    "TrailWidth": 2.4
   },
+  "Endlag": {
+   "Enabled": true,
+   "PunchHit": 0.1,
+   "PunchMiss": 0.28,
+   "KickHit": 0.2,
+   "KickMiss": 0.5,
+   "UppercutHit": 0.3,
+   "UppercutMiss": 0.55,
+   "CycloneHit": 0.35,
+   "CycloneMiss": 0.65,
+   "AirKick": 0.35,
+   "Dash": 0.2,
+   "Blink": 0.3,
+   "Tolerance": 0.06
+  },
   "Jump": {
    "Cooldown": 3,
    "UpBase": 50,

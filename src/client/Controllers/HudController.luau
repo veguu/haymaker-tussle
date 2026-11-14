@@ -339,6 +339,7 @@ function HudController:KnitStart()
 	local movement = Knit.GetController("MovementController")
 	local combat = Knit.GetController("CombatController")
 	local ability = Knit.GetController("AbilityController")
+	local endlag = Knit.GetController("EndlagController")
 	local lockOn = Knit.GetController("LockOnController")
 	local kickPrompt = Knit.GetController("KickPromptController")
 	local hud = movement.Hud
@@ -1007,6 +1008,20 @@ function HudController:KnitStart()
 	movement.PropelBlocked:Connect(function()
 		flashCap(rows.propel)
 	end)
+	-- Other kits' skills (Blink, Cyclone): the same press and refusal on the Q and R rows.
+	local slotRows = { mobility = rows.propel, attack = rows.uppercut }
+	ability.SkillUsed:Connect(function(slot: string)
+		local row = slotRows[slot]
+		if row then
+			HudMotion.press(row.capScale, T.PressScale, T.PressDown, T.PressUp)
+		end
+	end)
+	ability.SkillBlocked:Connect(function(slot: string)
+		local row = slotRows[slot]
+		if row then
+			flashCap(row)
+		end
+	end)
 
 	-- Touch: the cooldown drawn on the real buttons --------------------------------------------------
 	local function touchOverlay(actionName: string): (Frame?, TextLabel?)
@@ -1084,29 +1099,41 @@ function HudController:KnitStart()
 				or model:GetAttribute("HT_Clash") ~= nil
 			local punchReady, punchTotal, canPunch = combat:GetPunchTiming()
 			local upperReady, upperTotal, canUpper = combat:GetUppercutTiming()
-			-- A kit skill that isn't the Base one has no timing yet: shown as unavailable.
+			-- Another kit's skill brings its own timing (AbilityController); one that isn't built has
+			-- none, and is shown as unavailable.
 			local hasDash = ability:GetSkill("mobility").id == "Dash"
 			local hasUpper = ability:GetSkill("attack").id == "Uppercut"
+			local moveReady, moveTotal, moveUsable = ability:GetTiming("mobility")
+			local hitReady, hitTotal, hitUsable = ability:GetTiming("attack")
+			-- Endlag holds back the mobility skill and the jump too (the swings already count it).
+			local lagUntil = endlag:BusyUntil()
+			if moveReady then
+				moveReady = math.max(moveReady, lagUntil)
+			end
 			local timings = {
 				punch = { readyAt = punchReady, total = punchTotal, usable = canPunch },
-				propel = {
-					readyAt = if hasDash then now + hud.propelLeft else 0,
-					total = moveCfg.PropelCooldown,
-					usable = hasDash and not blocked,
-				},
+				propel = if moveReady and moveTotal
+					then { readyAt = moveReady, total = moveTotal, usable = moveUsable == true }
+					else {
+						readyAt = if hasDash then math.max(now + hud.propelLeft, lagUntil) else 0,
+						total = moveCfg.PropelCooldown,
+						usable = hasDash and not blocked,
+					},
 				-- Space: the air kick while there's someone to follow up (or one is under way), else the jump.
 				kick = if hud.kickTarget or hud.kicking
 					then { readyAt = hud.kickReadyAt, total = kickCfg.Cooldown, usable = true }
 					else {
-						readyAt = hud.jumpReadyAt,
+						readyAt = math.max(hud.jumpReadyAt, lagUntil),
 						total = GameConfig.Jump.Cooldown,
 						usable = not blocked,
 					},
-				uppercut = {
-					readyAt = if hasUpper then upperReady else 0,
-					total = upperTotal,
-					usable = hasUpper and canUpper,
-				},
+				uppercut = if hitReady and hitTotal
+					then { readyAt = hitReady, total = hitTotal, usable = hitUsable == true }
+					else {
+						readyAt = if hasUpper then upperReady else 0,
+						total = upperTotal,
+						usable = hasUpper and canUpper,
+					},
 			}
 			for _, action in HudTheme.Actions do
 				local id = action.id

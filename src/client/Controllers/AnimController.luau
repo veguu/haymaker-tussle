@@ -20,6 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
+local Abilities = require(ReplicatedStorage.Shared.Config.Abilities)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local AnimClips = require(ReplicatedStorage.Shared.Config.AnimClips)
 local AnimAssetIds = require(ReplicatedStorage.Shared.Config.AnimAssetIds)
@@ -50,6 +51,7 @@ local SWING_ARMS: { [string]: string } = {
 	Right = "Right Arm",
 	Uppercut = "Right Arm",
 	Kick = "Right Leg",
+	Cyclone = "Right Arm",
 }
 
 local SWING_CLIPS: { [string]: string } = {
@@ -57,6 +59,15 @@ local SWING_CLIPS: { [string]: string } = {
 	Right = "HookRight",
 	Uppercut = "Uppercut",
 	Kick = "HeavyKick",
+	-- The Cyclone is the right hook thrown while the whole body turns once round (the spin is added on
+	-- the root joint, below): AnimClips has no room for a clip of its own.
+	Cyclone = "HookRight",
+}
+-- How long each heavy swing takes to strike; the rest use the punch's windup.
+local SWING_WINDUPS: { [string]: number } = {
+	Kick = GameConfig.HeavyKick.Windup,
+	Uppercut = GameConfig.Uppercut.Windup,
+	Cyclone = Abilities.Cyclone.Windup,
 }
 -- Someone else holding a punch back, from the server's attribute (the swing it will be).
 local READY_ATTRIBUTE = "HT_PunchReady"
@@ -97,6 +108,8 @@ type Fighter = {
 	tiltAngle: number,
 	tiltSpeed: number,
 	skidding: boolean,
+	spinAt: number, -- when a Cyclone's body spin started
+	spinSeconds: number,
 }
 
 local animations: { [string]: Animation } = {}
@@ -142,6 +155,8 @@ local function setUpFighter(model: Model): Fighter?
 		tiltAngle = 0,
 		tiltSpeed = 0,
 		skidding = false,
+		spinAt = -math.huge,
+		spinSeconds = 1,
 	}
 	for name, animation in animations do
 		local track = (animator :: Animator):LoadAnimation(animation)
@@ -239,6 +254,12 @@ local function applyBodyOffset(fighter: Fighter, now: number, airborne: boolean,
 		return
 	end
 	local turn = swingTurn(fighter)
+	-- A Cyclone: the whole body goes once round, fastest at the start so the fist comes through as the
+	-- swing strikes, easing out to where it began.
+	local spun = (now - fighter.spinAt) / math.max(fighter.spinSeconds, 0.01)
+	if spun >= 0 and spun < 1 then
+		turn += 360 * (1 - (1 - spun) ^ 2)
+	end
 	local shaking = now < fighter.shakeUntil
 	-- Thrown over by a hit, then springing back past upright and settling: the bounce in a reaction.
 	-- It runs on a capped step, so a slow frame can't blow the spring up.
@@ -568,13 +589,11 @@ function AnimController:PlaySwing(model: Model, side: string)
 		-- The lead-in to the strike is stretched over the whole windup, so the fist lands when the server
 		-- decides the hit.
 		local strike = (AnimClips :: any)[chosen].strike or 0
-		local windup = math.max(
-			if side == "Kick"
-				then GameConfig.HeavyKick.Windup
-				elseif side == "Uppercut" then GameConfig.Uppercut.Windup
-				else GameConfig.Punch.Windup,
-			0.01
-		)
+		local windup = math.max(SWING_WINDUPS[side] or GameConfig.Punch.Windup, 0.01)
+		if side == "Cyclone" then
+			fighter.spinAt = os.clock()
+			fighter.spinSeconds = Abilities.Cyclone.SpinSeconds
+		end
 		if held == chosen and track.IsPlaying then
 			-- Let go of a held punch: it carries on from where it waited, ReleaseWindup from the strike.
 			track:AdjustSpeed(1)

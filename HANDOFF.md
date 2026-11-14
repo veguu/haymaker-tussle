@@ -686,3 +686,113 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   10 studs back the patch is faint (brightest hexagon 14%). Screenshot at the wall matches the GIF's structure.
 - NOT TESTED: motion by eye, phones, R2/R3, D2-D4, several players, corners. On the bright sky the white core has
   less contrast than on the GIF's dark scene.
+
+## kits-2 (2026-11-13): Tempest is real (Blink, Cyclone), rounds pay Coins (NOT COMMITTED, awaiting the user's try)
+- TEMPEST: `built = true` for both skills; their numbers are in Config/Abilities (`Abilities.Blink`,
+  `Abilities.Cyclone`), not GameConfig, so design/game.json doesn't mirror them.
+  - Blink (Q): the client moves its own body 20 studs the way it's moving (facing when slow), through fighters,
+    stopping 2.5 short of anything solid (two rays, chest and knee). Rules in Core/Blink (tests/Blink.spec, 7).
+    BlinkRequest (no args) -> AbilityService checks kit, cooldown (4 s), alive, not HT_RoundHold -> BlinkStarted to
+    the others, who show it (FxController:Blink). Client handler and cooldown in AbilityController.
+  - Cyclone (R): a heavy swing, side "Cyclone", in CombatService's HEAVY table (CycloneRequest, kit checked). Reach
+    7.5 all the way round, hits everyone once, low outward arc, no root, cooldown 6 s. It plays the HookRight clip
+    while AnimController turns the whole body once round on the root joint's C1 (no new clip: AnimClips is full).
+  - HUD: AbilityController:GetTiming(slot) gives non-Base skills' cooldowns; SkillUsed/SkillBlocked press the rows.
+- FIXED, AFFECTS THE KICK AND THE UPPERCUT: CombatService's swept contact check passed the plain punch's settings
+  to Combat.sweepReach, so every heavy move used the punch's hitbox (range 7, 20 degrees either side) and its own
+  `hitbox` was never read. It now passes `punch.cfg`. The launching kick and the Uppercut therefore now use what
+  GameConfig says: range 6, 35 degrees either side (shorter and wider than they have been playing). To get the
+  old feel back, set HeavyKick/Uppercut Range 7 and Degrees 20 (game.json and GameConfig together).
+- COINS FROM ROUNDS: Config/Abilities.RoundPay (Played 5, PerHit 1 up to 25 hits, PerRingOut 10, Win 30; nothing
+  without at least one hit landed, or in a round of fewer than 2). Core/Payout (tests/Payout.spec, 8) and
+  AbilityKit.addCoins. New RewardService keeps the tallies and pays at the round's end; CoinsEarned(total, lines)
+  shows as the menu's toast. RoundService (dumpl's) got four small hooks only: RoundStarted in startRound, Hit in
+  NoteHit (Fighting, both still standing), RingOut in settleOuts (a `lastHitters` table beside lastHits),
+  RoundEnded in finishRound. Hits on bots pay like any other.
+- SAVING: PlayerDataService LOAD_TRIES 6 -> 13 (104 s, longer than the 90 s lease). Seen in Studio: Play stopped
+  and started again, the old session's lock hadn't been let go, the load gave up after 48 s and the session was
+  unsaved (HT_DataTemp). Now it waits the lease out.
+- VERIFIED in Play (Studio, DataStore access on): bought Tempest 1000 -> 700, stopped, started: 700 Coins, Tempest
+  owned and equipped came back (HT_DataTemp false). Q moved 18.1 studs and stopped 2.5 short of the lobby wall; a
+  second Q inside the cooldown did nothing. R: server started "Cyclone", body turned (C1 sampled), one swing hit
+  Bot 1 and Bot 21 at once (strength 42). Round end paid 8 (Played 5, 3 hits) and 7 (Played 5, 2 hits); toast
+  text "+7 Coins: Played 5, 2 hits 2". No script errors. Gates: build OK, 441 tests, selene src 0, stylua clean.
+- NOT VERIFIED: the look of the blink and the spin by eye; a blink seen from a second client; ring-out and win
+  Coins in a live round (tests only); the 104 s lock wait itself; touch and gamepad.
+
+## lag-1 (2026-11-13): endlag on every move (user: "so you can't just chain them"; NOT COMMITTED, awaiting the user's try)
+- RULE (Core/Endlag, tests/Endlag.spec, 10 tests): one `busyUntil` per fighter. While it runs, no new move STARTS:
+  punch, launching kick, Uppercut, Cyclone, Dash, Blink, jump. Running is untouched. An attack locks from the press
+  through its strike (windup + Punch.ActiveSeconds) plus its Miss seconds; a hit cuts that to its Hit seconds after
+  the hit. Dash and Blink lock for one number from their start; the end of an air kick or dive kick (HT_Skill going
+  to nil) locks for `AirKick`. Cooldowns still apply; whichever ends later decides.
+- SETTINGS: GameConfig.Endlag and design/game.json config.Endlag (same place, after Uppercut), Settings Guide
+  `## Endlag`: PunchHit 0.1 / PunchMiss 0.28, KickHit 0.2 / KickMiss 0.5, UppercutHit 0.3 / UppercutMiss 0.55,
+  CycloneHit 0.35 / CycloneMiss 0.65, AirKick 0.35, Dash 0.2, Blink 0.3, Tolerance 0.06, Enabled. Punch after
+  punch is no slower than before (a test holds that); what changes is move INTO another move.
+- LEFT ALONE ON PURPOSE: a punch already held back can be let go during a dash's or blink's endlag (the server
+  allows it because it saw the hold start, and a hold can't start in endlag); the air kick after a launching kick;
+  the dive out of a jump. Bots have no endlag (BotBrain paces them).
+- SERVER: new EndlagService (IsBusy / Start / Landed; watches HT_Skill itself). CombatService refuses a swing or a
+  new hold in endlag ("refused: endlag"), starts the lock on accept and cuts it in finishPunch on a hit.
+  PropelService and AbilityService don't show a dash or blink asked for in endlag, and start its lock.
+- CLIENT: new EndlagController (BusyUntil / IsBusy / Start / Landed / Undo). CombatController's readyAt() is now
+  max(cooldown, endlag), so the punch buffer and the HUD follow it; AbilityController:Use holds back the mobility
+  skill; MovementController holds back the jump; the HUD's Q and Space rows show the wait.
+- VERIFIED in Play (Studio): Cyclone hit at +0.36 s, Q 0.17 s later did nothing, Q after the lock blinked 20 studs;
+  a punch pressed 0.2 s after a blink started exactly when the blink's 0.3 s ran out (the press was buffered);
+  Space 0.26 s after a whiffed punch didn't jump, Q after it dashed. Fired straight at the server: PunchRequest
+  0.6 s after a whiffed Cyclone came back "refused", the same 1.1 s after was accepted. Saved profile loaded
+  (708 Coins, Tempest, not temporary). Gates: build OK, 451 tests, selene src 0, stylua clean.
+- NOT VERIFIED: the dash's own 0.2 s lock by timing (tool input is too slow to press inside it), the air kick's
+  lock, the launching kick's and the Uppercut's numbers in Play, how any of it FEELS (the numbers are a first guess).
+
+## gust-1 (2026-11-13): the game's own VFX style, "Gustline", first pass (NOT COMMITTED, awaiting the user's try)
+- THE STYLE: design/VFX Style.md (approved by the user from a drawn board). Wind you can see, drawn as an ink line
+  with a puff behind it: navy ink + pale wind blue + thin white, one accent per kit (Base gold, Tempest mint,
+  Bruiser ember, Trickster violet) on heavy moves only, six shapes (crescent, ring, glint, puff, scuff, diamond
+  mote), three tiers. Its section 7 lists what is and isn't brought to it yet. The principles are in the vault:
+  `07 Lighting VFX and Audio/VFX Reference Study - Why Good Combat VFX Reads, and Building a House Style.md`.
+- TEXTURES: design/vfx/draw_gustline.ps1 -> design/vfx/out (7 PNGs), uploaded with Studio upload_image through a
+  localhost file server (it refuses file paths). Ids + palette + accents: src/shared/Config/GustStyle.luau.
+- CODE: new src/client/Fx/GustFx.luau (pooled flat plates: show / floorRing / airRing / scuff; sweep, drift,
+  stepped fade, follow a part). ImpactFx.burst: the flash is the glint, the shards are diamond motes, optional
+  accent. FxController: swingCrescent, accentOf (player attribute HT_Kit), floorBelow; Swing(character, side,
+  windup); HitBurst adds ring + scuff on a heavy hit; PropelGust and Blink add air rings; GroundBlast adds a floor
+  ring + scuff. CombatController passes the side and windup to fx:Swing (others' swings: the move's windup, plus
+  TestBot.ExtraWindup for bots).
+- MEASURED: SurfaceGui on a part's Top face: the image's right is the part's front (LookVector), its down is the
+  part's right. So a plate is CFrame.fromMatrix(at, bulge, bulge:Cross(head)).
+- VERIFIED in Play (Studio): the shapes render with ink, accent and white as drawn (staged screenshot: gold
+  Uppercut crescent, mint floor ring over a scuff, upright ring); a bot's real punch showed its crescent; punch,
+  Uppercut and dash pressed with no script errors. Gates: build OK, 451 tests, selene src 0, stylua clean.
+- NOT VERIFIED: any of it in motion (timing, the sweep, the Cyclone's turn direction against the body), the hit
+  glint and motes by eye, phones, frame cost with 25 fighters swinging (each swing is one plate; pool 24, 14 on
+  touch), how it reads on every map.
+
+## gust-2 (2026-11-13): Gustline redone as glowing layered particles after the user's correction (NOT COMMITTED)
+- WHY: the user said gust-1 was wrong: the references are glowy neon, see-through, 10+ particle layers a move, a few
+  solid pieces only, and heavily animated. A frame-by-frame pass over the four videos (yt-dlp 720p, ffmpeg contact
+  sheets at 12 fps) confirmed every point; gust-1 had been judged from one still every 1-4 s. The vault study note
+  has a corrected section 0, and design/VFX Style.md is rewritten (rendering rules first).
+- TEXTURES: a glow set added to draw_gustline.ps1 (glow_soft, crescent_glow, ring_glow, ring_burst, flare, mote_glow:
+  white, soft-edged, for additive particles), uploaded; ids in GustStyle.Images. GustStyle.Wind is the glow colour of
+  plain wind.
+- CODE: new src/client/Fx/GustBurst.luau. `hit` = 14 layers (ink underlay, white core, flare, halo, spikes, two
+  shock rings, camera-facing ring, spinning arcs, motes, ink speed lines; on the floor burst ring, glow ring, glow
+  pool, smoke, turning arcs). `ring` = 6 layers. `swing` = 5 stacked GustFx plates (7 for the Cyclone) + motes.
+  GustFx: shape "glow", `brightness`, pool 72 (28 on touch). FxController calls them from swingCrescent, HitBurst,
+  PropelGust, Blink and GroundBlast. ImpactFx.burst (now only the air kick's) uses the flare and glowing motes.
+- LEARNED: (1) a VelocityPerpendicular particle can be put in a plane, but which way it points within the plane
+  changed with the plane's tilt (same rig: right way round facing up, back to front facing down), so crescents are
+  plates and only rings are flat particles. (2) Stacked additive white = a white blob; one small white core, the
+  rest tinted, big layers dimmer. (3) Additive light nearly vanishes on the pale lobby sand; a non-additive ink
+  underlay and the ink lines carry it there. (4) To see an effect, freeze it: emit, wait, TimeScale 0 on every
+  emitter, screenshot; build every pooled rig first.
+- VERIFIED in Play (Studio, frozen frames on the arena grass): a heavy hit at 0.04 s and 0.15 s (flare, spikes,
+  standing rings, floor burst ring, ink lines), a punch hit, a heavy mint hit and a dash ring at 0.09 s; the
+  Uppercut's gold arc and a hook's blue arc in FRONT of a stand-in body. Gates: build OK, 451 tests, selene src 0,
+  stylua clean.
+- NOT VERIFIED: motion at real speed, the real key presses on this build (only staged calls), the Cyclone's arcs,
+  Blink's rings, the floor slam's rings, the lobby sand after the underlay was added, frame cost in a 25-fighter
+  round (a swing is 4-5 plates, a hit about 80 particles), phones.

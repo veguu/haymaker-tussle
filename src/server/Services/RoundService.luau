@@ -67,6 +67,8 @@ local standing: { [Model]: boolean } = {} -- who's still in it
 local outs: { [Model]: Out } = {} -- gone, waiting for the batch to settle
 local firstOutAt: number? = nil
 local lastHits: { [Model]: Round.Hit } = setmetatable({}, { __mode = "k" }) :: any
+-- The body behind each lastHits entry (which only keeps a name), for RewardService's ring-out Coins.
+local lastHitters: { [Model]: Model } = setmetatable({}, { __mode = "k" }) :: any
 local lastAfkToggle: { [Player]: number } = {}
 local folder: Folder
 local ringOut: RemoteEvent
@@ -267,12 +269,14 @@ local function startRound()
 			inPlayer:SetAttribute(IN_ROUND, true)
 		end
 		lastHits[model] = nil
+		lastHitters[model] = nil
 		CollectionService:AddTag(model, FIGHTER_TAG)
 		model:SetAttribute(HOLD, true)
 		local at = Vector3.new(spawn.x, arena.CenterY + STAND_HEIGHT, spawn.z)
 		place(model, CFrame.lookAt(at, at + Vector3.new(spawn.faceX, 0, spawn.faceZ)))
 	end
 	folder:SetAttribute("Winner", nil)
+	Knit.GetService("RewardService"):RoundStarted(roster) -- Coins: a fresh tally for everyone in it
 	trace(`round {roundNumber}: {count} fighters`)
 	setPhase("Starting", cfg.StartingSeconds)
 end
@@ -284,6 +288,7 @@ local function finishRound(winner: Model?)
 		end
 	end
 	folder:SetAttribute("Winner", if winner then roster[winner] else "")
+	Knit.GetService("RewardService"):RoundEnded(winner) -- Coins: everyone who started it is paid
 	trace(`round {roundNumber} over: {if winner then roster[winner] else "no winner"}`)
 	setPhase("RoundOver", cfg.RoundOverSeconds)
 end
@@ -298,6 +303,10 @@ local function settleOuts()
 		local credited = if out.left then nil else Round.credit(cfg, lastHits[model], out.at)
 		local cause = Round.cause(out.left, credited)
 		ringOut:FireAllClients(out.name, credited, cause)
+		local hitter = lastHitters[model]
+		if credited and hitter then
+			Knit.GetService("RewardService"):RingOut(hitter) -- Coins for the ring-out
+		end
 		trace(`{out.name} out: {cause}{if credited then ` by {credited}` else ""}`)
 		model:SetAttribute(HOLD, nil)
 		local player = Combatants.playerOf(model)
@@ -495,6 +504,11 @@ function RoundService:NoteHit(victim: Model, by: Model)
 		return
 	end
 	lastHits[victim] = { by = nameOf(by), at = os.clock() }
+	lastHitters[victim] = by
+	-- Coins: only a hit between two fighters still in the round, once it's really under way.
+	if phase == "Fighting" and self:IsStanding(victim) and self:IsStanding(by) then
+		Knit.GetService("RewardService"):Hit(by)
+	end
 end
 
 function RoundService:KnitInit()

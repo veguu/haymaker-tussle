@@ -25,6 +25,8 @@
 -- THE LAUNCHING KICK (Space while holding punch, HeavyKickRequest, no arguments): the rising kick with
 -- side "Kick", on its own cooldown. It throws the target into the air for an air kick (at LaunchSpeed or
 -- more, which is 0: always); a target that can't be launched gets its arc instead.
+-- THE CYCLONE (Tempest's R, CycloneRequest, no arguments): a spinning hook, side "Cyclone", whose reach goes
+-- all the way round. Everyone it reaches is thrown outward in a low arc (Config/Abilities.Cyclone).
 -- The kick roots the thrower through the windup (the client keeps itself still; HT_KickWindup marks it).
 -- The uppercut doesn't (Uppercut.Roots false): they keep running, and it costs them no speed, hit or miss.
 -- For both, the server measures how fast they were going at the press.
@@ -35,6 +37,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
+local Abilities = require(ReplicatedStorage.Shared.Config.Abilities)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Clash = require(ReplicatedStorage.Shared.Core.Clash)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
@@ -56,10 +59,17 @@ local upperCfg = GameConfig.Uppercut
 local upperHitbox = table.clone(punchCfg) :: any
 upperHitbox.Range = upperCfg.Range
 upperHitbox.UppercutDegrees = upperCfg.Degrees
--- The two heavy moves: their own button, windup, hitbox and cooldown, measured at the press.
-local HEAVY: { [string]: { cfg: any, hitbox: any } } = {
+-- The Cyclone (Tempest's attack skill): the same shape, reaching all the way round.
+local cycloneCfg: any = Abilities.Cyclone
+local cycloneHitbox = table.clone(punchCfg) :: any
+cycloneHitbox.Range = cycloneCfg.Range
+cycloneHitbox.UppercutDegrees = cycloneCfg.Degrees
+-- The heavy moves: their own button, windup, hitbox and cooldown, measured at the press. `skill` is
+-- the kit skill a player needs to throw it (the launching kick is everyone's).
+local HEAVY: { [string]: { cfg: any, hitbox: any, skill: string? } } = {
 	Kick = { cfg = kickCfg, hitbox = kickHitbox },
-	Uppercut = { cfg = upperCfg, hitbox = upperHitbox },
+	Uppercut = { cfg = upperCfg, hitbox = upperHitbox, skill = "Uppercut" },
+	Cyclone = { cfg = cycloneCfg, hitbox = cycloneHitbox, skill = "Cyclone" },
 }
 -- The drawing is sent whenever it could be wanted, and each client decides whether to show it.
 local SHOW_DEBUG = GameConfig.Debug.ShowHitbox or GameConfig.Training.Enabled
@@ -268,6 +278,14 @@ local function landHit(self: any, punch: Punch, target: Model, at: Vector3, from
 			Combat.staggerMultiplier(staggerCfg, before)
 		)
 		airUp = up
+	elseif punch.side == "Cyclone" then
+		-- The same kind of arc, lower and flatter (its own numbers), for everyone the spin reaches.
+		strength, up = Combat.uppercutArc(
+			cycloneCfg,
+			attackerSpeed,
+			Combat.staggerMultiplier(staggerCfg, before)
+		)
+		airUp = up
 	end
 	knockback:Launch(target, away.X * strength, away.Z * strength, up, airUp)
 	self._hitConfirmed:FireAllClients(punch.attacker, target, math.floor(strength))
@@ -298,6 +316,13 @@ local function finishPunch(self: any, punch: Punch)
 	sendResult(self, punch, if punch.hits > 0 then "hit" else "miss")
 	if punch.hits > 0 then
 		Knit.GetService("StaggerService"):Relieve(punch.attacker)
+		-- It landed: the endlag is cut from the whiff's to the hit's.
+		Knit.GetService("EndlagService"):Landed(
+			punch.attacker,
+			if HEAVY[punch.side] then punch.side else "Punch",
+			punch.acceptedAt,
+			os.clock()
+		)
 	end
 	-- The puncher pays either way: a miss slows them, a hit stops them and pushes them back. A
 	-- repel has already thrown them, which this would otherwise wipe out.
@@ -414,8 +439,9 @@ local function sample(self: any, punch: Punch, root: BasePart, now: number)
 			continue
 		end
 		punch.tested[target] = seen[#seen][2]
+		-- The swing's own hitbox (punch.cfg): a heavy move's reach and arc, not the plain punch's.
 		local found, why = Combat.sweepReach(
-			punchCfg,
+			punch.cfg,
 			samples,
 			flat.X,
 			flat.Z,
@@ -707,6 +733,7 @@ function CombatService:KnitInit()
 	self._punchReady = Net.server("PunchReady")
 	self._heavyKickRequest = Net.server("HeavyKickRequest")
 	self._uppercutRequest = Net.server("UppercutRequest")
+	self._cycloneRequest = Net.server("CycloneRequest")
 	self._punchStarted = Net.server("PunchStarted")
 	self._hitConfirmed = Net.server("HitConfirmed")
 	self._punchResult = Net.server("PunchResult")
@@ -715,7 +742,15 @@ end
 
 function CombatService:KnitStart()
 	-- The checks every swing request shares. Returns the attacker, or nil after saying why not.
-	local function acceptable(player: Player, record: PunchRecord, now: number, ...): Model?
+	-- `held`: the server saw this punch being held back, which it only allows outside endlag. Such a
+	-- punch (or the heavy move it turns into) may still go if a dash or blink started since.
+	local function acceptable(
+		player: Player,
+		record: PunchRecord,
+		now: number,
+		held: boolean,
+		...
+	): Model?
 		-- Rate limit before anything else, so a flood costs almost nothing.
 		if not Combat.takeToken(record.bucket, now, punchCfg.RequestsPerSecondLimit) then
 			record.refused += 1
@@ -749,6 +784,13 @@ function CombatService:KnitStart()
 			self._punchResult:FireClient(player, attacker, "refused")
 			return nil
 		end
+		-- Still recovering from the last move (Core/Endlag): nothing new starts.
+		if not held and Knit.GetService("EndlagService"):IsBusy(attacker, now) then
+			record.refused += 1
+			trace(`{player.Name} refused: endlag`)
+			self._punchResult:FireClient(player, attacker, "refused")
+			return nil
+		end
 		return attacker
 	end
 
@@ -777,6 +819,7 @@ function CombatService:KnitStart()
 			or punches[attacker]
 			or Knit.GetService("KickService"):IsBusy(attacker)
 			or not Combat.cooldownReady(punchCfg, now, record.lastPunch, record.recovery)
+			or Knit.GetService("EndlagService"):IsBusy(attacker, now)
 		then
 			return
 		end
@@ -792,7 +835,7 @@ function CombatService:KnitStart()
 		local now = os.clock()
 		local readyAt = record.readyAt
 		dropReady(player, record)
-		local attacker = acceptable(player, record, now, ...)
+		local attacker = acceptable(player, record, now, readyAt ~= nil, ...)
 		if not attacker then
 			return
 		end
@@ -804,6 +847,8 @@ function CombatService:KnitStart()
 		local windup = Combat.releaseWindup(punchCfg, readyAt, now)
 		self._punchStarted:FireAllClients(attacker, side)
 		trace(`{player.Name} {side} thrown, windup {string.format("%.2f", windup)}`)
+		Knit.GetService("EndlagService")
+			:Start(attacker, "Punch", now, windup + punchCfg.ActiveSeconds)
 		startPunch(self, attacker, player, side, now, windup, player:GetNetworkPing(), false)
 	end)
 
@@ -812,8 +857,9 @@ function CombatService:KnitStart()
 		local move = HEAVY[side]
 		local record = recordFor(player)
 		local now = os.clock()
+		local held = record.readyAt ~= nil
 		dropReady(player, record)
-		local attacker = acceptable(player, record, now, ...)
+		local attacker = acceptable(player, record, now, held, ...)
 		if not attacker then
 			return
 		end
@@ -841,6 +887,8 @@ function CombatService:KnitStart()
 		end
 		self._punchStarted:FireAllClients(attacker, side)
 		trace(`{player.Name} heavy {side} at speed {math.floor(speed)}`)
+		Knit.GetService("EndlagService")
+			:Start(attacker, side, now, move.cfg.Windup + punchCfg.ActiveSeconds)
 		startPunch(
 			self,
 			attacker,
@@ -857,13 +905,20 @@ function CombatService:KnitStart()
 	self._heavyKickRequest.OnServerEvent:Connect(function(player: Player, ...)
 		heavy("Kick", player, ...)
 	end)
-	self._uppercutRequest.OnServerEvent:Connect(function(player: Player, ...)
-		-- The uppercut is the Base kit's attack skill: only someone wearing a kit with it can throw it.
-		if not Knit.GetService("AbilityService"):HasSkill(player, "Uppercut") then
-			trace(`{player.Name} refused: no Uppercut in their kit`)
+	-- A kit's attack skill: only someone wearing a kit with it can throw it.
+	local function kitHeavy(side: string, player: Player, ...)
+		local skill = HEAVY[side].skill
+		if skill and not Knit.GetService("AbilityService"):HasSkill(player, skill) then
+			trace(`{player.Name} refused: no {skill} in their kit`)
 			return
 		end
-		heavy("Uppercut", player, ...)
+		heavy(side, player, ...)
+	end
+	self._uppercutRequest.OnServerEvent:Connect(function(player: Player, ...)
+		kitHeavy("Uppercut", player, ...)
+	end)
+	self._cycloneRequest.OnServerEvent:Connect(function(player: Player, ...)
+		kitHeavy("Cyclone", player, ...)
 	end)
 
 	RunService.Heartbeat:Connect(function()

@@ -8,8 +8,11 @@
 -- of particles. Nothing is created per punch. The textures are Roblox's own built-in ones, so there is
 -- nothing to upload.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+
+local GustStyle = require(ReplicatedStorage.Shared.Config.GustStyle)
 
 local ImpactFx = {}
 
@@ -60,12 +63,15 @@ local function buildKit(parent: Instance): Kit
 	local at = Instance.new("Attachment")
 	at.Parent = part
 
-	-- The star in the middle: there for a blink, swelling as it goes.
+	-- The glint in the middle (the style's four-point star, ink-edged): there for a blink, swelling as
+	-- it goes. Drawn as it is, not as a glow, so its ink edge shows against a bright sky.
 	local flash = emitter(at, "Flash")
+	flash.Texture = GustStyle.Images.Flare
+	flash.Color = ColorSequence.new(WHITE, GustStyle.Wind)
 	flash.Lifetime = NumberRange.new(0.1, 0.14)
 	flash.Speed = NumberRange.new(0)
-	flash.Rotation = NumberRange.new(0, 360)
-	flash.Brightness = 6
+	flash.Rotation = NumberRange.new(-12, 12)
+	flash.Brightness = 3
 	flash.ZOffset = 1
 	flash.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 0),
@@ -86,14 +92,16 @@ local function buildKit(parent: Instance): Kit
 		NumberSequenceKeypoint.new(1, 1),
 	})
 
-	-- The shards: small bits thrown wider and slower, that hang a moment and fall.
+	-- The motes (the style's diamonds, ink-edged): small bits thrown wider and slower, long axis along
+	-- the way they fly, that hang a moment and fall. White, or the kit's accent on a heavy hit.
 	local shards = emitter(at, "Shards")
+	shards.Texture = GustStyle.Images.MoteGlow
+	shards.Color = ColorSequence.new(WHITE)
 	shards.Orientation = Enum.ParticleOrientation.VelocityParallel
 	shards.Lifetime = NumberRange.new(0.25, 0.45)
 	shards.Drag = 4
 	shards.Acceleration = Vector3.new(0, -30, 0)
-	shards.Squash = NumberSequence.new(-0.8)
-	shards.Brightness = 3
+	shards.Brightness = 1.6
 	shards.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 0),
 		NumberSequenceKeypoint.new(0.8, 0.1),
@@ -129,9 +137,11 @@ local function count(amount: number): number
 end
 
 --- A burst at `position`, `scale` times the size of an ordinary landed punch. With a `direction` the
---- spikes and shards are thrown mostly that way, a spray off the hit; without one they go all round.
-function ImpactFx.burst(position: Vector3, direction: Vector3?, scale: number)
+--- spikes and motes are thrown mostly that way, a spray off the hit; without one they go all round.
+--- `accent` (a kit's colour, for heavy hits) colours the motes; without it they're white.
+function ImpactFx.burst(position: Vector3, direction: Vector3?, scale: number, accent: Color3?)
 	local kit = takeKit()
+	kit.shards.Color = ColorSequence.new(accent or WHITE)
 	local aim = if direction and direction.Magnitude > 0.01 then direction.Unit else nil
 	kit.part.CFrame = if aim then CFrame.lookAt(position, position + aim) else CFrame.new(position)
 	local spread = if aim then Vector2.new(70, 70) else Vector2.new(180, 180)
@@ -154,10 +164,10 @@ function ImpactFx.burst(position: Vector3, direction: Vector3?, scale: number)
 	kit.shards.SpreadAngle = spread
 	kit.shards.Speed = NumberRange.new(18 * scale, 46 * scale)
 	kit.shards.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.75 * scale),
-		NumberSequenceKeypoint.new(1, 0.15 * scale),
+		NumberSequenceKeypoint.new(0, 0.6 * scale),
+		NumberSequenceKeypoint.new(1, 0.14 * scale),
 	})
-	kit.shards:Emit(count(10))
+	kit.shards:Emit(count(if accent then 12 else 7))
 end
 
 local fistTrails: { [BasePart]: Trail } = setmetatable({}, { __mode = "k" }) :: any

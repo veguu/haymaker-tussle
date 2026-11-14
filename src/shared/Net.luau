@@ -24,7 +24,7 @@ export type EventName =
 	| "UppercutRequest" -- client to server: I pressed the heavy uppercut. No arguments, ever.
 	| "DiveRequest" -- client to server: I started a dive kick out of a jump. No arguments, ever.
 	| "DiveLanded" -- server to all: this character's dive kick landed here, and whether it hit anyone
-	| "PunchStarted" -- server to all: this character started a swing: Left, Right, Uppercut or Kick
+	| "PunchStarted" -- server to all: this character started a swing: Left, Right, Uppercut, Kick or Cyclone
 	| "HitConfirmed" -- server to all: this character's punch hit this target
 	| "Knockback" -- server to the target's client: launch velocity, and lift if airborne
 	| "BumpHappened" -- server to all: these two characters bumped
@@ -50,6 +50,10 @@ export type EventName =
 	| "AbilityBuy" -- client to server: buy this ability kit (a kit id string) with Coins
 	| "AbilityEquip" -- client to server: wear this owned ability kit (a kit id string)
 	| "AbilityResult" -- server to client: how your buy or equip went: action, kit id, "ok" or why not
+	| "BlinkRequest" -- client to server: I blinked (Tempest's Q). No arguments, ever.
+	| "BlinkStarted" -- server to other clients: this character blinked
+	| "CycloneRequest" -- client to server: I pressed the Cyclone (Tempest's R). No arguments, ever.
+	| "CoinsEarned" -- server to client: what the round just paid you: total Coins, and each line (label, Coins)
 
 local Net = {}
 

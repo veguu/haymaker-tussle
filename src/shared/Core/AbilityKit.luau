@@ -114,6 +114,20 @@ function AbilityKit.buy(book: Book, profile: Profile, kitId: any): (Profile?, st
 	return nextProfile, "ok"
 end
 
+--- Coins earned: a new profile with `amount` more (whole Coins, up to MAX_COINS), or nil when there's
+--- nothing to add (zero, negative, not a number). The old profile is never changed.
+function AbilityKit.addCoins(profile: Profile, amount: any): Profile?
+	if typeof(amount) ~= "number" or amount ~= amount or amount < 1 then
+		return nil
+	end
+	local nextProfile = copy(profile)
+	nextProfile.coins = math.min(
+		profile.coins + math.floor(math.min(amount, AbilityKit.MAX_COINS)),
+		AbilityKit.MAX_COINS
+	)
+	return nextProfile
+end
+
 --- Equips an owned kit: a new profile and "ok"; or nil and "unknown", "notOwned" or "equipped".
 function AbilityKit.equip(book: Book, profile: Profile, kitId: any): (Profile?, string)
 	local kit = AbilityKit.kit(book, kitId)

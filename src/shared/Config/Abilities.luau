@@ -36,6 +36,22 @@ Abilities.DefaultKit = "Base"
 -- Coins a brand new player starts with. A test balance until rounds pay out (user, 2026-11-12).
 Abilities.StarterCoins = 1000
 
+-- WHAT A ROUND PAYS (Core/Payout, RewardService), when it ends, to every player who started it and
+-- landed at least one hit (so standing still earns nothing):
+--   Played      for taking part
+--   PerHit      for each hit landed on someone still in the round (punch, kick, bump, clash), up to HitCap hits
+--   PerRingOut  for each ring-out credited to you
+--   Win         for being the last one standing
+-- A round with fewer than MinFighters at the start pays nothing. Hits on bots count like any other.
+Abilities.RoundPay = {
+	Played = 5,
+	PerHit = 1,
+	HitCap = 25,
+	PerRingOut = 10,
+	Win = 30,
+	MinFighters = 2,
+}
+
 -- The shop and the inventory list kits in this order.
 Abilities.Order = { "Base", "Tempest", "Bruiser", "Trickster" }
 
@@ -67,13 +83,13 @@ Abilities.Kits = {
 			id = "Blink",
 			name = "Blink",
 			blurb = "Vanish and reappear a few studs ahead.",
-			built = false,
+			built = true,
 		},
 		attack = {
 			id = "Cyclone",
 			name = "Cyclone",
 			blurb = "A spinning hook that hits everyone around you.",
-			built = false,
+			built = true,
 		},
 	},
 	Bruiser = {
@@ -113,5 +129,37 @@ Abilities.Kits = {
 		},
 	},
 } :: { [string]: Kit }
+
+-- THE SKILLS' NUMBERS. The Base kit's are in GameConfig (Movement.Propel*, Uppercut); every other
+-- built skill's are here, by skill id.
+
+-- Blink (Tempest, Q): you vanish and reappear `Distance` studs along the way you're moving (the way you
+-- face when you're slower than `MoveMinSpeed`), keeping your speed. It stops `WallGap` short of anything
+-- solid and goes through other fighters. Rules: Core/Blink.
+Abilities.Blink = {
+	Distance = 20,
+	Cooldown = 4,
+	WallGap = 2.5,
+	MoveMinSpeed = 4,
+}
+
+-- Cyclone (Tempest, R): a spinning hook through the heavy-swing machinery (CombatService, side
+-- "Cyclone"). It reaches all the way round (`Degrees` 180 either side) out to `Range`, hits everyone it
+-- reaches once, and throws each outward in a low arc: outward speed ArcBase + ArcPerStud per stud/s the
+-- thrower was going, up to ArcMax, with `Lift` upward. It doesn't root you. `SpinSeconds` is how long
+-- the body takes to turn once round (only what's shown).
+Abilities.Cyclone = {
+	Windup = 0.24,
+	Roots = false,
+	RootAfter = 0,
+	Cooldown = 6,
+	Range = 7.5,
+	Degrees = 180,
+	Lift = 38,
+	ArcBase = 42,
+	ArcPerStud = 0.7,
+	ArcMax = 85,
+	SpinSeconds = 0.42,
+}
 
 return Abilities

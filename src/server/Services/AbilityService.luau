@@ -9,6 +9,9 @@
 -- AbilityResult(action, kitId, reason) goes back to that client: action "buy" or "equip", reason "ok"
 -- or why not ("unknown", "owned", "coins", "notOwned", "equipped", "inRound", "loading", "busy").
 --
+-- BlinkRequest() - "I blinked" (Tempest's Q). No arguments. If the kit and the cooldown agree, every
+-- other client is sent BlinkStarted(character) to show it.
+--
 -- Other services ask HasSkill before letting a skill happen (the uppercut, the dash's broadcast).
 
 local Players = game:GetService("Players")
@@ -16,8 +19,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local Abilities = require(ReplicatedStorage.Shared.Config.Abilities)
+local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local AbilityKit = require(ReplicatedStorage.Shared.Core.AbilityKit)
+local Blink = require(ReplicatedStorage.Shared.Core.Blink)
 local Net = require(ReplicatedStorage.Shared.Net)
+local Combatants = require(script.Parent.Parent.Combatants)
 
 local MIN_GAP = 0.3 -- seconds between requests from one player
 local MAX_ID_LENGTH = 32
@@ -29,6 +35,7 @@ local AbilityService = Knit.CreateService({
 })
 
 local lastRequest: { [Player]: number } = {}
+local lastBlink: { [Player]: number } = {}
 
 --- The kit this player is wearing (the starter kit before their data loads).
 function AbilityService:KitOf(player: Player): string
@@ -65,6 +72,8 @@ function AbilityService:KnitInit()
 	self._buy = Net.server("AbilityBuy")
 	self._equip = Net.server("AbilityEquip")
 	self._result = Net.server("AbilityResult")
+	self._blink = Net.server("BlinkRequest")
+	self._blinkStarted = Net.server("BlinkStarted")
 end
 
 function AbilityService:KnitStart()
@@ -122,8 +131,45 @@ function AbilityService:KnitStart()
 		answer(player, "equip", kitId, why)
 	end)
 
+	-- Blink: the move itself is the client's (like the dash, it owns its body). This only decides
+	-- whether everyone else is shown it: the right kit, a living body that isn't held, and the cooldown
+	-- on the server's own clock, so a client can't spam everyone's effects.
+	self._blink.OnServerEvent:Connect(function(player: Player, ...)
+		if select("#", ...) ~= 0 then
+			return
+		end
+		local now = os.clock()
+		if
+			not Blink.ready(book.Blink, now, lastBlink[player], GameConfig.Punch.CooldownTolerance)
+		then
+			return
+		end
+		local character = player.Character
+		if
+			not character
+			or not Combatants.isAlive(character)
+			or character:GetAttribute("HT_RoundHold")
+			or not self:HasSkill(player, "Blink")
+		then
+			return
+		end
+		-- Still recovering from another move (Core/Endlag): no blink to show. Otherwise it starts its own.
+		local endlag = Knit.GetService("EndlagService")
+		if endlag:IsBusy(character, now) then
+			return
+		end
+		endlag:Start(character, "Blink", now)
+		lastBlink[player] = now
+		for _, other in Players:GetPlayers() do
+			if other ~= player then
+				self._blinkStarted:FireClient(other, character)
+			end
+		end
+	end)
+
 	Players.PlayerRemoving:Connect(function(player)
 		lastRequest[player] = nil
+		lastBlink[player] = nil
 	end)
 end
 

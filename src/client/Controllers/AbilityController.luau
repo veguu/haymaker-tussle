@@ -9,6 +9,7 @@
 -- The action names stay "HaymakerPropel" and "HaymakerUppercut": the HUD draws its cooldowns on the
 -- touch buttons by those names.
 
+local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,6 +18,8 @@ local Knit = require(ReplicatedStorage.Packages.Knit)
 local Signal = require(ReplicatedStorage.Packages.Signal)
 local Abilities = require(ReplicatedStorage.Shared.Config.Abilities)
 local AbilityKit = require(ReplicatedStorage.Shared.Core.AbilityKit)
+local Blink = require(ReplicatedStorage.Shared.Core.Blink)
+local Payout = require(ReplicatedStorage.Shared.Core.Payout)
 local Net = require(ReplicatedStorage.Shared.Net)
 
 local book: any = Abilities
@@ -46,16 +49,102 @@ local AbilityController = Knit.CreateController({
 	InventoryChanged = Signal.new(),
 	-- (text, good) a short message for the player: a buy went through, a placeholder skill, a refusal.
 	Notice = Signal.new(),
+	-- (slot) a kit skill that isn't the Base kit's went, or its press was turned down. For the HUD.
+	SkillUsed = Signal.new(),
+	SkillBlocked = Signal.new(),
 })
 
--- Each built skill's press. Returns whether it went (false: turned down; the skill's own controller
--- has already shown why, e.g. the HUD flashing its key). Add a new skill here, then mark it built.
+local blinkCfg: any = Abilities.Blink
+local lastBlink = -math.huge
+local blinkRemote: RemoteEvent? = nil
+
+-- The states nothing can be started from: stunned, caught by a kick or mid-kick, in a clash, held for
+-- a round's countdown, spectating.
+local function canAct(character: Model): boolean
+	return character:GetAttribute("HT_Stunned") == nil
+		and character:GetAttribute("HT_Air") ~= "hold"
+		and character:GetAttribute("HT_Clash") == nil
+		and character:GetAttribute("HT_RoundHold") == nil
+		and character:GetAttribute("HT_Skill") == nil
+		and character:GetAttribute("HT_Spectating") == nil
+end
+
+-- Blink: this client moves its own body (as it does for the dash), then tells the server, which shows
+-- everyone else. It goes the way you're moving, through other fighters, and stops short of anything
+-- solid at chest or knee height.
+local function blink(): boolean
+	local character = Players.LocalPlayer.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local now = os.clock()
+	if
+		not character
+		or not root
+		or not root:IsA("BasePart")
+		or not canAct(character)
+		or not Blink.ready(blinkCfg, now, lastBlink)
+	then
+		return false
+	end
+	local velocity = root.AssemblyLinearVelocity
+	local look = root.CFrame.LookVector
+	local dirX, dirZ = Blink.direction(blinkCfg, velocity.X, velocity.Z, look.X, look.Z)
+	if not dirX or not dirZ then
+		return false
+	end
+	local direction = Vector3.new(dirX, 0, dirZ)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = CollectionService:GetTagged("HT_Combatant")
+	params.IgnoreWater = true
+	params.RespectCanCollide = true
+	local reach = direction * (blinkCfg.Distance + blinkCfg.WallGap)
+	local wall: number? = nil
+	for _, drop in { 0, 1.6 } do
+		local hit = workspace:Raycast(root.Position - Vector3.yAxis * drop, reach, params)
+		if hit and (wall == nil or hit.Distance < wall) then
+			wall = hit.Distance
+		end
+	end
+	local travel = Blink.travel(blinkCfg, wall)
+	if travel < 1 then
+		return false
+	end
+	lastBlink = now
+	local from = root.Position
+	root.CFrame += direction * travel
+	Knit.GetController("FxController"):Blink(character, from, root.Position)
+	if blinkRemote then
+		blinkRemote:FireServer()
+	end
+	return true
+end
+
+-- Each built skill's press. Returns whether it went (false: turned down). Add a new skill here, then
+-- mark it built. A skill that isn't the Base kit's also needs a line in TIMINGS for the HUD.
 local HANDLERS: { [string]: () -> boolean } = {
 	Dash = function()
 		return Knit.GetController("MovementController"):RequestDash()
 	end,
 	Uppercut = function()
 		return Knit.GetController("CombatController"):ThrowUppercut()
+	end,
+	Blink = blink,
+	Cyclone = function()
+		return Knit.GetController("CombatController"):ThrowSkill("Cyclone")
+	end,
+}
+
+-- Each skill's timing for the HUD: when it's ready (os.clock()), its whole cooldown, and whether the
+-- body could use it right now. The Dash and the Uppercut have their own in the HUD already.
+local TIMINGS: { [string]: () -> (number, number, boolean) } = {
+	Blink = function()
+		local character = Players.LocalPlayer.Character
+		return lastBlink + blinkCfg.Cooldown,
+			blinkCfg.Cooldown,
+			character ~= nil and canAct(character)
+	end,
+	Cyclone = function()
+		return Knit.GetController("CombatController"):GetSkillTiming("Cyclone")
 	end,
 }
 
@@ -115,7 +204,33 @@ function AbilityController:Use(slot: string): boolean
 		self.Notice:Fire(`{skill.name} isn't built yet.`, false)
 		return false
 	end
-	return handler()
+	-- Still recovering from the last move (Core/Endlag): a mobility skill doesn't start. (Attack
+	-- skills are swings, and CombatController holds those back itself.)
+	local endlag = Knit.GetController("EndlagController")
+	if slot == "mobility" and endlag:IsBusy() then
+		self.SkillBlocked:Fire(slot)
+		return false
+	end
+	local went = handler()
+	if went and skill.id == "Blink" then
+		endlag:Start("Blink")
+	end
+	-- The Base kit's skills tell the HUD themselves (MovementController, CombatController).
+	if TIMINGS[skill.id] then
+		(if went then self.SkillUsed else self.SkillBlocked):Fire(slot)
+	end
+	return went
+end
+
+--- A slot's timing for the HUD, for skills that aren't the Base kit's: when it's ready (os.clock()),
+--- its whole cooldown, and whether it can be used right now. Nil for the Dash, the Uppercut and
+--- skills that aren't built.
+function AbilityController:GetTiming(slot: string): (number?, number?, boolean?)
+	local timing = TIMINGS[self:GetSkill(slot).id]
+	if timing then
+		return timing()
+	end
+	return nil, nil, nil
 end
 
 function AbilityController:KnitStart()
@@ -123,6 +238,32 @@ function AbilityController:KnitStart()
 	self._buy = Net.client("AbilityBuy")
 	self._equip = Net.client("AbilityEquip")
 	local result = Net.client("AbilityResult")
+	blinkRemote = Net.client("BlinkRequest")
+	local blinkStarted = Net.client("BlinkStarted")
+	if blinkStarted then
+		-- Someone else's blink: only where they left from is known here; the effect finds the arrival.
+		blinkStarted.OnClientEvent:Connect(function(character: any)
+			if typeof(character) ~= "Instance" or not character:IsA("Model") then
+				return
+			end
+			local root = character:FindFirstChild("HumanoidRootPart")
+			if root and root:IsA("BasePart") then
+				Knit.GetController("FxController"):Blink(character, root.Position)
+			end
+		end)
+	end
+	player.CharacterAdded:Connect(function()
+		lastBlink = -math.huge
+	end)
+	-- What the round just paid, as a notice. The Coins themselves arrive as the HT_Coins attribute.
+	local earned = Net.client("CoinsEarned")
+	if earned then
+		earned.OnClientEvent:Connect(function(total: any, lines: any)
+			if typeof(total) == "number" and typeof(lines) == "table" then
+				self.Notice:Fire(Payout.describe(total, lines), true)
+			end
+		end)
+	end
 
 	-- Q / B: mobility. High priority and sunk, as the dash always was, so nothing under it also fires.
 	ContextActionService:BindActionAtPriority(

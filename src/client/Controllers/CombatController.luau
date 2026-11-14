@@ -16,6 +16,7 @@ local UserInputService = game:GetService("UserInputService")
 local Typography = require(ReplicatedStorage.Shared.Typography)
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local Signal = require(ReplicatedStorage.Packages.Signal)
+local Abilities = require(ReplicatedStorage.Shared.Config.Abilities)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -91,6 +92,7 @@ function CombatController:KnitStart()
 	local fx = Knit.GetController("FxController")
 	local anim = Knit.GetController("AnimController")
 	local movement = Knit.GetController("MovementController")
+	local endlag = Knit.GetController("EndlagController")
 	if not request or not started or not confirmed then
 		warn("[Haymaker Tussle] combat remotes missing; punching is off")
 		return
@@ -126,6 +128,10 @@ function CombatController:KnitStart()
 
 	local function throw(now: number, character: Model)
 		local wasHeld = holdAt ~= nil
+		-- How long until it strikes: sooner for a punch held back long enough. Its endlag runs from now
+		-- through the strike.
+		local windup = Combat.releaseWindup(punchCfg, holdAt, now)
+		endlag:Start("Punch", windup + punchCfg.ActiveSeconds)
 		holdAt = nil
 		-- A punch that skipped the hold (a press remembered through the cooldown) says so first, so the
 		-- server never counts an old hold for it.
@@ -139,7 +145,7 @@ function CombatController:KnitStart()
 		buffered = nil
 		local swing = nextSide
 		anim:PlaySwing(character, swing)
-		fx:Swing(character)
+		fx:Swing(character, swing, windup)
 		nextSide = Combat.nextSwing(nextSide)
 		movement:PunchThrown(swing)
 		request:FireServer()
@@ -165,8 +171,10 @@ function CombatController:KnitStart()
 		end
 	end
 
+	-- When the next swing can start: the punch's cooldown, or the endlag of whatever move came last
+	-- (Core/Endlag), whichever ends later.
 	local function readyAt(): number
-		return lastPress + punchCfg.Cooldown + recovery
+		return math.max(lastPress + punchCfg.Cooldown + recovery, endlag:BusyUntil())
 	end
 
 	-- The HUD's view of the punch: when it can swing again, the whole wait that started, and whether
@@ -236,6 +244,12 @@ function CombatController:KnitStart()
 	local heavies: { [string]: { cfg: any, remote: RemoteEvent?, last: number } } = {
 		Kick = { cfg = kickCfg, remote = kickRemote, last = -math.huge },
 		Uppercut = { cfg = upperCfg, remote = Net.client("UppercutRequest"), last = -math.huge },
+		-- Tempest's attack skill: a spinning hook that reaches all the way round.
+		Cyclone = {
+			cfg = Abilities.Cyclone,
+			remote = Net.client("CycloneRequest"),
+			last = -math.huge,
+		},
 	}
 	local function throwHeavy(side: string): boolean
 		local move = heavies[side]
@@ -260,8 +274,9 @@ function CombatController:KnitStart()
 		undoPress, undoSide = lastPress, nextSide
 		lastPress = now
 		recovery = 0
+		endlag:Start(side, move.cfg.Windup + punchCfg.ActiveSeconds)
 		anim:PlaySwing(character, side)
-		fx:Swing(character)
+		fx:Swing(character, side, move.cfg.Windup)
 		-- The launching kick roots you through its windup. The uppercut doesn't: you keep running.
 		if move.cfg.Roots ~= false then
 			movement:HeavyKickStarted(move.cfg.Windup + move.cfg.RootAfter)
@@ -282,6 +297,19 @@ function CombatController:KnitStart()
 	-- The Uppercut skill (the Base kit's attack, R / L2). AbilityController owns the key.
 	self._throwUppercut = function(): boolean
 		return throwHeavy("Uppercut")
+	end
+	-- Any kit's attack skill that is a heavy swing ("Uppercut", "Cyclone"), and its timing for the HUD.
+	self._throwSkill = function(side: string): boolean
+		return heavies[side] ~= nil and side ~= "Kick" and throwHeavy(side)
+	end
+	self._skillTiming = function(side: string): (number, number, boolean)
+		local move = heavies[side]
+		if not move then
+			return 0, 1, false
+		end
+		return math.max(move.last + move.cfg.Cooldown, readyAt()),
+			move.cfg.Cooldown,
+			canPunch(player.Character)
 	end
 
 	-- Anything that could swallow the release lets go: the window losing focus, and a new body.
@@ -355,7 +383,10 @@ function CombatController:KnitStart()
 				end
 				if kind == "miss" then
 					recovery = punchCfg.MissRecovery
+				elseif kind == "hit" then
+					endlag:Landed()
 				elseif kind == "refused" then
+					endlag:Undo()
 					dropHold(player.Character)
 					-- It never happened, so the timing and the combo go back to before it.
 					lastPress = undoPress or lastPress
@@ -390,7 +421,14 @@ function CombatController:KnitStart()
 			-- Our swing already played. Follow the server's side in case they differ.
 			nextSide = Combat.nextSwing(side)
 		elseif attacker and attacker.Parent then
-			fx:Swing(attacker)
+			-- How long until theirs strikes, for its crescent: a heavy move's windup, the punch's, and
+			-- the extra a bot's punch takes.
+			local move = heavies[side]
+			local windup = if move then move.cfg.Windup else punchCfg.Windup
+			if attacker:GetAttribute("HT_Bot") or attacker:GetAttribute("HT_FillBot") then
+				windup += GameConfig.TestBot.ExtraWindup
+			end
+			fx:Swing(attacker, side, windup)
 		end
 	end)
 
@@ -464,6 +502,20 @@ function CombatController:ThrowUppercut(): boolean
 		return self._throwUppercut()
 	end
 	return false
+end
+
+--- A kit's attack skill that is a heavy swing, by its side ("Uppercut", "Cyclone"): throws it if it
+--- can. False when it was turned down.
+function CombatController:ThrowSkill(side: string): boolean
+	return self._throwSkill ~= nil and self._throwSkill(side)
+end
+
+--- That skill's timing for the HUD: when it's ready, its whole cooldown, and whether the body can swing.
+function CombatController:GetSkillTiming(side: string): (number, number, boolean)
+	if self._skillTiming then
+		return self._skillTiming(side)
+	end
+	return 0, 1, true
 end
 
 --- Is the punch button being held (a punch drawn back, or waiting to be)?

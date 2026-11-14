@@ -32,7 +32,10 @@ local AbilityKit = require(ReplicatedStorage.Shared.Core.AbilityKit)
 local STORE_NAME = "HT_PlayerData_v1"
 local LEASE = 90 -- seconds a lock holds without being renewed
 local AUTOSAVE = 30 -- seconds between saves, well inside the lease
-local LOAD_TRIES = 6 -- each waits LOCK_WAIT for a held lock
+-- Each try waits LOCK_WAIT for a held lock. Together they must outlast LEASE (13 x 8 = 104 s), so a
+-- lock left by a server that died without letting go always runs out while we wait. With 6 tries
+-- (48 s) a quick rejoin after a crash, or a Studio restart, gave an unsaved session (seen 2026-11-13).
+local LOAD_TRIES = 13
 local LOCK_WAIT = 8
 local CALL_TRIES = 4
 local CLOSE_DEADLINE = 25 -- of BindToClose's 30

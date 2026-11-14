@@ -114,6 +114,30 @@ R (L2). A slow, telegraphed uppercut on its own cooldown. You keep your momentum
 | `TrailSeconds` | 1.2 | How long the streak behind the thrown body keeps drawing. |
 | `TrailWidth` | 2.4 | How wide that streak is, in studs. |
 
+## Endlag
+
+Recovery after every move, so moves can't be chained straight into each other. While you're in a move's endlag you can't START another move: no punch, launching kick, Uppercut, Cyclone, Dash, Blink or jump. Running and steering are untouched. The server enforces it for the attacks; rules in `Core/Endlag`.
+
+An attack locks you from the press until its strike is over, plus its `Miss` seconds. If it hits, that's cut to its `Hit` seconds after the hit instead, so landing a move is rewarded and whiffing is punished. Each move's own cooldown still applies on top; whichever ends later decides.
+
+What it leaves alone, on purpose: a punch you were already holding back can still be let go (so you can dash in holding it); the air kick after a launching kick (that's the kick's combo); the dive out of a jump.
+
+| Setting | Value | What it does |
+|---|---|---|
+| `Enabled` | true | Off: no endlag at all, only the cooldowns, as before 2026-11-13. |
+| `PunchHit` | 0.1 | Seconds after a punch lands before another move can start. With the punch's 0.42 s cooldown this doesn't slow punch after punch; it stops a dash, blink or jump straight out of a hit. |
+| `PunchMiss` | 0.28 | The same after a punch that hits nobody. |
+| `KickHit` | 0.2 | After the launching kick (Space while holding punch) lands. The air kick that follows it is not held back. |
+| `KickMiss` | 0.5 | After a launching kick that misses. |
+| `UppercutHit` | 0.3 | After the Uppercut lands. |
+| `UppercutMiss` | 0.55 | After an Uppercut that misses. |
+| `CycloneHit` | 0.35 | After the Cyclone (Tempest's R) lands on anyone. |
+| `CycloneMiss` | 0.65 | After a Cyclone that hits nobody. |
+| `AirKick` | 0.35 | After an air kick or a dive kick ends (lands, misses or is broken off). |
+| `Dash` | 0.2 | Seconds from the START of a dash before an attack or jump can start. A punch already held back is let go as normal. 0: dash straight into anything. |
+| `Blink` | 0.3 | The same from the moment you reappear from a Blink (Tempest's Q). |
+| `Tolerance` | 0.06 | Slack the server gives a client's clock, so a press right on time isn't refused. |
+
 ## Jump
 
 Space, when there's nobody you launched to jump at and punch isn't held. Standing, a hop straight up. Moving, an arc that is higher and longer the faster you were going. The controls still steer in the air.

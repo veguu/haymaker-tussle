@@ -961,8 +961,11 @@ function MovementController:_bind(
 					if combat:IsHolding() then
 						-- Holding punch: the launching kick, which the air kick follows.
 						combat:ThrowLaunchKick()
-					elseif now >= jumpReadyAt then
-						-- An ordinary jump: up, and forward with the speed you had.
+					elseif
+						now >= jumpReadyAt and not Knit.GetController("EndlagController"):IsBusy()
+					then
+						-- An ordinary jump: up, and forward with the speed you had. Not while still
+						-- recovering from another move (Core/Endlag).
 						local moving = root.AssemblyLinearVelocity
 						local level = Vector3.new(moving.X, 0, moving.Z)
 						local up, forward = Jump.launch(jumpCfg, level.Magnitude)

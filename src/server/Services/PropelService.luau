@@ -64,6 +64,13 @@ function PropelService:KnitStart()
 		if not Knit.GetService("AbilityService"):HasSkill(player, "Dash") then
 			return
 		end
+		-- Still recovering from another move (Core/Endlag): no dash to show. Otherwise the dash starts
+		-- its own short endlag.
+		local endlag = Knit.GetService("EndlagService")
+		if endlag:IsBusy(character, now) then
+			return
+		end
+		endlag:Start(character, "Dash", now)
 		lastPropel[player] = now
 		lastPower[player] = power
 		for _, other in Players:GetPlayers() do
