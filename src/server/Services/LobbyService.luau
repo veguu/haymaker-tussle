@@ -10,16 +10,22 @@
 -- their inner faces on the floor's edge, frictionless so you slide along them. They're past the round's
 -- out line, so a fighter knocked this far is already out before reaching one.
 --
--- THE FLOOR built here is a plain stand-in for the Blender model (design/lobby). Once that's imported,
--- turn Lobby.ShowFloor off: the stand-in goes invisible and keeps doing the collision.
+-- WHAT YOU SEE is the Blender model (design/lobby/cliffside.py), kept at ServerStorage.HT_Lobby.<Lobby.Model>
+-- with its pivot on the middle of the viewing edge at floor level, and cloned into place here. It collides
+-- with nothing. WHAT YOU STAND ON is built here, invisible: one flat floor for the whole platform, then each
+-- terrace's slab and the ramp under its steps, and the solid props (planters, the stall's counter, posts),
+-- all from Config/LobbyLayout, which the same Blender script generates (never edit it by hand).
+-- If the model isn't in the place, the old plain stand-in floor shows instead (Lobby.ShowFloor).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local ServerStorage = game:GetService("ServerStorage")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Lobby = require(ReplicatedStorage.Shared.Core.Lobby)
+local LobbyLayout = require(ReplicatedStorage.Shared.Config.LobbyLayout)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Combatants = require(script.Parent.Parent.Combatants)
 
@@ -42,6 +48,7 @@ local LobbyService = Knit.CreateService({
 
 local dummies: { [Model]: boolean } = {}
 local folder: Folder
+local shown = false -- is the plain stand-in floor visible (no Blender model in the place)?
 
 local function slab(
 	name: string,
@@ -80,7 +87,70 @@ local function inlay(
 	part.CanQuery = false
 	part.CanTouch = false
 	part.CastShadow = false
-	part.Transparency = if cfg.ShowFloor then 0 else 1
+	part.Transparency = if shown then 0 else 1
+end
+
+-- An invisible solid piece of the layout: `u` across from the centre, `d` back from the viewing edge, `h`
+-- above the floor (the Blender script's axes).
+local function collider(index: number, c: any)
+	local back = if cfg.ViewEdgeZ >= 0 then 1 else -1
+	local part: BasePart
+	if c.kind == "cyl" then
+		local post = Instance.new("Part")
+		post.Shape = Enum.PartType.Cylinder
+		post.Size = Vector3.new(c.h1 - c.h0, c.r * 2, c.r * 2)
+		post.CFrame = CFrame.new(
+			cfg.CenterX + c.u,
+			cfg.FloorY + (c.h0 + c.h1) / 2,
+			cfg.ViewEdgeZ + back * c.d
+		) * CFrame.Angles(0, 0, math.pi / 2)
+		part = post
+	else
+		local size = Vector3.new(c.u1 - c.u0, c.h1 - c.h0, c.d1 - c.d0)
+		local at = CFrame.new(
+			cfg.CenterX + (c.u0 + c.u1) / 2,
+			cfg.FloorY + (c.h0 + c.h1) / 2,
+			cfg.ViewEdgeZ + back * (c.d0 + c.d1) / 2
+		)
+		if c.kind == "wedge" then
+			-- a WedgePart is low at its front (-Z) and high at its back: turned so it climbs away from the arena
+			part = Instance.new("WedgePart")
+			part.CFrame = if back > 0 then at else at * CFrame.Angles(0, math.pi, 0)
+		else
+			part = Instance.new("Part")
+			part.CFrame = at
+		end
+		part.Size = size
+	end
+	part.Name = `Solid{index}_{c.kind}`
+	part.Anchored = true
+	-- seen only with the plain stand-in floor (no Blender model in the place), so the terraces can be walked
+	part.Transparency = if shown then 0 else 1
+	part.Color = STONE
+	part.Material = Enum.Material.Limestone
+	part.CanCollide = true
+	part.CanTouch = false
+	part.CastShadow = false
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	part.Parent = folder
+end
+
+-- The Blender model, cloned into place. Returns whether it was there.
+local function placeModel(): boolean
+	local store = ServerStorage:FindFirstChild("HT_Lobby")
+	local source = store and store:FindFirstChild(cfg.Model or "")
+	if not (source and source:IsA("Model")) then
+		return false
+	end
+	local model = source:Clone()
+	model.Name = "Model"
+	local facing = if cfg.ViewEdgeZ >= 0 then CFrame.identity else CFrame.Angles(0, math.pi, 0)
+	model:PivotTo(CFrame.new(cfg.CenterX, cfg.FloorY, cfg.ViewEdgeZ) * facing)
+	-- always loaded for everyone, whole (streaming would deliver it piece by piece)
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+	model.Parent = folder
+	return true
 end
 
 local function build()
@@ -88,7 +158,9 @@ local function build()
 	folder.Name = "HT_Lobby"
 	local x0, x1, z0, z1 = Lobby.bounds(cfg)
 	local line = Lobby.trainingLine(cfg)
-	local hidden = if cfg.ShowFloor then 0 else 1
+	local modelled = placeModel()
+	local hidden = if cfg.ShowFloor and not modelled then 0 else 1
+	shown = hidden == 0
 
 	-- One floor for the whole platform, so there's no seam to trip on between lobby and training.
 	local floor = slab("Floor", x0, x1, z0, z1, cfg.FloorY, FLOOR_THICKNESS)
@@ -108,6 +180,10 @@ local function build()
 	local sx0, sx1, sz0, sz1 = Lobby.strip(cfg)
 	inlay("GamepassStrip", sx0 + 1, sx1 - 3, sz0 + 6, sz1 - 4, TIMBER, Enum.Material.WoodPlanks)
 	inlay("ViewingEdge", x0, x1, z0, z0 + 1.5, EDGE, Enum.Material.SmoothPlastic)
+
+	for index, solid in LobbyLayout.colliders do
+		collider(index, solid)
+	end
 
 	for index, wall in Lobby.walls(cfg) do
 		local part = Instance.new("Part")
@@ -147,7 +223,7 @@ function LobbyService:Enter(player: Player)
 	Knit.GetService("KickService"):Release(character)
 	Knit.GetService("ClashService"):EndFor(character, "fell")
 	local spot = Lobby.spawn(cfg, math.random(), math.random())
-	local at = Vector3.new(spot.x, cfg.FloorY + STAND_HEIGHT, spot.z)
+	local at = Vector3.new(spot.x, cfg.FloorY + Lobby.heightAt(cfg, spot.z) + STAND_HEIGHT, spot.z)
 	local face = Vector3.new(spot.faceX, 0, spot.faceZ)
 	root.AssemblyLinearVelocity = Vector3.zero
 	character:PivotTo(
@@ -186,7 +262,8 @@ local function spawnDummies()
 	end)
 	for _, spot in Lobby.dummies(cfg) do
 		task.spawn(function()
-			local at = Vector3.new(spot.x, cfg.FloorY + STAND_HEIGHT, spot.z)
+			local at =
+				Vector3.new(spot.x, cfg.FloorY + Lobby.heightAt(cfg, spot.z) + STAND_HEIGHT, spot.z)
 			local model = service:Spawn({
 				name = spot.name,
 				home = CFrame.lookAt(at, at + Vector3.new(spot.faceX, 0, spot.faceZ)),

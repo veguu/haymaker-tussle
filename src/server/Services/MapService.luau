@@ -15,9 +15,17 @@
 -- floor), then Map and Seq are published. A newer change made before the swap replaces the older one (only
 -- the latest token swaps). Rounds don't start while a change is under way (RoundService asks IsChanging).
 --
--- WHEN: never at round end. The finished map stays through RoundOver and the intermission; the rotation
--- only moves when the next round is actually starting (RoundService calls ChangeForNextRound as the
--- intermission countdown runs out, before any fighter is placed). Too few players -> no round -> no change.
+-- WHEN (Maps.LobbyBetweenRounds, 2026-11-13): the server starts with NO arena, on the lobby's own state
+-- (Maps.LobbyMap, a MapEnvironments entry marked `lobby = true`: an environment and no geometry). A finished
+-- map stays through RoundOver; when the round ends RoundService sends everyone to the lobby and calls
+-- RoundEnded, which changes to the lobby state: the arena's model (floor, rim, obstacles' colliders, dressing)
+-- is destroyed behind the fade and every client applies the lobby's environment. The templates in
+-- ServerStorage.HT_Maps are never touched. The next arena is loaded only when the next round is actually
+-- starting (ChangeForNextRound, as the intermission countdown runs out, before any fighter is placed); the
+-- rotation moves on every Maps.ChangeEveryRounds rounds. Too few players -> no round -> the lobby state stays.
+-- One change at a time: a change in flight makes RoundEnded and ChangeForNextRound do nothing, and only the
+-- latest token ever swaps, so nothing is cleaned up or loaded twice.
+-- With LobbyBetweenRounds off, the finished map stays up through the intermission as it used to.
 --
 -- GEOMETRY: the imported model ServerStorage.HT_Maps.<entry.model> when present; otherwise a stand-in floor
 -- in the map's own colours (the old test floor), so the rotation and environments work before the import.
@@ -52,6 +60,19 @@ local seq = 0
 local token = 0
 local pending: string? = nil
 local roundsSinceChange = 0
+local lastArena: string? = nil -- the last real arena that was up: the rotation carries on from it
+
+-- Is `id` the lobby's state: an environment with no arena?
+local function isLobby(id: string?): boolean
+	local entry = id and Envs.Maps[id]
+	return entry ~= nil and entry.lobby == true
+end
+
+-- The state to sit in between rounds, or nil when the finished map should stay up.
+local function lobbyState(): string?
+	local id = cfg.LobbyMap
+	return if cfg.LobbyBetweenRounds and type(id) == "string" and isLobby(id) then id else nil
+end
 
 local function trace(message: string)
 	if
@@ -154,9 +175,11 @@ end
 local function buildModel(id: string): Model
 	local entry = Envs.Maps[id]
 	local maps = ServerStorage:FindFirstChild("HT_Maps")
-	local source = entry and maps and maps:FindFirstChild(entry.model)
+	local source = entry and entry.model and maps and maps:FindFirstChild(entry.model)
 	local model: Model
-	if source and source:IsA("Model") then
+	if isLobby(id) then
+		model = Instance.new("Model") -- no arena: nothing to stand on, nothing to see, nothing to clean up
+	elseif source and source:IsA("Model") then
 		model = source:Clone()
 		model:PivotTo(CFrame.new(CENTER))
 		addObstacles(model, id)
@@ -182,6 +205,9 @@ local function swap(id: string)
 		old:Destroy()
 	end
 	active = id
+	if not isLobby(id) then
+		lastArena = id
+	end
 	pending = nil
 	state:SetAttribute("Pending", "")
 	state:SetAttribute("SwapAt", nil)
@@ -216,13 +242,18 @@ function MapService:ChangeTo(id: string)
 	end)
 end
 
---- A round has ended. Only counts it: the finished map stays up through the round end and the whole
---- intermission (the lobby keeps overlooking it), and nothing changes if no next round starts.
+--- A round has ended and everyone is back in the lobby. Counts it, then takes the arena away: a change to the
+--- lobby's state (its environment, no geometry), behind the fade. Does nothing if that's already where we are
+--- or a change is already under way, so a second call can't clean up twice.
 function MapService:RoundEnded()
 	if not cfg.Enabled then
 		return
 	end
 	roundsSinceChange += 1
+	local lobby = lobbyState()
+	if lobby and pending == nil and active ~= lobby then
+		self:ChangeTo(lobby)
+	end
 end
 
 --- The next round is about to place its fighters. If the rotation is due (every Maps.ChangeEveryRounds rounds)
@@ -233,11 +264,24 @@ function MapService:ChangeForNextRound(): boolean
 	if not cfg.Enabled or pending ~= nil then
 		return false
 	end
-	if roundsSinceChange < math.max(cfg.ChangeEveryRounds, 1) then
+	local onLobby = isLobby(active)
+	local due = roundsSinceChange >= math.max(cfg.ChangeEveryRounds, 1)
+	if not onLobby and not due then
 		return false
 	end
-	roundsSinceChange = 0
-	self:ChangeTo(Environment.nextMap(cfg.Rotation, active))
+	local nextId: string
+	if lastArena == nil then
+		nextId = if known(cfg.StartMap) and not isLobby(cfg.StartMap)
+			then cfg.StartMap
+			else cfg.Rotation[1]
+		roundsSinceChange = 0
+	elseif due then
+		nextId = Environment.nextMap(cfg.Rotation, lastArena)
+		roundsSinceChange = 0
+	else
+		nextId = lastArena -- the same arena again, loaded fresh
+	end
+	self:ChangeTo(nextId)
 	return true
 end
 
@@ -247,6 +291,11 @@ end
 
 function MapService:GetActive(): string?
 	return active
+end
+
+--- Is there an arena up right now (false between rounds, on the lobby's state)?
+function MapService:HasArena(): boolean
+	return active ~= nil and not isLobby(active)
 end
 
 function MapService:KnitInit()
@@ -260,7 +309,7 @@ function MapService:KnitStart()
 	if not cfg.Enabled then
 		return
 	end
-	swap(if known(cfg.StartMap) then cfg.StartMap else cfg.Rotation[1])
+	swap(lobbyState() or (if known(cfg.StartMap) then cfg.StartMap else cfg.Rotation[1]))
 
 	if RunService:IsStudio() then
 		local attr = cfg.StudioSwitchAttribute

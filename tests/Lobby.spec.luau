@@ -42,7 +42,7 @@ return {
 		end
 	end,
 
-	["from spawn and from the edge, a standing player sees the arena's near edge"] = function()
+	["the balcony and the court's front see the arena's near edge; spawn sees its middle"] = function()
 		local rise = CFG.FloorY - ARENA.CenterY
 		-- the nearest arena edge of any map (Gnomon's doubled oval reaches 176 toward the lobby)
 		local reach = ARENA.StartRadius
@@ -52,16 +52,61 @@ return {
 			end
 		end
 		local gap = CFG.ViewEdgeZ - (ARENA.CenterZ + reach)
-		local deepest = Lobby.spawn(CFG, 0.5, 1).z - CFG.ViewEdgeZ
-		assert(
-			Lobby.seesNearEdge(CFG, rise, gap, deepest),
-			"the lobby floor hides the arena from spawn"
-		)
+		-- 2026-11-13: the lobby is well above the arena now (a cliffside overlook), so the whole arena is seen
+		-- from the viewing balcony, and each terrace behind it stands higher and sees over the one in front.
+		assert(rise >= 15, "the lobby overlooks the arena from above")
 		assert(Lobby.seesNearEdge(CFG, rise, gap, 2))
+		assert(Lobby.seesNearEdge(CFG, rise, gap, 14), "most of the balcony sees the near edge")
+		local court = CFG.Terraces[1]
+		assert(
+			Lobby.seesNearEdge(CFG, rise, gap + 2, court.Start, court.Rise),
+			"the court's front edge doesn't see the arena's near edge"
+		)
+		-- from the deepest spawn spot, on the court: at least the arena's middle and everything beyond it
+		local deepest = Lobby.spawn(CFG, 0.5, 1).z - CFG.ViewEdgeZ
+		local lift = Lobby.heightAt(CFG, CFG.ViewEdgeZ + deepest)
+		assert(
+			Lobby.seesNearEdge(CFG, rise, CFG.ViewEdgeZ - ARENA.CenterZ, deepest, lift),
+			"the lobby floor hides the arena's middle from spawn"
+		)
 		-- and the arena's surface is below eye level, so feet show
 		assert(CFG.EyeHeight + rise > 0)
-		-- the same holds on the oval maps, whose near edge is 95 from the centre
-		assert(Lobby.seesNearEdge(CFG, rise, CFG.ViewEdgeZ - 95, deepest))
+	end,
+
+	["the terraces step up going away from the arena, by walkable flights"] = function()
+		local last = 0
+		for _, terrace in CFG.Terraces do
+			assert(terrace.Rise > last, "a terrace is lower than the one in front of it")
+			-- a flight is a ramp underfoot: gentle enough to run up without a jump
+			local slope = (terrace.Rise - last) / CFG.StairRun
+			assert(slope <= 0.6, `a flight's slope is {slope}`)
+			local z = CFG.ViewEdgeZ + terrace.Start
+			assert(
+				Lobby.heightAt(CFG, z) == terrace.Rise
+					and Lobby.heightAt(CFG, z + 5) == terrace.Rise
+			)
+			assert(Lobby.heightAt(CFG, z - CFG.StairLead - CFG.StairRun) == last)
+			local half = Lobby.heightAt(CFG, z - CFG.StairLead - CFG.StairRun / 2)
+			assert(half > last and half < terrace.Rise)
+			last = terrace.Rise
+		end
+		assert(
+			Lobby.heightAt(CFG, CFG.ViewEdgeZ + 1) == 0,
+			"the viewing balcony is the floor itself"
+		)
+		-- training starts exactly on its terrace, and nobody arrives on a flight
+		local line = Lobby.trainingLine(CFG)
+		assert(line - CFG.ViewEdgeZ == CFG.Terraces[#CFG.Terraces].Start)
+		for _, v in { 0, 0.5, 1 } do
+			local spot = Lobby.spawn(CFG, 0.5, v)
+			assert(
+				Lobby.heightAt(CFG, spot.z) == CFG.Terraces[1].Rise,
+				"spawn isn't flat on the court"
+			)
+		end
+		for _, dummy in Lobby.dummies(CFG) do
+			assert(Lobby.heightAt(CFG, dummy.z) == CFG.Terraces[#CFG.Terraces].Rise)
+		end
 	end,
 
 	["the gamepass strip leaves room to browse with others walking behind"] = function()

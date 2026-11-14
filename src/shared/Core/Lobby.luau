@@ -42,6 +42,26 @@ function Lobby.strip(cfg: any): (number, number, number, number)
 	return x0, x0 + cfg.StripWidth, z0, line
 end
 
+--- How far the walking surface is above `FloorY` at depth `z`. The lobby steps UP going away from the arena
+--- (`Terraces`: each { Start, Rise }, studs back from the viewing edge and studs above the floor), so every
+--- level sees over the one in front. A flight of `StairRun` studs climbs to each terrace and ends `StairLead`
+--- studs before its Start (where the last step is flush with it).
+function Lobby.heightAt(cfg: any, z: number): number
+	local back = (z - cfg.ViewEdgeZ) * (if cfg.ViewEdgeZ >= 0 then 1 else -1)
+	local height, previous = 0, 0
+	for _, terrace in cfg.Terraces or {} do
+		local top = terrace.Start - (cfg.StairLead or 0)
+		local foot = top - (cfg.StairRun or 0)
+		if back >= top then
+			height = terrace.Rise
+		elseif back > foot then
+			height = previous + (terrace.Rise - previous) * (back - foot) / (top - foot)
+		end
+		previous = terrace.Rise
+	end
+	return height
+end
+
 --- Where someone arrives: in the main lobby, facing the arena. `u` and `v` (0 to 1) spread arrivals
 --- over a small patch so players don't stand inside each other.
 function Lobby.spawn(cfg: any, u: number, v: number): Spot
@@ -89,11 +109,19 @@ end
 
 --- Can someone standing `back` studs from the viewing edge see the arena's near edge, `gap` studs
 --- beyond it and `rise` below the lobby floor? Their own floor's edge is what gets in the way.
-function Lobby.seesNearEdge(cfg: any, rise: number, gap: number, back: number): boolean
+--- `lift` is how far above the viewing edge they stand (a terrace's height), which lets them see further down.
+function Lobby.seesNearEdge(
+	cfg: any,
+	rise: number,
+	gap: number,
+	back: number,
+	lift: number?
+): boolean
+	local eye = cfg.EyeHeight + (lift or 0)
 	if rise <= 0 then
-		return cfg.EyeHeight + rise > 0
+		return eye + rise > 0
 	end
-	return rise * back / cfg.EyeHeight <= gap
+	return rise * back / eye <= gap
 end
 
 --- The lobby as a round platform, for the kick's rebound: centred on the floor, as wide as it is.
