@@ -26,9 +26,11 @@
 -- are built along the lobby's viewing edge until the round would have BotFill fighters, and the round waits
 -- for them. They're placed and held like everyone else; any left when the round ends are removed.
 --
--- MAPS: the finished map stays up through RoundOver and the whole intermission (MapService:RoundEnded only
--- counts). As the intermission countdown runs out, MapService:ChangeForNextRound() brings in the next map
--- and its environment behind the fade; fighters are placed only once that swap is done.
+-- MAPS: the finished map stays up through RoundOver (the winner's moment). When the round ends, everyone still
+-- on it is sent to the lobby FIRST, then MapService:RoundEnded() takes the arena away behind the fade and brings
+-- in the lobby's own environment (Maps.LobbyBetweenRounds). As the intermission countdown runs out,
+-- MapService:ChangeForNextRound() loads the next arena and its environment behind another fade; fighters are
+-- placed only once that swap is done.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -189,7 +191,7 @@ local function fillUp()
 		local col, row = i % perRow, i // perRow
 		local x = x0 + 24 + (x1 - x0 - 48) * (col + 0.5) / perRow
 		local z = z0 + row * 7
-		local at = Vector3.new(x, lobby.FloorY + STAND_HEIGHT, z)
+		local at = Vector3.new(x, lobby.FloorY + Lobby.heightAt(lobby, z) + STAND_HEIGHT, z)
 		table.insert(spots, CFrame.lookAt(at, at - Vector3.zAxis))
 	end
 	task.spawn(function()
@@ -399,7 +401,7 @@ local function endRound()
 	roundNumber += 1
 	folder:SetAttribute("Winner", nil)
 	setPhase("Intermission", nil)
-	-- The finished map stays up while everyone waits; it only changes when the next round starts.
+	-- Everyone is in the lobby by now: the arena goes (behind the fade) and the lobby's environment comes in.
 	Knit.GetService("MapService"):RoundEnded()
 end
 

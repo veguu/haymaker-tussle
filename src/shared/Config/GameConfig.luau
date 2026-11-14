@@ -250,15 +250,27 @@ local GameConfig = {
 	Lobby = {
 		Enabled = true,
 		CenterX = 3000,
-		FloorY = 111,
+		FloorY = 120,
 		ViewEdgeZ = 250,
-		Width = 180,
-		Depth = 240,
-		TrainingDepth = 80,
-		StripWidth = 28,
+		Width = 132,
+		Depth = 150,
+		TrainingDepth = 48,
+		Terraces = {
+			{
+				Start = 28,
+				Rise = 3,
+			},
+			{
+				Start = 102,
+				Rise = 6,
+			},
+		},
+		StairRun = 6,
+		StairLead = 1,
+		StripWidth = 24,
 		StripSide = 1,
-		SpawnZ = 266,
-		SpawnSpread = 12,
+		SpawnZ = 296,
+		SpawnSpread = 10,
 		WallHeight = 240,
 		WallThickness = 6,
 		FallDepth = 20,
@@ -268,13 +280,13 @@ local GameConfig = {
 		Dummies = {
 			{
 				Name = "Practice Dummy 1",
-				X = -40,
-				FromBack = 40,
+				X = -26,
+				FromBack = 24,
 			},
 			{
 				Name = "Practice Dummy 2",
-				X = 40,
-				FromBack = 40,
+				X = 26,
+				FromBack = 24,
 			},
 		},
 		Spectate = {
@@ -283,6 +295,7 @@ local GameConfig = {
 			LookAhead = 16,
 			Smooth = 9,
 		},
+		Model = "Cliffside",
 	},
 	Maps = {
 		Enabled = true,
@@ -300,6 +313,8 @@ local GameConfig = {
 		MaxBlackSeconds = 6,
 		JoinFadeInSeconds = 1,
 		StudioSwitchAttribute = "HT_MapRequest",
+		LobbyMap = "lobby",
+		LobbyBetweenRounds = true,
 	},
 	Training = {
 		Enabled = false,

@@ -55,6 +55,7 @@ local FILL_ATTRIBUTE = "HT_FillBot"
 -- BOTS FROZEN (workspace attribute, set only by the owner's Bots button): every bot stops where it is - no
 -- walking, no punching - so the map can be looked at in peace. Physics still applies (a flying bot lands).
 local FROZEN_ATTRIBUTE = "HT_BotsFrozen"
+local PARK_DROP = Vector3.new(0, 600, 0) -- how far below its home the arena's bot waits between rounds
 local CAN_FREEZE_ATTRIBUTE = "HT_CanFreezeBots" -- on a player: they may press the Bots button
 local FREEZE_TOGGLE_SECONDS = 0.3
 
@@ -91,6 +92,7 @@ type Dummy = {
 	requested: boolean,
 	slammed: boolean?,
 	stationary: boolean,
+	parked: boolean?, -- held out of sight while there's no arena (the arena's own bot, between rounds)
 	toB: boolean,
 	align: AlignOrientation,
 	tracks: { [string]: AnimationTrack },
@@ -916,11 +918,27 @@ function DummyService:KnitStart()
 	RunService.Heartbeat:Connect(function(dt)
 		local now = os.clock()
 		local frozen = workspace:GetAttribute(FROZEN_ATTRIBUTE) == true
+		local noArena = not ActiveArena.hasArena()
 		for model, dummy in dummies do
 			local root = Combatants.rootOf(model)
 			local humanoid = model:FindFirstChildOfClass("Humanoid")
 			if root and humanoid and humanoid.Health > 0 and model.Parent then
-				if frozen then
+				-- A bot whose home is the arena (the Studio test bot) has nothing under it between rounds: it's
+				-- held still, far below its home and out of sight, until an arena is back (then it's home
+				-- again, or on the spawn the round gives it). Fill bots and practice dummies are never parked.
+				local park = noArena and dummy.spec.fights == true and not dummy.spec.fill
+				if park ~= (dummy.parked == true) then
+					dummy.parked = park
+					root.AssemblyLinearVelocity = Vector3.zero
+					placeAt(model, if park then dummy.spec.home - PARK_DROP else dummy.spec.home)
+					if not dummy.stationary then
+						root.Anchored = park
+						if not park then
+							root:SetNetworkOwner(nil)
+						end
+					end
+				end
+				if frozen or dummy.parked then
 					humanoid.WalkSpeed = 0
 					humanoid:Move(Vector3.zero, false)
 				else

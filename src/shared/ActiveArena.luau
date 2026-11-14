@@ -40,6 +40,14 @@ function ActiveArena.mapId(): string?
 	return if type(id) == "string" and id ~= "" then id else nil
 end
 
+--- Is there an arena up right now? False between rounds, when the lobby's own state is active
+--- (a MapEnvironments entry marked `lobby = true`: an environment and no geometry).
+function ActiveArena.hasArena(): boolean
+	local id = ActiveArena.mapId()
+	local entry = id and Envs.Maps[id]
+	return not (entry ~= nil and (entry :: any).lobby == true)
+end
+
 --- The live map's settings.
 function ActiveArena.get(): Round.ArenaSettings
 	return ActiveArena.forMap(ActiveArena.mapId())

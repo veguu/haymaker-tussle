@@ -505,6 +505,126 @@ MapEnvironments.Maps = {
 			standIn = { floor = { 120, 186, 176 }, ring = { 242, 236, 222 } },
 		},
 	},
+	-- THE LOBBY'S OWN STATE (2026-11-13): not an arena. `lobby = true` means MapService shows no geometry for
+	-- it; it is what's active between rounds (GameConfig.Maps.LobbyMap), so the cliffside courtyard gets its own
+	-- golden-hour light once the finished arena has gone. Never put it in Maps.Rotation.
+	lobby = {
+		name = "Cliffside Courtyard",
+		lobby = true,
+		environment = {
+			-- golden hour: a low, warm sun from the lobby's left (late clock time swings it toward -X), long
+			-- readable shadows, shade that leans violet so lit and shaded stone separate by hue, a warm haze
+			-- toward the horizon. Exposure near neutral: the pale paving must not blow out.
+			sun = { clockTime = 16.55, latitude = 50, colour = { 255, 206, 150 }, brightness = 2.6 },
+			ambient = {
+				ambient = { 138, 126, 142 },
+				outdoor = { 172, 158, 166 },
+				bottom = { 44, 30, 22 },
+				shadowSoftness = 0.3,
+				diffuse = 0.5,
+				specular = 0.1,
+			},
+			exposure = -0.05,
+			grade = {
+				saturation = 0.06,
+				contrast = 0.14,
+				brightness = 0,
+				tint = { 255, 244, 228 },
+			},
+			bloom = { intensity = 0.35, size = 28, threshold = 1.4 },
+			sunRays = { intensity = 0.03, spread = 0.16 },
+			atmosphere = {
+				density = 0.2,
+				offset = 0.25,
+				colour = { 255, 228, 200 },
+				decay = { 255, 200, 156 },
+				glare = 0.1,
+				haze = 0.7,
+			},
+			wind = {
+				direction = { 1, 0.3 },
+				lean = 0.07,
+				strength = 0.22,
+				gustLength = 42,
+				gustSeconds = 5,
+				flutter = 0.04,
+			},
+			clouds = {
+				top = { 255, 236, 212 },
+				under = { 238, 172, 150 }, -- lit from below the horizon: peach undersides
+				list = {},
+				drift = {
+					span = 3000,
+					speed = 4.5,
+					edge = 0.14,
+					acrossJitter = 60,
+					yJitter = 25,
+					sizeJitter = 0.15,
+					headingJitter = 20,
+					rise = 6,
+					risePeriod = 90,
+					lanes = {
+						{
+							across = -950,
+							y = 300,
+							length = 160,
+							speed = 0.9,
+							phase = 0.75,
+							stretched = 0.7,
+						},
+						{
+							across = 650,
+							y = 185,
+							length = 140,
+							speed = 1.0,
+							phase = 0.2,
+							stretched = 0.6,
+						},
+						{
+							across = 800,
+							y = 210,
+							length = 150,
+							speed = 0.9,
+							phase = 0.65,
+							stretched = 0.7,
+						},
+						{
+							across = 1100,
+							y = 270,
+							length = 150,
+							speed = 0.85,
+							phase = 0.4,
+							stretched = 0.6,
+						},
+						{
+							across = -600,
+							y = 210,
+							length = 140,
+							speed = 1.0,
+							phase = 0.05,
+							stretched = 0.6,
+						},
+						{
+							across = -600,
+							y = 240,
+							length = 130,
+							speed = 1.0,
+							phase = 0.55,
+							stretched = 0.7,
+						},
+						{
+							across = -800,
+							y = 270,
+							length = 150,
+							speed = 0.85,
+							phase = 0.3,
+							stretched = 0.6,
+						},
+					},
+				},
+			},
+		},
+	},
 }
 
 return MapEnvironments
