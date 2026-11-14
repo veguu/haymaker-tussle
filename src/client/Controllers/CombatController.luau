@@ -145,7 +145,7 @@ function CombatController:KnitStart()
 		buffered = nil
 		local swing = nextSide
 		anim:PlaySwing(character, swing)
-		fx:Swing(character, swing, windup)
+		fx:Swing(character)
 		nextSide = Combat.nextSwing(nextSide)
 		movement:PunchThrown(swing)
 		request:FireServer()
@@ -276,7 +276,7 @@ function CombatController:KnitStart()
 		recovery = 0
 		endlag:Start(side, move.cfg.Windup + punchCfg.ActiveSeconds)
 		anim:PlaySwing(character, side)
-		fx:Swing(character, side, move.cfg.Windup)
+		fx:Swing(character)
 		-- The launching kick roots you through its windup. The uppercut doesn't: you keep running.
 		if move.cfg.Roots ~= false then
 			movement:HeavyKickStarted(move.cfg.Windup + move.cfg.RootAfter)
@@ -421,14 +421,7 @@ function CombatController:KnitStart()
 			-- Our swing already played. Follow the server's side in case they differ.
 			nextSide = Combat.nextSwing(side)
 		elseif attacker and attacker.Parent then
-			-- How long until theirs strikes, for its crescent: a heavy move's windup, the punch's, and
-			-- the extra a bot's punch takes.
-			local move = heavies[side]
-			local windup = if move then move.cfg.Windup else punchCfg.Windup
-			if attacker:GetAttribute("HT_Bot") or attacker:GetAttribute("HT_FillBot") then
-				windup += GameConfig.TestBot.ExtraWindup
-			end
-			fx:Swing(attacker, side, windup)
+			fx:Swing(attacker)
 		end
 	end)
 

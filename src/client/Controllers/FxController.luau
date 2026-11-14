@@ -17,12 +17,10 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Sfx = require(ReplicatedStorage.Shared.Sfx)
 local GroundBreak = require(ReplicatedStorage.Shared.Core.GroundBreak)
-local Abilities = require(ReplicatedStorage.Shared.Config.Abilities)
-local GustStyle = require(ReplicatedStorage.Shared.Config.GustStyle)
 local DashFx = require(script.Parent.Parent.Fx.DashFx)
-local GustBurst = require(script.Parent.Parent.Fx.GustBurst)
-local GustFx = require(script.Parent.Parent.Fx.GustFx)
 local ImpactFx = require(script.Parent.Parent.Fx.ImpactFx)
+local PunchHitFx = require(script.Parent.Parent.Fx.PunchHitFx)
+local StepBurstFx = require(script.Parent.Parent.Fx.StepBurstFx)
 
 local cfg = GameConfig.Effects
 local LIGHT = Color3.fromRGB(226, 238, 252)
@@ -136,92 +134,6 @@ local function streak(
 	})
 end
 
--- GUSTLINE (design/VFX Style.md). The style's flat shapes are Fx/GustFx; these pick the colour, the
--- size and the tier for each move.
-
--- The accent of the kit a fighter is wearing (bots and anyone unknown: the Base kit's).
-local function accentOf(model: Model?): Color3
-	local player = model and Players:GetPlayerFromCharacter(model)
-	return GustStyle.accentFor(player and player:GetAttribute("HT_Kit"))
-end
-
--- The floor under a point, within `reach` studs, ignoring fighters.
-local function floorBelow(position: Vector3, reach: number): Vector3?
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = CollectionService:GetTagged("HT_Combatant")
-	params.IgnoreWater = true
-	local hit = workspace:Raycast(position, Vector3.new(0, -reach, 0), params)
-	return hit and hit.Position
-end
-
--- The heavy swings (tier 2): they glow in the kit's accent. A plain punch (tier 1) glows in the pale
--- wind colour.
-local HEAVY_SWINGS = { Kick = true, Uppercut = true, Cyclone = true }
-local SWING_LEAD = 0.1 -- the crescent starts sweeping this long before the strike
-
--- The gust crescent of a swing: glowing tapered arcs along the path of the fist or foot (GustBurst.swing:
--- a hot core, a coloured body and a faint trail smearing behind it, an ink edge, motes), sweeping
--- through the strike and staying with the fighter. `windup` is how long until the strike.
-local function swingCrescent(character: Model, side: string, windup: number)
-	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked on the next line)
-	if not root then
-		return
-	end
-	local look = root.CFrame.LookVector
-	local forward = Vector3.new(look.X, 0, look.Z)
-	if forward.Magnitude < 0.01 then
-		return
-	end
-	forward = forward.Unit
-	local right = Vector3.new(-forward.Z, 0, forward.X)
-	local up = Vector3.yAxis
-	local heavy = HEAVY_SWINGS[side] == true
-	local colour = if heavy then accentOf(character) else GustStyle.Wind
-	local at = root.Position
-	if side == "Cyclone" then
-		-- All the way round the body, turning with it: two arcs across from each other.
-		local spin = Abilities.Cyclone.SpinSeconds
-		GustBurst.swing({
-			follow = root,
-			at = at + up * 0.3,
-			head = -right,
-			bulge = forward,
-			size = Abilities.Cyclone.Range * 2.6,
-			seconds = spin,
-			sweepDegrees = 400,
-			colour = colour,
-			double = true,
-			motes = 14,
-		})
-		return
-	end
-	local head, size
-	if side == "Left" then
-		at, head, size = at + forward * 1 + up * 0.6, right, 7.5
-	elseif side == "Right" then
-		at, head, size = at + forward * 1 + up * 0.6, -right, 7.5
-	elseif side == "Uppercut" then
-		at, head, size = at + forward * 1.6 + up * 0.2, up, 10.5
-	elseif side == "Kick" then
-		at, head, size = at + forward * 1.8 - up * 0.6, up + forward * 0.3, 11
-	else
-		return
-	end
-	GustBurst.swing({
-		follow = root,
-		at = at,
-		head = head,
-		bulge = forward,
-		size = size,
-		seconds = if heavy then 0.26 else 0.2,
-		sweepDegrees = if heavy then 70 else 55,
-		colour = colour,
-		delay = math.max(windup - SWING_LEAD, 0),
-		motes = if heavy then 9 else 5,
-	})
-end
-
 -- One side's gust: three swelling blobs, wind streaks trailing back, and a small droplet.
 local function gustSide(feet: Vector3, right: Vector3, back: Vector3, side: number)
 	local up = Vector3.yAxis
@@ -280,14 +192,8 @@ function FxController:PropelGust(character: Model, seconds: number?, power: numb
 	end
 	local charge = math.clamp(power or 0, 0, 1)
 	DashFx.play(character, length, charge)
-	-- The gust ring it bursts out of, standing where it started and facing the way it goes (tier 1:
-	-- no accent).
-	local moving = root.AssemblyLinearVelocity
-	local way = Vector3.new(moving.X, 0, moving.Z)
-	if way.Magnitude < 4 then
-		way = root.CFrame.LookVector
-	end
-	GustBurst.ring(root.Position, way, 4, 2.4, 0.3, GustStyle.Wind)
+	-- The burst on the floor it pushes off from (nothing in the air).
+	StepBurstFx.play(root.Position, 1)
 	-- A sharp gust of air, pitched up a little, over the old whoosh as a soft tail.
 	Sfx.play(
 		"dash",
@@ -338,14 +244,10 @@ function FxController:Blink(character: Model, from: Vector3, to: Vector3?)
 	end
 	blinkPuffs(from, true)
 	Sfx.play("dash", root, PITCH_VARY, { pitch = 1.55, volume = 0.75, cut = 0.35 })
-	-- Tier 2: gust rings in the kit's accent, one closing where they left, one opening where they land.
-	local accent = accentOf(character)
 	local function arrive(at: Vector3)
 		local gap = at - from
 		if gap.Magnitude > 1 then
 			local along = gap.Unit
-			GustBurst.ring(from, along, 8, 0.3, 0.22, accent)
-			GustBurst.ring(at, along, 3, 3, 0.34, accent)
 			for index = -1, 1 do
 				local start = from + Vector3.yAxis * index * 1.1 + along * 1.5
 				streak(start, along, math.min(gap.Magnitude * 0.45, 9), 0.2, (index + 1) * 0.012)
@@ -450,7 +352,7 @@ function FxController:AirPunchGust(character: Model, direction: Vector3)
 	gustSide(root.Position, right, -forward, -1)
 end
 
---- A burst of the same wind on the target, blowing away from the attacker.
+--- A landed hit on the target, sending them away from the attacker.
 function FxController:HitBurst(target: Model, attacker: Model?, strength: number, tip: Vector3?)
 	local root = target:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if not root then
@@ -467,58 +369,15 @@ function FxController:HitBurst(target: Model, attacker: Model?, strength: number
 	end
 	local strong = strength >= cfg.StrongHitSpeed
 	local scale = if strong then cfg.StrongHitScale else 1
-	local seconds = cfg.HitBurstSeconds * (if strong then 1.3 else 1)
 	local center = tip or root.Position - away * 0.8
 	local up = Vector3.yAxis
-	local right = Vector3.new(-away.Z, 0, away.X)
 
 	local function at(position: Vector3): CFrame
 		return CFrame.new(position)
 	end
-	spawnBlob({
-		from = at(center),
-		to = at(center + away * 1.2 + up * 0.3),
-		fromSize = ball(1.3 * scale),
-		toSize = ball(3.6 * scale),
-		seconds = seconds,
-	})
-	spawnBlob({
-		from = at(center + right * 0.5 - up * 0.3),
-		to = at(center + right * 1.8 + away * 0.6 - up * 0.5),
-		fromSize = ball(0.9 * scale),
-		toSize = ball(2.4 * scale),
-		seconds = seconds * 0.85,
-		colour = SHADE,
-	})
-	spawnBlob({
-		from = at(center - right * 0.5 + up * 0.3),
-		to = at(center - right * 1.8 + away * 0.6 + up * 0.8),
-		fromSize = ball(0.8 * scale),
-		toSize = ball(2.2 * scale),
-		seconds = seconds * 0.8,
-	})
-	streak(center + up * 0.7, away, 2.6 * scale, seconds * 0.7)
-	streak(center - up * 0.6 + right * 0.4, away, 2.2 * scale, seconds * 0.6)
-	streak(center + right * -0.7, away, 1.8 * scale, seconds * 0.55)
-	-- The spark of the hit itself: the glint, and motes sprayed the way they're sent. A heavy swing's
-	-- hit (tier 2) carries its kit's accent, and leaves a gust ring and an ink scuff on the floor.
-	local side = Knit.GetController("AnimController"):LastSwing(attacker)
-	local heavy = side ~= nil and HEAVY_SWINGS[side] == true
-	local floor = floorBelow(root.Position, 7)
-	-- The hit itself: many glowing layers at once (GustBurst.hit). A plain punch glows in the pale wind
-	-- colour; a heavy swing's hit (tier 2) is bigger, in its kit's accent, and leaves an ink scuff on
-	-- the floor after the light has gone.
-	GustBurst.hit(
-		center,
-		away,
-		scale * (if heavy then 1.15 else 0.72),
-		if heavy then accentOf(attacker) else GustStyle.Wind,
-		heavy,
-		floor
-	)
-	if heavy and floor then
-		GustFx.scuff(floor, 8, 1.6)
-	end
+	-- The hit itself: the replica of the reference's punch hit (Fx/PunchHitFx), all particles.
+	-- A strong hit is the reference's heavy hit, which carries its own size.
+	PunchHitFx.play(center, away, if strong then 1 else scale, nil, strong)
 
 	-- The crack on top, the old impact as its body, and on a strong hit a deep boom for weight.
 	Sfx.play("punch_crack", root, PITCH_VARY, { volume = 1.25 })
@@ -1077,12 +936,6 @@ function FxController:GroundBlast(body: Model, at: Vector3, power: number)
 	if floor then
 		breakFloor(floor, cfg.GroundBreakBlastScale)
 		ImpactFx.groundBlast(floor.Position, cfg.GroundBlastScale * math.max(power, 0.6))
-		-- Tier 3: a wide gust ring racing out along the floor, and a scuff that stays after the blast.
-		local strength = math.clamp(power, 0.6, 1.3)
-		local ringAt = floor.Position + Vector3.yAxis * 0.2
-		GustBurst.ring(ringAt, Vector3.yAxis, 6 * strength, 4, 0.45, GustStyle.DefaultAccent)
-		GustBurst.ring(ringAt, Vector3.yAxis, 3 * strength, 5, 0.7, GustStyle.DefaultAccent)
-		GustFx.scuff(floor.Position, 15 * strength, 2)
 	end
 end
 
@@ -1157,12 +1010,7 @@ end
 
 --- A swing: its sound, played as soon as the punch starts, and a thin streak behind the fist, the
 --- after-image of the arm going through. The spark is kept for punches that land (HitBurst).
---- `side` is the swing (Left, Right, Uppercut, Kick, Cyclone) and `windup` how long until it strikes;
---- with them it also draws the swing's gust crescent.
-function FxController:Swing(character: Model, side: string?, windup: number?)
-	if side then
-		swingCrescent(character, side, windup or GameConfig.Punch.Windup)
-	end
+function FxController:Swing(character: Model)
 	local arm = Knit.GetController("AnimController"):SwingArm(character)
 	if arm then
 		local punch = GameConfig.Punch
@@ -1188,7 +1036,8 @@ function FxController:KnitInit()
 	made.Parent = workspace
 	folder = made
 	task.spawn(Sfx.preload)
-	task.spawn(GustFx.preload)
+	task.spawn(PunchHitFx.preload)
+	task.spawn(StepBurstFx.preload)
 end
 
 -- Smoke at the feet of anyone drifting in a propel: moving fast with the body pointing away from

@@ -796,3 +796,62 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
 - NOT VERIFIED: motion at real speed, the real key presses on this build (only staged calls), the Cyclone's arcs,
   Blink's rings, the floor slam's rings, the lobby sand after the underlay was added, frame cost in a 25-fighter
   round (a swing is 4-5 plates, a hit about 80 particles), phones.
+
+## vfx-0 (2026-11-13): the Gustline VFX code taken out again (NOT COMMITTED, awaiting the user's try)
+- WHY: the user rejected gust-2 and said "revert it". New direction: one-to-one replicas of reference effects first,
+  particles only, no 3D parts, no house style yet.
+- REMOVED: src/client/Fx/GustBurst.luau, src/client/Fx/GustFx.luau, src/shared/Config/GustStyle.luau. ImpactFx.luau is
+  back to its hex-2 version (built-in textures). FxController: swingCrescent, accentOf, floorBelow and every
+  GustBurst/GustFx call gone; HitBurst calls ImpactFx.burst again; Swing(character) takes no side or windup;
+  CombatController's three fx:Swing calls follow.
+- KEPT: everything from kits-2 and lag-1, including FxController:Blink (its puffs and streaks; only its two Gust rings
+  went). Blink's puffs are the old sphere blobs, which the user also dislikes: to be replaced in the replica work.
+- KEPT ON DISK, unused: design/VFX Style.md (ON HOLD), design/vfx/draw_gustline.ps1 and design/vfx/out. The 13 uploaded
+  image ids are only in Git history now (GustStyle.luau at ff87aef).
+- Gates: rojo build OK, 451 tests, selene src 0, stylua clean. NOT VERIFIED in Studio: Rojo was not connected, because
+  the place holds a LobbyLayout script and a LobbyService that are not in Git (see the open question).
+
+## vfx-1 (2026-11-13): first replica, the punch hit from "Mumen Rider Combo" (NOT COMMITTED, awaiting the user's try)
+- DIRECTION (user, 2026-11-13): replicas first; particles are the basis, and meshes, camera work and screen effects
+  are fine ONLY where particles can't do it. Study at 24 fps or more.
+- REFERENCE: Venomec "Mumen Rider Combo" (YouTube 3R5WsLDp2f4), first punch hit, 2.28 s to 2.65 s, read at 60 fps
+  (24 frames, cropped). Layers found, in order: white floor ring (1 f before), white-hot core + star of sharp green
+  spikes (0 f), band of long green lines along the hit with black lines among them + soft white bubble (1 f), small
+  needles (4 f), green haze, thin white arcs and floor smoke (5-6 f); light gone by 8 f, smoke and arcs to 20 f+.
+- TEXTURES: design/vfx/draw_hit_replica.ps1 (C# per-pixel through Add-Type) -> design/vfx/out/hit_*.png: needle,
+  dome, floor ring, arc. Uploaded through Studio; ids at the top of src/client/Fx/PunchHitFx.luau. It also uses the
+  earlier glow_soft id and Roblox's built-in smoke.
+- CODE: new src/client/Fx/PunchHitFx.luau: 6 pooled rigs (4 hidden parts each), 12 emitters, each told to Emit at its
+  frame. PunchHitFx.play(position, direction, scale, colour?). FxController:HitBurst calls it in place of the three
+  sphere blobs, three streaks and ImpactFx.burst (ImpactFx.burst is still the air kick's).
+- MEASURED: (1) VelocityParallel lays the texture's WIDTH along the velocity, so a spike is drawn lying sideways.
+  (2) Squash s: length x 2^-s, thickness x 2^s. (3) Spikes that should meet at a point: emit from a Sphere-shaped
+  part, ShapeStyle Surface, ShapeInOut Outward. (4) On the arena grass a fully additive hit is a white blob:
+  LightEmission 0.5-0.6 and Brightness 1.3-1.6 on the coloured layers keep the green. (5) Particles in Edit mode
+  don't advance reliably with Studio in the background: judge frozen frames in Play. (6) The game's camera wins over
+  CameraType Scriptable; BindToRenderStep at RenderPriority.Last + 1 holds a test camera.
+- VERIFIED in Play (Studio, the test module pasted in, frozen frames on the arena grass at about 1 f, 3 f, 8 f, 13 f,
+  20 f): burst, line band, bubble, floor ring, arcs, floor smoke all show in that order. Gates: build OK, 451 tests,
+  selene src 0, stylua clean.
+- NOT VERIFIED: the code on disk running in the game (Rojo not connected: the place holds LobbyLayout and a
+  LobbyService that are not in Git), real punches, motion at full speed, phones, 25 fighters.
+- KNOWN GAPS against the reference: the smoke is Roblox's soft built-in puff, the reference's is wispy (wants a
+  flipbook); no ring one frame BEFORE the hit; the dark circle under the hit is left out; the white cores inside the
+  spikes are weaker than the reference's.
+
+## vfx-2 (2026-11-13): two more replicas (heavy hit, floor burst) and the first flipbook (NOT COMMITTED)
+- REFERENCE: the same video (3R5WsLDp2f4). Floor burst 3.27-3.75 s and heavy hit 3.53-4.0 s, both read at 60 fps.
+- HEAVY HIT: PunchHitFx.play(position, direction, size, colour?, heavy?). heavy = 1.25x, the star and the lines thrown
+  again every 2 f for 0.4 s ("Hold", "HoldLines"), a faint tall white column, a white circle at 16 f, two tall arcs
+  at 22 f. FxController:HitBurst passes heavy on a strong hit (strength >= Effects.StrongHitSpeed).
+- FLOOR BURST: new src/client/Fx/StepBurstFx.luau, play(position, scale): flash, crown racing out along the floor,
+  two thin arcs spinning flat, smoke. Called from FxController:PropelGust (a dash off the ground; nothing in the air).
+- FLIPBOOK (the user: "they are very necessary for good vfx"): hit_smoke.png, 1024 x 1024, 4 x 4, one puff swelling
+  and fraying into wisps, drawn by 3D value-noise in draw_hit_replica.ps1 (domain-warped fbm + ridged filaments,
+  worn away over time). FlipbookLayout Grid4x4 + FlipbookMode OneShot. Used by the hit's haze and floor smoke and
+  the floor burst's smoke, in place of Roblox's built-in puff. New textures too: hit_crown, hit_circle.
+- VERIFIED in Play (Studio, pasted test copies, frozen frames on the arena grass): floor burst at 4 f, 6 f, 18 f and
+  from straight above; heavy hit at 12 f and 30 f. Gates: see the end of the session.
+- NOT VERIFIED: the code on disk in the game (Rojo still not connected), real key presses, full speed, phones.
+- KNOWN GAPS: the heavy hit's centre is less white-hot than the reference's; the flipbook only frays in its last
+  five frames; the floor burst's crown is drawn tufts, the reference's is blurrier dust.
