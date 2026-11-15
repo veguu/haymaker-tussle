@@ -1128,3 +1128,86 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   the place's two stamps read `vfx-9+lobby-2` and its PunchHitFx has the corrected sizes (checked by grep).
 - Gates on the combined code: rojo build OK, 452 Lune tests, selene src 0, stylua clean. Build stamp on disk:
   vfx-9+lobby-2. Nothing committed: the working tree holds vfx-9 (mine) and lobby-2 (the teammate's) together.
+
+## vfx-10 (2026-11-14): batch 1 of the remake in one style: shared kit, step burst, swing lines, clash, kick, heavy hit (superseded by vfx-11 and vfx-12; committed with them)
+- WHY (the user, after approving vfx-9): "remake all the vfx we have right now, just to test out what youve learned
+  from our previous study. still going for a consistent style ... use the references as a basis". They agreed a
+  plan of three batches; this is batch 1. Batch 2: dash (lines, after-images, wind, charge), air punch gust, blink,
+  launch trail. Batch 3: ground blast, floor break, dive landing, bump puff, drift smoke.
+- THE STYLE is written at the top of the new `src/client/Fx/FxKit.luau`: a sequence not a pile; hit colour with a
+  white-hot middle = force, white and grey = floor, air and anything deflected, thin black lines = the only dark;
+  pointed shapes placed as the camera sees them; real sizes (H = 5 studs, a particle draws twice its Size);
+  leftovers gone in half a second. FxKit also holds the textures and the machinery (pooled rigs, layers fired in
+  sequence, studySlow for all kit effects). PunchHitFx is NOT yet moved onto the kit (it was just approved).
+- StepBurstFx (rewritten on the kit; reference V01 frames 196-211, 258-292, 327-343): toothed burst 0.85 -> 2.7 H
+  in four frames with a hard stop, soft flash, thin inner circle, ticked ring spreading steadily to 14 f, three
+  slow crescents, eight smoke puffs. White and grey only. Was about twice the reference's size with arcs spinning
+  at 420 deg/s.
+- SwingTrailFx (rewritten; reference V10 slash ribbons): a thin white-hot line (0.22 studs) drawn by the fist or
+  foot, a thinner hit-coloured line just inside it that lasts a little longer, a thin black line just outside,
+  and a faint wide body. Two upright sparkles after the strike that sit and shrink. `SWING_RIBBON_LIFE` 0.14 -> 0.1.
+- ClashFx (new): `pulse` (black hatch alone for a frame, swapping sides; white-hot spot with seven short green
+  spikes; small ticked ring) replaces a sphere part; `repel` is WHITE because nobody is hurt (cross flare, ring
+  with an upright four-point star shrinking inside, white and black lines thrown back, four sparkles) and
+  replaces a yellow sphere and three streak parts.
+- KickHitFx (new; reference V01 hit 2, frames 159-195): floor ring cue; star with its longest spike forward and
+  down; ONE thick white beam with a green sheath, tilted up 5 degrees, about 27 studs; thin lines round it; a fan
+  of black lines above it; opaque white bubble; at 5 f a green ball with fourteen placed sparks; three thin hoops
+  standing at different tilts from 6 f; dust, shade and smoke. `FxController:KickImpact` now calls it for a kick
+  that connects, and StepBurstFx for a body reaching the floor or a kick that hit nothing. Its flat discs, ball
+  and twelve spokes of solid parts are gone. The finisher's trail puffs (sphere parts) are left for batch 2.
+- PunchHitFx heavy hit (reference V01 hit 3, the held hit): nothing is thrown again (HOLD_TIMES 0; HoldLines,
+  which fired twelve times two frames apart, removed). The hold is layers that last 0.4-0.5 s: fourteen needles
+  that stay and thin, three bands that turn from green to black, a ticked ring, a wider pale plume, then a green
+  ball and a circle at 24-26 f.
+- SEEN in Play in slow motion (FxKit.studySlow(300), dark floor): step burst at 1.5 f (13.9 studs wide, toothed,
+  inner circles) and 9.5 f (ticked ring about 16 studs, smoke puffs); clash pulse (hatch, spot, spikes, ring);
+  clash repel at 1.5 f (ring, star, flare, lines back) and 9.5 f (ring grown, sparkles sitting, black lines; its
+  ring dipped under the floor, so it was made smaller afterwards and not seen again); kick at about 3 f (star,
+  beam to about 27 studs tilted up, black fan above).
+- NOT SEEN BY ANYONE: the kick after 3 f (ball, sparks, hoops, smoke); the heavy hit; the swing lines; anything at
+  full speed or in a real round. Studio's captures went black part-way through (the known problem in the vault's
+  field note; nothing scripted fixes it).
+- Gates: rojo build OK, 452 Lune tests, selene src 0, stylua clean. Build stamp vfx-10+lobby-2. Rojo is
+  connected, so the place has this build.
+
+## vfx-11 (2026-11-14): basic punch hit; no sun-like rings anywhere; no black line on swing trails (superseded in part by vfx-12; committed with it)
+- WHY (the user, after trying vfx-10): "i dont really want the mumen rider vfx, i just want a basic punching
+  animation. also i feel liek there are some werid particles mixed in there such as this circle with white lines
+  coming out of it looking like a drawing of the sun or something. also i dont think black lines are good for the
+  m1 swing trails".
+- PunchHitFx REPLACED by a basic hit spark on FxKit (about 230 lines, was about 950): a small white-hot spot, eight
+  short green spikes, two longer ones leaning the way of the hit, a thin plain ring, five short white lines, five
+  small placed sparks. About a head's size, gone in a sixth of a second. A strong hit is the same, 1.5 times the
+  size, with a second ring and three glints. No black, floor ring, bubble, band, smoke or arcs. The replica is in
+  Git at 070c547 (vfx-9). This also replaces vfx-10's heavy-hit layers (never seen by the user).
+- THE "SUN": the FloorRing texture (thin rings and radial dashes) and the Crown texture (rings and tufts pointing
+  outward), and possibly Dust (soft radial streaks). All three are now marked NOT TO BE USED in FxKit. Every ring
+  is the plain Circle: StepBurstFx (burst and spreading ring; its extra inner circle removed), ClashFx pulse,
+  KickHitFx floor cue and third hoop. KickHitFx's floor dust is a soft glow now.
+- SwingTrailFx: the black line is gone. Three tones: white-hot line, thinner hit-coloured line, faint body.
+- NOT CHANGED, AND NOT YET JUDGED BY THE USER: the kick (still the Mumen Rider second hit: star, thick beam, black
+  fan, ball, hoops), the step burst's size, the clash effects' black hatch and black lines.
+- SEEN BY NOBODY: this build. Studio's captures were still black. Gates: rojo build OK, 452 Lune tests, selene
+  src 0, stylua clean. Build stamp vfx-11+lobby-2; Rojo connected.
+
+## vfx-12 (2026-11-14): everything plain white; the kick and the clash effects basic too (the user tried it: "Looks good"; committed, not pushed)
+- WHY (the user, while vfx-11's follow-up was being built): asked for the kick to be basic like the punch, then
+  "also dont make the stuff green just make it plain" and "this goes for everything btw".
+- PLAIN: FxKit's default colour is white (`FxKit.PLAIN`; the green constant is gone). The Blade texture has green
+  drawn into it, so it is marked NOT TO BE USED; spikes are the white Needle, one emitter each, placed round the
+  point as the camera sees it (new helpers `FxKit.placed` and `FxKit.arrange`). A layer marked `tint` takes a
+  colour only if one is passed, which nothing does. The style's rule 2 in FxKit now says PLAIN.
+- KickHitFx REWRITTEN as a basic hit one size up from the punch: spot, ten short spikes (three lean the way of the
+  kick), ONE short thick streak (about 9 studs) with six thin lines, two thin rings, seven sparks, three glints.
+  No black fan, bubble, ball, hoops, smoke or floor layers. vfx-10's big kick was never committed.
+- PunchHitFx: same basic spark as vfx-11, now white, spikes placed by the helper.
+- ClashFx: pulse is a spot, six short spikes and a thin ring; repel is the cross flare, ring and star, white
+  lines back and sparkles. No black in either now (my choice, to keep them plain; the user only ruled black out
+  for swing trails).
+- SwingTrailFx: its second line is light grey, not green.
+- OLD EFFECTS NOT YET REMADE, colours only: DashFx's pale blue, warm and orange line colours and ImpactFx's blue
+  edge, gold, ember and fire colours are now white and light grey; FxController's LIGHT and SHADE puff colours are
+  neutral grey. The dash no longer shows its speed tiers by colour. Rock and soot colours are unchanged.
+- SEEN BY NOBODY: this build (Studio captures still black). Gates: rojo build OK, 452 Lune tests, selene src 0,
+  stylua clean. Build stamp vfx-12+lobby-2; Rojo connected.

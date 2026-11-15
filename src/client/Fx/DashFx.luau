@@ -24,16 +24,16 @@ local cfg = GameConfig.Effects
 local DashFx = {}
 
 local WHITE = Color3.new(1, 1, 1)
-local PALE = Color3.fromRGB(226, 238, 252)
+local PALE = Color3.fromRGB(240, 242, 245)
 -- A dash is coloured by how charged it is: white for a tap, through pale gold, to a bright neon orange
 -- at full. Even the full colour stays light, so it glows rather than going dark.
 -- HEAD is where a line or streak starts and what an after-image is when it appears; TAIL is what each
 -- fades to.
-local COOL_TAIL = Color3.fromRGB(196, 222, 250)
-local WARM_HEAD = Color3.fromRGB(255, 240, 196)
-local WARM_TAIL = Color3.fromRGB(255, 214, 140)
-local HOT_HEAD = Color3.fromRGB(255, 208, 136)
-local HOT_TAIL = Color3.fromRGB(255, 152, 64)
+local COOL_TAIL = Color3.fromRGB(208, 211, 216)
+local WARM_HEAD = Color3.fromRGB(255, 255, 255)
+local WARM_TAIL = Color3.fromRGB(224, 227, 232)
+local HOT_HEAD = Color3.fromRGB(255, 255, 255)
+local HOT_TAIL = Color3.fromRGB(238, 240, 244)
 local STREAK_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
 local DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local PARK = CFrame.new(0, -1000, 0)

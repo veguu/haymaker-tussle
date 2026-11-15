@@ -17,15 +17,17 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Sfx = require(ReplicatedStorage.Shared.Sfx)
 local GroundBreak = require(ReplicatedStorage.Shared.Core.GroundBreak)
+local ClashFx = require(script.Parent.Parent.Fx.ClashFx)
 local DashFx = require(script.Parent.Parent.Fx.DashFx)
 local ImpactFx = require(script.Parent.Parent.Fx.ImpactFx)
+local KickHitFx = require(script.Parent.Parent.Fx.KickHitFx)
 local PunchHitFx = require(script.Parent.Parent.Fx.PunchHitFx)
 local StepBurstFx = require(script.Parent.Parent.Fx.StepBurstFx)
 local SwingTrailFx = require(script.Parent.Parent.Fx.SwingTrailFx)
 
 local cfg = GameConfig.Effects
-local LIGHT = Color3.fromRGB(226, 238, 252)
-local SHADE = Color3.fromRGB(176, 205, 236)
+local LIGHT = Color3.fromRGB(240, 242, 245)
+local SHADE = Color3.fromRGB(200, 204, 210)
 local ROCK = Color3.fromRGB(120, 112, 104)
 local BLACK = Color3.new(0, 0, 0)
 local DARK_SHARE = 0.72
@@ -461,13 +463,8 @@ function FxController:ClashPulse(a: Model, b: Model)
 	local jitter =
 		Vector3.new(math.random() - 0.5, (math.random() - 0.3) * 1.2, math.random() - 0.5)
 	local center = middle + jitter * 0.8
-	spawnBlob({
-		from = CFrame.new(center),
-		to = CFrame.new(center + jitter * 0.6),
-		fromSize = ball(0.6),
-		toSize = ball(2.1),
-		seconds = cfg.HitBurstSeconds * 0.45,
-	})
+	-- Black hatch, a white-hot spot with green spikes, a small ticked ring (Fx/ClashFx).
+	ClashFx.pulse(center)
 	Sfx.play("bump", rootA, PITCH_VARY)
 end
 
@@ -482,18 +479,9 @@ function FxController:ClashRepel(target: Model, attacker: Model)
 		Vector3.new(rootA.Position.X - rootT.Position.X, 0, rootA.Position.Z - rootT.Position.Z)
 	local back = if line.Magnitude > 0.01 then line.Unit else rootA.CFrame.LookVector
 	local center = rootT.Position + back * math.min(line.Magnitude / 2, 2)
-	spawnBlob({
-		from = CFrame.new(center),
-		to = CFrame.new(center + back * 1.2),
-		fromSize = ball(1.2),
-		toSize = ball(4.2),
-		seconds = cfg.HitBurstSeconds * 0.8,
-		colour = Color3.fromRGB(255, 225, 120),
-	})
-	local right = Vector3.new(-back.Z, 0, back.X)
-	streak(center + right * 0.6, back, 2.8, cfg.HitBurstSeconds * 0.6)
-	streak(center - right * 0.6, back, 2.8, cfg.HitBurstSeconds * 0.6)
-	streak(center + Vector3.yAxis * 0.7, back, 2.2, cfg.HitBurstSeconds * 0.55)
+	-- White, because nobody is hurt: a cross flare, a ring with a star inside, lines thrown back
+	-- (Fx/ClashFx).
+	ClashFx.repel(center, back)
 	Sfx.play("punch_crack", rootT, PITCH_VARY, { volume = 0.8 })
 	Sfx.play("punch_hit", rootT, PITCH_VARY, { volume = 0.55 })
 end
@@ -580,47 +568,24 @@ function FxController:KickImpact(
 			end
 		end
 	end
-	local feet = position - up * cfg.FootDrop + up * 0.2
-	local seconds = cfg.KickImpactSeconds
-
-	local function flat(size: number): Vector3
-		return Vector3.new(size, 0.35, size)
-	end
-	spawnBlob({
-		from = CFrame.new(feet),
-		to = CFrame.new(feet),
-		fromSize = flat(3),
-		toSize = flat(26 * power),
-		seconds = seconds,
-	})
-	spawnBlob({
-		from = CFrame.new(feet + up * 0.1),
-		to = CFrame.new(feet + up * 0.1),
-		fromSize = flat(2),
-		toSize = flat(17 * power),
-		seconds = seconds * 0.75,
-		colour = SHADE,
-		delay = 0.03,
-	})
-	spawnBlob({
-		from = CFrame.new(feet + up * 0.6),
-		to = CFrame.new(feet + up * 2.6),
-		fromSize = ball(3),
-		toSize = ball(10 * power),
-		seconds = seconds * 0.6,
-		startTransparency = 0.05,
-	})
-	local spokes = if hit then 12 else 7
-	for index = 1, spokes do
-		local angle = (index / spokes) * math.pi * 2
-		local out = Vector3.new(math.cos(angle), 0, math.sin(angle))
-		streak(
-			feet + out * 1.2 + up * 0.5,
-			out + up * 0.25,
-			6 * power,
-			seconds * 0.6,
-			(index % 3) * 0.012
+	-- THE LOOK (vfx-10, Fx/KickHitFx and Fx/StepBurstFx; the old discs, ball and spokes of solid
+	-- parts are gone). A kick that connects is the reference's second hit: a star, one thick beam the
+	-- way it sends them, a green ball with sparks, hoops. A body reaching the floor, or a kick that
+	-- hit nothing, is only movement, so it gets the white floor burst.
+	local kickerRoot = attacker:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked where it is used)
+	if hit and not landing then
+		local line = if kickerRoot then position - kickerRoot.Position else Vector3.zero
+		local along = Vector3.new(line.X, 0, line.Z)
+		if along.Magnitude <= 0.01 and kickerRoot then
+			along = kickerRoot.CFrame.LookVector
+		end
+		KickHitFx.play(
+			position,
+			along,
+			math.clamp(0.75 + 0.35 * power, 0.7, 1.3) * (if finisher then 1.2 else 1)
 		)
+	else
+		StepBurstFx.play(position + up * 0.5, math.clamp(0.8 + 0.5 * power, 0.7, 1.5))
 	end
 
 	-- One sound per moment: the kick's crack where it connects, then the ground slam where the body
@@ -1009,7 +974,7 @@ function FxController:JumpBreak(character: Model, floorReach: number)
 	end
 end
 
-local SWING_RIBBON_LIFE = 0.14 -- seconds each bit of a swing's ribbon lasts
+local SWING_RIBBON_LIFE = 0.1 -- seconds each bit of a swing's ribbon lasts (the reference erases it in 4 to 6 frames)
 
 --- A swing: its sound, played as soon as the punch starts, and the ribbon its fist or foot leaves in
 --- the air (Fx/SwingTrailFx). The spark is kept for punches that land (HitBurst).
@@ -1041,6 +1006,8 @@ function FxController:KnitInit()
 	task.spawn(Sfx.preload)
 	task.spawn(PunchHitFx.preload)
 	task.spawn(StepBurstFx.preload)
+	task.spawn(KickHitFx.preload)
+	task.spawn(ClashFx.preload)
 end
 
 -- Smoke at the feet of anyone drifting in a propel: moving fast with the body pointing away from

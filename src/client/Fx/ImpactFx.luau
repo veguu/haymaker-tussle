@@ -15,7 +15,7 @@ local ImpactFx = {}
 
 local SPARK_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
 local WHITE = Color3.new(1, 1, 1)
-local EDGE = Color3.fromRGB(120, 170, 255)
+local EDGE = Color3.fromRGB(222, 225, 230)
 local PARK = CFrame.new(0, -1000, 0)
 local KITS = 6
 local QUALITY = if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
@@ -219,12 +219,12 @@ end
 -- THE GROUND BLAST: what a body slamming into the floor throws up. A flash and spikes going up and out,
 -- a ring of light racing outward along the floor, a short pillar of light, embers drifting up and a
 -- skirt of dust. Its parts are made once and reused, like the bursts.
-local GOLD = Color3.fromRGB(255, 214, 120)
-local EMBER = Color3.fromRGB(255, 150, 50)
+local GOLD = Color3.fromRGB(255, 255, 255)
+local EMBER = Color3.fromRGB(230, 232, 236)
 local DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local BLASTS = 3
 
-local FIRE = Color3.fromRGB(255, 120, 30)
+local FIRE = Color3.fromRGB(238, 240, 244)
 local SOOT = Color3.fromRGB(60, 48, 42)
 
 type Blast = {
@@ -329,7 +329,7 @@ local function buildBlast(parent: Instance): Blast
 	dust.Drag = 4
 	dust.Rotation = NumberRange.new(0, 360)
 	dust.RotSpeed = NumberRange.new(-50, 50)
-	dust.Color = ColorSequence.new(Color3.fromRGB(214, 200, 180))
+	dust.Color = ColorSequence.new(Color3.fromRGB(206, 206, 206))
 	dust.LightEmission = 0.15
 	dust.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 0.45),
@@ -378,7 +378,7 @@ local function buildBlast(parent: Instance): Blast
 	smoke.Acceleration = Vector3.new(0, 6, 0)
 	smoke.Rotation = NumberRange.new(0, 360)
 	smoke.RotSpeed = NumberRange.new(-30, 30)
-	smoke.Color = ColorSequence.new(Color3.fromRGB(90, 80, 74), Color3.fromRGB(150, 140, 132))
+	smoke.Color = ColorSequence.new(Color3.fromRGB(84, 84, 84), Color3.fromRGB(144, 144, 144))
 	smoke.LightEmission = 0
 	smoke.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 0.35),
