@@ -110,12 +110,54 @@ local pool = FxKit.pool("HT_StepBurstFx", 6, function(parent, add)
 	smoke.Drag = 2
 	smoke.Transparency = fade(0, 0.2, 0.6, 0.45, 1, 1)
 
+	-- A HEAVY LANDING ONLY (a body slammed into the floor, a dive kick landing): the same burst, plus
+	-- thin white lines thrown up off the floor at once, and more smoke rising from 4 f. This replaces
+	-- the old ground blast (a flash, spikes, a pillar of light, embers and fire in gold and orange).
+	local upLines = add(
+		floor,
+		"UpLines",
+		Tex.Needle,
+		7,
+		0,
+		curve(0, 0.9, 0.3, 0.25, 1.1, 0.35, 1, 0.8, 0.25),
+		{ speed = NumberRange.new(25, 55), flag = "heavy" }
+	)
+	upLines.Orientation = Enum.ParticleOrientation.VelocityParallel
+	upLines.EmissionDirection = Enum.NormalId.Top
+	upLines.SpreadAngle = Vector2.new(28, 28)
+	upLines.Lifetime = NumberRange.new(0.1, 0.17)
+	upLines.Drag = 5
+	upLines.Brightness = 2.2
+	upLines.Squash = NumberSequence.new(-1.26) -- about 5 studs long
+	upLines.Transparency = fade(0, 0, 0.6, 0.1, 1, 1)
+	local rising = add(
+		floor,
+		"RisingSmoke",
+		Tex.Smoke,
+		7,
+		4,
+		curve(0, 1.4, 0.4, 0.4, 2.4, 0.7, 1, 3, 0.8),
+		{ speed = NumberRange.new(3, 8), flag = "heavy" }
+	)
+	rising.FlipbookLayout = Enum.ParticleFlipbookLayout.Grid4x4
+	rising.FlipbookMode = Enum.ParticleFlipbookMode.OneShot
+	rising.EmissionDirection = Enum.NormalId.Top
+	rising.SpreadAngle = Vector2.new(35, 35)
+	rising.Color = ColorSequence.new(FxKit.SMOKE_GREY)
+	rising.LightEmission = 0.3
+	rising.Lifetime = NumberRange.new(0.4, 0.55)
+	rising.Rotation = NumberRange.new(0, 360)
+	rising.RotSpeed = NumberRange.new(-30, 30)
+	rising.Drag = 2
+	rising.Transparency = fade(0, 0.25, 0.6, 0.5, 1, 1)
+
 	return { floor = floor }
 end)
 
 --- A burst on the floor under `position` (nothing if there's no floor within reach). `scale` is its
---- size against the reference's (1 = 2.7 character heights wide at its widest).
-function StepBurstFx.play(position: Vector3, scale: number)
+--- size against the reference's (1 = 2.7 character heights wide at its widest). heavy is a body
+--- slammed into the floor: lines thrown up and more smoke.
+function StepBurstFx.play(position: Vector3, scale: number, heavy: boolean?)
 	local at = FxKit.floorUnder(position, FLOOR_REACH)
 	if not at then
 		return
@@ -124,7 +166,7 @@ function StepBurstFx.play(position: Vector3, scale: number)
 	local floor = rig.parts.floor :: Part
 	floor.CFrame = CFrame.new(at + Vector3.new(0, LIFT, 0))
 	floor.Size = Vector3.new(WIDTH * scale, 0.2, WIDTH * scale)
-	FxKit.fire(rig, scale)
+	FxKit.fire(rig, scale, nil, { heavy = heavy == true })
 end
 
 --- Builds every rig ahead of the first burst, so the textures are loaded by then.

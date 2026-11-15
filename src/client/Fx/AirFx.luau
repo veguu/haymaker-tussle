@@ -258,11 +258,135 @@ function AirFx.trail(part: BasePart, seconds: number)
 	end)
 end
 
+-- BUMP: two fighters knocking into each other. A small white spot, one thin ring and four small
+-- puffs. Nobody is hurt, so it is smaller and softer than a hit.
+local bumps = FxKit.pool("HT_AirBumpFx", 4, function(parent, add)
+	local center = FxKit.hiddenPart("HT_AirBump", Vector3.new(0.2, 0.2, 0.2), parent)
+	local at = FxKit.attach(center)
+
+	local core = add(at, "Core", Tex.Glow, 1, 0, keys(0, 1, 0.3, 1.5, 1, 0.7))
+	core.Lifetime = NumberRange.new(0.07)
+	core.Brightness = 2.5
+	core.ZOffset = 1
+	core.Transparency = fade(0, 0.1, 0.5, 0.25, 1, 1)
+
+	local ring = add(at, "Ring", Tex.Circle, 1, 0, keys(0, 0.9, 0.4, 2, 1, 2.6))
+	ring.Lifetime = NumberRange.new(0.14)
+	ring.Rotation = NumberRange.new(0, 360)
+	ring.Brightness = 1.6
+	ring.Transparency = fade(0, 0.15, 0.5, 0.45, 1, 1)
+
+	local smoke = add(
+		at,
+		"Puffs",
+		Tex.Smoke,
+		4,
+		1,
+		curve(0, 0.7, 0.2, 0.4, 1.3, 0.4, 1, 1.7, 0.5),
+		{ speed = NumberRange.new(2, 6) }
+	)
+	puffs(smoke)
+	smoke.SpreadAngle = Vector2.new(180, 180)
+	smoke.Lifetime = NumberRange.new(0.28, 0.4)
+
+	return { center = center }
+end)
+
+-- DRIFT: one puff of smoke kicked up by feet sliding sideways out of a dash. It leaves the way the
+-- part's front faces, rising a little as it swells.
+local drifts = FxKit.pool("HT_AirDriftFx", 8, function(parent, add)
+	local center = FxKit.hiddenPart("HT_AirDrift", Vector3.new(0.6, 0.4, 0.2), parent)
+	local smoke = add(
+		center,
+		"Puff",
+		Tex.Smoke,
+		1,
+		0,
+		curve(0, 0.8, 0.2, 0.4, 1.6, 0.4, 1, 2.2, 0.5),
+		{ speed = NumberRange.new(3, 5) }
+	)
+	puffs(smoke)
+	smoke.EmissionDirection = Enum.NormalId.Front
+	smoke.SpreadAngle = Vector2.new(15, 15)
+	smoke.Acceleration = Vector3.new(0, 6, 0)
+	smoke.Lifetime = NumberRange.new(0.4, 0.55)
+	return { center = center }
+end)
+
+--- Two fighters bumping at `position`. `scale` is how hard (1 = an ordinary knock).
+function AirFx.bump(position: Vector3, scale: number)
+	local rig = bumps.take()
+	local center = rig.parts.center :: Part
+	center.CFrame = CFrame.new(position)
+	FxKit.fire(rig, scale)
+end
+
+--- One puff of drift smoke at `position`, leaving along `drift`.
+function AirFx.puff(position: Vector3, drift: Vector3)
+	local rig = drifts.take()
+	local center = rig.parts.center :: Part
+	local way = FxKit.flat(drift)
+	center.CFrame = CFrame.lookAt(position, position + way)
+	FxKit.fire(rig, 1)
+end
+
+-- RIBBON. A plain wide streak behind a part for a moment (the body an uppercut has thrown). One
+-- Trail per part, made the first time and reused.
+local ribbons: { [BasePart]: Trail } = setmetatable({}, { __mode = "k" }) :: any
+local ribbonTokens: { [Trail]: number } = setmetatable({}, { __mode = "k" }) :: any
+
+--- A streak behind `part` for `seconds`, `width` studs thick, each bit of it lasting `life` seconds.
+function AirFx.ribbon(part: BasePart, seconds: number, width: number, life: number)
+	local drop = part.Size.Y / 2 - 0.15
+	local trail = ribbons[part]
+	if not trail or trail.Parent ~= part then
+		local top = Instance.new("Attachment")
+		top.Name = "HT_AirRibbonA"
+		top.Parent = part
+		local bottom = Instance.new("Attachment")
+		bottom.Name = "HT_AirRibbonB"
+		bottom.Parent = part
+		local made = Instance.new("Trail")
+		made.Name = "HT_AirRibbon"
+		made.Attachment0 = top
+		made.Attachment1 = bottom
+		made.FaceCamera = true
+		made.MinLength = 0.05
+		made.Color = ColorSequence.new(FxKit.WHITE, FxKit.SMOKE_GREY)
+		made.Transparency = fade(0, 0.25, 1, 1)
+		made.WidthScale = NumberSequence.new(1, 0.2)
+		made.LightEmission = 1
+		made.LightInfluence = 0
+		made.Enabled = false
+		made.Parent = part
+		ribbons[part] = made
+		trail = made
+	end
+	local shown = trail :: Trail
+	-- Its width can change from use to use.
+	if shown.Attachment0 and shown.Attachment1 then
+		shown.Attachment0.Position = Vector3.new(0, -drop, width / 2)
+		shown.Attachment1.Position = Vector3.new(0, -drop, -width / 2)
+	end
+	shown.Lifetime = life
+	shown:Clear()
+	shown.Enabled = true
+	local token = (ribbonTokens[shown] or 0) + 1
+	ribbonTokens[shown] = token
+	task.delay(seconds, function()
+		if ribbonTokens[shown] == token then
+			shown.Enabled = false
+		end
+	end)
+end
+
 --- Builds every rig ahead of the first use, so the textures are loaded by then.
 function AirFx.preload()
 	gusts.preload()
 	leaves.preload()
 	arrivals.preload()
+	bumps.preload()
+	drifts.preload()
 end
 
 return AirFx

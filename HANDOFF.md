@@ -1231,3 +1231,25 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   puffs), blink out (tall line and ring), blink in (star in a ring, lines across). All plain white.
 - NOT SEEN: the launch smoke trail, the dash with its new textures, anything at full speed or in a round.
 - Gates: rojo build OK, 452 Lune tests, selene src 0, stylua clean. Build stamp vfx-13+lobby-2; Rojo connected.
+
+## vfx-14 (2026-11-14): batch 3 of the remake: bump, jump, drift and ground blast as plain particles; ImpactFx and the sphere-part code deleted (the user tried it: "Looks good"; committed)
+- WHY: the user approved batch 2 ("Looks good", commit 07bfb50, not pushed) and the three-batch plan. This is the
+  last batch. Same rules: basic, plain white and grey, plain rings, no solid sphere parts.
+- StepBurstFx: new third argument `heavy`. A heavy landing adds seven thin white lines thrown up off the floor and
+  seven rising smoke puffs to the ordinary burst.
+- AirFx: `bump` (a small spot, one thin ring, four puffs), `puff` (one drift-smoke puff leaving along a
+  direction, rising as it swells), `ribbon` (the Trail behind a launched body, moved here from ImpactFx).
+- FxController: `BumpPuff` -> AirFx.bump + a small StepBurstFx at the feet; `JumpBreak` -> StepBurstFx at 0.8
+  (its ten sphere puffs and the floor-coloured dust are gone; rocks unchanged); `driftSmoke` -> AirFx.puff;
+  `GroundBlast` -> StepBurstFx heavy at 0.75 x GroundBlastScale x power (rocks unchanged); `LaunchTrail` ->
+  AirFx.ribbon. Deleted: the Blob type, `takePart`, `spawnBlob`, `ball`, the sphere pool, LIGHT, SHADE and the
+  TweenService import. No solid effect parts remain except the rock chunks and the dash's after-images.
+- DELETED `src/client/Fx/ImpactFx.luau` (529 lines: the old spark, fist trail and the gold-and-fire ground
+  blast). Nothing uses it now. It is in Git up to 07bfb50.
+- CAUGHT BY THE PLAY TEST, not by the gates: a PowerShell array literal (`@("a", $block + "b")`: the comma binds
+  tighter than +) dropped the pool's `return { floor = floor }`, so StepBurstFx errored on its first use. Fixed.
+- SEEN in Play in slow motion (studySlow(300), dark floor, about 7 f): heavy landing (plain rings about 13 studs
+  wide, lines thrown up, smoke), bump (ring and puff), one drift puff, a small step burst. All plain white.
+- NOT SEEN: these in a real round (a dive kick landing, a jump off the floor, sliding out of a dash, two fighters
+  bumping), the launch ribbon, anything at full speed.
+- Gates: rojo build OK, 452 Lune tests, selene src 0, stylua clean. Build stamp vfx-14+lobby-2; Rojo connected.

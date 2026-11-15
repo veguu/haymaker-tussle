@@ -10,7 +10,6 @@ local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -20,15 +19,12 @@ local GroundBreak = require(ReplicatedStorage.Shared.Core.GroundBreak)
 local AirFx = require(script.Parent.Parent.Fx.AirFx)
 local ClashFx = require(script.Parent.Parent.Fx.ClashFx)
 local DashFx = require(script.Parent.Parent.Fx.DashFx)
-local ImpactFx = require(script.Parent.Parent.Fx.ImpactFx)
 local KickHitFx = require(script.Parent.Parent.Fx.KickHitFx)
 local PunchHitFx = require(script.Parent.Parent.Fx.PunchHitFx)
 local StepBurstFx = require(script.Parent.Parent.Fx.StepBurstFx)
 local SwingTrailFx = require(script.Parent.Parent.Fx.SwingTrailFx)
 
 local cfg = GameConfig.Effects
-local LIGHT = Color3.fromRGB(240, 242, 245)
-local SHADE = Color3.fromRGB(200, 204, 210)
 local ROCK = Color3.fromRGB(120, 112, 104)
 local BLACK = Color3.new(0, 0, 0)
 local DARK_SHARE = 0.72
@@ -36,23 +32,11 @@ local MARK_SOLID = 0.08
 local PITCH_VARY = 0.08
 local PARK_POSITION = CFrame.new(0, -1000, 0)
 
-type Blob = {
-	from: CFrame,
-	to: CFrame,
-	fromSize: Vector3,
-	toSize: Vector3,
-	seconds: number,
-	colour: Color3?,
-	startTransparency: number?,
-	delay: number?,
-}
-
 local FxController = Knit.CreateController({
 	Name = "FxController",
 })
 
 local folder: Folder? = nil
-local pool: { Part } = {}
 local rockPool: { Part } = {}
 -- When each character's propel ends, which is the only time they make drift smoke.
 local propelEnds: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
@@ -67,56 +51,6 @@ local chargePower = 0
 local chargeShaking = false
 local CHARGE_PITCH_LOW = 0.5
 local CHARGE_PITCH_HIGH = 0.95
-
-local function takePart(): Part
-	local part = table.remove(pool)
-	if part then
-		return part
-	end
-	part = Instance.new("Part")
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanQuery = false
-	part.CanTouch = false
-	part.CastShadow = false
-	part.Material = Enum.Material.SmoothPlastic
-	part.TopSurface = Enum.SurfaceType.Smooth
-	part.BottomSurface = Enum.SurfaceType.Smooth
-	local mesh = Instance.new("SpecialMesh")
-	mesh.MeshType = Enum.MeshType.Sphere
-	mesh.Parent = part
-	part.Parent = folder
-	return part
-end
-
-local function spawnBlob(blob: Blob)
-	local part = takePart()
-	part.Color = blob.colour or LIGHT
-	part.CFrame = blob.from
-	part.Size = blob.fromSize
-	part.Transparency = 1
-	task.delay(blob.delay or 0, function()
-		part.Transparency = blob.startTransparency or 0.12
-		local tween = TweenService:Create(
-			part,
-			TweenInfo.new(blob.seconds, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-			{ CFrame = blob.to, Size = blob.toSize, Transparency = 1 }
-		)
-		tween.Completed:Connect(function()
-			part.CFrame = PARK_POSITION
-			if #pool < cfg.PoolLimit then
-				table.insert(pool, part)
-			else
-				part:Destroy()
-			end
-		end)
-		tween:Play()
-	end)
-end
-
-local function ball(size: number): Vector3
-	return Vector3.new(size, size, size)
-end
 
 --- A dash starting: after-images, speed lines, wind streaks and dust (Fx/DashFx), and its gust of
 --- wind. `seconds` is how long that dash runs, `power` how charged it is (0 to 1), which colours it
@@ -292,26 +226,10 @@ function FxController:BumpPuff(a: Model, b: Model, knock: number?)
 	-- Sized by the harder of the two knocks: a jostle is a small pop, a dash into someone a real impact.
 	local share = math.clamp((knock or 20) / 60, 0.35, 1.6)
 	local middle = rootA.Position:Lerp(rootB.Position, 0.5)
-	local line = rootB.Position - rootA.Position
-	local flat = Vector3.new(line.X, 0, line.Z)
-	ImpactFx.burst(middle, if flat.Magnitude > 0.01 then flat.Unit else nil, 0.7 * share)
-	spawnBlob({
-		from = CFrame.new(middle),
-		to = CFrame.new(middle + Vector3.yAxis * 0.7),
-		fromSize = ball(1),
-		toSize = ball(3.2 * share),
-		seconds = cfg.HitBurstSeconds,
-	})
-	-- A ring of dust kicked up at their feet.
-	local feet = middle - Vector3.yAxis * (cfg.FootDrop - 0.2)
-	spawnBlob({
-		from = CFrame.new(feet),
-		to = CFrame.new(feet),
-		fromSize = Vector3.new(2, 0.3, 2),
-		toSize = Vector3.new(9 * share, 0.3, 9 * share),
-		seconds = cfg.HitBurstSeconds * 1.3,
-		colour = SHADE,
-	})
+	-- A small plain pop between them and a small burst on the floor at their feet (Fx/AirFx,
+	-- Fx/StepBurstFx).
+	AirFx.bump(middle, share)
+	StepBurstFx.play(middle - Vector3.yAxis * (cfg.FootDrop - 1), 0.45 * share)
 	Sfx.play(
 		"punch_hit",
 		rootA,
@@ -731,7 +649,7 @@ end
 --- The spring of a jump: the floor breaks under the feet, and smoke and dust burst out around them in a
 --- ring, drifting up and fading. With no floor within `floorReach`, it's only the smoke.
 --- A kicked body hitting the floor: the floor breaks up (the same rocks and cracks as a jump's push-off)
---- and an explosion goes off on it (ImpactFx.groundBlast). `at` is where the SERVER saw them land: this
+--- and an explosion goes off on it (Fx/StepBurstFx, heavy). `at` is where the SERVER saw them land: this
 --- client sees other bodies a moment late, so at the moment the news arrives the body can still look
 --- well up in the air here, and looking for floor under it would find none. Nothing happens with no
 --- floor in reach, such as past the platform's edge. `power` is the kick's strength, about 0.5 to 1.3.
@@ -749,7 +667,11 @@ function FxController:GroundBlast(body: Model, at: Vector3, power: number)
 	)
 	if floor then
 		breakFloor(floor, cfg.GroundBreakBlastScale)
-		ImpactFx.groundBlast(floor.Position, cfg.GroundBlastScale * math.max(power, 0.6))
+		StepBurstFx.play(
+			floor.Position + Vector3.yAxis,
+			0.75 * cfg.GroundBlastScale * math.max(power, 0.6),
+			true
+		)
 	end
 end
 
@@ -758,7 +680,7 @@ function FxController:LaunchTrail(target: Model)
 	local torso = target:FindFirstChild("Torso") or target:FindFirstChild("HumanoidRootPart")
 	if torso and torso:IsA("BasePart") then
 		local upper = GameConfig.Uppercut
-		ImpactFx.fistTrail(torso, upper.TrailSeconds, upper.TrailWidth, 0.45)
+		AirFx.ribbon(torso, upper.TrailSeconds, upper.TrailWidth, 0.45)
 	end
 end
 
@@ -787,32 +709,14 @@ function FxController:JumpBreak(character: Model, floorReach: number)
 	end
 	local floor = findFloor(character, root, floorReach)
 	local feet = if floor then floor.Position else root.Position - Vector3.yAxis * cfg.FootDrop
-	local dust: Color3? = nil
 	if floor then
-		dust = (floorLook(floor)):Lerp(LIGHT, 0.35)
 		breakFloor(floor)
 		if character == Players.LocalPlayer.Character then
 			self:CameraKick(cfg.GroundBreakShake)
 		end
 	end
-	local count = cfg.JumpSmokePuffs
-	for index = 1, count do
-		local angle = (index / count) * math.pi * 2 + math.random() * 0.4
-		local out = Vector3.new(math.cos(angle), 0, math.sin(angle))
-		-- Uneven on purpose: a neat ring of identical balls reads as a shape, not smoke.
-		local reach = cfg.JumpSmokeSpread * (0.8 + 0.4 * math.random())
-		spawnBlob({
-			from = CFrame.new(feet + out * cfg.JumpSmokeRadius + Vector3.yAxis * 0.4),
-			to = CFrame.new(
-				feet + out * (cfg.JumpSmokeRadius + reach) + Vector3.yAxis * (1 + math.random())
-			),
-			fromSize = ball(1.4),
-			toSize = ball(cfg.JumpSmokeSize * (0.75 + 0.5 * math.random())),
-			seconds = cfg.JumpSmokeSeconds * (0.8 + 0.4 * math.random()),
-			startTransparency = 0.2,
-			colour = if index % 2 == 0 then dust else nil,
-		})
-	end
+	-- The white burst and smoke on the floor it left (Fx/StepBurstFx).
+	StepBurstFx.play(feet + Vector3.yAxis, 0.8)
 	Sfx.play("bump", root, 0, {
 		pitch = if floor then 0.8 else 1.3,
 		volume = if floor then 1 else 0.5,
@@ -886,13 +790,7 @@ local function driftSmoke(character: Model)
 		return
 	end
 	local feet = root.Position - Vector3.yAxis * cfg.FootDrop
-	spawnBlob({
-		from = CFrame.new(feet + Vector3.yAxis * 0.4),
-		to = CFrame.new(feet + Vector3.yAxis * 2 - flat.Unit * 2),
-		fromSize = ball(1.6),
-		toSize = ball(5),
-		seconds = cfg.DriftPuffSeconds,
-	})
+	AirFx.puff(feet + Vector3.yAxis * 0.5, -flat.Unit)
 end
 
 function FxController:KnitStart()
