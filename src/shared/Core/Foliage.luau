@@ -99,6 +99,12 @@ function Foliage.kindOf(name: string): Kind?
 	return nil
 end
 
+--- How much of the tree tuning a crown `size` studs across (its largest side) gets: big crowns sway more gently,
+--- so a 40-stud crown moves half as far as one 20 studs or smaller (the tip still travels about as far).
+function Foliage.crownScale(size: number): number
+	return math.clamp(20 / math.max(size, 1), 0.5, 1)
+end
+
 --- Whether a part of a `kind` placement moves (a tree's bark stays put; everything else in a moving clump moves).
 function Foliage.partMoves(kind: Kind, partName: string): boolean
 	if kind == "tree" then

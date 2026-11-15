@@ -1305,3 +1305,34 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
 - Pulled spicy's vfx-9..vfx-14 first (they had committed the lobby-2 scripts from the place; identical). Build label
   vfx-14+lobby-3. Rojo push 159 instances, PASS 142 scripts. Place saved v317.
 - NOT SEEN BY EYE: Studio's capture returns a black 3D view and screen access was declined; checked by raycasts only.
+
+## ui-0b (2026-11-15): Golden Hour tokens (committed with lobby-4)
+- First UI Phase 0 piece done here (0a "measure first" needs a phone, so it waits). NEW src/shared/Tokens.luau: every
+  colour (HEX strings + lazy Tokens.colour), space 4..64, radius, surface levels 1-3 (HUD 0.12), shadows, motion
+  durations/easings, the type scale per role, the three Builder families. Nothing requires it yet: no visual change.
+- NEW tests/Tokens.spec.luau (8): measured contrasts match the palette to 0.1, essential text >= 4.5:1 on ink
+  900/800/700, ink on accent fills, 4-unit grid, 15-unit floor, HUD transparency <= 0.12. 460 passed.
+- Build vfx-14+lobby-3+ui-0b, Rojo push PASS 143. Frame cost: none to measure (module is unused until 0c/0d).
+- NEXT: 0c Typography (Builder Sans/Extended/Mono behind the same Typography API), then 0d HudTheme -> tokens.
+
+## lobby-4 (2026-11-15): bigger shop stall; lobby wind fixed (committed, approved)
+- STALL (cliffside.py, STALL_FRONT/BACK/OVER): front posts 12.5 (was 9.4), back 15.5 (was 12.2), awning reaches 7
+  past the front posts (was 3.6), same slope/stripes/hem, knee braces under the overhang, thicker posts; counter
+  height, length, stock and colours unchanged. Awning front edge 10.7 above the court, hem low point 8.85: a 5.2-stud
+  R15 has ~3.5 studs headroom (Blender check with stand-ins: scratch render, not kept). Post colliders r 0.7.
+  Full build done (blend, GLBs, textures, manifest: 32 meshes, no gate). Uploaded under group 2970443:
+  cliffside_1 = 93706706559765, cliffside_2 = 85520808283381 (Approved, version 11766525074883 for _2). Inserted
+  after a network outage (TLS to roblox.com was being intercepted; fixed on the user's side) and built with
+  studio_lobby.luau: 32/32 meshes, 61/61 kit pieces. MEASURED in Play: awning bottom 11.85 (court 3), the user's
+  character with a hat tops out 2.8 below it; the customer side (u 48..54.6, in front of the counter) is open from
+  the court and a 2x5.6 box sweeps d 39..86 clear (barrel at the far end). The strip behind the counter is closed at
+  both ends by crates and planters, as before. Wind still 74 dressing parts moving, no non-vegetation. Place v321.
+- WIND: the lobby's kit plants were ALL still in Play. Two causes: (1) EnvironmentKit only bound the lobby's plants
+  in the lobby-only state, so with an arena up the lobby was static for everyone waiting there; (2) streaming:
+  PlantField was built before the lobby's Dressing reached the client, so it found nothing. Fixes: a second,
+  always-on lobby PlantField in the lobby preset's wind (retried each second until HT_Lobby.Model arrives);
+  PlantField rescans on DescendantAdded at its 4 Hz refresh; the great tree's crown (Meshes/Lobby_*_Leaf) sways as a
+  tree; Foliage.crownScale damps big crowns (20/size, 0.5..1; test). MEASURED in Play with an arena loaded: lobby
+  vegetation moving 43-45 of 45 (rest at range edge), crown moving, rocks/soil/ruins/stall still; PlantAvgMs 0.25
+  (both fields), peak 0.99. Phones/low graphics: existing 30 Hz + shorter ranges. Build vfx-14+lobby-4+ui-0b,
+  Rojo push PASS 143.

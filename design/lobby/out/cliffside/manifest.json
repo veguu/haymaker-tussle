@@ -25,12 +25,12 @@
   "Lobby_Banners_Rope": {
    "file": 1,
    "key": "cloth_cream",
-   "x": 0.0,
+   "x": 0.007,
    "y": 9.9,
    "z": 140.5,
-   "sx": 81.753,
+   "sx": 81.739,
    "sy": 3.44,
-   "sz": 1.753,
+   "sz": 1.754,
    "tris": 420
   },
   "Lobby_Banners_Timber": {
@@ -38,10 +38,10 @@
    "key": "bark_timber",
    "x": 0.0,
    "y": 9.35,
-   "z": 86.389,
+   "z": 86.402,
    "sx": 116.8,
    "sy": 19.3,
-   "sz": 123.511,
+   "sz": 123.529,
    "tris": 356
   },
   "Lobby_Benches_Stone": {
@@ -300,46 +300,46 @@
   "Lobby_Stall_Clay": {
    "file": 1,
    "key": "stone_clay",
-   "x": 52.769,
+   "x": 52.743,
    "y": 5.719,
-   "z": 62.175,
-   "sx": 9.539,
+   "z": 62.151,
+   "sx": 9.644,
    "sy": 5.438,
-   "sz": 53.706,
+   "sz": 53.697,
    "tris": 460
   },
   "Lobby_Stall_Coral": {
    "file": 1,
    "key": "cloth_coral",
-   "x": 58.365,
-   "y": 12.755,
+   "x": 56.665,
+   "y": 15.429,
    "z": 59.1,
-   "sx": 14.39,
-   "sy": 6.11,
+   "sx": 17.79,
+   "sy": 7.157,
    "sz": 40.6,
    "tris": 72
   },
   "Lobby_Stall_Cream": {
    "file": 1,
    "key": "cloth_cream",
-   "x": 58.365,
-   "y": 12.755,
+   "x": 56.665,
+   "y": 15.429,
    "z": 64.9,
-   "sx": 14.39,
-   "sy": 6.11,
+   "sx": 17.79,
+   "sy": 7.157,
    "sz": 40.6,
    "tris": 72
   },
   "Lobby_Stall_Timber": {
-   "file": 2,
+   "file": 1,
    "key": "bark_timber",
-   "x": 58.167,
-   "y": 9.232,
-   "z": 62.002,
-   "sx": 14.636,
-   "sy": 12.602,
-   "sz": 55.812,
-   "tris": 1788
+   "x": 56.861,
+   "y": 10.865,
+   "z": 61.98,
+   "sx": 17.489,
+   "sy": 15.867,
+   "sz": 55.83,
+   "tris": 1800
   },
   "Lobby_Steps_Stone": {
    "file": 2,
@@ -356,7 +356,7 @@
  "files": [
   {
    "file": "cliffside_1.glb",
-   "mb": 11.95,
+   "mb": 12.12,
    "meshes": [
     "Lobby_Banners_Coral",
     "Lobby_Banners_Gold",
@@ -367,7 +367,6 @@
     "Lobby_Crag_Blue",
     "Lobby_Crag_Cream",
     "Lobby_Crag_Sand",
-    "Lobby_Gate_Timber",
     "Lobby_GreatTree_Bark",
     "Lobby_GreatTree_Leaf",
     "Lobby_GreatTree_Soil",
@@ -388,17 +387,17 @@
     "Lobby_Retaining_Stone",
     "Lobby_Stall_Clay",
     "Lobby_Stall_Coral",
-    "Lobby_Stall_Cream"
+    "Lobby_Stall_Cream",
+    "Lobby_Stall_Timber"
    ]
   },
   {
    "file": "cliffside_2.glb",
-   "mb": 1.96,
+   "mb": 1.58,
    "meshes": [
-    "Lobby_Stall_Timber",
     "Lobby_Steps_Stone"
    ]
   }
  ],
- "triangles": 76112
+ "triangles": 76124
 }

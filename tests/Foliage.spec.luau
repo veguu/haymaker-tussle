@@ -26,6 +26,15 @@ return {
 		assert(Foliage.partMoves("flower", "Flowers_Tulip_Petal"))
 	end,
 
+	["bigger tree crowns sway more gently, never stiller than half"] = function()
+		assert(Foliage.crownScale(12) == 1)
+		assert(Foliage.crownScale(20) == 1)
+		assert(near(Foliage.crownScale(31), 20 / 31))
+		assert(Foliage.crownScale(40) == 0.5)
+		assert(Foliage.crownScale(400) == 0.5)
+		assert(Foliage.crownScale(40) < Foliage.crownScale(25))
+	end,
+
 	["movement fades to nothing at the edge of the range, so leaving it can't be seen"] = function()
 		assert(Foliage.fade(0, 100) == 1)
 		assert(Foliage.fade(60, 100) == 1)

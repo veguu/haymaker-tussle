@@ -12,6 +12,8 @@
 -- * Phones (touch, no keyboard) and low graphics (quality 1-3) get shorter ranges.
 -- * Characters (players and bots) push flowers, plants and bushes over a little as they walk through.
 -- If the map has no HT_Dressing folder (the lobby model: Dressing), nothing happens and nothing errors.
+-- * The lobby's own leaf meshes (Meshes/Lobby_*_Leaf: the great tree's crown) sway as trees too, in the same pass.
+-- * Trees sway less the bigger their crown (Foliage.crownScale), so the large ones move gently.
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -47,6 +49,7 @@ type Entry = {
 	phase: number,
 	radius: number,
 	range: number,
+	scale: number, -- share of the tuning this one gets (big tree crowns less)
 	bx: number, -- current push from characters (radians, horizontal vector)
 	bz: number,
 	moved: boolean, -- off its rest pose right now
@@ -65,7 +68,8 @@ local function lowGraphics(): boolean
 	return false
 end
 
---- The moving plants of `model` (the live map) in `wind` (a resolved preset's wind table), or nil.
+--- The moving plants of `model` (the live map) in `wind` (a resolved preset's wind table); nil when it has no
+--- dressing folder. An empty folder still gets a field: its placements may stream in later.
 function PlantField.new(model: Instance?, wind: any): Field?
 	if not model then
 		return nil
@@ -85,33 +89,14 @@ function PlantField.new(model: Instance?, wind: any): Field?
 
 	local entries: { Entry } = {}
 	local maxRange = 0
-	for _, placement in dressing:GetChildren() do
-		local kind = Foliage.kindOf(placement.Name)
-		if not kind or not placement:IsA("Model") then
-			continue
-		end
+	local function add(
+		kind: Foliage.Kind,
+		parts: { BasePart },
+		pivot: Vector3,
+		radius: number,
+		scale: number
+	)
 		local tune = Foliage.Tuning[kind]
-		local parts: { BasePart } = {}
-		for _, p in placement:GetDescendants() do
-			if p:IsA("BasePart") and p.Anchored and Foliage.partMoves(kind, p.Name) then
-				table.insert(parts, p)
-			end
-		end
-		if #parts == 0 then
-			continue
-		end
-		-- the pivot: a clump's base (bottom of its bounds); a tree crown's low point (a third up the crown)
-		local pivot: Vector3
-		local radius: number
-		if kind == "tree" then
-			local leaf = parts[1]
-			pivot = leaf.Position - Vector3.new(0, leaf.Size.Y * 0.2, 0)
-			radius = 0
-		else
-			local box, size = (placement :: Model):GetBoundingBox()
-			pivot = box.Position - Vector3.new(0, size.Y * 0.5, 0)
-			radius = math.max(size.X, size.Z) * 0.5
-		end
 		local rel = table.create(#parts)
 		for i, p in parts do
 			rel[i] = CFrame.new(-pivot) * p.CFrame
@@ -127,13 +112,88 @@ function PlantField.new(model: Instance?, wind: any): Field?
 			phase = Environment.hash(math.floor(pivot.X), math.floor(pivot.Z), 11) * TAU,
 			radius = radius,
 			range = range,
+			scale = scale,
 			bx = 0,
 			bz = 0,
 			moved = false,
 		})
 	end
-	if #entries == 0 then
-		return nil
+	-- a tree crown turns about its low point (a fifth of its height under its middle); bigger crowns less
+	local function addCrown(leaf: BasePart, parts: { BasePart })
+		local size = leaf.Size
+		add(
+			"tree",
+			parts,
+			leaf.Position - Vector3.new(0, size.Y * 0.2, 0),
+			0,
+			Foliage.crownScale(math.max(size.X, size.Z))
+		)
+	end
+	-- Placements can reach this client AFTER the field starts (streaming: the lobby model is Persistent, but
+	-- its pieces still arrive over the first seconds), so scan() runs again whenever something new arrives.
+	-- Found 2026-11-15: the lobby's plants were all still because Dressing was empty when the field was built.
+	local known: { [Instance]: boolean } = {}
+	local function scanPlacement(placement: Instance)
+		local kind = Foliage.kindOf(placement.Name)
+		if known[placement] or not kind or not placement:IsA("Model") then
+			return
+		end
+		local parts: { BasePart } = {}
+		for _, p in placement:GetDescendants() do
+			if p:IsA("BasePart") and p.Anchored and Foliage.partMoves(kind, p.Name) then
+				table.insert(parts, p)
+			end
+		end
+		if #parts == 0 then
+			return -- not arrived yet: tried again on the next scan
+		end
+		known[placement] = true
+		if kind == "tree" then
+			addCrown(parts[1], parts)
+		else
+			-- a clump turns about its base (bottom of its bounds)
+			local box, size = (placement :: Model):GetBoundingBox()
+			add(
+				kind,
+				parts,
+				box.Position - Vector3.new(0, size.Y * 0.5, 0),
+				math.max(size.X, size.Z) * 0.5,
+				1
+			)
+		end
+	end
+	local parent = dressing.Parent
+	local function scan()
+		for _, placement in dressing:GetChildren() do
+			scanPlacement(placement)
+		end
+		local meshes = parent and parent:FindFirstChild("Meshes")
+		if meshes then
+			for _, p in meshes:GetChildren() do
+				if
+					not known[p]
+					and p:IsA("BasePart")
+					and p.Anchored
+					and p.Name:match("^Lobby_.*_Leaf$")
+				then
+					known[p] = true
+					addCrown(p, { p })
+				end
+			end
+		end
+	end
+	scan()
+	local dirty = false
+	local function markDirty()
+		dirty = true
+	end
+	local connections = { dressing.DescendantAdded:Connect(markDirty) }
+	if parent then
+		table.insert(connections, parent.ChildAdded:Connect(markDirty))
+		local meshes = parent:FindFirstChild("Meshes")
+		if meshes then
+			table.insert(connections, meshes.ChildAdded:Connect(markDirty))
+		end
 	end
 
 	local alive = true
@@ -214,6 +274,13 @@ function PlantField.new(model: Instance?, wind: any): Field?
 			or Vector3.zero
 		if t >= nextRefresh or t < nextRefresh - REFRESH * 2 then
 			nextRefresh = t + REFRESH
+			if dirty then
+				dirty = false
+				scan()
+			end
+			if #entries == 0 then
+				return
+			end
 			refresh(cam)
 		end
 		frameNo += 1
@@ -258,7 +325,7 @@ function PlantField.new(model: Instance?, wind: any): Field?
 				continue
 			end
 
-			local amp = Foliage.fade(dist, e.range)
+			local amp = Foliage.fade(dist, e.range) * e.scale
 			local frame: CFrame
 			if e.kind == "lily" then
 				local w = TAU * t / (gustSeconds * 0.8) + e.phase
@@ -293,6 +360,9 @@ function PlantField.new(model: Instance?, wind: any): Field?
 
 	function self.destroy(_self: Field)
 		alive = false
+		for _, c in connections do
+			c:Disconnect()
+		end
 		for _, e in entries do
 			if e.moved then
 				pushRest(e)

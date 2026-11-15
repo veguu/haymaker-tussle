@@ -502,6 +502,9 @@ def great_tree():
 
 
 # --- the shop stall: on the strip kept for gamepass displays, opposite the tree ---------------------------------------
+STALL_FRONT = 12.5  # front post height above the court (was 9.4)
+STALL_BACK = 15.5  # back post height (was 12.2)
+STALL_OVER = 7.0  # how far the awning reaches past the front posts toward the court (was 3.6)
 def stall():
     rng = random.Random(71)
     timber, coral, cream, clay = bmesh.new(), bmesh.new(), bmesh.new(), bmesh.new()
@@ -514,20 +517,32 @@ def stall():
         append(timber, block((3.0, seg - 0.1, 2.9), rng, chip=0.05, bevel=0.05), T(u0 + 1.5, d0 + (i + 0.5) * seg, h))
     append(timber, block((4.2, d1 - d0 + 1.2, 0.4), rng, chip=0.03, bevel=0.05), T(u0 + 1.7, (d0 + d1) / 2, h + 2.9))
     box_c(u0 - 0.4, u0 + 3.8, d0 - 0.6, d1 + 0.6, h, h + 3.3)
-    # posts and the awning's frame
+    # posts and the awning's frame. Sized for a character to walk under (2026-11-15): an R15 fighter is about 5.2
+    # studs; the awning's front edge sits 10.7 above the court and its lowest point (the hem's scallop) 8.85 above the
+    # court, so the shaded walk in front of the counter (STALL_OVER deep) has 3.5+ studs of headroom. The counter
+    # keeps its height (2.9: a counter for that character), only the frame and the roof grew.
+    front_top, back_top, over = STALL_FRONT, STALL_BACK, STALL_OVER
+    slope = (back_top - front_top) / (u1 - u0 + 0.2)
+
+    def roof(u, lift=0.0):  # height of the awning plane over u, resting on the beams
+        return h + front_top + 0.2 + (u - (u0 - 0.2)) * slope + lift
+
     for d in (d0, (d0 + d1) / 2, d1):
-        tube(timber, [at(u0 - 0.2, d, h), at(u0 - 0.2, d, h + 9.4)], [0.5, 0.42], sides=6, rng=rng)
-        tube(timber, [at(u1, d, h), at(u1, d, h + 12.2)], [0.5, 0.42], sides=6, rng=rng)
-        tube(timber, [at(u0 - 3.4, d, h + 8.4), at(u1 + 0.4, d, h + 12.3)], [0.26, 0.26], sides=5, rng=rng)
-        cyl_c(u0 - 0.2, d, 0.6, h, h + 9)
-    tube(timber, [at(u0 - 0.2, d0 - 1, h + 9.3), at(u0 - 0.2, d1 + 1, h + 9.3)], [0.3, 0.3], sides=5, rng=rng)
-    tube(timber, [at(u1, d0 - 1, h + 12.1), at(u1, d1 + 1, h + 12.1)], [0.3, 0.3], sides=5, rng=rng)
+        tube(timber, [at(u0 - 0.2, d, h), at(u0 - 0.2, d, h + front_top)], [0.62, 0.52], sides=6, rng=rng)
+        tube(timber, [at(u1, d, h), at(u1, d, h + back_top)], [0.62, 0.52], sides=6, rng=rng)
+        tube(timber, [at(u0 - over + 0.2, d, roof(u0 - over + 0.2, -0.3)), at(u1 + 0.4, d, roof(u1 + 0.4, -0.3))], [0.32, 0.32], sides=5, rng=rng)
+        # a knee brace under the overhang, so the deeper awning reads as carried
+        tube(timber, [at(u0 - 0.2, d, h + front_top - 2.6), at(u0 - 0.2 - over * 0.45, d, roof(u0 - 0.2 - over * 0.45, -0.45))], [0.22, 0.22], sides=5, rng=rng)
+        cyl_c(u0 - 0.2, d, 0.7, h, h + front_top - 0.4)
+    tube(timber, [at(u0 - 0.2, d0 - 1, h + front_top - 0.1), at(u0 - 0.2, d1 + 1, h + front_top - 0.1)], [0.36, 0.36], sides=5, rng=rng)
+    tube(timber, [at(u1, d0 - 1, h + back_top - 0.1), at(u1, d1 + 1, h + back_top - 0.1)], [0.36, 0.36], sides=5, rng=rng)
     # awning: coral and cream stripes sloping down toward the court, a scalloped hem
     stripes = 8
     for i in range(stripes):
         a, b = d0 - 1.2 + i * (d1 - d0 + 2.4) / stripes, d0 - 1.2 + (i + 1) * (d1 - d0 + 2.4) / stripes
         target = coral if i % 2 == 0 else cream
-        p = [at(u0 - 3.6, a, h + 8.55), at(u0 - 3.6, b, h + 8.55), at(u1 + 0.5, b, h + 12.65), at(u1 + 0.5, a, h + 12.65)]
+        lo, hi = u0 - over, u1 + 0.5
+        p = [at(lo, a, roof(lo)), at(lo, b, roof(lo)), at(hi, b, roof(hi)), at(hi, a, roof(hi))]
         hem = [p[0] + Vector((-0.15, 0, -1.3)), p[1] + Vector((-0.15, 0, -1.3))]
         mid = (hem[0] + hem[1]) / 2 + Vector((0, 0, -0.55))
         up = Vector((0.06, 0, 0.16))

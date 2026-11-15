@@ -13,7 +13,7 @@
       "id": "P2",
       "title": "Standable surface",
       "status": "PASS",
-      "detail": "1612 nodes across 23 walk-connected components",
+      "detail": "1612 nodes across 24 walk-connected components",
       "rows": []
     },
     {
@@ -41,7 +41,7 @@
       "id": "P5",
       "title": "Sightlines",
       "status": "PASS",
-      "detail": "93.3% of 16110 sampled pairs have a clear line (band 0%-100%)",
+      "detail": "93.2% of 16110 sampled pairs have a clear line (band 0%-100%)",
       "rows": []
     },
     {
@@ -68,9 +68,9 @@
         "Floor and Solid4_box overlap by 1.00 studs",
         "Solid2_box and Solid6_box overlap by 1.00 studs",
         "Solid2_box and Solid9_box overlap by 1.00 studs",
-        "Solid13_box and Solid14_cyl overlap by 0.80 studs",
-        "Solid13_box and Solid15_cyl overlap by 0.80 studs",
-        "Solid13_box and Solid16_cyl overlap by 0.80 studs",
+        "Solid13_box and Solid14_cyl overlap by 0.90 studs",
+        "Solid13_box and Solid15_cyl overlap by 0.90 studs",
+        "Solid13_box and Solid16_cyl overlap by 0.90 studs",
         "Solid17_box and Solid20_cyl overlap by 0.32 studs"
       ]
     },

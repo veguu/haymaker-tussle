@@ -360,6 +360,11 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 	local bobs: { Bob } = {}
 	local grass: GrassField.Field? = nil
 	local plants: PlantField.Field? = nil
+	-- the lobby is always there (LobbyService), so its plants keep moving while an arena is up, for everyone
+	-- waiting or spectating in it; out of the camera's range they cost a distance check 4 times a second
+	local lobbyPlants: PlantField.Field? = nil
+	local lobbyWind: any = nil -- set by bind; while the lobby model hasn't reached this client, retried each second
+	local lobbyRetryAt = 0
 	local plantSpent, plantPeak, plantFrames, plantReportAt = 0, 0, 0, 0
 
 	-- every moving part, in one list for a single BulkMoveTo per frame
@@ -472,15 +477,28 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 			local sway = (b.rule.sway or 0) * math.sin(w * 0.5)
 			b.part.CFrame = b.home + Vector3.new(wx * sway, rise, wz * sway)
 		end
-		if grass or plants then
+		if not lobbyPlants and lobbyWind and t >= lobbyRetryAt then
+			lobbyRetryAt = t + 1
+			local lobbyFolder = workspace:FindFirstChild("HT_Lobby")
+			local lobbyModel = lobbyFolder and lobbyFolder:FindFirstChild("Model")
+			if lobbyModel then
+				lobbyPlants = PlantField.new(lobbyModel, lobbyWind)
+			end
+		end
+		if grass or plants or lobbyPlants then
 			local camera = workspace.CurrentCamera
 			local at = camera and camera.CFrame.Position
 			if grass then
 				grass:step(t, at)
 			end
-			if plants then
+			if plants or lobbyPlants then
 				local clock = os.clock()
-				plants:step(t, at)
+				if plants then
+					plants:step(t, at)
+				end
+				if lobbyPlants then
+					lobbyPlants:step(t, at)
+				end
 				-- What the moving plants cost, for the owner's testing: the scene folder's PlantAvgMs and
 				-- PlantPeakMs attributes, about once a second (like HT_BarrierFx's AvgMs / PeakMs).
 				local spent = os.clock() - clock
@@ -518,16 +536,27 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 		if plants then
 			plants:destroy()
 		end
-		-- The lobby state has no arena (workspace.HT_Map is there but empty): its plants are the lobby's own kit
-		-- dressing (LobbyService's persistent workspace.HT_Lobby.Model, folder Dressing), in the lobby preset's wind.
+		if lobbyPlants then
+			lobbyPlants:destroy()
+		end
+		-- The lobby's plants are its own kit dressing (LobbyService's persistent workspace.HT_Lobby.Model, folder
+		-- Dressing), always in the lobby preset's wind. In the lobby state (no arena: workspace.HT_Map is there
+		-- but empty) that is the only field; with an arena up, the arena's plants get their own in its wind.
 		local entry = mapId and Envs.Maps[mapId :: string]
-		local lobbyFolder = if entry and entry.lobby
-			then workspace:FindFirstChild("HT_Lobby")
+		local lobbyFolder = workspace:FindFirstChild("HT_Lobby")
+		local lobbyModel = lobbyFolder and lobbyFolder:FindFirstChild("Model")
+		local lobbyId: string? = nil
+		for id, e in Envs.Maps do
+			if (e :: any).lobby then
+				lobbyId = id
+				break
+			end
+		end
+		lobbyWind = if lobbyId then Environment.resolve(Envs, lobbyId).wind else nil
+		lobbyPlants = if lobbyModel and lobbyWind
+			then PlantField.new(lobbyModel, lobbyWind)
 			else nil
-		plants = PlantField.new(
-			if lobbyFolder then lobbyFolder:FindFirstChild("Model") else mapModel,
-			p.wind
-		)
+		plants = if entry and entry.lobby then nil else PlantField.new(mapModel, p.wind)
 		if not mapModel then
 			return
 		end
@@ -567,6 +596,10 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 		if plants then
 			plants:destroy()
 			plants = nil
+		end
+		if lobbyPlants then
+			lobbyPlants:destroy()
+			lobbyPlants = nil
 		end
 		folder:Destroy()
 	end
