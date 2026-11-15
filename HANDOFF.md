@@ -1211,3 +1211,23 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   neutral grey. The dash no longer shows its speed tiers by colour. Rock and soot colours are unchanged.
 - SEEN BY NOBODY: this build (Studio captures still black). Gates: rojo build OK, 452 Lune tests, selene src 0,
   stylua clean. Build stamp vfx-12+lobby-2; Rojo connected.
+
+## vfx-13 (2026-11-14): batch 2 of the remake: gust, blink and launch smoke as plain particles; dash on kit textures (the user tried it: "Looks good"; committed)
+- WHY: the user approved vfx-12 ("Looks good", pushed as e156abf) and said to start batch 2. Rules now settled:
+  basic weight, plain white and grey, plain rings, no black on trails, no solid sphere parts.
+- NEW `src/client/Fx/AirFx.luau` (on FxKit): `gust` (a thin ring standing square to an air punch, a second
+  smaller one, five thin lines back, three small puffs; after the wind ring in the vault's "VFX Ref V10");
+  `blinkOut` (an upright line growing tall and hair-thin while a ring closes); `blinkIn` (a white spot, an upright
+  four-point star, a ring, three lines crossing the gap, two puffs; after V10's weapon-swap flash); `trail`
+  (one smoke-flipbook emitter per launched root, switched on for a moment).
+- FxController: `AirPunchGust`, `Blink`, the strong hit's trail puffs and the kick finisher's streaks and puffs now
+  call AirFx. The `streak`, `gustSide` and `blinkPuffs` functions of solid sphere parts are deleted. `spawnBlob`
+  remains for BumpPuff and JumpBreak (batch 3). `LaunchTrail` (the uppercut's Trail) is unchanged.
+- DashFx: wind streaks and charge sparks use the kit's white needle (were Roblox's sparkle texture); the foot dust
+  is the kit's smoke flipbook at about two thirds the size. After-images and line Trails are unchanged; its
+  colours were made neutral in vfx-12.
+- SEEN in Play in slow motion (FxKit.studySlow(300), dark floor, about 3 f): the punch (spot, spikes to about 4
+  studs, ring, lines, sparks), the kick (larger; one thick streak of about 10 studs), the gust (ring, lines back,
+  puffs), blink out (tall line and ring), blink in (star in a ring, lines across). All plain white.
+- NOT SEEN: the launch smoke trail, the dash with its new textures, anything at full speed or in a round.
+- Gates: rojo build OK, 452 Lune tests, selene src 0, stylua clean. Build stamp vfx-13+lobby-2; Rojo connected.

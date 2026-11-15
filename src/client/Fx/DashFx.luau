@@ -23,6 +23,8 @@ local cfg = GameConfig.Effects
 
 local DashFx = {}
 
+local FxKit = require(script.Parent.FxKit)
+
 local WHITE = Color3.new(1, 1, 1)
 local PALE = Color3.fromRGB(240, 242, 245)
 -- A dash is coloured by how charged it is: white for a tap, through pale gold, to a bright neon orange
@@ -34,8 +36,8 @@ local WARM_HEAD = Color3.fromRGB(255, 255, 255)
 local WARM_TAIL = Color3.fromRGB(224, 227, 232)
 local HOT_HEAD = Color3.fromRGB(255, 255, 255)
 local HOT_TAIL = Color3.fromRGB(238, 240, 244)
-local STREAK_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
-local DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
+local STREAK_TEXTURE = FxKit.Tex.Needle -- the plain white spike, laid along its flight
+local DUST_TEXTURE = FxKit.Tex.Smoke -- flipbook, 4 x 4
 local PARK = CFrame.new(0, -1000, 0)
 local FIRST_GHOST_DELAY = 0.03
 local GHOST_SHOW_DELAY = 0.045 -- at dash speed the body is about 4 studs clear by then
@@ -168,6 +170,8 @@ local function buildKit(root: BasePart): Kit
 	local dust = Instance.new("ParticleEmitter")
 	dust.Name = "HT_DashDust"
 	dust.Texture = DUST_TEXTURE
+	dust.FlipbookLayout = Enum.ParticleFlipbookLayout.Grid4x4
+	dust.FlipbookMode = Enum.ParticleFlipbookMode.OneShot
 	dust.EmissionDirection = Enum.NormalId.Back
 	dust.Lifetime = NumberRange.new(0.35, 0.6)
 	dust.Speed = NumberRange.new(6, 14)
@@ -176,8 +180,8 @@ local function buildKit(root: BasePart): Kit
 	dust.Rotation = NumberRange.new(0, 360)
 	dust.RotSpeed = NumberRange.new(-60, 60)
 	dust.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 1.2),
-		NumberSequenceKeypoint.new(1, 3.6),
+		NumberSequenceKeypoint.new(0, 0.9),
+		NumberSequenceKeypoint.new(1, 2.2),
 	})
 	dust.Color = ColorSequence.new(PALE)
 	dust.Transparency = NumberSequence.new({

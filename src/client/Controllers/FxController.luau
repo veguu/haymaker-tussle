@@ -17,6 +17,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Sfx = require(ReplicatedStorage.Shared.Sfx)
 local GroundBreak = require(ReplicatedStorage.Shared.Core.GroundBreak)
+local AirFx = require(script.Parent.Parent.Fx.AirFx)
 local ClashFx = require(script.Parent.Parent.Fx.ClashFx)
 local DashFx = require(script.Parent.Parent.Fx.DashFx)
 local ImpactFx = require(script.Parent.Parent.Fx.ImpactFx)
@@ -117,72 +118,6 @@ local function ball(size: number): Vector3
 	return Vector3.new(size, size, size)
 end
 
--- A thin streak pointing along `direction`, stretching out as it fades.
-local function streak(
-	position: Vector3,
-	direction: Vector3,
-	length: number,
-	seconds: number,
-	delay: number?
-)
-	local aim = CFrame.lookAt(position, position + direction)
-	spawnBlob({
-		from = aim,
-		to = aim + direction * length,
-		fromSize = Vector3.new(0.24, 0.24, length * 0.7),
-		toSize = Vector3.new(0.05, 0.05, length * 1.5),
-		seconds = seconds,
-		colour = SHADE,
-		delay = delay,
-	})
-end
-
--- One side's gust: three swelling blobs, wind streaks trailing back, and a small droplet.
-local function gustSide(feet: Vector3, right: Vector3, back: Vector3, side: number)
-	local up = Vector3.yAxis
-	local out = right * side
-	local base = feet + out * cfg.GustSideOffset
-	local seconds = cfg.GustSeconds
-
-	local function at(position: Vector3): CFrame
-		return CFrame.new(position)
-	end
-	spawnBlob({
-		from = at(base + up * 0.5),
-		to = at(base + out * 1.6 + back * 1.3 + up * 1),
-		fromSize = ball(1.4),
-		toSize = ball(3.3),
-		seconds = seconds,
-	})
-	spawnBlob({
-		from = at(base + back * 0.6 + up * 0.3),
-		to = at(base + out * 0.9 + back * 2.8 + up * 0.5),
-		fromSize = ball(1),
-		toSize = ball(2.5),
-		seconds = seconds * 0.85,
-		colour = SHADE,
-		delay = 0.02,
-	})
-	spawnBlob({
-		from = at(base + out * 0.4 - back * 0.3 + up * 0.5),
-		to = at(base + out * 2.3 + up * 1.4),
-		fromSize = ball(0.8),
-		toSize = ball(2),
-		seconds = seconds * 0.75,
-		delay = 0.04,
-	})
-	streak(base + back * 0.6 + up * 0.9, back, 2.6, seconds * 0.6)
-	streak(base + out * 0.5 + back * 0.4 + up * 0.25, back, 2, seconds * 0.5, 0.03)
-	spawnBlob({
-		from = at(base + back * 1 + up * 0.8),
-		to = at(base + out * 1.3 + back * 3.2 + up * 1.2),
-		fromSize = ball(0.4),
-		toSize = ball(0.1),
-		seconds = seconds * 0.7,
-		colour = SHADE,
-	})
-end
-
 --- A dash starting: after-images, speed lines, wind streaks and dust (Fx/DashFx), and its gust of
 --- wind. `seconds` is how long that dash runs, `power` how charged it is (0 to 1), which colours it
 --- and deepens its sound.
@@ -207,36 +142,6 @@ function FxController:PropelGust(character: Model, seconds: number?, power: numb
 	Sfx.play("propel", root, PITCH_VARY, { volume = 0.4 })
 end
 
--- One end of a blink: a ring of puffs at chest height, closing in to nothing where they left
--- (`closing`) or bursting outward where they arrive.
-local function blinkPuffs(at: Vector3, closing: boolean)
-	local count = 6
-	for index = 1, count do
-		local angle = index / count * math.pi * 2
-		local out = Vector3.new(math.cos(angle), 0, math.sin(angle))
-		local near = CFrame.new(at + out * 0.4)
-		local far =
-			CFrame.new(at + out * 2.6 + Vector3.yAxis * (if index % 2 == 0 then 0.9 else -0.6))
-		spawnBlob({
-			from = if closing then far else near,
-			to = if closing then near else far,
-			fromSize = ball(if closing then 2 else 1.1),
-			toSize = ball(if closing then 0.3 else 2.4),
-			seconds = if closing then 0.16 else 0.28,
-			colour = if index % 2 == 0 then SHADE else nil,
-			delay = if closing then 0 else index * 0.006,
-		})
-	end
-	spawnBlob({
-		from = CFrame.new(at),
-		to = CFrame.new(at),
-		fromSize = if closing then Vector3.new(3.4, 5.6, 3.4) else Vector3.new(0.6, 6.5, 0.6),
-		toSize = if closing then Vector3.new(0.2, 7, 0.2) else Vector3.new(4.2, 4.8, 4.2),
-		seconds = if closing then 0.14 else 0.22,
-		startTransparency = 0.35,
-	})
-end
-
 --- A blink (Tempest's Q): the body closes to nothing at `from`, a few thin streaks cross the gap, and
 --- it bursts back out at `to`. Without `to` (someone else's blink: only the start is known) the arrival
 --- is shown where their body turns up a moment later.
@@ -245,18 +150,10 @@ function FxController:Blink(character: Model, from: Vector3, to: Vector3?)
 	if not root then
 		return
 	end
-	blinkPuffs(from, true)
+	AirFx.blinkOut(from)
 	Sfx.play("dash", root, PITCH_VARY, { pitch = 1.55, volume = 0.75, cut = 0.35 })
 	local function arrive(at: Vector3)
-		local gap = at - from
-		if gap.Magnitude > 1 then
-			local along = gap.Unit
-			for index = -1, 1 do
-				local start = from + Vector3.yAxis * index * 1.1 + along * 1.5
-				streak(start, along, math.min(gap.Magnitude * 0.45, 9), 0.2, (index + 1) * 0.012)
-			end
-		end
-		blinkPuffs(at, false)
+		AirFx.blinkIn(at, at - from)
 		Sfx.play("propel", root, PITCH_VARY, { pitch = 1.3, volume = 0.45 })
 	end
 	if to then
@@ -349,10 +246,7 @@ function FxController:AirPunchGust(character: Model, direction: Vector3)
 	if not root or direction.Magnitude < 0.01 then
 		return
 	end
-	local forward = direction.Unit
-	local right = Vector3.new(-forward.Z, 0, forward.X)
-	gustSide(root.Position, right, -forward, 1)
-	gustSide(root.Position, right, -forward, -1)
+	AirFx.gust(root.Position, direction)
 end
 
 --- A landed hit on the target, sending them away from the attacker.
@@ -373,11 +267,6 @@ function FxController:HitBurst(target: Model, attacker: Model?, strength: number
 	local strong = strength >= cfg.StrongHitSpeed
 	local scale = if strong then cfg.StrongHitScale else 1
 	local center = tip or root.Position - away * 0.8
-	local up = Vector3.yAxis
-
-	local function at(position: Vector3): CFrame
-		return CFrame.new(position)
-	end
 	-- The hit itself: the replica of the reference's punch hit (Fx/PunchHitFx), all particles.
 	-- A strong hit is the reference's heavy hit, which carries its own size.
 	PunchHitFx.play(center, away, if strong then 1 else scale, nil, strong)
@@ -388,21 +277,8 @@ function FxController:HitBurst(target: Model, attacker: Model?, strength: number
 	if strong then
 		Sfx.play("boom_low", root, 0, { pitch = 1.1, volume = 0.8, cut = 0.5 })
 		Sfx.play("launch", root, PITCH_VARY)
-		-- Puffs left along the flight path, so a big launch is readable across the arena.
-		for index = 1, cfg.TrailPuffs do
-			task.delay(index * cfg.TrailPuffSeconds, function()
-				if root.Parent then
-					spawnBlob({
-						from = at(root.Position),
-						to = at(root.Position + up * 0.5),
-						fromSize = ball(1.3),
-						toSize = ball(2.6),
-						seconds = cfg.HitBurstSeconds * 1.4,
-						colour = SHADE,
-					})
-				end
-			end)
-		end
+		-- Smoke left along the flight path, so a big launch is readable across the arena (Fx/AirFx).
+		AirFx.trail(root, cfg.TrailPuffs * cfg.TrailPuffSeconds)
 	end
 end
 
@@ -534,38 +410,10 @@ function FxController:KickImpact(
 	local up = Vector3.yAxis
 	local power = (if hit then 1 else 0.55) * share
 	if finisher then
-		-- A finisher throws them away: a blast of streaks along the way they're going, and puffs left
-		-- along the first of their flight.
-		local attackerRoot = attacker:FindFirstChild("HumanoidRootPart") :: BasePart?
-		local line = if attackerRoot then position - attackerRoot.Position else Vector3.zero
-		local away = Vector3.new(line.X, 0, line.Z)
-		away = if away.Magnitude > 0.01 then away.Unit else Vector3.zAxis
-		local right = Vector3.new(-away.Z, 0, away.X)
-		for index = -2, 2 do
-			streak(
-				position + right * index * 0.5 + up * (index % 2) * 0.4,
-				away + up * 0.35,
-				7 * power,
-				cfg.KickImpactSeconds * 0.5,
-				math.abs(index) * 0.015
-			)
-		end
-		local targetRoot = target and target:FindFirstChild("HumanoidRootPart") :: BasePart?
-		if targetRoot then
-			for index = 1, cfg.TrailPuffs + 2 do
-				task.delay(index * cfg.TrailPuffSeconds, function()
-					if targetRoot.Parent then
-						spawnBlob({
-							from = CFrame.new(targetRoot.Position),
-							to = CFrame.new(targetRoot.Position + up * 0.5),
-							fromSize = ball(1.6),
-							toSize = ball(3.2),
-							seconds = cfg.HitBurstSeconds * 1.4,
-							colour = SHADE,
-						})
-					end
-				end)
-			end
+		-- A finisher throws them away: smoke left along the first of their flight (Fx/AirFx).
+		local targetRoot = target and target:FindFirstChild("HumanoidRootPart")
+		if targetRoot and targetRoot:IsA("BasePart") then
+			AirFx.trail(targetRoot, (cfg.TrailPuffs + 2) * cfg.TrailPuffSeconds)
 		end
 	end
 	-- THE LOOK (vfx-10, Fx/KickHitFx and Fx/StepBurstFx; the old discs, ball and spokes of solid
@@ -1008,6 +856,7 @@ function FxController:KnitInit()
 	task.spawn(StepBurstFx.preload)
 	task.spawn(KickHitFx.preload)
 	task.spawn(ClashFx.preload)
+	task.spawn(AirFx.preload)
 end
 
 -- Smoke at the feet of anyone drifting in a propel: moving fast with the body pointing away from
