@@ -19,8 +19,20 @@
 -- the particles became too dull, it should be more bright and shiny"). The reference's star lasts two
 -- frames and its early layers five. Played in the game, particles that live two to four frames cannot
 -- show growth or spin: they pop on and off. So the layers and their ORDER are the reference's, but each
--- now lives long enough to be seen moving (blades 0.16 to 0.28 s): it starts small, shoots out, thins
--- and turns as it fades. Nothing is thrown again in quick pops.
+-- lives long enough to be seen moving, and nothing is thrown again in quick pops.
+--
+-- vfx-9 (2026-11-14, after the frame-by-frame study in the vault, "VFX Ref V01", and the user's word
+-- that timing, brightness and shape were all still off). The reference is a SEQUENCE of separate
+-- pictures, and vfx-8 piled them on top of each other. Now:
+--   * the white floor ring comes alone, one frame before anything else (LEAD)
+--   * the star is at full size at once and only shrinks and thins (6 to 10 frames), so the band of
+--     lines that follows is seen on its own
+--   * the band is a wedge: tall at the fighters, tapering to one tip (three tiers of lines, the longest
+--     in the middle), with about three dozen lines
+--   * the sparks sit round the one hit, pointing outward as the camera sees them, and shrink in place
+--   * a bigger white centre, a tighter glow; black is thin hatch lines inside the star and thin lines
+--     by the band (no black blades, no black arcs); three glints, later; leftovers gone sooner; the
+--     ring and the bubble no longer spin
 --
 -- HOW THE BURST IS MADE (the user, 2026-11-14: "speed, size, rotation, randomness, are all very useful
 -- for making a burst, explosive like effect"). The star is NOT one emitter per spike any more. It is a
@@ -35,7 +47,7 @@
 --   * Lifetime is a range, so they don't all go at the same instant
 -- Only the six longest spikes are aimed on purpose (LONG, below), from the hit's direction.
 --
--- HOW IT'S BUILT. A few rigs made once and used in turn (three invisible anchored parts each, with
+-- HOW IT'S BUILT. A few rigs made once and used in turn (eight invisible anchored parts each, with
 -- their emitters). A hit moves the next rig to the spot and tells each emitter to throw a fixed number
 -- of particles at its moment. Nothing is created per punch. Textures: design/vfx/draw_hit_replica.ps1.
 
@@ -63,7 +75,14 @@ local GREEN = Color3.fromRGB(50, 255, 60) -- the reference's colour
 local PARK = CFrame.new(0, -1000, 0)
 local FRAME = 1 / 60
 local RIGS = 4
-local LINES_SIZE = Vector3.new(2.2, 3, 0.2)
+local LEAD = 1 -- frames the floor ring comes before everything else
+-- THE BAND's three tiers: the face its lines leave (width, height), how far ahead of the contact it
+-- sits (half a line, so the lines start at the contact) and the Size of its lines. The middle tier is
+-- small and long, the outer one tall and short: together a wedge that tapers to one tip.
+local TIER_CORE = { face = Vector3.new(1.6, 1.2, 0.2), ahead = 10, size = 4.2 }
+local TIER_MID = { face = Vector3.new(2, 3.6, 0.2), ahead = 6.5, size = 2.7 }
+local TIER_OUTER = { face = Vector3.new(2.2, 6.5, 0.2), ahead = 3.5, size = 1.5 }
+local HATCH_SIZE = 1.6 -- the square the hatch lines are scattered in
 local FLOOR_REACH = 9 -- how far under the hit a floor is looked for
 local QUALITY = if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	then 0.6
@@ -74,12 +93,34 @@ local QUALITY = if UserInputService.TouchEnabled and not UserInputService.Keyboa
 -- higher, the thinner). Read off the reference's first frame: two lean back toward the attacker, up and
 -- down; the rest fan forward round the band of lines.
 local LONG = {
-	{ 147, 10, 0.9 },
-	{ 240, 9, 0.7 },
-	{ 15, 9.5, 0.5 },
+	{ 147, 11.5, 0.9 },
+	{ 240, 10, 0.7 },
+	{ 15, 10, 0.5 },
 	{ 32, 9, 0.9 },
-	{ 340, 7, 0.2 },
+	{ 340, 7.5, 0.2 },
 	{ 73, 5.5, 0.5 },
+}
+-- THE SPARKS: where each sits round the one hit as the camera sees it (degrees anticlockwise from
+-- screen-right, before the hit's own random turn), how far out in studs, and how big against the rest.
+local SPARKS = {
+	{ 8, 2.5, 1 },
+	{ 47, 1.8, 0.7 },
+	{ 88, 2.7, 1.15 },
+	{ 124, 2, 0.8 },
+	{ 163, 2.4, 1 },
+	{ 201, 1.7, 0.65 },
+	{ 236, 2.6, 1.1 },
+	{ 272, 1.9, 0.75 },
+	{ 305, 2.5, 0.95 },
+	{ 338, 2, 0.85 },
+}
+local SPARK_SIZE = 1.2 -- with Squash 0.6: a kite about 1.6 studs long and 0.4 thick
+-- THE HATCH: two patches of thin black lines inside the star. Where each sits from the contact as the
+-- camera sees it (x is along the way the hit goes across the screen, y is up), and the angle its lines
+-- lie at (degrees anticlockwise from that way).
+local HATCH = {
+	{ Vector3.new(-0.3, 1.5, 0), 60 },
+	{ Vector3.new(1.4, -1, 0), -30 },
 }
 local BLADE_SIZE = 1.2 -- the Size that draws a blade one stud long (measured in slow motion)
 local HOLD_TIMES = 2 -- a heavy hit throws its star again this many times...
@@ -112,14 +153,23 @@ type Aim = { emitter: ParticleEmitter, angle: number }
 -- An arc whose angle is set for each hit: `tilt` degrees off upright toward the way of the hit, turning
 -- on that way at `spin` degrees a second.
 type Turn = { emitter: ParticleEmitter, tilt: number, spin: number }
+-- A spark: its emitter, the attachment it sits on, and where that goes for each hit.
+type Spark = { emitter: ParticleEmitter, at: Attachment, angle: number, radius: number }
+-- A patch of hatch lines: its emitter, the part it is scattered in, and where that goes for each hit.
+type Hatch = { emitter: ParticleEmitter, part: Part, offset: Vector3, angle: number }
+-- One tier of the band: the part its lines leave, and its measures (TIER_...).
+type Tier = { part: Part, face: Vector3, ahead: number }
 
 type Rig = {
 	center: Part,
-	lines: Part,
+	tiers: { Tier },
 	floor: Part,
+	face: Part, -- turned to the camera for each hit; the sparks sit on it
 	layers: { Layer },
 	aims: { Aim },
 	turns: { Turn },
+	sparks: { Spark },
+	hatches: { Hatch },
 	used: number, -- counts up each time the rig is used, so a late layer of an old hit is dropped
 }
 
@@ -173,9 +223,19 @@ end
 
 local function buildRig(parent: Instance): Rig
 	local center = hiddenPart("HT_PunchHit", Vector3.new(0.2, 0.2, 0.2), parent)
-	-- The lines leave the whole of this part's front face, so they come as a band, not from a point.
-	local lines = hiddenPart("HT_PunchHitLines", LINES_SIZE, parent)
+	-- The lines leave the whole of a part's front face, so they come as a band, not from a point.
+	-- Three parts, one for each tier of the wedge.
+	local lines = hiddenPart("HT_PunchHitLines", TIER_CORE.face, parent)
+	local linesMid = hiddenPart("HT_PunchHitLinesMid", TIER_MID.face, parent)
+	local linesOuter = hiddenPart("HT_PunchHitLinesOuter", TIER_OUTER.face, parent)
+	local tiers: { Tier } = {
+		{ part = lines, face = TIER_CORE.face, ahead = TIER_CORE.ahead },
+		{ part = linesMid, face = TIER_MID.face, ahead = TIER_MID.ahead },
+		{ part = linesOuter, face = TIER_OUTER.face, ahead = TIER_OUTER.ahead },
+	}
 	local floor = hiddenPart("HT_PunchHitFloor", Vector3.new(7, 0.2, 7), parent)
+	-- Turned to the camera for each hit: its +X is the screen's right and its +Y the screen's up.
+	local face = hiddenPart("HT_PunchHitFace", Vector3.new(0.2, 0.2, 0.2), parent)
 	local at = Instance.new("Attachment")
 	at.Parent = center
 	-- On the one hit, a little past the point of contact.
@@ -213,7 +273,8 @@ local function buildRig(parent: Instance): Rig
 		table.insert(layers, {
 			emitter = made,
 			amount = amount,
-			delay = delayFrames * FRAME,
+			-- Everything but the floor ring waits LEAD frames, so the ring is seen alone first.
+			delay = (delayFrames + (if name == "FloorRing" then 0 else LEAD)) * FRAME,
 			tinted = tinted,
 			size = size,
 			speed = speed,
@@ -235,49 +296,63 @@ local function buildRig(parent: Instance): Rig
 	end
 	local STILL = NumberRange.new(0)
 
-	-- 0 f. The white-hot core: it swells out fast and fades. Bright enough to bloom.
-	local core = layer(at, "Core", GLOW, 1, 0, false, keys(0, 0.8, 0.2, 3.4, 1, 1.3), STILL)
-	core.Lifetime = NumberRange.new(0.14)
+	-- 0 f. The white-hot core: the reference's is about six studs wide. Full at once, a short swell,
+	-- gone in six frames. Bright enough to bloom.
+	local core = layer(at, "Core", GLOW, 1, 0, false, keys(0, 3, 0.3, 4.2, 1, 2), STILL)
+	core.Lifetime = NumberRange.new(0.1)
 	core.Brightness = 3
 	core.ZOffset = 1.8
 	core.Transparency = fade(0, 0, 0.5, 0.15, 1, 1)
 
-	-- 0 f. The glow round the core, swelling outward: this is most of the shine.
-	local halo = layer(at, "Halo", GLOW, 1, 0, true, keys(0, 2.5, 0.3, 8, 1, 10), STILL)
+	-- 0 f. The glow round the core: tight to the star (the reference's floor is not tinted).
+	local halo = layer(at, "Halo", GLOW, 1, 0, true, keys(0, 3, 0.4, 4.5, 1, 5), STILL)
 	tone(0.2)
-	halo.Lifetime = NumberRange.new(0.22)
+	halo.Lifetime = NumberRange.new(0.14)
 	halo.Brightness = 1.4
 	halo.LightEmission = 0.6 -- part glow, part its own green, so it stays green on a pale floor
 	halo.ZOffset = 0.5
-	halo.Transparency = fade(0, 0.45, 0.4, 0.65, 1, 1)
+	halo.Transparency = fade(0, 0.5, 0.5, 0.7, 1, 1)
 
 	-- THE STAR (see the top of this file). A blade's length on screen is its Size / BLADE_SIZE times
 	-- 2^Squash; its thickness is divided by the same 2^Squash.
 
-	-- 0 f. Black blades, behind everything (lowest ZOffset): thin, few, each its own length. Only what
-	-- sticks out past the green or between it shows.
-	local ink = layer(
-		at,
-		"StarInk",
-		BLADE,
-		9,
-		0,
-		false,
-		curve(0, 1, 0.5, 0.3, 6.5, 3.2, 0.6, 6, 3, 1, 3, 1.5),
-		STILL
-	)
-	ink.Color = ColorSequence.new(BLACK)
-	ink.LightEmission = 0
-	ink.ZOffset = 0.2
-	ink.Rotation = NumberRange.new(0, 360)
-	ink.RotSpeed = NumberRange.new(-90, 90)
-	ink.Lifetime = NumberRange.new(0.14, 0.24)
-	ink.Squash = NumberSequence.new(curve(0, 0.5, 0.4, 1, 1.3, 0.4))
-	ink.Transparency = fade(0, 0.2, 0.75, 0.35, 1, 1)
+	-- 0 f. The hatch: two patches of thin black lines drawn over the star's white middle, as in the
+	-- reference's first frame. Each patch is scattered through a small square that faces the camera;
+	-- its lines lie at one angle, set for each hit (`hatches`), a little apart from each other.
+	local hatches: { Hatch } = {}
+	for index, spec in HATCH do
+		local square = hiddenPart(
+			"HT_PunchHitHatch" .. index,
+			Vector3.new(HATCH_SIZE, HATCH_SIZE, 0.1),
+			parent
+		)
+		local scribble = layer(
+			square,
+			"Hatch" .. index,
+			NEEDLE,
+			4,
+			0,
+			false,
+			curve(0, 0.65, 0.25, 1, 0.5, 0.2),
+			STILL
+		)
+		scribble.Shape = Enum.ParticleEmitterShape.Box
+		scribble.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+		scribble.Color = ColorSequence.new(BLACK)
+		scribble.LightEmission = 0
+		scribble.ZOffset = 2.2 -- in front of the white core
+		scribble.Lifetime = NumberRange.new(0.08, 0.13)
+		scribble.Squash = NumberSequence.new(-0.6) -- about 2 studs long, hair-thin
+		scribble.Transparency = fade(0, 0.05, 0.7, 0.2, 1, 1)
+		table.insert(
+			hatches,
+			{ emitter = scribble, part = square, offset = spec[1], angle = spec[2] }
+		)
+	end
 
-	-- 0 f. The crowd of green blades. Each starts a sixth of its length, shoots out to full length in
-	-- the first quarter of its life, then thins to a needle, turning a little, as it fades. Lengths
-	-- from about 2 to 10 studs.
+	-- 0 f. The crowd of green blades. Each is at its full length at once (the reference's star is
+	-- already shrinking on its second frame), then shortens and thins to a needle, turning a little,
+	-- as it fades. Lengths from about 2 to 8 studs.
 	local blades = layer(
 		at,
 		"StarBlades",
@@ -285,7 +360,7 @@ local function buildRig(parent: Instance): Rig
 		26,
 		0,
 		false,
-		curve(0, 0.9, 0.4, 0.28, 6, 3, 0.55, 5.6, 2.8, 1, 2.8, 1.4),
+		curve(0, 6, 3, 0.4, 3.6, 1.8, 1, 1.4, 0.7),
 		STILL
 	)
 	layers[#layers].hold = true
@@ -293,9 +368,9 @@ local function buildRig(parent: Instance): Rig
 	blades.Brightness = 2
 	blades.ZOffset = 1
 	blades.Rotation = NumberRange.new(0, 360)
-	blades.RotSpeed = NumberRange.new(-110, 110) -- up to 30 degrees of twist in its life
-	blades.Lifetime = NumberRange.new(0.16, 0.28)
-	blades.Squash = NumberSequence.new(curve(0, -0.2, 0.4, 0.4, 0.3, 0.5, 1, 1.1, 0.5)) -- broad, then thinning to a needle
+	blades.RotSpeed = NumberRange.new(-110, 110) -- up to 20 degrees of twist in its life
+	blades.Lifetime = NumberRange.new(0.1, 0.16)
+	blades.Squash = NumberSequence.new(curve(0, 0.1, 0.4, 0.4, 0.6, 0.5, 1, 1.2, 0.5)) -- broad, then thinning to a needle
 	blades.Transparency = fade(0, 0, 0.55, 0.05, 1, 1)
 
 	-- 0 f. The six long spikes, one emitter each: aimed for each hit (`aims`), not random.
@@ -310,14 +385,14 @@ local function buildRig(parent: Instance): Rig
 			1,
 			0,
 			false,
-			keys(0, peak * 0.15, 0.25, peak, 0.5, peak * 0.95, 1, peak * 0.5),
+			keys(0, peak, 0.35, peak * 0.7, 1, peak * 0.3),
 			STILL
 		)
 		layers[#layers].hold = true
 		spike.LightEmission = 0.65
 		spike.Brightness = 2.2
 		spike.ZOffset = 1.2
-		spike.Lifetime = NumberRange.new(0.14, 0.2)
+		spike.Lifetime = NumberRange.new(0.09, 0.14)
 		spike.RotSpeed = NumberRange.new(-25, 25)
 		spike.Squash = NumberSequence.new(spec[3] - 0.4, spec[3] + 0.5)
 		spike.Transparency = fade(0, 0, 0.75, 0.1, 1, 1)
@@ -325,16 +400,8 @@ local function buildRig(parent: Instance): Rig
 	end
 
 	-- 2 f. A second, smaller burst of blades on the one hit, spinning faster: one throw, not a flicker.
-	local ball = layer(
-		body,
-		"StarBall",
-		BLADE,
-		14,
-		2,
-		false,
-		curve(0, 0.6, 0.3, 0.3, 4.5, 2, 1, 2, 1),
-		STILL
-	)
+	local ball =
+		layer(body, "StarBall", BLADE, 8, 2, false, curve(0, 0.6, 0.3, 0.3, 4.5, 2, 1, 2, 1), STILL)
 	ball.LightEmission = 0.65
 	ball.Brightness = 2
 	ball.ZOffset = 1.1
@@ -346,36 +413,53 @@ local function buildRig(parent: Instance): Rig
 
 	-- 1 f. THE BAND of long lines shot the way of the hit. Each line has its own length (the size's
 	-- envelope), its own speed and its own life. Brighter lines are drawn nearer (ZOffset).
+	-- MEASURED in Play (vfx-9): a particle is drawn TWICE its Size across, so a line is as long as its
+	-- Size times 4.8 (2 x 2^1.26). vfx-9's first try assumed 2.4 and the band came out 40 studs long.
+	-- The same holds for every Size in this file: a ring of Size 3.3 is 6.6 studs across. It is nearly full length at once (the
+	-- reference's band is four character heights long on its first frame) and drifts on a little, so
+	-- the band stays rooted at the fighters. The three tiers together make the wedge (TIER_...).
 	local function line(
+		host: Part,
 		name: string,
 		amount: number,
+		length: number,
 		dark: number?,
 		hot: number?,
 		emission: number,
 		brightness: number
 	)
 		local made = layer(
-			lines,
+			host,
 			name,
 			NEEDLE,
 			amount,
 			1,
 			true,
-			curve(0, 2.2, 0.8, 0.3, 5.4, 2, 1, 4, 1.5),
-			NumberRange.new(80, 190)
+			curve(
+				0,
+				length * 0.8,
+				length * 0.25,
+				0.25,
+				length,
+				length * 0.3,
+				1,
+				length * 0.75,
+				length * 0.25
+			),
+			NumberRange.new(15, 45)
 		)
 		tone(dark, hot)
 		made.Orientation = Enum.ParticleOrientation.VelocityParallel
 		made.EmissionDirection = Enum.NormalId.Front
-		made.Lifetime = NumberRange.new(0.09, 0.17)
-		made.Drag = 5 -- shot out fast, slowing as it goes
+		made.Lifetime = NumberRange.new(0.1, 0.16)
+		made.Drag = 5
 		made.Brightness = brightness * 1.4
 		made.LightEmission = emission
 		made.ZOffset = emission
 		made.Squash = NumberSequence.new(-1.26)
 		made.Transparency = fade(0, 0, 0.6, 0.05, 1, 1)
 	end
-	-- The thick white middle of the band.
+	-- The thick white middle of the band: the longest lines, about 20 studs.
 	local beam = layer(
 		lines,
 		"LinesCore",
@@ -383,8 +467,8 @@ local function buildRig(parent: Instance): Rig
 		3,
 		1,
 		false,
-		curve(0, 6, 1.5, 1, 6, 1.5),
-		NumberRange.new(70, 110)
+		curve(0, 4.7, 0.7, 1, 4.7, 0.7),
+		NumberRange.new(15, 40)
 	)
 	beam.Orientation = Enum.ParticleOrientation.VelocityParallel
 	beam.EmissionDirection = Enum.NormalId.Front
@@ -394,21 +478,28 @@ local function buildRig(parent: Instance): Rig
 	beam.Squash = NumberSequence.new(-0.95)
 	beam.ZOffset = 1.2
 	beam.Transparency = fade(0, 0, 0.6, 0.1, 1, 1)
-	line("LinesHot", 4, nil, 0.85, 0.85, 2)
-	line("Lines", 6, 0.1, nil, 0.5, 1.3)
-	line("LinesDeep", 5, 0.5, nil, 0.2, 1)
+	-- Middle tier: long, mostly white-hot and bright green.
+	line(lines, "LinesHot", 4, TIER_CORE.size, nil, 0.85, 0.85, 2)
+	line(lines, "Lines", 4, TIER_CORE.size, 0.1, nil, 0.5, 1.3)
+	-- Second tier: about 13 studs, all three tones.
+	line(linesMid, "MidHot", 3, TIER_MID.size, nil, 0.85, 0.85, 2)
+	line(linesMid, "MidLines", 6, TIER_MID.size, 0.1, nil, 0.5, 1.3)
+	line(linesMid, "MidDeep", 4, TIER_MID.size, 0.5, nil, 0.2, 1)
+	-- Outer tier: about 7 studs, over the whole height of the band, the deeper tones.
+	line(linesOuter, "OuterLines", 6, TIER_OUTER.size, 0.1, nil, 0.5, 1.3)
+	line(linesOuter, "OuterDeep", 5, TIER_OUTER.size, 0.5, nil, 0.2, 1)
 
-	-- 1 f. Black lines behind them: faster and longer-lived, so they reach past the green's far end,
-	-- fanned a little, and they outlast it by a few frames.
+	-- 1 f. Black lines above and below the green ones: faster and longer-lived, so they reach past
+	-- the green's far end, fanned a little, and they outlast it by a few frames.
 	local dark = layer(
-		lines,
+		linesMid,
 		"DarkLines",
 		NEEDLE,
 		14,
 		1,
 		false,
-		curve(0, 4, 1.5, 1, 4, 1.5),
-		NumberRange.new(95, 160)
+		curve(0, 2.6, 0.9, 1, 2.6, 0.9),
+		NumberRange.new(60, 110)
 	)
 	dark.Orientation = Enum.ParticleOrientation.VelocityParallel
 	dark.EmissionDirection = Enum.NormalId.Front
@@ -421,25 +512,26 @@ local function buildRig(parent: Instance): Rig
 	dark.ZOffset = -0.5
 	dark.Transparency = fade(0, 0.1, 0.7, 0.2, 1, 1)
 
-	-- 1 f. THE SHOCKWAVE. The bubble: out fast, then easing (measured), turning slowly as it goes.
-	local dome =
-		layer(body, "Dome", DOME, 1, 1, false, keys(0, 2.5, 0.3, 10.5, 0.65, 13, 1, 14), STILL)
+	-- 1 f. THE SHOCKWAVE. The bubble: out fast, then easing (measured). It does not turn.
+	local dome = layer(body, "Dome", DOME, 1, 1, false, keys(0, 3, 0.3, 5, 0.65, 6, 1, 6.4), STILL)
 	dome.Lifetime = NumberRange.new(0.22)
 	dome.Rotation = NumberRange.new(0, 360)
-	dome.RotSpeed = NumberRange.new(-120, 120)
 	dome.LightEmission = 0.7
 	dome.Transparency = fade(0, 0.42, 0.5, 0.62, 1, 1)
 
 	-- 1 f. Its bright rim: a second, brighter bubble racing outward ahead of the first (soft-edged: a
 	-- drawn circle here looked like an interface ring, not a shockwave).
-	local shock = layer(body, "ShockRing", DOME, 1, 1, false, keys(0, 2, 0.35, 11, 1, 14.5), STILL)
+	local shock =
+		layer(body, "ShockRing", DOME, 1, 1, false, keys(0, 2.6, 0.35, 5.4, 1, 6.8), STILL)
 	shock.Lifetime = NumberRange.new(0.16)
 	shock.Rotation = NumberRange.new(0, 360)
 	shock.LightEmission = 0.8
 	shock.Brightness = 1.6
 	shock.Transparency = fade(0, 0.5, 0.5, 0.7, 1, 1)
 
-	-- 0 f. The ring racing out along the floor, turning as it goes.
+	-- THE FIRST THING SEEN (it does not wait LEAD frames): the white ring on the floor, there one
+	-- frame before the star. About six studs across at once, widening to nine as it fades. It does
+	-- not turn.
 	local ring = layer(
 		ground,
 		"FloorRing",
@@ -447,47 +539,53 @@ local function buildRig(parent: Instance): Rig
 		1,
 		0,
 		false,
-		keys(0, 3, 0.3, 7, 1, 8.5),
+		keys(0, 3.3, 0.5, 3.8, 1, 4.8),
 		NumberRange.new(0.01)
 	)
 	ring.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
 	ring.EmissionDirection = Enum.NormalId.Top
-	ring.Lifetime = NumberRange.new(0.26)
+	ring.Lifetime = NumberRange.new(0.2)
 	ring.Rotation = NumberRange.new(0, 360)
-	ring.RotSpeed = NumberRange.new(110, 170)
 	ring.LightEmission = 0.8
 	ring.Brightness = 1.6
 	ring.Transparency = fade(0, 0, 0.5, 0.35, 1, 1)
 
-	-- 4 f. Needles flying off all round: fast, slowing hard, each its own size and speed.
-	local sparks = layer(
-		at,
-		"Sparks",
-		NEEDLE,
-		12,
-		3,
-		true,
-		curve(0, 1.2, 0.5, 1, 0.4, 0.2),
-		NumberRange.new(40, 110)
-	)
-	tone(nil, 0.5)
-	sparks.Orientation = Enum.ParticleOrientation.VelocityParallel
-	sparks.SpreadAngle = Vector2.new(180, 180)
-	sparks.Lifetime = NumberRange.new(0.18, 0.4)
-	sparks.Drag = 5
-	sparks.Squash = NumberSequence.new(-0.4)
-	sparks.Brightness = 3
-	sparks.LightEmission = 0.6
-	sparks.ZOffset = 1.3
-	sparks.Transparency = fade(0, 0, 0.8, 0.1, 1, 1)
+	-- 4 f. THE SPARKS: ten small kites sitting round the one hit, each pointing outward as the camera
+	-- sees it, shrinking where it is. One emitter each, on the part that is turned to the camera; where
+	-- each sits and which way it points is set for each hit (`sparks`), not left to chance.
+	local sparks: { Spark } = {}
+	for index, spec in SPARKS do
+		local seat = Instance.new("Attachment")
+		seat.Parent = face
+		local big = SPARK_SIZE * spec[3]
+		local spark = layer(
+			seat,
+			"Spark" .. index,
+			NEEDLE,
+			1,
+			4,
+			true,
+			keys(0, big, 0.35, big * 0.85, 1, big * 0.12),
+			STILL
+		)
+		tone(nil, 0.6)
+		spark.Lifetime = NumberRange.new(0.11, 0.17)
+		spark.Squash = NumberSequence.new(0.6)
+		spark.Brightness = 3
+		spark.LightEmission = 0.6
+		spark.ZOffset = 1.3
+		spark.Transparency = fade(0, 0, 0.75, 0.1, 1, 1)
+		table.insert(sparks, { emitter = spark, at = seat, angle = spec[1], radius = spec[2] })
+	end
 
-	-- 2 f. Glints: four-point stars thrown outward, swelling and shrinking as they spin. The shine.
+	-- 6 f. Glints: three four-point stars thrown outward, swelling and shrinking as they spin. In the
+	-- reference they come late and are few.
 	local glints = layer(
 		at,
 		"Glints",
 		STAR,
-		9,
-		2,
+		3,
+		6,
 		true,
 		curve(0, 0.1, 0.05, 0.3, 1.5, 0.7, 1, 0, 0),
 		NumberRange.new(8, 26)
@@ -511,26 +609,26 @@ local function buildRig(parent: Instance): Rig
 		1,
 		4,
 		false,
-		keys(0, 6, 0.3, 11, 1, 14),
+		keys(0, 4, 0.3, 6, 1, 7.5),
 		NumberRange.new(0.01)
 	)
 	dust.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
 	dust.EmissionDirection = Enum.NormalId.Top
 	dust.Rotation = NumberRange.new(0, 360)
 	dust.RotSpeed = NumberRange.new(-60, 60)
-	dust.Lifetime = NumberRange.new(0.45)
+	dust.Lifetime = NumberRange.new(0.3)
 	dust.LightEmission = 0.5
 	dust.Brightness = 1.3
 	dust.Transparency = fade(0, 0.2, 0.4, 0.5, 1, 1)
 
 	-- 2 f. A dark patch on the floor under it all, so the light has something to stand out from.
 	local patch =
-		layer(ground, "FloorShade", GLOW, 1, 2, false, keys(0, 6, 1, 8.5), NumberRange.new(0.01))
+		layer(ground, "FloorShade", GLOW, 1, 2, false, keys(0, 4.5, 1, 6), NumberRange.new(0.01))
 	patch.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
 	patch.EmissionDirection = Enum.NormalId.Top
 	patch.Color = ColorSequence.new(BLACK)
 	patch.LightEmission = 0
-	patch.Lifetime = NumberRange.new(0.5)
+	patch.Lifetime = NumberRange.new(0.35)
 	patch.Transparency = fade(0, 0.5, 0.5, 0.68, 1, 1)
 
 	-- 5 f. Deep green flame wisps rising over the one hit: low glow, each its own size and speed.
@@ -541,7 +639,7 @@ local function buildRig(parent: Instance): Rig
 		7,
 		5,
 		true,
-		curve(0, 3, 1, 0.3, 5.5, 1.5, 1, 6.5, 2),
+		curve(0, 2, 0.7, 0.3, 3.4, 1, 1, 4, 1.2),
 		NumberRange.new(3, 8)
 	)
 	tone(0.35)
@@ -577,7 +675,7 @@ local function buildRig(parent: Instance): Rig
 			keys(0, from, 0.35, from + (to - from) * 0.75, 1, to),
 			STILL
 		)
-		made.Lifetime = NumberRange.new(0.34, 0.44)
+		made.Lifetime = NumberRange.new(0.22, 0.3)
 		made.LightEmission = 0.7
 		made.Brightness = 2
 		made.Transparency = fade(0, 0.15, 0.6, 0.4, 1, 1)
@@ -586,26 +684,17 @@ local function buildRig(parent: Instance): Rig
 	end
 	arc("ArcA", 6, 20, 110, 4.6, 6.6)
 	arc("ArcB", 6, 55, 170, 5.4, 7.6)
-	-- 8 f. Two black arcs outside them, leaning the other way: shading for the white ones.
-	for index, spec in { { -15, 90, 5.8, 8 }, { 40, 140, 6.6, 9 } } do
-		local shade = arc("ArcDark" .. index, 8, spec[1], spec[2], spec[3], spec[4])
-		shade.Color = ColorSequence.new(BLACK)
-		shade.LightEmission = 0
-		shade.Brightness = 1
-		shade.ZOffset = -0.3
-		shade.Transparency = fade(0, 0.45, 0.6, 0.6, 1, 1)
-	end
 
 	-- 5 f. Smoke along the floor, left behind after the light has gone: each puff swelling, drifting
-	-- out and turning at its own rate.
+	-- out and turning at its own rate. Gone about half a second after the hit, as in the reference.
 	local smoke = layer(
 		floor,
 		"FloorSmoke",
 		SMOKE,
-		22,
+		18,
 		5,
 		false,
-		curve(0, 2.2, 0.8, 0.4, 4.6, 1.4, 1, 5.8, 1.6),
+		curve(0, 1.4, 0.5, 0.4, 2.6, 0.8, 1, 3.2, 0.9),
 		NumberRange.new(0.5, 5)
 	)
 	smoke.FlipbookLayout = Enum.ParticleFlipbookLayout.Grid4x4
@@ -614,7 +703,7 @@ local function buildRig(parent: Instance): Rig
 	smoke.SpreadAngle = Vector2.new(80, 80)
 	smoke.Color = ColorSequence.new(SMOKE_GREY)
 	smoke.LightEmission = 0.3
-	smoke.Lifetime = NumberRange.new(0.6, 0.95)
+	smoke.Lifetime = NumberRange.new(0.32, 0.5)
 	smoke.Rotation = NumberRange.new(0, 360)
 	smoke.RotSpeed = NumberRange.new(-50, 50)
 	smoke.Drag = 3
@@ -672,11 +761,14 @@ local function buildRig(parent: Instance): Rig
 
 	return {
 		center = center,
-		lines = lines,
+		tiers = tiers,
 		floor = floor,
+		face = face,
 		layers = layers,
 		aims = aims,
 		turns = turns,
+		sparks = sparks,
+		hatches = hatches,
 		used = 0,
 	}
 end
@@ -746,9 +838,12 @@ function PunchHitFx.play(
 	local floorAt = floorUnder(position)
 
 	rig.center.CFrame = CFrame.lookAt(position, position + way)
-	-- The lines are as long as they are fast, so their source sits half a line ahead of the contact.
-	rig.lines.CFrame = CFrame.lookAt(position + way * 8 * scale, position + way * 9 * scale)
-	rig.lines.Size = LINES_SIZE * scale
+	-- Each tier of the band sits half a line ahead of the contact, so its lines start at the contact.
+	for _, tier in rig.tiers do
+		local from = position + way * tier.ahead * scale
+		tier.part.CFrame = CFrame.lookAt(from, from + way)
+		tier.part.Size = tier.face * scale
+	end
 	if floorAt then
 		rig.floor.CFrame = CFrame.new(floorAt + way * 1.2 * scale)
 		rig.floor.Size = Vector3.new(7 * scale, 0.2, 7 * scale)
@@ -768,6 +863,38 @@ function PunchHitFx.play(
 	for _, turn in rig.turns do
 		turn.emitter.Rotation = NumberRange.new(-side * turn.tilt)
 		turn.emitter.RotSpeed = NumberRange.new(-side * turn.spin)
+	end
+
+	-- A frame that faces the camera: its +X is the screen's right and its +Y the screen's up. The
+	-- sparks and the hatch are laid out in it, so they are placed as the camera sees them.
+	local eye = if camera then camera.CFrame.Position else position + Vector3.zAxis * 20
+	local function screenAt(point: Vector3): CFrame
+		local away = point - eye
+		return if away.Magnitude > 0.1
+			then CFrame.lookAt(point, point + away)
+			else CFrame.new(point)
+	end
+	-- The sparks sit round the one hit, a little past the contact. The whole set is turned by a
+	-- different amount each hit, so no two hits are the same; each spark points straight outward.
+	rig.face.CFrame = screenAt(position + way * 1.4 * scale + Vector3.new(0, 0.3 * scale, 0))
+	local turned = math.random() * 360
+	for _, spark in rig.sparks do
+		local angle = spark.angle + turned
+		local radians = math.rad(angle)
+		spark.at.Position = Vector3.new(math.cos(radians), math.sin(radians), 0)
+			* spark.radius
+			* scale
+		spark.emitter.Rotation = NumberRange.new(angle - 8, angle + 8)
+	end
+	-- The hatch: each patch's square is put where it belongs on screen (mirrored when the hit goes
+	-- left), and its lines lie at their angle, a few degrees apart.
+	local screen = screenAt(position)
+	for _, hatch in rig.hatches do
+		local offset = Vector3.new(hatch.offset.X * side, hatch.offset.Y, 0) * scale
+		hatch.part.CFrame = screen * CFrame.new(offset)
+		hatch.part.Size = Vector3.new(HATCH_SIZE * scale, HATCH_SIZE * scale, 0.1)
+		local angle = if side == 1 then hatch.angle else 180 - hatch.angle
+		hatch.emitter.Rotation = NumberRange.new(angle - 12, angle + 12)
 	end
 
 	for _, layer in rig.layers do

@@ -1086,3 +1086,45 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   grass at 0.07 s: bright white middle and band, green blades with white cores, black behind.
 - NOT VERIFIED: how it feels at full speed (slow motion can't show flicker; the user must judge), the lobby floor
   after the last change, the heavy hit, 25 fighters, phones. Gates at the end of the session.
+
+## vfx-9 (2026-11-14): the hit as a sequence, a wedge band, placed sparks, sizes corrected (the user tried it at full speed: "Looks good"; committed, not pushed)
+- WHY: the user said timing, brightness and size or shape were all still off on vfx-8 (no detail given), and asked
+  for it to be compared with the frame-by-frame study of the reference (vault, `63 VFX Creation/Reference Study/
+  VFX Ref V01`, hit 1 = f138-f158). They approved seven changes.
+- FOUND WHILE TESTING: a particle is drawn TWICE its Size across (ring of Size 6.5 measured 12 studs; band built
+  for 20 studs measured 40). vfx-8's bubble (Size to 14 = 28 studs), dust (28), halo (20) and smoke puffs (to 12)
+  were therefore about twice the reference's. BLADE_SIZE (measured earlier) already allowed for it; nothing else did.
+- NOW (src/client/Fx/PunchHitFx.luau):
+  - SEQUENCE: the white floor ring fires alone; everything else waits LEAD = 1 frame. The star is at full size at
+    once and only shrinks and thins (blades 0.10-0.16 s, long spikes 0.09-0.14 s); no grow-in.
+  - BAND: three tiers of lines on three parts (TIER_CORE / MID / OUTER: 20, 13 and 7 studs long; faces 1.2, 3.6
+    and 6.5 studs tall), 35 lines plus 14 thin black ones, slow drift (15-45) so it stays rooted at the contact.
+  - SPARKS: ten kites on attachments of a part turned to the camera each hit; each sits 1.7-2.7 studs out and
+    points straight outward; the set is turned by a random angle per hit. No sphere emission.
+  - CENTRE AND GLOW: core Size 3 -> 4.2 (about 6-8 studs of glow), halo 3 -> 5 for 0.14 s.
+  - BLACK: the nine black blades and two black arcs are gone. NEW hatch: two patches of four thin black lines
+    over the white centre (Box volume emitters on two small camera-facing parts). Black band lines kept.
+  - LEFTOVERS: smoke 0.32-0.5 s, dust 0.3 s, arcs 0.22-0.3 s, floor shade 0.35 s; ring and bubble no longer spin.
+  - GLINTS: three, at 6 f (was nine at 2 f).
+  - SIZES halved where they were double: bubble 6 -> 12.8 studs, shock ring to 13.6, floor ring 6.6 -> 9.6,
+    dust 8 -> 15, shade 9 -> 12, wisps, smoke puffs.
+  - Kept on the user's own rules: flipbook wisps and smoke, the dark floor patch.
+- SEEN (Play, not saved, Rojo off): the module was pasted into the Play client as a new ModuleScript and fired
+  with studySlow(600) on a dark floor in the sky. Ring alone at 0.5 f. Star at 1.1 f: white centre about 6 studs,
+  green-edged spikes to about 11 studs with sharp tips. Band at about 3.5 f and 7.5 f: starts at the contact,
+  tapers to one tip about 22 studs out, white middle, green tiers, black lines at its edges; bubble about 9 studs.
+- NOT VERIFIED: full speed (nobody has seen vfx-9 at full speed); the sparks' and hatch's exact look (too small in
+  the captures; their placement is by arithmetic and the vault's measured rotation signs); real punches in a
+  round; the heavy hit; pale floors and grass; 25 fighters; phones.
+- lobby-2 SAVED FROM THE PLACE (later the same day). The teammate told the user to go ahead ("doesnt care, do
+  whatever"), and lobby-2 never reached GitHub (origin/main = 34285b6). Every Rojo-managed script in the place was
+  checksummed against disk (102 scripts): 8 differed. Five were lobby-2 and were copied from the place to disk,
+  each verified by checksum: `MovementController` (Lobby.disc gets the kick's depth), `Core/Lobby` (disc height at
+  a terrace), `Config/LobbyLayout` (tall posts reach h 30 so nobody can perch), `EnvironmentKit` (lobby plants,
+  PlantAvgMs / PlantPeakMs attributes), `PlantField` (lobby `Dressing` folder, 45 / 30 Hz sway). The other three
+  were mine (PunchHitFx and the two stamps). NOT copied: anything lobby-2 changed outside the three Rojo roots
+  (tests, design files, gen_layout.py): those exist only on the teammate's PC.
+- Rojo: `rojo serve default.project.json` running from this folder on 34872. The user connected the plugin;
+  the place's two stamps read `vfx-9+lobby-2` and its PunchHitFx has the corrected sizes (checked by grep).
+- Gates on the combined code: rojo build OK, 452 Lune tests, selene src 0, stylua clean. Build stamp on disk:
+  vfx-9+lobby-2. Nothing committed: the working tree holds vfx-9 (mine) and lobby-2 (the teammate's) together.
