@@ -1,0 +1,157 @@
+{
+  "map": "HaymakerLobby",
+  "result": "FAIL",
+  "checks": [
+    {
+      "id": "P1",
+      "title": "Grounding",
+      "status": "PASS",
+      "detail": "every part with a declared grounding sits as declared",
+      "rows": []
+    },
+    {
+      "id": "P2",
+      "title": "Standable surface",
+      "status": "PASS",
+      "detail": "1612 nodes across 23 walk-connected components",
+      "rows": []
+    },
+    {
+      "id": "P3",
+      "title": "Intent match",
+      "status": "PASS",
+      "detail": "every surface is reachable exactly as declared",
+      "rows": []
+    },
+    {
+      "id": "P2b",
+      "title": "Recovery margin",
+      "status": "PASS",
+      "detail": "no return route runs the climb budget to zero",
+      "rows": []
+    },
+    {
+      "id": "P4",
+      "title": "Anchor legitimacy",
+      "status": "PASS",
+      "detail": "every declared anchor is solid, visible and in range",
+      "rows": []
+    },
+    {
+      "id": "P5",
+      "title": "Sightlines",
+      "status": "PASS",
+      "detail": "93.3% of 16110 sampled pairs have a clear line (band 0%-100%)",
+      "rows": []
+    },
+    {
+      "id": "P6",
+      "title": "Overlap",
+      "status": "FAIL",
+      "detail": "13 interpenetrating pair(s)",
+      "rows": [
+        "Solid1_wedge and Solid3_box overlap by 3.00 studs",
+        "Solid1_wedge and Solid4_box overlap by 3.00 studs",
+        "Solid1_wedge and Solid21_cyl overlap by 2.60 studs",
+        "Solid1_wedge and Solid22_cyl overlap by 2.60 studs",
+        "Solid2_box and Solid3_box overlap by 4.00 studs",
+        "Solid2_box and Solid4_box overlap by 4.00 studs",
+        "Solid2_box and Solid7_box overlap by 1.00 studs",
+        "Solid2_box and Solid8_box overlap by 1.00 studs",
+        "Solid5_wedge and Solid7_box overlap by 3.00 studs",
+        "Solid5_wedge and Solid8_box overlap by 3.00 studs",
+        "Solid6_box and Solid7_box overlap by 4.00 studs",
+        "Solid6_box and Solid8_box overlap by 4.00 studs",
+        "Solid9_box and Solid10_cyl overlap by 1.00 studs",
+        "Floor and Solid2_box overlap by 1.00 studs",
+        "Floor and Solid3_box overlap by 1.00 studs",
+        "Floor and Solid4_box overlap by 1.00 studs",
+        "Solid2_box and Solid6_box overlap by 1.00 studs",
+        "Solid2_box and Solid9_box overlap by 1.00 studs",
+        "Solid13_box and Solid14_cyl overlap by 0.80 studs",
+        "Solid13_box and Solid15_cyl overlap by 0.80 studs",
+        "Solid13_box and Solid16_cyl overlap by 0.80 studs",
+        "Solid17_box and Solid20_cyl overlap by 0.32 studs"
+      ]
+    },
+    {
+      "id": "P7",
+      "title": "Role coverage",
+      "status": "PASS",
+      "detail": "every shipped movement tech has somewhere to live",
+      "rows": [
+        "roles: arena_floorx5, boundaryx4, propx32"
+      ]
+    },
+    {
+      "id": "P8",
+      "title": "Symmetry",
+      "status": "INFO",
+      "detail": "no congruent ring of 3 or more parts to check",
+      "rows": []
+    },
+    {
+      "id": "P9",
+      "title": "Ring-out counterplay",
+      "status": "INFO",
+      "detail": "ring-out declares no counterplay and names no edge to be launched off, so there is nothing to measure",
+      "rows": []
+    },
+    {
+      "id": "P10",
+      "title": "Coplanar surfaces",
+      "status": "PASS",
+      "detail": "no coplanar overlapping faces",
+      "rows": []
+    },
+    {
+      "id": "P11",
+      "title": "Empty space",
+      "status": "PASS",
+      "detail": "21% of 24 sampled cells have nothing within 26 studs (budget 22%)",
+      "rows": []
+    },
+    {
+      "id": "P12",
+      "title": "Entrances",
+      "status": "INFO",
+      "detail": "no part declares a facing",
+      "rows": []
+    },
+    {
+      "id": "P13",
+      "title": "Feature dressing",
+      "status": "INFO",
+      "detail": "no water or landmark declared",
+      "rows": []
+    },
+    {
+      "id": "P14",
+      "title": "Props in water",
+      "status": "INFO",
+      "detail": "no water declared",
+      "rows": []
+    },
+    {
+      "id": "P15",
+      "title": "Clear routes",
+      "status": "INFO",
+      "detail": "no routes declared",
+      "rows": []
+    },
+    {
+      "id": "P16",
+      "title": "Enclosure",
+      "status": "PASS",
+      "detail": "perimeter sealed by 4 barrier(s) at 156 samples",
+      "rows": []
+    },
+    {
+      "id": "P21",
+      "title": "Performance budget",
+      "status": "INFO",
+      "detail": "no meshes placed; 41 instances",
+      "rows": []
+    }
+  ]
+}

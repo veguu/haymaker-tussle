@@ -160,6 +160,12 @@ return {
 		local disc = Lobby.disc(CFG)
 		assert(disc.y == CFG.FloorY and disc.radius == CFG.Width / 2)
 		assert(Lobby.contains(CFG, disc.x, disc.z))
+		-- on a terrace the rebound platform sits at that terrace's height, not the flat floor
+		for _, terrace in CFG.Terraces do
+			local z = CFG.ViewEdgeZ + terrace.Start + 5
+			assert(Lobby.disc(CFG, z).y == CFG.FloorY + terrace.Rise)
+		end
+		assert(Lobby.disc(CFG, CFG.ViewEdgeZ + 1).y == CFG.FloorY)
 	end,
 
 	["spectating: a match exists only while it's being fought"] = function()

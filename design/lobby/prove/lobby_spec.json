@@ -1,0 +1,761 @@
+{
+ "name": "HaymakerLobby",
+ "profile": "C:\\Users\\dumpl\\Documents\\LihFolk\\LihFolk Vault V2\\LihFolk Vault V2\\Haymaker Tussle\\Project\\design\\lobby\\prove\\haymaker_profile.json",
+ "ground_is_parts": "a built courtyard on a cliff shelf: the ground is the Blender model, collision is invisible parts",
+ "parts_are_deliberate": "invisible collision proxies under a Blender mesh model; the look is the mesh",
+ "volume": {
+  "bounds": [
+   [
+    -72.0,
+    -30,
+    -81.0
+   ],
+   [
+    72.0,
+    140,
+    81.0
+   ]
+  ],
+  "killPlane": -25,
+  "ringOutOffset": 10,
+  "lift": 8
+ },
+ "parts": [
+  {
+   "id": "Floor",
+   "size": [
+    132,
+    8,
+    150
+   ],
+   "pos": [
+    0,
+    -4,
+    0
+   ],
+   "roles": [
+    "arena_floor"
+   ]
+  },
+  {
+   "id": "Solid1_wedge",
+   "size": [
+    132.0,
+    3.0,
+    6.0
+   ],
+   "pos": [
+    0.0,
+    1.5,
+    -51.0
+   ],
+   "ramp": "+z",
+   "roles": [
+    "arena_floor"
+   ]
+  },
+  {
+   "id": "Solid2_box",
+   "size": [
+    132.0,
+    4.0,
+    123.0
+   ],
+   "pos": [
+    0.0,
+    1.0,
+    13.5
+   ],
+   "roles": [
+    "arena_floor"
+   ]
+  },
+  {
+   "id": "Solid3_box",
+   "size": [
+    20.0,
+    5.7,
+    12.0
+   ],
+   "pos": [
+    -56.0,
+    1.85,
+    -50.0
+   ],
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid4_box",
+   "size": [
+    20.0,
+    5.7,
+    12.0
+   ],
+   "pos": [
+    56.0,
+    1.85,
+    -50.0
+   ],
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid5_wedge",
+   "size": [
+    132.0,
+    3.0,
+    6.0
+   ],
+   "pos": [
+    0.0,
+    4.5,
+    23.0
+   ],
+   "ramp": "+z",
+   "roles": [
+    "arena_floor"
+   ]
+  },
+  {
+   "id": "Solid6_box",
+   "size": [
+    132.0,
+    4.0,
+    49.0
+   ],
+   "pos": [
+    0.0,
+    4.0,
+    50.5
+   ],
+   "roles": [
+    "arena_floor"
+   ]
+  },
+  {
+   "id": "Solid7_box",
+   "size": [
+    20.0,
+    5.7,
+    12.0
+   ],
+   "pos": [
+    -56.0,
+    4.85,
+    24.0
+   ],
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid8_box",
+   "size": [
+    20.0,
+    5.7,
+    12.0
+   ],
+   "pos": [
+    56.0,
+    4.85,
+    24.0
+   ],
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid9_box",
+   "size": [
+    18.0,
+    2.9000000000000004,
+    36.0
+   ],
+   "pos": [
+    -57.0,
+    3.45,
+    -13.0
+   ],
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid10_cyl",
+   "size": [
+    4.8,
+    26.1,
+    4.8
+   ],
+   "pos": [
+    -57.5,
+    16.95,
+    -13.0
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid11_box",
+   "size": [
+    2.0,
+    1.75,
+    7.200000000000003
+   ],
+   "pos": [
+    -44.8,
+    3.875,
+    -23.0
+   ],
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid12_box",
+   "size": [
+    2.0,
+    1.75,
+    7.199999999999989
+   ],
+   "pos": [
+    -44.8,
+    3.875,
+    -3.0
+   ],
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid13_box",
+   "size": [
+    4.199999999999996,
+    3.3,
+    45.199999999999996
+   ],
+   "pos": [
+    56.7,
+    4.65,
+    -13.0
+   ],
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid14_cyl",
+   "size": [
+    1.2,
+    27.0,
+    1.2
+   ],
+   "pos": [
+    54.8,
+    16.5,
+    -35.0
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid15_cyl",
+   "size": [
+    1.2,
+    27.0,
+    1.2
+   ],
+   "pos": [
+    54.8,
+    16.5,
+    -13.0
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid16_cyl",
+   "size": [
+    1.2,
+    27.0,
+    1.2
+   ],
+   "pos": [
+    54.8,
+    16.5,
+    9.0
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid17_box",
+   "size": [
+    5.600000000000001,
+    2.5999999999999996,
+    3.3000000000000043
+   ],
+   "pos": [
+    53.599999999999994,
+    4.3,
+    -39.55
+   ],
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid18_box",
+   "size": [
+    5.699999999999996,
+    2.4000000000000004,
+    3.200000000000003
+   ],
+   "pos": [
+    54.05,
+    4.2,
+    13.199999999999989
+   ],
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid19_cyl",
+   "size": [
+    3.0,
+    3.625,
+    3.0
+   ],
+   "pos": [
+    49.4,
+    4.8125,
+    12.599999999999994
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid20_cyl",
+   "size": [
+    2.64,
+    3.1899999999999995,
+    2.64
+   ],
+   "pos": [
+    49.8,
+    4.595,
+    -38.4
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid21_cyl",
+   "size": [
+    1.2,
+    30.0,
+    1.2
+   ],
+   "pos": [
+    -44.8,
+    15.0,
+    -50.0
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid22_cyl",
+   "size": [
+    1.2,
+    30.0,
+    1.2
+   ],
+   "pos": [
+    44.8,
+    15.0,
+    -50.0
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid23_cyl",
+   "size": [
+    1.2,
+    24.0,
+    1.2
+   ],
+   "pos": [
+    -58,
+    18.0,
+    72.80000000000001
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid24_cyl",
+   "size": [
+    1.2,
+    24.0,
+    1.2
+   ],
+   "pos": [
+    -30,
+    18.0,
+    72.80000000000001
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid25_cyl",
+   "size": [
+    1.2,
+    24.0,
+    1.2
+   ],
+   "pos": [
+    30,
+    18.0,
+    72.80000000000001
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid26_cyl",
+   "size": [
+    1.2,
+    24.0,
+    1.2
+   ],
+   "pos": [
+    58,
+    18.0,
+    72.80000000000001
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid27_cyl",
+   "size": [
+    1.9,
+    6.199999999999999,
+    1.9
+   ],
+   "pos": [
+    -40,
+    9.1,
+    65.5
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid28_cyl",
+   "size": [
+    1.9,
+    6.199999999999999,
+    1.9
+   ],
+   "pos": [
+    -20,
+    9.1,
+    65.5
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid29_cyl",
+   "size": [
+    1.9,
+    6.199999999999999,
+    1.9
+   ],
+   "pos": [
+    0,
+    9.1,
+    65.5
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid30_cyl",
+   "size": [
+    1.9,
+    6.199999999999999,
+    1.9
+   ],
+   "pos": [
+    20,
+    9.1,
+    65.5
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid31_cyl",
+   "size": [
+    1.9,
+    6.199999999999999,
+    1.9
+   ],
+   "pos": [
+    40,
+    9.1,
+    65.5
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid32_cyl",
+   "size": [
+    3.2,
+    4.4,
+    3.2
+   ],
+   "pos": [
+    -60.0,
+    2.2,
+    -67.0
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid33_cyl",
+   "size": [
+    3.2,
+    24.0,
+    3.2
+   ],
+   "pos": [
+    61.0,
+    18.0,
+    69.0
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid34_cyl",
+   "size": [
+    3.2,
+    4.4,
+    3.2
+   ],
+   "pos": [
+    -61.0,
+    8.2,
+    68.0
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid35_cyl",
+   "size": [
+    5.2,
+    3.6,
+    5.2
+   ],
+   "pos": [
+    60.0,
+    1.8,
+    -66.0
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "Solid36_cyl",
+   "size": [
+    4.0,
+    2.4000000000000004,
+    4.0
+   ],
+   "pos": [
+    -59.0,
+    7.2,
+    62.0
+   ],
+   "shape": "cylinder",
+   "roles": [
+    "prop"
+   ]
+  },
+  {
+   "id": "BarrierFront",
+   "size": [
+    144,
+    240,
+    6
+   ],
+   "pos": [
+    0,
+    120.0,
+    -78.0
+   ],
+   "roles": [
+    "boundary"
+   ],
+   "barrier": true,
+   "visible": false
+  },
+  {
+   "id": "BarrierBack",
+   "size": [
+    144,
+    240,
+    6
+   ],
+   "pos": [
+    0,
+    120.0,
+    78.0
+   ],
+   "roles": [
+    "boundary"
+   ],
+   "barrier": true,
+   "visible": false
+  },
+  {
+   "id": "BarrierLeft",
+   "size": [
+    6,
+    240,
+    150
+   ],
+   "pos": [
+    -69.0,
+    120.0,
+    0
+   ],
+   "roles": [
+    "boundary"
+   ],
+   "barrier": true,
+   "visible": false
+  },
+  {
+   "id": "BarrierRight",
+   "size": [
+    6,
+    240,
+    150
+   ],
+   "pos": [
+    69.0,
+    120.0,
+    0
+   ],
+   "roles": [
+    "boundary"
+   ],
+   "barrier": true,
+   "visible": false
+  }
+ ],
+ "spawns": [
+  [
+   0,
+   3.5,
+   -29.0
+  ]
+ ],
+ "intent": {
+  "reachable": [
+   "Floor",
+   "Solid1_wedge",
+   "Solid2_box",
+   "Solid3_box",
+   "Solid4_box",
+   "Solid5_wedge",
+   "Solid6_box",
+   "Solid7_box",
+   "Solid8_box",
+   "Solid9_box",
+   "Solid11_box",
+   "Solid12_box",
+   "Solid13_box",
+   "Solid17_box",
+   "Solid18_box",
+   "Solid19_cyl",
+   "Solid20_cyl",
+   "Solid27_cyl",
+   "Solid28_cyl",
+   "Solid29_cyl",
+   "Solid30_cyl",
+   "Solid31_cyl",
+   "Solid32_cyl",
+   "Solid34_cyl",
+   "Solid35_cyl",
+   "Solid36_cyl"
+  ],
+  "transit": [],
+  "reachableOnlyBy": {},
+  "ringOut": {
+   "counterplay": "none",
+   "minWindow": 0.0,
+   "from": []
+  }
+ },
+ "sightlines": {
+  "minClearFraction": 0.0,
+  "maxClearFraction": 1.0
+ }
+}

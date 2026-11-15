@@ -1,0 +1,19 @@
+{
+  "name": "haymaker",
+  "source": "Haymaker Tussle: src/shared/Config/GameConfig.luau Movement + Jump, Core/Jump.launch. Worst case envelope: a running Space jump at full carried speed.",
+  "gravity":     { "value": 196.2, "src": "measured", "note": "workspace.Gravity read in Play 2026-11-14; Jump.GravityScale 1" },
+  "jumpPower":   { "value": 80, "src": "derived", "note": "Jump.UpMax 80 (UpBase 50 + 0.5/stud of speed, capped). Standing hop is 50." },
+  "walkSpeed":   { "value": 50, "src": "config", "note": "Movement.MaxSpeed 50 (custom controller; Humanoid.WalkSpeed unused)" },
+  "sprintSpeed": { "value": 90, "src": "config", "note": "Jump.ForwardMax 90: the flat speed carried through a running jump" },
+  "jumpApex":    { "value": 16.31, "src": "derived", "note": "80^2 / (2*196.2)" },
+  "jumpAirtime": { "value": 0.8155, "src": "derived", "note": "2*80/196.2" },
+  "jumpDistance": { "src": "derived", "note": "speed * airtime", "walk": 40.8, "sprint": 73.4 },
+  "autoStep":    { "value": 2.0, "src": "assumed" },
+  "maxWalkSlope": { "value": 89, "src": "measured", "note": "Humanoid.MaxSlopeAngle in Play" },
+  "designMaxSlope": { "value": 45, "src": "design" },
+  "charHeight":  { "value": 5.0, "src": "assumed" },
+  "charRadius":  { "value": 2.0, "src": "assumed" },
+  "eyeHeight":   { "value": 4.5, "src": "config", "note": "Lobby.EyeHeight" },
+  "ragdollRecovery": { "value": 0.0, "src": "assumed" },
+  "abilities": {}
+}

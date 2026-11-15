@@ -99,17 +99,6 @@
    "sz": 197.268,
    "tris": 5974
   },
-  "Lobby_Gate_Timber": {
-   "file": 1,
-   "key": "bark_gate",
-   "x": -0.006,
-   "y": 12.693,
-   "z": 98.994,
-   "sx": 54.024,
-   "sy": 20.421,
-   "sz": 3.256,
-   "tris": 780
-  },
   "Lobby_GreatTree_Bark": {
    "file": 1,
    "key": "bark",
@@ -411,5 +400,5 @@
    ]
   }
  ],
- "triangles": 76892
+ "triangles": 76112
 }

@@ -16,8 +16,24 @@ def num(v):
     return str(int(v)) if float(v).is_integer() else str(round(float(v), 3))
 
 
-def render():
+# NO PERCHING (prover, 2026-11-14): the running jump reaches 16.3 studs up (Jump.UpMax 80, gravity 196.2), so
+# players could stand on the lantern, gate and banner posts and inside the great tree's canopy. A tall thin post's
+# collision is carried up to NO_PERCH_TOP, out of reach from anything standable (highest top 7.7 + 16.3 = 24).
+NO_PERCH_TOP = 30
+NO_PERCH_MAX_RADIUS = 2.5
+NO_PERCH_MIN_TALL = 8
+
+
+def colliders():
     items = json.load(open(SRC, encoding="utf-8"))
+    for c in items:
+        if c["kind"] == "cyl" and c["r"] <= NO_PERCH_MAX_RADIUS and c["h1"] - c["h0"] >= NO_PERCH_MIN_TALL:
+            c["h1"] = max(c["h1"], NO_PERCH_TOP)
+    return items
+
+
+def render():
+    items = colliders()
     out = [
         "--!strict",
         "-- GENERATED FILE - DO NOT EDIT BY HAND.",
@@ -25,7 +41,8 @@ def render():
         "-- Regenerate: python design/lobby/gen_layout.py",
         "-- The lobby's solid pieces, which LobbyService builds invisible: u across from the centre, d back from the",
         "-- viewing edge, h above Lobby.FloorY. box and wedge: u0..u1, d0..d1, h0..h1 (a wedge climbs from h0 at d0",
-        "-- to h1 at d1). cyl: an upright post at u, d of radius r, from h0 to h1.",
+        "-- to h1 at d1). cyl: an upright post at u, d of radius r, from h0 to h1. Tall thin posts reach h 30 so",
+        "-- nobody can stand on them (gen_layout.py NO_PERCH_TOP; proven by design/lobby/prove).",
         "",
         "local LobbyLayout = {",
         "\tcolliders = {",

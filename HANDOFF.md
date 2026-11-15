@@ -1253,3 +1253,55 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
 - NOT SEEN: these in a real round (a dive kick landing, a jump off the floor, sliding out of a dash, two fighters
   bumping), the launch ribbon, anything at full speed.
 - Gates: rojo build OK, 452 Lune tests, selene src 0, stylua clean. Build stamp vfx-14+lobby-2; Rojo connected.
+
+## lobby-2 (2026-11-14): lobby checked properly - prover, hand walk, frame cost, the three known gaps (NOT COMMITTED)
+- Pulled spicy's vfx-3..vfx-8 first (fast-forward, no conflict). Build label `vfx-8+lobby-2`. Pushed 156 instances,
+  PASS; place saved v303 and v304. ServerStorage.HT_Lobby.Cliffside was in the place (194 descendants).
+- PROVER (roblox-map prove.py): `design/lobby/prove/make_spec.py` writes `lobby_spec.json` from the SAME collider list
+  LobbyService builds (gen_layout.colliders()) + floor + the four barriers from game.json; movement profile
+  `haymaker_profile.json` = the game's own numbers, worst case a running Space jump (Jump.UpMax 80, gravity 196.2
+  -> 16.3 studs up, 73 across). FOUND: players could stand on the lantern/gate/banner posts and on the great tree's
+  trunk inside its canopy. FIX: gen_layout.py NO_PERCH carries every tall thin post (r <= 2.5, >= 8 tall) up to
+  h 30 (above anything reachable: highest top 7.7 + 16.3). Now P1/P2/P2b/P3/P5/P10/P11/P16 PASS; P6 "overlap" is the
+  invisible collision boxes sunk into each other on purpose (never rendered). Plan: prove/lobby_plan.png.
+- HAND WALK in Play (keyboard via MCP; works when the Client DM is focused): balcony -> ramp -> court -> ramp ->
+  training and back down, no snag or drop; front/back walls and stair-end planters stop where drawn. Side walls
+  only by the prover.
+- REBOUND DISC: Lobby.disc(cfg, z) now sits at the terrace height under the kick (tests/Lobby.spec).
+- PLANT SWAY in the lobby: EnvironmentKit binds PlantField to workspace.HT_Lobby.Model (folder Dressing) whenever
+  the map entry has `lobby = true` (in the lobby state HT_Map exists but is EMPTY, so "no model" never happened).
+  48 of 60 placements move (rocks/ruins never). PlantField now poses at most 45 Hz (UPDATE_HZ; phones/low graphics
+  30 Hz) instead of every frame. Cost readout: HT_Environment attributes PlantAvgMs / PlantPeakMs.
+- MEASURED, lobby state alone (Studio PC): 227 fps, 4.4 ms/frame, 44 draw calls, 119k tris in view, barrier
+  0.05 ms, plants 0.22 ms -> 0.11 ms after the cap (0.2 ms per update). Model: 132 MeshParts, all anchored, no
+  CanCollide/CanTouch/CanQuery, no lights.
+- GOLDEN HOUR by eye (in-game spawn capture): warm, readable; a bright glare patch on the paving toward the sun.
+- CAPTURES: Studio's Assistant HTTP permission is not configured, so capture_receiver can't write PNGs (user's
+  setting, not changed). screen_capture images land in the session's tool-results folder; copies in
+  design/lobby/prove/review/ with EVIDENCE.md (the reviewers' pack). Edit-mode captures came back black/timed out.
+- NOT TESTED: phones (lighter path = existing low-graphics ranges + 30 Hz), several real players, side walls by hand.
+- RUBRIC (3 blind reviewers, median; pack in design/lobby/prove/review): LOBBY 7.5/10 (W1 2, W2 1, W3 2, W4 1, W5 1,
+  W6 2; gates pass, phone budget unmeasured). BARRIER 5.8/10 (X1-X5 all 1, X6 2), held down mainly by evidence:
+  no frame shows the lit cells by a player, no motion seen; also low contrast on bright sky. BOTH BELOW 8.5.
+  Reviewers' asks: lobby - warmer golden-hour grade (sky reads noon), landmarks leading up the terraces, detail
+  on the open court/training paving; barrier - frames of the lit patch, brighter core/darker backing in daylight.
+- FIX ROUND 1 started, NOT DONE: a warmer grade was tried live (sun 255,192,128; exposure -0.12; saturation 0.14;
+  bloom 0.22; atmosphere density 0.3, haze 1.8, decay 236,164,118) but Studio's viewport then rendered BLACK in
+  every capture (Edit and Play; HUD only), so it was never seen and NOTHING was changed in MapEnvironments.
+
+## lobby-3 (2026-11-15): floating plants grounded, red gate removed, soil under the ledge trees
+- FLOATING: the kit's bushes have their pivot 0.4-1.65 studs below the leaves, so placing by pivot left every bush
+  hovering. studio_lobby.py now GROUNDS each kit piece (lowest point dropped to its placement height, sunk 0.2;
+  never lifted). Measured in Studio after: every piece's lowest point is at or below its ground (max -0.02).
+  Ledge dressing also hung off the cut rock tops (Blender raycasts: up to 5 studs of air); it now sits on each
+  ledge's flattest spot (found by raycasting cliffside.blend) within the measured flat radius.
+- GATE: the red training gate is gone (cliffside.py gate_and_banners, mesh dropped from manifest.json, its two post
+  colliders gone from collision.json -> LobbyLayout.luau; prover unchanged: all pass but P6, the known on-purpose
+  overlap). cliffside.blend / export GLBs still hold the gate until the next full rebuild + upload.
+- SOIL: each ledge tree grows from a soil mound = the kit's Rock_Flat_Slab at scale 3 (2 on the back-left ledge),
+  mostly buried, repainted with the planters' soil texture (placement skin "soil"). The first left ledge was
+  swallowed by a spire (2 studs of flat) and no longer carries a tree.
+- NEW: design/lobby/out/cliffside/studio_dressing.luau re-dresses the existing Cliffside model in Studio (no upload).
+- Pulled spicy's vfx-9..vfx-14 first (they had committed the lobby-2 scripts from the place; identical). Build label
+  vfx-14+lobby-3. Rojo push 159 instances, PASS 142 scripts. Place saved v317.
+- NOT SEEN BY EYE: Studio's capture returns a black 3D view and screen access was declined; checked by raycasts only.

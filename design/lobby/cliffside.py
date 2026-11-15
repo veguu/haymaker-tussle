@@ -7,7 +7,7 @@ honey timber, terracotta, teal, coral and gold, under golden-hour light.
 
 CONCEPT "Stepped Overlook": three terraces stepping DOWN toward the arena, so every level sees over the one in
 front. From the arena backward: the viewing balcony, three steps up to the court (spawn, shop stall, great
-tree), three more to the training terrace under a timber gate. The crag under it tapers like Gnomon's island.
+tree), three more to the training terrace (its red gate removed 2026-11-15, user's call). The crag under it tapers like Gnomon's island.
 
 AXES: lobby-local. u across (Roblox +X), d back from the viewing edge (Roblox +Z), h above the lobby floor
 (GameConfig.Lobby.FloorY). In Blender x = u, y = -d (so +Y points at the arena), z = h; the origin is the
@@ -109,8 +109,13 @@ def cyl_c(u, d, r, h0, h1):
     COLLISION.append({"kind": "cyl", "u": u, "d": d, "r": r, "h0": h0, "h1": h1})
 
 
-def put(asset, u, d, h, yaw=0.0, scale=1.0):
-    PLACE.append({"asset": asset, "u": round(u, 2), "d": round(d, 2), "h": round(h, 2), "yaw": round(yaw, 3), "scale": scale})
+def put(asset, u, d, h, yaw=0.0, scale=1.0, skin=None):
+    """A kit piece. The Studio script grounds it (its lowest point on h, sunk a little), so a piece whose pivot sits
+    below its mesh, like the bushes, never floats. skin="soil" repaints it with the planters' soil texture."""
+    p = {"asset": asset, "u": round(u, 2), "d": round(d, 2), "h": round(h, 2), "yaw": round(yaw, 3), "scale": scale}
+    if skin:
+        p["skin"] = skin
+    PLACE.append(p)
 
 
 def plain_box(bm, u0, u1, d0, d1, h0, h1):
@@ -335,6 +340,8 @@ def lanterns():
 
 # --- the crag: big chunks under the edge, tapering down like Gnomon's island; spires behind and beside ----------------
 SHELVES = []  # (u, d, h): flat rock tops outside the walls, for the kit's trees
+SOIL_SCALE = 3.0  # the kit's Rock_Flat_Slab (3.4 x 1.1 x 3.6) at this scale: a 10-stud mound, 3.3 tall
+SOIL_SINK = 2.5  # buried this far below the shelf top, so about 0.8 shows
 
 
 def flat_top(bm, cut):
@@ -408,20 +415,32 @@ def crag():
                 if abs(fu) - reach > HX + 3 or fd - reach > D + 3:
                     rock(rng.choice(list(bands)), fu, fd, h + 4, (sz[0] * s * 1.6, sz[1] * s * 1.6, sz[2] * s), soft=False)
                     break
-    # shelves: flat-topped ledges just outside the walls, each with a tree from the kit
-    for u, d, top, sz, tree in (
-        (-HX - 15, 104, 4.0, (22, 26, 30), "Tree_D"),
-        (HX + 16, 112, 5.0, (24, 26, 32), "Tree_B"),
-        (-HX - 13, 38, -2.0, (18, 22, 24), "Tree_E"),
-        (HX + 14, 30, -3.0, (20, 20, 24), "Tree_C"),
-        (-30, D + 17, 8.0, (26, 18, 30), "Tree_A"),
-        (28, D + 16, 9.0, (24, 18, 30), "Tree_D"),
+    # shelves: flat-topped ledges just outside the walls, each with a tree from the kit growing out of a soil mound
+    # (a kit slab in the planters' soil, mostly buried). (tu, td) is the shelf's flattest spot, found by raycasting
+    # the built crag: the rock's cut top is irregular. (soil, ring) = the mound's scale and the dressing's distance
+    # from the trunk, kept inside the flat (measured: the rock drops away past r 5, r 3 on the back-left shelf). The
+    # first shelf ran into a spire (2 studs of flat) and carries no tree. The rng draws are kept so every rock keeps
+    # its shape.
+    for u, d, top, sz, tree, tu, td, soil, ring_r in (
+        (-HX - 15, 104, 4.0, (22, 26, 30), None, -HX - 14, 98, 0, 0),
+        (HX + 16, 112, 5.0, (24, 26, 32), "Tree_B", HX + 14, 110, SOIL_SCALE, 3.2),
+        (-HX - 13, 38, -2.0, (18, 22, 24), "Tree_E", -HX - 13, 38, SOIL_SCALE, 3.2),
+        (HX + 14, 30, -3.0, (20, 20, 24), "Tree_C", HX + 14, 31, SOIL_SCALE, 3.2),
+        (-30, D + 17, 8.0, (26, 18, 30), "Tree_A", -31, D + 13, 2.0, 2.2),
+        (28, D + 16, 9.0, (24, 18, 30), "Tree_D", 28, D + 16, SOIL_SCALE, 3.2),
     ):
         rock("stone_cream", u, d, top - sz[2] * 0.5, sz, top=top)
-        put(tree, u, d, top, rng.uniform(0, 6.28), 1.0)
-        put("Bush_Low", u + rng.uniform(-5, 5), d + rng.uniform(-5, 5), top, rng.uniform(0, 6.28), 1.2)
-        put("Plant_Tall_Blade", u + rng.uniform(-6, 6), d + rng.uniform(-6, 6), top, rng.uniform(0, 6.28), 1.4)
-        put("Rock_Small_A", u + rng.uniform(-6, 6), d + rng.uniform(-6, 6), top, rng.uniform(0, 6.28), 1.3)
+        yaw = rng.uniform(0, 6.28)
+        if tree:
+            sink = SOIL_SINK * soil / SOIL_SCALE
+            put("Rock_Flat_Slab", tu, td, top - sink, (tu + td) * 0.37, soil, skin="soil")  # no rng draw
+            put(tree, tu, td, top, yaw, 1.0)
+        for asset, scale, ring in (("Bush_Low", 1.2, 0.6), ("Plant_Tall_Blade", 1.4, 2.6), ("Rock_Small_A", 1.3, 4.6)):
+            for _ in range(2):
+                rng.uniform(-6, 6)
+            yaw = rng.uniform(0, 6.28)
+            if tree:
+                put(asset, tu + math.cos(ring) * ring_r, td + math.sin(ring) * ring_r, top, yaw, scale)
     for key, bm in bands.items():
         make("Lobby_Crag", key.split("_")[1].capitalize(), key, bm, "Lobby")
 
@@ -542,22 +561,11 @@ def stall():
     make("Lobby_Stall", "Clay", "stone_clay", clay, "Lobby")
 
 
-# --- the training gate, banner poles, striking posts ------------------------------------------------------------------
+# --- banner poles, striking posts (the training gate was removed) ------------------------------------------------------------------
 def gate_and_banners():
     rng = random.Random(83)
-    gate, timber, coral, gold, rope = bmesh.new(), bmesh.new(), bmesh.new(), bmesh.new(), bmesh.new()
-    gd = TRAIN_D - 3.0
-    h = COURT_H
-    for s in (-1, 1):
-        u = s * 19.0
-        tube(gate, [at(u, gd, h - 0.5), at(u * 0.985, gd, h + 17.5)], [1.15, 0.95], sides=8, rng=rng, jitter=0.03)
-        append(gate, block((3.2, 3.2, 1.4), rng, chip=0.06), T(u, gd, h + 2.0))
-        cyl_c(u, gd, 1.6, h, h + 17)
-    append(gate, block((50.0, 2.4, 1.7), rng, chip=0.04, bevel=0.05), T(0, gd, h + 17.4))
-    append(gate, block((54.0, 3.0, 0.8), rng, chip=0.04, bevel=0.05), T(0, gd, h + 19.1))
-    append(gate, block((42.0, 1.6, 1.3), rng, chip=0.04, bevel=0.05), T(0, gd, h + 13.4))
-    append(gate, block((1.6, 1.4, 2.7), rng, chip=0.04), T(0, gd, h + 14.7))
-    make("Lobby_Gate", "Timber", "bark_gate", gate, "Lobby")
+    # The red gate over the training steps was removed 2026-11-15 (the user's call): mesh and post colliders.
+    timber, coral, gold, rope = bmesh.new(), bmesh.new(), bmesh.new(), bmesh.new()
 
     def banner(u, d, h0, cloth, tall=15.0, face=0.0):
         tube(timber, [at(u, d, h0 - 0.3), at(u, d, h0 + tall)], [0.36, 0.28], sides=6, rng=rng)
