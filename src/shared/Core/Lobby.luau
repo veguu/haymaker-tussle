@@ -124,12 +124,16 @@ function Lobby.seesNearEdge(
 	return rise * back / eye <= gap
 end
 
---- The lobby as a round platform, for the kick's rebound: centred on the floor, as wide as it is.
-function Lobby.disc(cfg: any): { key: string, x: number, y: number, z: number, radius: number }
+--- The lobby as a round platform, for the kick's rebound: centred on the floor, as wide as it is. Its height is
+--- the walking surface at depth `z` (the terrace you kicked from); with no `z`, the flat floor.
+function Lobby.disc(
+	cfg: any,
+	z: number?
+): { key: string, x: number, y: number, z: number, radius: number }
 	return {
 		key = "Lobby",
 		x = cfg.CenterX,
-		y = cfg.FloorY,
+		y = cfg.FloorY + (if z then Lobby.heightAt(cfg, z) else 0),
 		z = cfg.ViewEdgeZ + cfg.Depth / 2,
 		radius = cfg.Width / 2,
 	}

@@ -11,7 +11,7 @@
 --   placement moves every 3rd frame (slow motion, so it can't be seen). One BulkMoveTo per frame for all of it.
 -- * Phones (touch, no keyboard) and low graphics (quality 1-3) get shorter ranges.
 -- * Characters (players and bots) push flowers, plants and bushes over a little as they walk through.
--- If the map has no HT_Dressing folder, nothing happens and nothing errors.
+-- If the map has no HT_Dressing folder (the lobby model: Dressing), nothing happens and nothing errors.
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -21,6 +21,8 @@ local Foliage = require(script.Parent.Core.Foliage)
 
 local PlantField = {}
 
+local UPDATE_HZ = 45
+local UPDATE_HZ_LOW = 30
 local REFRESH = 0.25 -- seconds between re-finding the near set and the characters
 local TIER_SHARE = 0.4 -- past this share of its range, a placement moves every TIER_EVERY frames
 local TIER_EVERY = 3
@@ -68,12 +70,14 @@ function PlantField.new(model: Instance?, wind: any): Field?
 	if not model then
 		return nil
 	end
-	local dressing = model:FindFirstChild("HT_Dressing", true)
+	-- an arena's kit placements are in HT_Dressing; the lobby model's in Dressing (design/lobby/studio_lobby.py)
+	local dressing = model:FindFirstChild("HT_Dressing", true) or model:FindFirstChild("Dressing")
 	if not dressing then
 		return nil
 	end
 
 	local low = lowGraphics()
+	local minStep = 1 / (if low then UPDATE_HZ_LOW else UPDATE_HZ) - 0.002 -- a hair under, so frame jitter can't halve it
 	local wx, wz = Environment.wind(wind.direction)
 	local gustLength = math.max(wind.gustLength or 40, 1)
 	local gustSeconds = math.max(wind.gustSeconds or 4.5, 0.1)
@@ -196,6 +200,11 @@ function PlantField.new(model: Instance?, wind: any): Field?
 
 	function self.step(_self: Field, t: number, camera: Vector3?)
 		if not alive then
+			return
+		end
+		-- The sway is slow, so it's posed at most UPDATE_HZ times a second (UPDATE_HZ_LOW on phones / low
+		-- graphics), not every frame: measured 2026-11-14 in the lobby (48 placements) 0.22 ms a frame at ~225 fps.
+		if lastT and t - lastT < minStep then
 			return
 		end
 		local dt = if lastT then math.clamp(t - lastT, 0, 0.1) else 0

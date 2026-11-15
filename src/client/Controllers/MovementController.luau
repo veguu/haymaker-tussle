@@ -449,7 +449,7 @@ function MovementController:_bind(
 					-- Whichever platform this is: the rebound lands on the one you kicked from.
 					local lobbyCfg: any = GameConfig.Lobby
 					local arena = if lobbyCfg.Enabled and Lobby.contains(lobbyCfg, at.X, at.Z)
-						then Lobby.disc(lobbyCfg)
+						then Lobby.disc(lobbyCfg, at.Z)
 						else TrainingLayout.platformAt(
 							GameConfig.Training,
 							-- the live map's arena (its smaller semi-axis as the radius on an oval)
