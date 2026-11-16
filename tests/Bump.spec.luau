@@ -74,13 +74,19 @@ return {
 		assert(PUNCH.HitRecoilSpeed < KNOCK.BaseSpeed, "the recoil must be weaker than the punch")
 	end,
 
-	-- Changed on purpose (2026-11-08): a punch on a fresh fighter is now a short shove so one step puts you
-	-- back in reach, while a bump keeps its old strength. So the hardest bump can out-shove a punch on
-	-- someone with no stagger, but never one on anyone a quarter of the way to full stagger.
-	["a finisher at full stagger is as strong as before the retune"] = function()
-		local full = Combat.punchStrength(KNOCK, STAGGER, 0, STAGGER.Max)
-		-- Before: 55 base at 2.5x.
-		assert(math.abs(full - 55 * 2.5) < 2, `full-stagger punch {full}`)
+	-- Changed on purpose (2026-11-15): only the string's last punch knocks back now, at a fixed strength
+	-- (no bonus for speed), so it is set where a running punch used to land. At full stagger it is that
+	-- times the stagger cap, and always well past the hardest bump.
+	["a finisher at full stagger is its base times the stagger cap, past any bump"] = function()
+		local full = Combat.punchStrength(KNOCK, STAGGER, STAGGER.Max)
+		assert(
+			math.abs(full - KNOCK.BaseSpeed * STAGGER.MaxKnockbackMultiplier) < 0.01,
+			`full-stagger punch {full}`
+		)
+		assert(
+			Combat.punchStrength(KNOCK, STAGGER, 0) >= KNOCK.BumpMaxPush * 0.6,
+			"a fresh finisher"
+		)
 	end,
 
 	["both are bumped, each by how fast the other was going"] = function()
@@ -99,7 +105,7 @@ return {
 		local run = bump(FULL_SPEED, 0)
 		assert(run.knockB < 40, `a running bump is a modest shove, got {run.knockB}`)
 		assert(
-			run.knockB < Combat.punchStrength(KNOCK, STAGGER, 50, 0) * 0.5,
+			run.knockB < Combat.punchStrength(KNOCK, STAGGER, 0) * 0.5,
 			"well under a running punch"
 		)
 		local dash = bump(140, 0)

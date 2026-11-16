@@ -33,8 +33,6 @@ export type PunchSettings = {
 
 export type KnockbackSettings = {
 	BaseSpeed: number,
-	SpeedBonusPerStud: number,
-	SpeedBonusMax: number?,
 	UpwardFraction: number,
 	UpwardMax: number,
 	AirborneUpwardFraction: number,
@@ -67,21 +65,186 @@ function Combat.staggerSpeedShare(cfg: StaggerSettings, stagger: number): number
 	return 1 - math.min(cfg.SpeedPenaltyMax, MAX_STAGGER_SLOWDOWN) * share ^ cfg.SpeedPenaltyCurve
 end
 
---- How hard a punch launches, in studs/s. THE RULE: `staggerBefore` is the target's
---- stagger from before this hit. The hit's own stagger only affects the next punch.
+--- How hard a combo's last punch launches, in studs/s. THE RULE: `staggerBefore` is the target's
+--- stagger from before this hit. The hit's own stagger only affects the next one. How fast the attacker
+--- was going adds nothing (the user, 2026-11-15: no speed gimmick).
 function Combat.punchStrength(
 	knock: KnockbackSettings,
 	stagger: StaggerSettings,
-	attackerSpeed: number,
 	staggerBefore: number
 ): number
-	-- The faster the attacker is going, the harder it throws, up to SpeedBonusMax extra.
-	local bonus = math.min(
-		knock.SpeedBonusPerStud * math.max(attackerSpeed, 0),
-		knock.SpeedBonusMax or math.huge
-	)
-	local base = knock.BaseSpeed + bonus
-	return base * Combat.staggerMultiplier(stagger, staggerBefore)
+	return knock.BaseSpeed * Combat.staggerMultiplier(stagger, staggerBefore)
+end
+
+-- THE M1 STRING (2026-11-15). Four punches: the first three stun and drag, only the last knocks back.
+
+export type ComboSettings = {
+	ComboHits: number,
+	ComboResetSeconds: number,
+	LockDistance: number,
+}
+
+--- Which punch of the string (1 to ComboHits) a swing thrown now is: `nextStep` after a hit not long
+--- ago, otherwise the first. Anything that isn't a step in the string counts as the first.
+function Combat.comboStep(
+	cfg: ComboSettings,
+	nextStep: number?,
+	now: number,
+	lastHitAt: number?
+): number
+	if
+		nextStep == nil
+		or lastHitAt == nil
+		or now - lastHitAt >= cfg.ComboResetSeconds
+		or nextStep ~= nextStep
+		or nextStep < 1
+		or nextStep > cfg.ComboHits
+	then
+		return 1
+	end
+	return math.floor(nextStep)
+end
+
+--- The step after a swing that was step `step` and landed `hits` hits: the next one on a hit (the
+--- first again after the last), the first after a miss.
+function Combat.comboAfter(cfg: ComboSettings, step: number, hits: number): number
+	if hits <= 0 or step >= cfg.ComboHits then
+		return 1
+	end
+	return step + 1
+end
+
+--- Does this step of the string knock back (the last one) rather than stun?
+function Combat.isFinisher(cfg: ComboSettings, step: number): boolean
+	return step >= cfg.ComboHits
+end
+
+--- While a string's stun lasts the target is LOCKED in front of the puncher (the user, 2026-11-15:
+--- "locked in front of you"): its spot is `distance` studs (Combat.lockDistance; LockDistance if left
+--- out) ahead of where the puncher faces, so it goes wherever they step or turn. `lookX, lookZ` is the
+--- puncher's facing; with none, straight ahead along -Z. Returns the spot's flat position.
+function Combat.lockSpot(
+	cfg: any,
+	ax: number,
+	az: number,
+	lookX: number,
+	lookZ: number,
+	distance: number?
+): (number, number)
+	if ax ~= ax or az ~= az then
+		return 0, 0
+	end
+	local size = if lookX == lookX and lookZ == lookZ
+		then math.sqrt(lookX * lookX + lookZ * lookZ)
+		else 0
+	local fx, fz = 0, -1
+	if size > 0.001 then
+		fx, fz = lookX / size, lookZ / size
+	end
+	local ahead = if distance and distance == distance then distance else cfg.LockDistance
+	return ax + fx * ahead, az + fz * ahead
+end
+
+--- How far in front the target is held for this string: as far as they were when the lock began, kept
+--- between LockMinDistance and LockMaxDistance. The user, 2026-11-15: the lock "drag[ged] the person to
+--- you and teleport[ed] them"; holding them where they were means the first hit pulls nobody in.
+function Combat.lockDistance(cfg: any, distance: number?): number
+	if distance == nil or distance ~= distance then
+		return cfg.LockDistance
+	end
+	return math.clamp(distance, cfg.LockMinDistance, cfg.LockMaxDistance)
+end
+
+--- One frame of a locked target following its spot, seamlessly (never a jump): carried along at the
+--- puncher's own flat velocity (`vx, vz`, capped at LockCarryMax), so a punch's step moves both bodies
+--- together, and the gap that's left closes smoothly at LockFollowRate, never faster than
+--- LockCatchUpSpeed. From (`cx, cz`) toward the spot (`sx, sz`) over `dt` seconds; returns where to be.
+function Combat.lockFollow(
+	cfg: any,
+	cx: number,
+	cz: number,
+	sx: number,
+	sz: number,
+	vx: number,
+	vz: number,
+	dt: number
+): (number, number)
+	if dt ~= dt or dt <= 0 or cx ~= cx or cz ~= cz or sx ~= sx or sz ~= sz then
+		return cx, cz
+	end
+	if vx ~= vx or vz ~= vz then
+		vx, vz = 0, 0
+	end
+	local speed = math.sqrt(vx * vx + vz * vz)
+	if speed > cfg.LockCarryMax then
+		vx, vz = vx / speed * cfg.LockCarryMax, vz / speed * cfg.LockCarryMax
+	end
+	local px, pz = cx + vx * dt, cz + vz * dt
+	local share = 1 - math.exp(-cfg.LockFollowRate * dt)
+	local mx, mz = (sx - px) * share, (sz - pz) * share
+	local move = math.sqrt(mx * mx + mz * mz)
+	local most = cfg.LockCatchUpSpeed * dt
+	if move > most then
+		mx, mz = mx / move * most, mz / move * most
+	end
+	return px + mx, pz + mz
+end
+
+--- How much further a punch's step may carry the puncher along (`dirX, dirZ`, a unit) before someone in
+--- front would be nearer than LockMinDistance. `others` are flat offsets from the puncher to everyone else.
+--- Measured 2026-11-16: a step moved by position straight into a target the server hadn't moved yet made
+--- Roblox push the overlapping bodies apart hard enough to fling the puncher. math.huge with nobody ahead.
+function Combat.stepRoom(
+	cfg: any,
+	dirX: number,
+	dirZ: number,
+	others: { { x: number, z: number } }
+): number
+	local room = math.huge
+	for _, other in others do
+		local along = other.x * dirX + other.z * dirZ
+		local across = math.abs(other.x * dirZ - other.z * dirX)
+		if along > 0 and across < 2 * cfg.LockBodyRadius then
+			room = math.min(room, along - cfg.LockMinDistance)
+		end
+	end
+	return math.max(room, 0)
+end
+
+--- How far a ground punch steps the puncher forward (the user, 2026-11-15: you stop moving while you M1,
+--- and "each punch should knock both you and your target forward in the direction youre facing"):
+--- StepDistance, cut short so a target held in front still fits before a wall `wallDistance` studs ahead
+--- (nil: none in reach).
+function Combat.punchStep(cfg: any, wallDistance: number?): number
+	if wallDistance == nil or wallDistance ~= wallDistance then
+		return cfg.StepDistance
+	end
+	local room = wallDistance - cfg.LockDistance - 2 * cfg.LockBodyRadius
+	return math.clamp(room, 0, cfg.StepDistance)
+end
+
+--- The lock spot clipped at the first wall (the user, 2026-11-15: never pushed through walls; the target
+--- stops there until the puncher turns or moves). From the puncher's body (`ax, az`) toward the spot
+--- (`sx, sz`), a ray found something solid `wallDistance` studs along (nil: nothing). The target's body
+--- radius is kept clear of the wall. Returns the spot to use.
+function Combat.clipLock(
+	cfg: any,
+	ax: number,
+	az: number,
+	sx: number,
+	sz: number,
+	wallDistance: number?
+): (number, number)
+	if wallDistance == nil or wallDistance ~= wallDistance then
+		return sx, sz
+	end
+	local dx, dz = sx - ax, sz - az
+	local length = math.sqrt(dx * dx + dz * dz)
+	if length < 0.001 then
+		return ax, az
+	end
+	local along = math.clamp(wallDistance - cfg.LockBodyRadius, 0, length)
+	return ax + dx / length * along, az + dz / length * along
 end
 
 function Combat.addStagger(cfg: StaggerSettings, stagger: number): number
@@ -314,41 +477,12 @@ function Combat.nextSwing(side: string): string
 	return "Right"
 end
 
---- How long a punch takes to land after the request. Held back first (the server saw the hold start at
---- `readyAt`, at least Windup - ReleaseWindup ago), the arm is already drawn and only ReleaseWindup is
---- left. Otherwise the full Windup.
-function Combat.releaseWindup(cfg: any, readyAt: number?, now: number): number
-	if
-		readyAt
-		and now - readyAt >= cfg.Windup - cfg.ReleaseWindup
-		and now - readyAt <= cfg.ReadyMaxSeconds
-	then
-		return cfg.ReleaseWindup
-	end
-	return cfg.Windup
-end
-
---- Does a heavy kick thrown at this speed launch its target into the air, for an air kick?
-function Combat.kickLaunches(cfg: any, speed: number): boolean
-	return speed == speed and speed >= cfg.LaunchSpeed
-end
-
---- A heavy kick that doesn't launch: an upward arc, outward speed then lift, both growing with how fast
---- the kicker was going (ArcBase + ArcPerStud a stud/s, up to ArcMax), and with the target's stagger
---- like any hit.
-function Combat.heavyKickArc(cfg: any, speed: number, staggerMultiplier: number): (number, number)
-	local fast = if speed == speed then math.max(speed, 0) else 0
-	local out = math.min(cfg.ArcBase + cfg.ArcPerStud * fast, cfg.ArcMax) * staggerMultiplier
-	return out, out * cfg.ArcLiftShare
-end
-
---- The heavy uppercut (R): always an arc, never a launch for an air kick. A fixed lift, and an outward
---- speed that grows with how fast the thrower was going (ArcBase + ArcPerStud a stud/s, up to ArcMax) and
---- with the target's stagger like any hit. Returns outward speed, then lift.
-function Combat.uppercutArc(cfg: any, speed: number, staggerMultiplier: number): (number, number)
-	local fast = if speed == speed then math.max(speed, 0) else 0
-	local out = math.min(cfg.ArcBase + cfg.ArcPerStud * fast, cfg.ArcMax) * staggerMultiplier
-	return out, cfg.Lift
+--- An attack skill's throw (R): outward speed ArcBase and lift Lift, both times `power` (1 unless a
+--- move sets it), the outward speed also times the target's stagger like any hit. How fast the thrower
+--- was going adds nothing. Returns outward speed, then lift.
+function Combat.uppercutArc(cfg: any, staggerMultiplier: number, power: number?): (number, number)
+	local scale = if power and power == power then math.max(power, 0) else 1
+	return cfg.ArcBase * staggerMultiplier * scale, cfg.Lift * scale
 end
 
 --- The swing to throw now: the next in the order, or back to the first after a pause.

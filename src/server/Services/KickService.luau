@@ -478,7 +478,7 @@ function KickService:_impact(player: Player, record: Record)
 	local share = KickMeter.strength(meterCfg, record.quality)
 	local stagger = Knit.GetService("StaggerService")
 	local before = stagger:Get(target)
-	local push = Combat.punchStrength(GameConfig.Knockback, staggerCfg, 0, before) * share
+	local push = Combat.punchStrength(GameConfig.Knockback, staggerCfg, before) * share
 	if finisher then
 		push = math.min(push * cfg.FinisherPushScale, cfg.FinisherMaxSpeed)
 	end

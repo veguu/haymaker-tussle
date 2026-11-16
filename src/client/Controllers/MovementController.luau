@@ -62,8 +62,8 @@ local kickCfg = GameConfig.Kick
 local meterCfg = GameConfig.KickMeter
 local airCfg = GameConfig.AirRecovery
 local jumpCfg = GameConfig.Jump
-local diveCfg = GameConfig.Dive
-local DIVE_LAND_SECONDS = 0.05 -- a dive can't count as landed this soon
+local punchCfg = GameConfig.Punch
+local DIVE_LAND_SECONDS = 0.05 -- an air punch's glide can't count as landed this soon
 
 local MovementController = Knit.CreateController({
 	Name = "MovementController",
@@ -246,19 +246,28 @@ function MovementController:_bind(
 	-- `id` is the skill to show and tell the server about; a lunge has none.
 	local skillMove: { id: string?, cfg: any, at: number }? = nil
 	local knockGraceUntil = 0
+	local thrownAt = -math.huge -- when a knockback last reached this body (a drag gives way to it)
+	-- The M1 lock holding this body: who, how far in front of them (fixed when it began), and when it was
+	-- last seen, so a string's next punch carries on the same lock rather than starting a new one.
+	local lockBy: Model? = nil
+	local lockAhead = 0
+	local lockSeenAt = -math.huge
+	-- A ground punch's step forward (Punch.StepDistance), from CombatController via PunchThrown: it starts
+	-- at the strike and runs StepSeconds.
+	local punchStep: { at: number, dirX: number, dirZ: number, speed: number, left: number }? = nil
 	local kick: DiveKick.State? = nil
 	local kickTarget: Model? = nil
 	local kickRequested = false
 	local kickClicked = false -- the timed kick, once attached: a left click (R2), the punch button
 	local kickAwaiting = false -- the timing is over, and waiting for the server's verdict
 	local kickReadyAt = 0
-	-- THE JUMP (Space, with nobody to follow up and no punch held): up, and forward in an arc that grows
-	-- with speed (Core/Jump), flown as an air run. A click in the air is THE DIVE: straight down onto the
-	-- spot the cursor is on, where the server hits whoever is close around the landing.
+	-- THE JUMP (Space): up, and forward in an arc that grows with speed (Core/Jump), flown as an air run.
+	-- THE AIR PUNCH (2026-11-15; it replaced the dive kick): a punch thrown in the air glides the body
+	-- straight toward what the cursor is on, up to Punch.AirReach studs, over Punch.AirGlideSeconds, and
+	-- the punch lands as it arrives (CombatService gives it the longer AirWindup). A plain hitbox: no slam.
 	local jumping = false
 	local jumpReadyAt = 0
-	local dive: { x: number, y: number, z: number, t: number }? = nil
-	local diveRemote = Net.client("DiveRequest")
+	local glide: { dir: Vector3, speed: number, t: number }? = nil
 	local steerX, steerZ = 0, 0 -- a launched body's own steering, on top of its push
 	local speedShare = 1 -- how much of running speed stagger leaves
 	local pondShare = 1 -- how much of it wading in a pond leaves (Core/Pond), eased on its own
@@ -313,7 +322,7 @@ function MovementController:_bind(
 		kickAccepted = false
 		airRun = nil
 		jumping = false
-		dive = nil
+		glide = nil
 		prompt:Hide()
 	end
 	trove:Add(endKick)
@@ -397,7 +406,7 @@ function MovementController:_bind(
 		return if viewing.Magnitude > 0.01 then viewing.Unit else nil
 	end
 
-	-- Where a dive kick is aimed: the spot the cursor is on (the floor, or anything solid). Without a
+	-- Where an air punch is aimed: the spot the cursor is on (the floor, or anything solid). Without a
 	-- mouse, a little ahead of where the camera looks.
 	local function diveSpot(): Vector3
 		local camera = workspace.CurrentCamera
@@ -422,7 +431,7 @@ function MovementController:_bind(
 		local viewing = camera.CFrame.LookVector
 		local level = Vector3.new(viewing.X, 0, viewing.Z)
 		local ahead = if level.Magnitude > 0.01 then level.Unit else Vector3.zero
-		return from + ahead * diveCfg.Range * 0.5 - Vector3.yAxis * 10
+		return from + ahead * punchCfg.AirReach - Vector3.yAxis * 4
 	end
 
 	-- The server's pick for the follow-up. It only counts for a squat waiting on it, so a late answer
@@ -556,10 +565,12 @@ function MovementController:_bind(
 			return
 		end
 		endKick()
+		punchStep = nil
 		-- A hit's own lift and fall take over from any recovery lift still running.
 		liftUntil, liftSet = 0, false
 		state = Momentum.applyKnock(state, cfg, velocity.X, velocity.Z, speedKeep)
 		knockGraceUntil = os.clock() + cfg.KnockbackGraceSeconds
+		thrownAt = os.clock()
 		local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
 		local current = root.AssemblyLinearVelocity
 		-- Never adds lift to someone already rising, so repeated hits can't fly them upward.
@@ -592,6 +603,7 @@ function MovementController:_bind(
 		steerX, steerZ, pushX, pushZ, lift = 0, 0, 0, 0, 0
 		punchRequested, propelRequested, kickRequested = false, false, false
 		skillMove = nil
+		punchStep = nil
 		lastPush = nil
 		lifts, liftUntil, liftSet = AirRecovery.newLifts(), 0, false
 		state = if face and face.Magnitude > 0.01
@@ -607,7 +619,52 @@ function MovementController:_bind(
 		rootedUntil = os.clock() + seconds
 	end
 
+	-- Where an air punch glides to: a fighter you're locked onto or pointing at (stopping just short of
+	-- them), else the spot the cursor is on. Never further than Punch.AirReach.
+	local function airPunchGoal(): Vector3
+		local from = root.Position
+		local locked = assistTarget()
+		if locked and (locked.Position - from).Magnitude <= punchCfg.AirReach + 3 then
+			return locked.Position
+		end
+		local camera = workspace.CurrentCamera
+		if camera and UserInputService.MouseEnabled then
+			local mouse = UserInputService:GetMouseLocation()
+			local ray = camera:ViewportPointToRay(mouse.X, mouse.Y)
+			local params = RaycastParams.new()
+			params.FilterType = Enum.RaycastFilterType.Exclude
+			params.FilterDescendantsInstances = { character }
+			params.IgnoreWater = true
+			local hit = workspace:Raycast(ray.Origin, ray.Direction * 1000, params)
+			local model = hit and hit.Instance:FindFirstAncestorOfClass("Model")
+			if model and CollectionService:HasTag(model, "HT_Combatant") then
+				-- lihfolk-ignore: findfirstchild-chain (checked on the next line)
+				local theirRoot = model:FindFirstChild("HumanoidRootPart") :: BasePart?
+				if theirRoot then
+					return theirRoot.Position
+				end
+			end
+		end
+		return diveSpot()
+	end
+
 	self._punchThrown = function(swing: string?)
+		-- In the air, the punch is the air punch: a glide toward the aim, and nothing else.
+		if humanoid.FloorMaterial == Enum.Material.Air and not kick then
+			local offset = airPunchGoal() - root.Position
+			local distance = offset.Magnitude
+			-- Stop a little short of whatever it is, so the fist meets them instead of the body.
+			local travel = math.clamp(distance - 2.5, 0, punchCfg.AirReach)
+			if travel > 0.5 then
+				glide = {
+					dir = offset.Unit,
+					speed = travel / punchCfg.AirGlideSeconds,
+					t = 0,
+				}
+				airRun = nil
+			end
+			return
+		end
 		punchRequested = true
 		punchIsUppercut = swing == "Uppercut"
 		-- Locked on and close, roughly in front: the punch turns you to face them.
@@ -630,6 +687,38 @@ function MovementController:_bind(
 				root.CFrame = CFrame.lookAt(root.Position, root.Position + facing)
 			end
 		end
+		-- On the ground an M1 plants you (the user, 2026-11-15: "make the m1 combos slow you down so you cant
+		-- run while m1ing ... you stop moving but each punch should knock both you and your target forward"):
+		-- running stops dead, the keys do nothing for Punch.RootSeconds, and at the strike you step forward
+		-- (Combat.punchStep, shorter near a wall). A target locked in front follows the step (lockFollow).
+		rootedUntil = math.max(rootedUntil, os.clock() + punchCfg.RootSeconds)
+		state = Momentum.stopped(state)
+		-- The way the body really faces (after any turn to the locked-on target above), which is where the
+		-- swing goes; the heading follows it so nothing turns the body back mid-string.
+		local bodyLook = root.CFrame.LookVector
+		local faceX, faceZ = Momentum.facing(state)
+		if Vector3.new(bodyLook.X, 0, bodyLook.Z).Magnitude > 0.01 then
+			local flatLook = Vector3.new(bodyLook.X, 0, bodyLook.Z).Unit
+			faceX, faceZ = flatLook.X, flatLook.Z
+			local turned = table.clone(state)
+			turned.headingX, turned.headingZ = faceX, faceZ
+			state = turned
+		end
+		local reach = punchCfg.StepDistance + punchCfg.LockDistance + 2 * punchCfg.LockBodyRadius
+		local wall =
+			workspace:Raycast(root.Position, Vector3.new(faceX, 0, faceZ) * reach, solidParams())
+		local distance = Combat.punchStep(punchCfg, if wall then wall.Distance else nil)
+		punchStep = if distance > 0.05
+			then {
+				-- at the end of the swing's hit window, when the server has placed the target's spot, so
+				-- both start moving together (starting at the windup ran into them for a moment)
+				at = os.clock() + punchCfg.Windup + punchCfg.ActiveSeconds,
+				dirX = faceX,
+				dirZ = faceZ,
+				speed = distance / punchCfg.StepSeconds,
+				left = punchCfg.StepSeconds,
+			}
+			else nil
 	end
 	-- The server refused that punch, so it never happened: its push goes back too.
 	self._punchRefused = function()
@@ -702,8 +791,8 @@ function MovementController:_bind(
 		return nil, nil, nil, nil
 	end
 
-	-- Space: jumps at someone you launched; else, holding punch, the launching kick; else an ordinary jump.
-	-- The timed press once attached, and the dive out of a jump, are a left click (below).
+	-- Space: jumps at someone you launched; else an ordinary jump.
+	-- The timed press once attached is a left click (below). A click in the air is the air punch.
 	ContextActionService:BindActionAtPriority(
 		KICK_ACTION,
 		function(_name: string, inputState: Enum.UserInputState)
@@ -722,13 +811,13 @@ function MovementController:_bind(
 		ContextActionService:UnbindAction(KICK_ACTION)
 	end)
 
-	-- Once a jump is under way, the punch button is the timed kick (or, out of an ordinary jump, the dive)
+	-- Once attached in a follow-up kick, the punch button is the timed kick
 	-- instead: the press is taken here, above the punch, and the punch never sees it. Any other time it
 	-- passes straight through to the punch.
 	ContextActionService:BindActionAtPriority(
 		KICK_CLICK_ACTION,
 		function(_name: string, inputState: Enum.UserInputState)
-			if not kick and not jumping then
+			if not kick then
 				return Enum.ContextActionResult.Pass
 			end
 			if inputState == Enum.UserInputState.Begin then
@@ -947,6 +1036,140 @@ function MovementController:_bind(
 			pushX, pushZ, steerX, steerZ = 0, 0, 0, 0
 			skillMove = nil
 		end
+		-- In an ultimate (either side of it): UltimateController sets this body to the timeline. Nothing of
+		-- ours moves it, and nothing carries over afterwards.
+		if character:GetAttribute("HT_Ultimate") ~= nil then
+			state = Momentum.stopped(state)
+			pushX, pushZ, steerX, steerZ = 0, 0, 0, 0
+			skillMove = nil
+			glide = nil
+			humanoid.WalkSpeed = 0
+			humanoid:Move(Vector3.zero, false)
+			return
+		end
+		-- Stunned by a punch of someone's M1 string (StatusService): LOCKED in front of them, facing them,
+		-- for as long as the stun lasts. Nothing of your own moves you. The user, 2026-11-15: the old lock
+		-- "drag[ged] the person to you and teleport[ed] them"; now it keeps the distance you were at when it
+		-- began (Combat.lockDistance) and FOLLOWS the spot smoothly, carried at their speed so their punch's
+		-- step moves you both together (Combat.lockFollow), never jumping.
+		do
+			local locked = character:FindFirstChild("HT_DraggedBy")
+			local by = if locked and locked:IsA("ObjectValue") then locked.Value else nil
+			local byRoot = if by and by:IsA("Model")
+				then by:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked on the next line)
+				else nil
+			if character:GetAttribute("HT_Stunned") ~= nil and byRoot and now - thrownAt > 0.35 then
+				local byLook = byRoot.CFrame.LookVector
+				local moving = byRoot.AssemblyLinearVelocity
+				local from = byRoot.Position
+				if by ~= lockBy or now - lockSeenAt > 0.4 then
+					local gap = Vector3.new(root.Position.X - from.X, 0, root.Position.Z - from.Z)
+					lockBy = by :: Model
+					lockAhead = Combat.lockDistance(punchCfg, gap.Magnitude)
+				end
+				lockSeenAt = now
+				-- The spot the server picked for this punch (StatusService HT_LockSpot: in front of them, a step
+				-- on) holds still between punches, so it's glided to with nothing to carry. Without one, the
+				-- old way: in front of their body as it's seen here.
+				local held = character:GetAttribute("HT_LockSpot") :: Vector3?
+				local x, z
+				if held then
+					x, z = held.X, held.Z
+					moving = Vector3.zero
+				else
+					x, z = Combat.lockSpot(punchCfg, from.X, from.Z, byLook.X, byLook.Z, lockAhead)
+				end
+				-- Never through a wall: it stops at the first solid thing between the puncher and the spot.
+				local start = byRoot.Position
+				local toward = Vector3.new(x - start.X, 0, z - start.Z)
+				if not held and toward.Magnitude > 0.01 then
+					local hit = workspace:Raycast(
+						start,
+						toward.Unit * (toward.Magnitude + punchCfg.LockBodyRadius),
+						solidParams()
+					)
+					x, z = Combat.clipLock(
+						punchCfg,
+						start.X,
+						start.Z,
+						x,
+						z,
+						if hit then hit.Distance else nil
+					)
+				end
+				local nx, nz = Combat.lockFollow(
+					punchCfg,
+					root.Position.X,
+					root.Position.Z,
+					x,
+					z,
+					moving.X,
+					moving.Z,
+					dt
+				)
+				local spot = Vector3.new(nx, root.Position.Y, nz)
+				state = Momentum.stopped(state)
+				pushX, pushZ, steerX, steerZ = 0, 0, 0, 0
+				skillMove = nil
+				glide = nil
+				punchStep = nil
+				humanoid.WalkSpeed = 0
+				humanoid:Move(Vector3.zero, false)
+				local facing = Vector3.new(from.X - spot.X, 0, from.Z - spot.Z)
+				local stepped = Vector3.new(nx - root.Position.X, 0, nz - root.Position.Z)
+				root.CFrame = if facing.Magnitude > 0.05
+					then CFrame.lookAt(spot, spot + facing)
+					else CFrame.new(spot) * root.CFrame.Rotation
+				if facing.Magnitude > 0.05 then
+					align.CFrame = CFrame.lookAt(Vector3.zero, facing)
+				end
+				-- The velocity it really moved at, so everyone else's copy of this body glides too.
+				local carried = if dt > 0 then stepped / dt else Vector3.zero
+				root.AssemblyLinearVelocity =
+					Vector3.new(carried.X, root.AssemblyLinearVelocity.Y, carried.Z)
+				return
+			end
+		end
+		-- A ground punch's step forward, at the strike: a short, set glide along the way you face, then
+		-- you stand planted again (rootedUntil) until the string ends.
+		if punchStep and now >= punchStep.at then
+			local step = punchStep
+			local this = math.min(dt, step.left)
+			step.left -= dt
+			if step.left <= 0 then
+				punchStep = nil
+			end
+			if this > 0 then
+				local dir = Vector3.new(step.dirX, 0, step.dirZ)
+				state = Momentum.stopped(state)
+				pushX, pushZ, steerX, steerZ = 0, 0, 0, 0
+				humanoid.WalkSpeed = 0
+				humanoid:Move(Vector3.zero, false)
+				align.CFrame = CFrame.lookAt(Vector3.zero, dir)
+				-- Moved exactly, not walked: the Humanoid's own walking cut a walked step to about two
+				-- thirds (measured 2026-11-16), while the target's spot (CombatService) counts on all of it.
+				-- Never into the body in front (Combat.stepRoom): pushed into one, it flung us.
+				local others: { { x: number, z: number } } = {}
+				for _, other in CollectionService:GetTagged("HT_Combatant") do
+					local otherRoot = other ~= character
+						and other:FindFirstChild("HumanoidRootPart")
+					if otherRoot and otherRoot:IsA("BasePart") then
+						local offset = otherRoot.Position - root.Position
+						if offset.Magnitude < 10 then
+							table.insert(others, { x = offset.X, z = offset.Z })
+						end
+					end
+				end
+				local move =
+					math.min(step.speed * this, Combat.stepRoom(punchCfg, dir.X, dir.Z, others))
+				root.CFrame = root.CFrame + dir * move
+				-- the velocity it really moved at (none once the step is over), so other screens glide too
+				local rate = if punchStep and this > 0 then move / this else 0
+				local v = root.AssemblyLinearVelocity
+				root.AssemblyLinearVelocity = Vector3.new(dir.X * rate, v.Y, dir.Z * rate)
+				return
+			end
+		end
 		-- Anywhere in the air without something else moving the body, the keys steer it.
 		local freeAir = not grounded and not floating and not airRun and not kick and not stunned
 		if not floating and not freeAir then
@@ -970,17 +1193,6 @@ function MovementController:_bind(
 			if lockedNow ~= lockSent then
 				lockSent = lockedNow
 				kickRemotes.lockOn:FireServer(lockedNow)
-			end
-		end
-
-		-- Out of a jump, the click is the dive: straight down onto the spot the cursor is on.
-		if jumping and not dive and timedPress and not grounded and not stunned then
-			local offset = diveSpot() - root.Position
-			local x, y, z = Jump.diveWay(diveCfg, offset.X, offset.Y, offset.Z)
-			dive = { x = x, y = y, z = z, t = 0 }
-			airRun = nil
-			if diveRemote then
-				diveRemote:FireServer()
 			end
 		end
 
@@ -1011,11 +1223,7 @@ function MovementController:_bind(
 					and not rooted
 					and not jumping
 				then
-					local combat = Knit.GetController("CombatController")
-					if combat:IsHolding() then
-						-- Holding punch: the launching kick, which the air kick follows.
-						combat:ThrowLaunchKick()
-					elseif
+					if
 						now >= jumpReadyAt and not Knit.GetController("EndlagController"):IsBusy()
 					then
 						-- An ordinary jump: up, and forward with the speed you had. Not while still
@@ -1119,41 +1327,40 @@ function MovementController:_bind(
 		end
 
 		-- A jump that lost its air run some other way is over once it's back on the floor.
-		if jumping and not dive and not airRun and grounded then
+		if jumping and not glide and not airRun and grounded then
 			jumping = false
 		end
 
-		if dive then
-			dive.t += dt
+		if glide then
+			glide.t += dt
 			propelRequested, punchRequested = false, false
 			pushX, pushZ, lift = 0, 0, 0
 			steerX, steerZ = 0, 0
-			local landed = grounded and dive.t >= DIVE_LAND_SECONDS
-			local level = Vector3.new(dive.x, 0, dive.z)
-			if landed or stunned or dive.t >= diveCfg.MaxSeconds then
-				-- Down: it stops dead where it lands, facing the way it came in. Off the edge or cut
-				-- short, it's just a fall from here.
+			local level = Vector3.new(glide.dir.X, 0, glide.dir.Z)
+			local done = (grounded and glide.t >= DIVE_LAND_SECONDS)
+				or stunned
+				or glide.t >= punchCfg.AirGlideSeconds
+			if done then
+				-- Arrived: it carries on with a little of the glide's speed, as an ordinary fall.
 				state = if level.Magnitude > 0.05
-					then Momentum.moving(state, level.X, level.Z, 0)
-					else Momentum.stopped(state)
-				if landed then
-					root.AssemblyLinearVelocity = Vector3.zero
-					fx:DiveLanded(character, root.Position, true)
-				end
-				dive = nil
-				jumping = false
+					then Momentum.moving(
+						state,
+						level.Unit.X,
+						level.Unit.Z,
+						level.Magnitude * glide.speed * 0.25
+					)
+					else state
+				root.AssemblyLinearVelocity = glide.dir * glide.speed * 0.15
+				glide = nil
 			else
 				humanoid.WalkSpeed = 0
 				humanoid:Move(Vector3.zero, false)
-				root.AssemblyLinearVelocity = Vector3.new(dive.x, dive.y, dive.z) * diveCfg.Speed
+				root.AssemblyLinearVelocity = glide.dir * glide.speed
 				if level.Magnitude > 0.05 then
 					align.CFrame = CFrame.lookAt(Vector3.zero, level)
 				end
 				if rootJoint then
 					rootJoint.C0 = baseC0
-				end
-				if readout then
-					readout.Text = `Dive   Stagger {character:GetAttribute("HT_Stagger") or 0}`
 				end
 				return
 			end
@@ -1503,7 +1710,13 @@ function MovementController:_bind(
 		end
 		local realSpeed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 		-- Stagger doesn't shorten a rebound: where it lands was worked out at full speed.
-		local travelShare = if airRun and airRun.keep then 1 else speedShare * pondShare
+		-- Charging an attack skill (R held, AbilityController): you move at SkillHold.MoveShare.
+		local chargeShare = if character:GetAttribute("HT_Charging") ~= nil
+			then GameConfig.SkillHold.MoveShare
+			else 1
+		local travelShare = if airRun and airRun.keep
+			then 1
+			else speedShare * pondShare * chargeShare
 		local wantX, wantZ = Momentum.velocity(state, travelShare)
 		pushX, pushZ = AirRecovery.fade(airCfg, pushX, pushZ, dt)
 		pushX, pushZ = AirRecovery.limit(airCfg, pushX, pushZ, wantX + steerX, wantZ + steerZ)
@@ -1620,7 +1833,7 @@ function MovementController:PunchThrown(swing: string?)
 	end
 end
 
---- A heavy kick started: rooted for `seconds`, through its windup.
+--- An attack skill that roots started: rooted for `seconds`, through its strike.
 function MovementController:HeavyKickStarted(seconds: number)
 	if self._heavyKick then
 		self._heavyKick(seconds)

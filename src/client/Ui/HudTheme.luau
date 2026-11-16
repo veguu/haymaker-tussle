@@ -158,45 +158,37 @@ HudTheme.Guide = {
 	mouse = {
 		{
 			key = "Click",
-			action = "Punch: left and right hooks. Hold to draw it back, let go to throw it fast.",
+			action = "Punch: a 4-hit string. The first three stun and drag them, the fourth knocks them away.",
 		},
 		{
 			key = "R",
-			action = "Uppercut: throws them up and away. You keep your speed. Further the faster you ran in.",
+			action = "Hold to charge your skill, let go to throw it. Let go in the white for a PERFECT.",
 		},
 		{
 			key = "Q",
-			action = "Dash: a short burst the way you're going. Hard to steer. 3 s to recharge.",
+			action = "Your kit's move. Can't be used while stunned.",
 		},
 		{
 			key = "Space",
-			action = "Jump: further and higher the faster you run. Click in the air to dive kick where you point.",
+			action = "Jump. Click in the air to glide a punch at where you point.",
 		},
-		{
-			key = "Click + Space",
-			action = "Holding punch, Space kicks them up. Space again to jump at them, then click on the ring.",
-		},
-		{ key = "Ctrl", action = "Shift lock. The camera aims your kick." },
+		{ key = "Ctrl", action = "Shift lock." },
 		{ key = lockKey, action = "Lock on to the nearest opponent." },
 		{ key = "H", action = "Show or hide this guide." },
 	},
 	gamepad = {
 		{
 			key = "R2",
-			action = "Punch: left and right hooks. Hold to draw it back, let go to throw.",
+			action = "Punch: a 4-hit string. The first three stun and drag them, the fourth knocks them away.",
 		},
 		{
 			key = "L2",
-			action = "Uppercut: throws them up and away. You keep your speed. Further the faster you ran in.",
+			action = "Hold to charge your skill, let go to throw it. Let go in the white for a PERFECT.",
 		},
-		{ key = "B", action = "Dash: a short burst the way you're going. Hard to steer." },
+		{ key = "B", action = "Your kit's move. Can't be used while stunned." },
 		{
 			key = "Y",
-			action = "Jump: further and higher the faster you run. R2 in the air to dive kick.",
-		},
-		{
-			key = "R2 + Y",
-			action = "Holding punch, Y kicks them up. Y again to jump at them, then R2 on the ring.",
+			action = "Jump. R2 in the air to glide a punch.",
 		},
 		{ key = "L1", action = "Lock on to the nearest opponent." },
 		{ key = "Select", action = "Show or hide this guide." },
@@ -204,13 +196,13 @@ HudTheme.Guide = {
 	touch = {
 		{
 			key = "Punch",
-			action = "Punch: left and right hooks. Hold to draw it back, let go to throw it fast.",
+			action = "Punch: a 4-hit string. The fourth knocks them away.",
 		},
-		{ key = "Propel", action = "Dash: a short burst the way you're going. 3 s to recharge." },
-		{ key = "Upper", action = "Uppercut: throws them up and away. You keep your speed." },
+		{ key = "Propel", action = "Your kit's move." },
+		{ key = "Upper", action = "Hold to charge your skill, let go to throw it." },
 		{
 			key = "Kick",
-			action = "Jump. Tap again in the air to dive kick. Holding Punch, it kicks them up.",
+			action = "Jump. Punch in the air to glide a punch at them.",
 		},
 		{ key = "Lock", action = "Lock on to the nearest opponent." },
 	},

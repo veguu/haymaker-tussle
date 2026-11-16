@@ -22,11 +22,13 @@ local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local Net = require(ReplicatedStorage.Shared.Net)
 
 local punchCfg = GameConfig.Punch
+local holdCfg = GameConfig.SkillHold
 local ACTION = "HaymakerPunch"
-local kickCfg = GameConfig.HeavyKick
 local upperCfg = GameConfig.Uppercut
 local COMBATANT_TAG = "HT_Combatant"
 local FLASH_SECONDS = 0.12
+-- How big a stunning punch's burst is drawn (it carries no knockback to size it by).
+local STUN_HIT_SIZE = 40
 
 local CombatController = Knit.CreateController({
 	Name = "CombatController",
@@ -100,6 +102,7 @@ function CombatController:KnitStart()
 
 	local clashTap = Net.client("ClashTap")
 	local result = Net.client("PunchResult")
+	local chargeStart = Net.client("SkillChargeStart")
 
 	local nextSide = "Right"
 	local lastPress = -math.huge
@@ -107,11 +110,9 @@ function CombatController:KnitStart()
 	local buffered: number? = nil
 	local undoPress: number? = nil
 	local undoSide = "Right"
-	local holdAt: number? = nil -- when the punch started being held back, on this clock
-	local held = false
-	local heldBy: Enum.UserInputType? = nil
-	local readyRemote = Net.client("PunchReady")
-	local kickRemote = Net.client("HeavyKickRequest")
+	-- An attack skill being charged (R held): which, and since when on this clock.
+	local charge: { side: string, at: number }? = nil
+
 	-- The same things the server refuses a punch for, so no swing plays that was never going to count.
 	local function canPunch(character: Model?): boolean
 		if character == nil then
@@ -126,51 +127,6 @@ function CombatController:KnitStart()
 			and character:GetAttribute("HT_Clash") == nil
 	end
 
-	local function throw(now: number, character: Model)
-		local wasHeld = holdAt ~= nil
-		-- How long until it strikes: sooner for a punch held back long enough. Its endlag runs from now
-		-- through the strike.
-		local windup = Combat.releaseWindup(punchCfg, holdAt, now)
-		endlag:Start("Punch", windup + punchCfg.ActiveSeconds)
-		holdAt = nil
-		-- A punch that skipped the hold (a press remembered through the cooldown) says so first, so the
-		-- server never counts an old hold for it.
-		if not wasHeld and readyRemote then
-			readyRemote:FireServer()
-		end
-		undoPress, undoSide = lastPress, nextSide
-		nextSide = Combat.comboSwing(punchCfg, nextSide, now, lastPress)
-		lastPress = now
-		recovery = 0
-		buffered = nil
-		local swing = nextSide
-		anim:PlaySwing(character, swing)
-		fx:Swing(character)
-		nextSide = Combat.nextSwing(nextSide)
-		movement:PunchThrown(swing)
-		request:FireServer()
-		self.PunchEvent:Fire("thrown")
-	end
-
-	-- Holding: the arm draws back and waits there, and the server is told, so a release throws fast.
-	local function startHold(now: number, character: Model)
-		holdAt = now
-		if readyRemote then
-			readyRemote:FireServer()
-		end
-		anim:HoldSwing(character, Combat.comboSwing(punchCfg, nextSide, now, lastPress))
-	end
-
-	-- A hold given up without a punch (stunned, caught, in a clash): the arm comes back.
-	local function dropHold(character: Model?)
-		if holdAt then
-			holdAt = nil
-			if character then
-				anim:CancelSwing(character)
-			end
-		end
-	end
-
 	-- When the next swing can start: the punch's cooldown, or the endlag of whatever move came last
 	-- (Core/Endlag), whichever ends later.
 	local function readyAt(): number
@@ -183,66 +139,55 @@ function CombatController:KnitStart()
 		return readyAt(), punchCfg.Cooldown + recovery, canPunch(player.Character)
 	end
 
-	-- Pressing draws the punch back; letting go throws it. A quick click is an ordinary punch. Held, the
-	-- arm waits drawn back for as long as you like (it adds no power), so you can run in holding it and
-	-- let go just before you reach them: the punch then lands after only Punch.ReleaseWindup. Pressed a
-	-- moment too early, the press is remembered and the hold (or the tap) starts the moment it can. A
-	-- press that can't punch tells the HUD it was blocked. A clash takes one tap per press.
-	ContextActionService:BindAction(
-		ACTION,
-		function(_name: string, inputState: Enum.UserInputState, inputObject: InputObject)
-			local now = os.clock()
-			local character = player.Character
-			if inputState == Enum.UserInputState.Begin then
-				if character and character:GetAttribute("HT_Clash") then
-					if clashTap then
-						clashTap:FireServer()
-					end
-				elseif not character or not canPunch(character) then
-					buffered = nil
-					held, heldBy = true, inputObject.UserInputType
-					self.PunchEvent:Fire("blocked")
-				else
-					held, heldBy = true, inputObject.UserInputType
-					if holdAt then
-						return Enum.ContextActionResult.Pass
-					elseif now >= readyAt() then
-						startHold(now, character)
-					elseif Combat.pressBuffers(punchCfg, now, readyAt()) then
-						buffered = now
-					else
-						self.PunchEvent:Fire("blocked")
-					end
-				end
-			elseif
-				inputState == Enum.UserInputState.End
-				or inputState == Enum.UserInputState.Cancel
-			then
-				held, heldBy = false, nil
-				if holdAt and character then
-					if canPunch(character) then
-						throw(now, character)
-					else
-						dropHold(character)
-					end
-				end
-			end
+	-- A punch goes on the press: there is no holding one back (2026-11-15). In the air it is the air
+	-- punch, which glides toward the aim (MovementController) and strikes after the longer AirWindup.
+	local function throw(now: number, character: Model)
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		local air = humanoid ~= nil and humanoid.FloorMaterial == Enum.Material.Air
+		local windup = if air then punchCfg.AirWindup else punchCfg.Windup
+		endlag:Start("Punch", windup + punchCfg.ActiveSeconds)
+		undoPress, undoSide = lastPress, nextSide
+		nextSide = Combat.comboSwing(punchCfg, nextSide, now, lastPress)
+		lastPress = now
+		recovery = 0
+		buffered = nil
+		local swing = nextSide
+		anim:PlaySwing(character, swing, windup)
+		fx:Swing(character)
+		nextSide = Combat.nextSwing(nextSide)
+		movement:PunchThrown(swing)
+		request:FireServer()
+		self.PunchEvent:Fire("thrown")
+	end
+
+	-- Pressing punches at once. Pressed a moment too early, the press is remembered and the punch goes the
+	-- moment it can. A press that can't punch tells the HUD it was blocked. A clash takes one tap per press.
+	ContextActionService:BindAction(ACTION, function(_name: string, inputState: Enum.UserInputState)
+		if inputState ~= Enum.UserInputState.Begin then
 			return Enum.ContextActionResult.Pass
-		end,
-		true,
-		Enum.UserInputType.MouseButton1,
-		Enum.KeyCode.ButtonR2
-	)
+		end
+		local now = os.clock()
+		local character = player.Character
+		if character and character:GetAttribute("HT_Clash") then
+			if clashTap then
+				clashTap:FireServer()
+			end
+		elseif not character or not canPunch(character) or charge then
+			buffered = nil
+			self.PunchEvent:Fire("blocked")
+		elseif now >= readyAt() then
+			throw(now, character)
+		elseif Combat.pressBuffers(punchCfg, now, readyAt()) then
+			buffered = now
+		else
+			self.PunchEvent:Fire("blocked")
+		end
+		return Enum.ContextActionResult.Pass
+	end, true, Enum.UserInputType.MouseButton1, Enum.KeyCode.ButtonR2)
 	ContextActionService:SetTitle(ACTION, "Punch")
 
-	-- THE HEAVY MOVES. Both are slow and telegraphed, root you through the windup, have their own cooldown
-	-- and also count as a swing for the punch's.
-	-- The uppercut: R (or L2). Throws them up and away in an arc, further the faster you were going.
-	-- Nothing follows it.
-	-- The launching kick: Space while holding punch (MovementController asks for it). Throws them straight
-	-- up for an air kick.
+	-- THE ATTACK SKILLS (R). Each has its own cooldown and counts as a swing for the punch's.
 	local heavies: { [string]: { cfg: any, remote: RemoteEvent?, last: number } } = {
-		Kick = { cfg = kickCfg, remote = kickRemote, last = -math.huge },
 		Uppercut = { cfg = upperCfg, remote = Net.client("UppercutRequest"), last = -math.huge },
 		-- Tempest's attack skill: a spinning hook that reaches all the way round.
 		Cyclone = {
@@ -251,82 +196,125 @@ function CombatController:KnitStart()
 			last = -math.huge,
 		},
 	}
-	-- The newer kits' attack skills (Config/Abilities.KitSwings): each a heavy move, all through one
-	-- remote that names nothing (the server knows the kit).
+	-- The newer kits' attack skills (Config/Abilities.KitSwings): each through one remote that names
+	-- nothing (the server knows the kit).
 	local kitSwingRemote = Net.client("KitSwingRequest")
 	for skillId, swing in Abilities.KitSwings :: { [string]: any } do
 		heavies[skillId] = { cfg = swing, remote = kitSwingRemote, last = -math.huge }
 	end
+
+	local function skillReady(move: any, now: number, character: Model?): boolean
+		return character ~= nil
+			and canPunch(character)
+			and now >= readyAt()
+			and now - move.last >= move.cfg.Cooldown
+			and move.remote ~= nil
+	end
+
+	local function dropCharge(character: Model?, showCancel: boolean)
+		if not charge then
+			return
+		end
+		charge = nil
+		if character then
+			character:SetAttribute("HT_Charging", nil)
+			if showCancel then
+				anim:CancelSwing(character)
+			end
+		end
+	end
+
+	-- Let go: the skill goes, the same however long it was held (no charge, no timing). The hold
+	-- was the wind-up, so it strikes after only SkillHold.ReleaseWindup.
 	local function throwHeavy(side: string): boolean
 		local move = heavies[side]
 		local now = os.clock()
 		local character = player.Character
-		-- A punch being held back doesn't have to wait out the punch's cooldown again.
-		if
-			not character
-			or not canPunch(character)
-			or (holdAt == nil and now < readyAt())
-			or now - move.last < move.cfg.Cooldown
-			or not move.remote
-		then
+		if not character or not skillReady(move, now, character) then
 			self.PunchEvent:Fire("blocked")
 			return false
 		end
-		-- The held punch becomes this instead, and the button has to be pressed again to hold another.
-		holdAt = nil
-		held, heldBy = false, nil
 		buffered = nil
 		move.last = now
 		undoPress, undoSide = lastPress, nextSide
 		lastPress = now
 		recovery = 0
+		local windup = holdCfg.ReleaseWindup
 		endlag:Start(
 			side,
-			move.cfg.Windup
-				+ punchCfg.ActiveSeconds
-				+ (if move.cfg.Cast then move.cfg.Cast.Lead or 0 else 0)
+			windup + punchCfg.ActiveSeconds + (if move.cfg.Cast then move.cfg.Cast.Lead or 0 else 0)
 		)
-		anim:PlaySwing(character, side)
+		anim:PlaySwing(character, side, windup)
 		fx:Swing(character)
-		-- The launching kick roots you through its windup. The uppercut doesn't: you keep running.
 		if move.cfg.Roots ~= false then
-			movement:HeavyKickStarted(move.cfg.Windup + move.cfg.RootAfter)
+			movement:HeavyKickStarted(windup + move.cfg.RootAfter)
 		end
-		-- A kit's attack skill: its own windup and strike effects (FxController ignores the sides that
-		-- have none), and the lunge some of them carry.
+		-- A kit's attack skill: its own strike effects (FxController ignores the sides that have none),
+		-- and the lunge some of them carry.
 		fx:KitSwing(character, side)
-		do
-			local lunge = move.cfg.Lunge
-			if lunge then
-				movement:SkillMove(nil, {
-					Kind = "burst",
-					Aim = "face",
-					Speed = lunge.Speed,
-					Seconds = lunge.Seconds,
-					Turn = 0.2,
-				})
-			end
+		local lunge = move.cfg.Lunge
+		if lunge then
+			movement:SkillMove(nil, {
+				Kind = "burst",
+				Aim = "face",
+				Speed = lunge.Speed,
+				Seconds = lunge.Seconds,
+				Turn = 0.2,
+			})
 		end
 		move.remote:FireServer()
 		self.PunchEvent:Fire("thrown")
 		return true
 	end
-	self._throwKick = function(): boolean
-		return throwHeavy("Kick")
+
+	-- Starts holding the attack skill `side`: the arm draws back and waits, and you move
+	-- at SkillHold.MoveShare. False when it can't be used now.
+	self._startCharge = function(side: string): boolean
+		local move = heavies[side]
+		local now = os.clock()
+		local character = player.Character
+		if not move or charge or not skillReady(move, now, character) then
+			self.PunchEvent:Fire("blocked")
+			return false
+		end
+		local body = character :: Model
+		charge = { side = side, at = now }
+		body:SetAttribute("HT_Charging", true)
+		anim:HoldSwing(body, side)
+		if chargeStart then
+			chargeStart:FireServer()
+		end
+		return true
 	end
+	-- Lets go of the charge: the skill goes. False when there was none or it was turned down.
+	self._releaseCharge = function(): boolean
+		local held = charge
+		if not held then
+			return false
+		end
+		charge = nil
+		local character = player.Character
+		if character then
+			character:SetAttribute("HT_Charging", nil)
+		end
+		return throwHeavy(held.side)
+	end
+	self._cancelCharge = function()
+		dropCharge(player.Character, true)
+	end
+	self._charging = function(): boolean
+		return charge ~= nil
+	end
+
 	-- For the HUD: when the uppercut can be thrown again, and whether the body can swing at all.
 	self._uppercutTiming = function(): (number, number, boolean)
 		return math.max(heavies.Uppercut.last + upperCfg.Cooldown, readyAt()),
 			upperCfg.Cooldown,
 			canPunch(player.Character)
 	end
-	-- The Uppercut skill (the Base kit's attack, R / L2). AbilityController owns the key.
-	self._throwUppercut = function(): boolean
-		return throwHeavy("Uppercut")
-	end
-	-- Any kit's attack skill that is a heavy swing ("Uppercut", "Cyclone"), and its timing for the HUD.
+	-- An attack skill thrown at once, with no charge (tests and on-screen buttons that only tap).
 	self._throwSkill = function(side: string): boolean
-		return heavies[side] ~= nil and side ~= "Kick" and throwHeavy(side)
+		return heavies[side] ~= nil and throwHeavy(side)
 	end
 	self._skillTiming = function(side: string): (number, number, boolean)
 		local move = heavies[side]
@@ -337,46 +325,29 @@ function CombatController:KnitStart()
 			move.cfg.Cooldown,
 			canPunch(player.Character)
 	end
+	self._isSkill = function(side: string): boolean
+		return heavies[side] ~= nil
+	end
 
-	-- Anything that could swallow the release lets go: the window losing focus, and a new body.
+	-- Anything that could swallow the release lets go of a charge: the window losing focus, a new body.
 	UserInputService.WindowFocusReleased:Connect(function()
-		held, heldBy = false, nil
-		dropHold(player.Character)
+		dropCharge(player.Character, true)
 	end)
 	player.CharacterAdded:Connect(function()
 		buffered = nil
-		holdAt = nil
-		held, heldBy = false, nil
+		charge = nil
 	end)
-
-	local function stillHeld(): boolean
-		if not held then
-			return false
-		end
-		if heldBy == Enum.UserInputType.MouseButton1 then
-			return UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
-		elseif heldBy and string.find(heldBy.Name, "Gamepad") then
-			return UserInputService:IsGamepadButtonDown(heldBy, Enum.KeyCode.ButtonR2)
-		end
-		return true -- touch has no polled state; End and Cancel cover it
-	end
-
-	-- Is the punch button down right now (drawn back, or waiting to be)? Space then kicks, not jumps.
-	self._holding = function(): boolean
-		return holdAt ~= nil or stillHeld()
-	end
 
 	RunService.Heartbeat:Connect(function()
 		local now = os.clock()
 		local character = player.Character
-		if holdAt then
+		if charge then
 			if not character or not canPunch(character) then
-				dropHold(character)
-			elseif not stillHeld() or now - holdAt >= punchCfg.HoldMaxSeconds then
-				-- Let go, or held as long as it can be (HoldMaxSeconds): it goes, and after a full hold
-				-- the button has to be pressed again.
-				held, heldBy = false, nil
-				throw(now, character)
+				-- Stunned, caught or in a clash while charging: the charge is gone.
+				dropCharge(character, true)
+			elseif now - charge.at >= holdCfg.MaxHoldSeconds then
+				-- Held as long as it can be: it goes by itself.
+				self._releaseCharge()
 			end
 			return
 		end
@@ -385,19 +356,8 @@ function CombatController:KnitStart()
 				buffered = nil
 			elseif character and now >= readyAt() then
 				buffered = nil
-				if stillHeld() then
-					startHold(now, character)
-				else
-					throw(now, character)
-				end
+				throw(now, character)
 			end
-			return
-		end
-		-- Held from before a punch was possible (stunned, cooling down): the hold starts the moment it is.
-		if held and stillHeld() and character and canPunch(character) and now >= readyAt() then
-			startHold(now, character)
-		elseif held and not stillHeld() then
-			held, heldBy = false, nil
 		end
 	end)
 
@@ -411,9 +371,8 @@ function CombatController:KnitStart()
 					recovery = punchCfg.MissRecovery
 				elseif kind == "hit" then
 					endlag:Landed()
-				elseif kind == "refused" then
+				elseif kind == "refused" or kind == "cancelled" then
 					endlag:Undo()
-					dropHold(player.Character)
 					-- It never happened, so the timing and the combo go back to before it.
 					lastPress = undoPress or lastPress
 					nextSide = undoSide
@@ -447,36 +406,51 @@ function CombatController:KnitStart()
 	started.OnClientEvent:Connect(function(attacker: Model, side: string)
 		if attacker == player.Character then
 			-- Our swing already played. Follow the server's side in case they differ.
-			nextSide = Combat.nextSwing(side)
+			if not heavies[side] then
+				nextSide = Combat.nextSwing(side)
+			end
 		elseif attacker and attacker.Parent then
 			fx:Swing(attacker)
 			fx:KitSwing(attacker, side)
 		end
 	end)
 
-	confirmed.OnClientEvent:Connect(function(attacker: Model, target: Model, strength: number)
-		if target and target.Parent then
-			-- Shown the moment this client's swing reaches its Hit event, at the fist.
-			anim:AtStrike(attacker, function()
-				if target.Parent then
-					-- An uppercut's arc leaves a trail behind the body it threw.
-					if anim:LastSwing(attacker) == "Uppercut" then
-						fx:LaunchTrail(target)
-						fx:UppercutHit(target)
+	confirmed.OnClientEvent:Connect(
+		function(attacker: Model, target: Model, strength: number, step: number?)
+			-- Hit while charging: the charge is gone (the server drops it too).
+			if target == player.Character and charge then
+				dropCharge(target, true)
+			end
+			if target and target.Parent then
+				-- Shown the moment this client's swing reaches its Hit event, at the fist.
+				anim:AtStrike(attacker, function()
+					if target.Parent then
+						-- An uppercut's arc leaves a trail behind the body it threw.
+						if anim:LastSwing(attacker) == "Uppercut" then
+							fx:LaunchTrail(target)
+							fx:UppercutHit(target)
+						end
+						flash(target)
+						anim:HitLanded(attacker, target, strength)
+						-- A kit's attack skill lands with its own hit, in its kit's look.
+						local swing = anim:LastSwing(attacker)
+						if swing and (Abilities.KitSwings :: any)[swing] then
+							fx:KitHit(target, attacker, swing, strength)
+						else
+							-- A stunning punch (strength 0) still lands as a hit, sized like a light one.
+							fx:HitBurst(
+								target,
+								attacker,
+								if strength > 0 then strength else STUN_HIT_SIZE,
+								anim:StrikeTip(attacker)
+							)
+						end
 					end
-					flash(target)
-					anim:HitLanded(attacker, target, strength)
-					-- A kit's attack skill lands with its own hit, in its kit's look.
-					local swing = anim:LastSwing(attacker)
-					if swing and (Abilities.KitSwings :: any)[swing] then
-						fx:KitHit(target, attacker, swing, strength)
-					else
-						fx:HitBurst(target, attacker, strength, anim:StrikeTip(attacker))
-					end
-				end
-			end)
+				end)
+			end
+			local _ = step
 		end
-	end)
+	)
 
 	if bumped then
 		-- A shove, not a hit: the puff, and a small reaction on whoever was knocked, sized to it. The faster
@@ -525,18 +499,42 @@ function CombatController:GetUppercutTiming(): (number, number, boolean)
 	return 0, upperCfg.Cooldown, true
 end
 
---- The Uppercut skill: throws the heavy uppercut if it can. False when it was turned down.
+--- The Uppercut skill thrown at once, with no charge. False when it was turned down.
 function CombatController:ThrowUppercut(): boolean
-	if self._throwUppercut then
-		return self._throwUppercut()
-	end
-	return false
+	return self._throwSkill ~= nil and self._throwSkill("Uppercut")
 end
 
---- A kit's attack skill that is a heavy swing, by its side ("Uppercut", "Cyclone"): throws it if it
---- can. False when it was turned down.
+--- A kit's attack skill ("Uppercut", "Cyclone", a KitSwings id) thrown at once, with no charge. False
+--- when it was turned down.
 function CombatController:ThrowSkill(side: string): boolean
 	return self._throwSkill ~= nil and self._throwSkill(side)
+end
+
+--- Is `side` an attack skill this controller throws (so R charges it)?
+function CombatController:IsSkill(side: string): boolean
+	return self._isSkill ~= nil and self._isSkill(side)
+end
+
+--- R pressed: starts charging the attack skill `side`. False when it can't be used now.
+function CombatController:StartCharge(side: string): boolean
+	return self._startCharge ~= nil and self._startCharge(side)
+end
+
+--- R let go: the charged skill goes. False when nothing was charging or it was turned down.
+function CombatController:ReleaseCharge(): boolean
+	return self._releaseCharge ~= nil and self._releaseCharge()
+end
+
+--- Drops a charge without throwing anything.
+function CombatController:CancelCharge()
+	if self._cancelCharge then
+		self._cancelCharge()
+	end
+end
+
+--- Is an attack skill being charged right now?
+function CombatController:IsCharging(): boolean
+	return self._charging ~= nil and self._charging()
 end
 
 --- That skill's timing for the HUD: when it's ready, its whole cooldown, and whether the body can swing.
@@ -545,16 +543,6 @@ function CombatController:GetSkillTiming(side: string): (number, number, boolean
 		return self._skillTiming(side)
 	end
 	return 0, 1, true
-end
-
---- Is the punch button being held (a punch drawn back, or waiting to be)?
-function CombatController:IsHolding(): boolean
-	return self._holding ~= nil and self._holding()
-end
-
---- The launching kick, for Space pressed while holding punch. False when it couldn't be thrown.
-function CombatController:ThrowLaunchKick(): boolean
-	return self._throwKick ~= nil and self._throwKick()
 end
 
 return CombatController

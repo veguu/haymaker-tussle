@@ -227,8 +227,8 @@ Abilities.Blink = {
 
 -- Cyclone (Tempest, R): a spinning hook through the heavy-swing machinery (CombatService, side
 -- "Cyclone"). It reaches all the way round (`Degrees` 180 either side) out to `Range`, hits everyone it
--- reaches once, and throws each outward in a low arc: outward speed ArcBase + ArcPerStud per stud/s the
--- thrower was going, up to ArcMax, with `Lift` upward. It doesn't root you. `SpinSeconds` is how long
+-- reaches once, and throws each outward in a low arc: outward speed ArcBase (times the charge), with
+-- `Lift` upward. How fast you were going adds nothing. It doesn't root you. `SpinSeconds` is how long
 -- the body takes to turn once round (only what's shown).
 Abilities.Cyclone = {
 	Windup = 0.24,
@@ -238,9 +238,7 @@ Abilities.Cyclone = {
 	Range = 10.5,
 	Degrees = 180,
 	Lift = 45,
-	ArcBase = 85,
-	ArcPerStud = 1.2,
-	ArcMax = 160,
+	ArcBase = 125,
 	SpinSeconds = 0.42,
 }
 
@@ -321,7 +319,7 @@ Abilities.KitMoves = {
 -- KIT SWINGS: the attack skills (R) of those kits, by skill id. Each is a heavy swing through the same
 -- machinery as the Uppercut and the Cyclone (CombatService, side = the skill id, KitSwingRequest), so
 -- the numbers mean what the Cyclone's do: it reaches `Degrees` either side out to `Range` and throws
--- everyone it reaches outward at ArcBase + ArcPerStud per stud/s the thrower was going (up to ArcMax),
+-- everyone it reaches outward at ArcBase (times the charge and the target's stagger), never more for speed,
 -- with `Lift` upward. `Lunge` is a burst forward the thrower gets as the windup starts (Core/SkillMove).
 -- `Clip` and `Arm` are the swing animation it borrows and the limb its trail follows.
 Abilities.KitSwings = {
@@ -348,8 +346,6 @@ Abilities.KitSwings = {
 		Degrees = 40,
 		Lift = 80,
 		ArcBase = 150,
-		ArcPerStud = 0,
-		ArcMax = 150,
 		Clip = "Uppercut",
 		Arm = "Right Arm",
 		Cast = { Kind = "meteor", Distance = 16, Fall = 0.35, Radius = 13, Tall = 9, Lead = 0.35 },
@@ -364,9 +360,7 @@ Abilities.KitSwings = {
 		Range = 15,
 		Degrees = 110,
 		Lift = 145,
-		ArcBase = 40,
-		ArcPerStud = 0.3,
-		ArcMax = 70,
+		ArcBase = 52,
 		Clip = "Uppercut",
 		Arm = "Right Arm",
 	},
@@ -381,8 +375,6 @@ Abilities.KitSwings = {
 		Degrees = 75,
 		Lift = 44,
 		ArcBase = 115,
-		ArcPerStud = 0,
-		ArcMax = 150,
 		Lunge = { Speed = 64, Seconds = 0.58 },
 		Clip = "HookLeft",
 		Arm = "Left Arm",
@@ -406,9 +398,7 @@ Abilities.KitSwings = {
 		Range = 22,
 		Degrees = 20,
 		Lift = 30,
-		ArcBase = 105,
-		ArcPerStud = 0.5,
-		ArcMax = 150,
+		ArcBase = 125,
 		Clip = "HookRight",
 		Arm = "Right Arm",
 	},
@@ -421,9 +411,7 @@ Abilities.KitSwings = {
 		Range = 12,
 		Degrees = 180,
 		Lift = 80,
-		ArcBase = 95,
-		ArcPerStud = 0.6,
-		ArcMax = 150,
+		ArcBase = 120,
 		Clip = "Uppercut",
 		Arm = "Right Arm",
 	},
@@ -437,9 +425,7 @@ Abilities.KitSwings = {
 		Range = 8.5,
 		Degrees = 180,
 		Lift = 24,
-		ArcBase = 90,
-		ArcPerStud = 1.3,
-		ArcMax = 170,
+		ArcBase = 140,
 		Spin = 0.34,
 		Clip = "HookLeft",
 		Arm = "Left Arm",

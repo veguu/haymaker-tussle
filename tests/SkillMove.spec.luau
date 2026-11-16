@@ -36,7 +36,12 @@ return {
 			assert(swing, `{kit.attack.id} has swing numbers`)
 			assert(swing.Windup > 0 and swing.Cooldown > 0 and swing.Range > 0)
 			assert(swing.Degrees > 0 and swing.Degrees <= 180)
-			assert(swing.ArcMax >= swing.ArcBase and swing.Lift >= 0)
+			assert(
+				swing.ArcBase > 0
+					and swing.Lift >= 0
+					and swing.ArcMax == nil
+					and swing.ArcPerStud == nil
+			)
 			assert(typeof(swing.Clip) == "string" and typeof(swing.Arm) == "string")
 		end
 	end,
@@ -120,15 +125,15 @@ return {
 		assert(near(x, 0) and near(z, 1), "the opposite of the facing, whatever the keys say")
 	end,
 
-	["every R throws harder standing still than a standing punch, and far harder at a run"] = function()
+	["every R at full charge throws well past a combo's last punch, the same at any speed"] = function()
 		local knock: any = GameConfig.Knockback
 		local swings = table.clone(SWINGS)
 		swings.Uppercut = GameConfig.Uppercut
 		swings.Cyclone = Abilities.Cyclone
 		for id, swing in swings do
-			local standing = math.sqrt(swing.ArcBase ^ 2 + swing.Lift ^ 2)
-			assert(standing >= 2 * knock.BaseSpeed, `{id} standing throw {standing}`)
-			assert(swing.ArcMax >= 150 or swing.Lift >= 100, `{id} tops out strong`)
+			local full = math.sqrt(swing.ArcBase ^ 2 + swing.Lift ^ 2)
+			assert(full >= 1.4 * knock.BaseSpeed, `{id} full-charge throw {full}`)
+			assert(swing.ArcPerStud == nil, `{id} has no speed bonus`)
 		end
 	end,
 

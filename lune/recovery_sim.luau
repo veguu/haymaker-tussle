@@ -131,7 +131,7 @@ local function attempt(launch: Launch, skill: Skill, radius: number, rng: any, s
 
 	local speed = if launch.outward
 		then between(rng, launch.outward)
-		else Combat.punchStrength(KNOCK, STAGGER, between(rng, launch.attackerSpeed), stagger)
+		else Combat.punchStrength(KNOCK, STAGGER, stagger)
 	local up = 0
 	local floating = launch.kind == "uppercut"
 	if launch.kind == "uppercut" then

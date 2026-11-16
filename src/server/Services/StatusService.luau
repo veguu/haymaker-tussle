@@ -96,9 +96,84 @@ function StatusService:Shatter(target: Model): boolean
 	return true
 end
 
+-- STUNNED by a punch of someone's M1 string (CombatService): HT_Stunned for a moment, so they can't
+-- move, punch, dash or use a skill (Q included). Each punch of the string starts it over. A freeze
+-- already holding them is left alone, and ice that ends doesn't end a stun.
+local stuns: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
+-- While a string's stun lasts, an ObjectValue of this name in the target points at the puncher: whoever
+-- moves the target's body (its own client, or DummyService) locks it in front of them (Combat.lockSpot).
+local DRAG_NAME = "HT_DraggedBy"
+-- Where the target is held (2026-11-16): a world point the SERVER picks on each punch of the string
+-- (CombatService: in front of the puncher, a step further on). Whoever moves the body glides it there
+-- (Combat.lockFollow) instead of chasing the puncher's body, which every other screen sees late.
+local SPOT_ATTRIBUTE = "HT_LockSpot"
+
+local function setDrag(target: Model, by: Model?, spot: Vector3?)
+	local value = target:FindFirstChild(DRAG_NAME)
+	target:SetAttribute(SPOT_ATTRIBUTE, if by then spot else nil)
+	if by == nil then
+		if value then
+			value:Destroy()
+		end
+		return
+	end
+	if not value or not value:IsA("ObjectValue") then
+		local made = Instance.new("ObjectValue")
+		made.Name = DRAG_NAME
+		made.Parent = target
+		value = made
+	end
+	(value :: ObjectValue).Value = by
+end
+
+--- Stuns `target` for `seconds` (a punch of a string), held by `by` at `spot` (world) while it lasts. False
+--- when it can't be (not alive, pinned).
+function StatusService:Stun(target: Model, seconds: number, by: Model?, spot: Vector3?): boolean
+	if
+		typeof(seconds) ~= "number"
+		or seconds ~= seconds
+		or seconds <= 0
+		or not Combatants.isAlive(target)
+		or target:GetAttribute(Combatants.STATIONARY_ATTRIBUTE) ~= nil
+	then
+		return false
+	end
+	nextToken += 1
+	local token = nextToken
+	stuns[target] = token
+	target:SetAttribute(STUN_ATTRIBUTE, true)
+	setDrag(target, by, spot)
+	task.delay(math.min(seconds, MAX_SECONDS), function()
+		if stuns[target] == token then
+			stuns[target] = nil
+			if target.Parent then
+				setDrag(target, nil)
+				if not frozen[target] then
+					target:SetAttribute(STUN_ATTRIBUTE, nil)
+				end
+			end
+		end
+	end)
+	return true
+end
+
+--- Ends a punch's stun now (the string's last punch throws them). Ice is left alone.
+function StatusService:Unstun(target: Model)
+	if stuns[target] then
+		stuns[target] = nil
+		if target.Parent then
+			setDrag(target, nil)
+			if not frozen[target] then
+				target:SetAttribute(STUN_ATTRIBUTE, nil)
+			end
+		end
+	end
+end
+
 --- Whatever is on this body, gone, for when it's being moved somewhere else or its round ends.
 function StatusService:Release(target: Model)
 	thaw(self, target, false)
+	self:Unstun(target)
 end
 
 function StatusService:KnitInit()

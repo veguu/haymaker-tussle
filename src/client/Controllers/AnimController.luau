@@ -61,7 +61,6 @@ local SWING_ARMS: { [string]: string } = {
 	Left = "Left Arm",
 	Right = "Right Arm",
 	Uppercut = "Right Arm",
-	Kick = "Right Leg",
 	Cyclone = "Right Arm",
 }
 
@@ -69,14 +68,12 @@ local SWING_CLIPS: { [string]: string } = {
 	Left = "HookLeft",
 	Right = "HookRight",
 	Uppercut = "Uppercut",
-	Kick = "HeavyKick",
 	-- The Cyclone is the right hook thrown while the whole body turns once round (the spin is added on
 	-- the root joint, below): AnimClips has no room for a clip of its own.
 	Cyclone = "HookRight",
 }
 -- How long each heavy swing takes to strike; the rest use the punch's windup.
 local SWING_WINDUPS: { [string]: number } = {
-	Kick = GameConfig.HeavyKick.Windup,
 	Uppercut = GameConfig.Uppercut.Windup,
 	Cyclone = Abilities.Cyclone.Windup,
 }
@@ -87,8 +84,8 @@ for skillId, swing in Abilities.KitSwings :: { [string]: any } do
 	SWING_CLIPS[skillId] = swing.Clip
 	SWING_WINDUPS[skillId] = swing.Windup
 end
--- Someone else holding a punch back, from the server's attribute (the swing it will be).
-local READY_ATTRIBUTE = "HT_PunchReady"
+-- Someone else charging an attack skill (R held), from the server's attribute (the skill it will be).
+local READY_ATTRIBUTE = "HT_ChargingSkill"
 
 local AnimController = Knit.CreateController({
 	Name = "AnimController",
@@ -554,7 +551,7 @@ local function updateFighter(model: Model, dt: number)
 end
 
 --- Throws a swing on a fighter. `side` is the server's: Left, Right or Uppercut.
-function AnimController:PlaySwing(model: Model, side: string)
+function AnimController:PlaySwing(model: Model, side: string, windupOverride: number?)
 	-- An ordinary punch is the kit's own, when the kit has one (only the look: the swing is the same).
 	local clip = AnimVariants.swing(kitOf(model), side) or SWING_CLIPS[side]
 	local fighter = fighters[model]
@@ -605,7 +602,8 @@ function AnimController:PlaySwing(model: Model, side: string)
 		-- The lead-in to the strike is stretched over the whole windup, so the fist lands when the server
 		-- decides the hit.
 		local strike = Clips[chosen].strike or 0
-		local windup = math.max(SWING_WINDUPS[side] or GameConfig.Punch.Windup, 0.01)
+		local windup =
+			math.max(windupOverride or SWING_WINDUPS[side] or GameConfig.Punch.Windup, 0.01)
 		if side == "Cyclone" then
 			fighter.spinAt = os.clock()
 			fighter.spinSeconds = Abilities.Cyclone.SpinSeconds
@@ -618,7 +616,7 @@ function AnimController:PlaySwing(model: Model, side: string)
 			end
 		end
 		if held == chosen and track.IsPlaying then
-			-- Let go of a held punch: it carries on from where it waited, ReleaseWindup from the strike.
+			-- Let go of a held attack skill (R): it carries on from where it waited.
 			track:AdjustSpeed(1)
 		else
 			track:Play(SWING_FADE, 1, if strike > 0 then math.min(strike / windup, 1) else 1)
@@ -854,15 +852,17 @@ function AnimController:KnitStart()
 	-- Server swings for everyone but ourselves; our own swing already played on the click.
 	local started = Net.client("PunchStarted")
 	if started then
-		started.OnClientEvent:Connect(function(attacker: Model, side: string)
-			if
-				attacker
-				and attacker.Parent
-				and attacker ~= game:GetService("Players").LocalPlayer.Character
-			then
-				self:PlaySwing(attacker, side)
+		started.OnClientEvent:Connect(
+			function(attacker: Model, side: string, _step: number?, windup: number?)
+				if
+					attacker
+					and attacker.Parent
+					and attacker ~= game:GetService("Players").LocalPlayer.Character
+				then
+					self:PlaySwing(attacker, side, windup)
+				end
 			end
-		end)
+		)
 	end
 
 	RunService.RenderStepped:Connect(function(dt: number)

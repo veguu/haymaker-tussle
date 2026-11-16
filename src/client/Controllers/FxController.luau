@@ -39,6 +39,12 @@ local BLACK = Color3.new(0, 0, 0)
 local DARK_SHARE = 0.72
 local MARK_SOLID = 0.08
 local PITCH_VARY = 0.08
+-- An M1's heavy blow, built like the user's reference (2026-11-16): a full-range crack on top (punch_crack,
+-- for the snap), the glove-on-bag body (punch_body, a little deep, lows up), and a short noise-like low
+-- boom under it (punch_sub; a bass drum there read as a drum).
+local PUNCH_CRACK = { volume = 0.8 }
+local PUNCH_BODY = { volume = 1.5, pitch = 0.9, eq = { low = 5, mid = 0, high = -2 } }
+local PUNCH_SUB = { volume = 1.2, cut = 0.3 }
 local PARK_POSITION = CFrame.new(0, -1000, 0)
 
 local FxController = Knit.CreateController({
@@ -243,9 +249,11 @@ function FxController:HitBurst(target: Model, attacker: Model?, strength: number
 		PunchHitFx.play(center, away, if strong then 1 else scale, nil, strong)
 	end
 
-	-- The crack on top, the old impact as its body, and on a strong hit a deep boom for weight.
-	Sfx.play("punch_crack", root, PITCH_VARY, { volume = 1.25 })
-	Sfx.play("punch_hit", root, PITCH_VARY, { volume = 0.55 })
+	-- A HEAVY BLOW (the user, 2026-11-16): crack, body and boom (see PUNCH_BODY). On a strong hit a
+	-- bigger boom as well.
+	Sfx.play("punch_crack", root, PITCH_VARY, PUNCH_CRACK)
+	Sfx.play("punch_body", root, PITCH_VARY, PUNCH_BODY)
+	Sfx.play("punch_sub", root, 0.04, PUNCH_SUB)
 	if strong then
 		Sfx.play("boom_low", root, 0, { pitch = 1.1, volume = 0.8, cut = 0.5 })
 		Sfx.play("launch", root, PITCH_VARY)
@@ -1062,8 +1070,10 @@ function FxController:KitHit(target: Model, attacker: Model?, side: string, stre
 		self:HitBurst(target, attacker, strength)
 		return
 	end
-	Sfx.play("punch_crack", root, PITCH_VARY, { volume = 1.25 })
-	Sfx.play("punch_hit", root, PITCH_VARY, { volume = 0.6 })
+	-- The same heavy blow as an M1 (2026-11-16), louder, with the boom.
+	Sfx.play("punch_crack", root, PITCH_VARY, PUNCH_CRACK)
+	Sfx.play("punch_body", root, PITCH_VARY, { volume = 1.9, pitch = 0.87, eq = PUNCH_BODY.eq })
+	Sfx.play("punch_sub", root, 0.04, PUNCH_SUB)
 	Sfx.play("boom_low", root, 0, { pitch = 1.1, volume = 0.8, cut = 0.5 })
 	Sfx.play("launch", root, PITCH_VARY)
 	-- Smoke left along the flight path, so the throw is readable across the arena.

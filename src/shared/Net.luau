@@ -19,13 +19,16 @@ local CLIENT_WAIT_TIMEOUT = 10
 -- Every remote in the game is declared here. A name not on this list is a bug.
 export type EventName =
 	"PunchRequest" -- client to server: I pressed punch. No arguments, ever.
-	| "PunchReady" -- client to server: I'm holding a punch back. No arguments, ever.
-	| "HeavyKickRequest" -- client to server: I pressed the heavy kick. No arguments, ever.
-	| "UppercutRequest" -- client to server: I pressed the heavy uppercut. No arguments, ever.
+	| "SkillChargeStart" -- client to server: I started holding my attack skill (R). No arguments, ever.
+	| "UltimateWindow" -- server to one client: your meter is full and you just threw this fighter: G within this many seconds
+	| "UltimateRequest" -- client to server: I pressed G (the ultimate). No arguments, ever.
+	| "UltimateStarted" -- server to all: attacker, target, kit, anchor CFrame, attacker start (anchor space), server start time, flight end
+	| "UltimateEnded" -- server to all: this attacker's ultimate on this target is over
+	| "UppercutRequest" -- client to server: I released the Uppercut. No arguments, ever.
 	| "DiveRequest" -- client to server: I started a dive kick out of a jump. No arguments, ever.
 	| "DiveLanded" -- server to all: this character's dive kick landed here, and whether it hit anyone
-	| "PunchStarted" -- server to all: this character started a swing: Left, Right, Uppercut, Kick, Cyclone or a kit swing's skill id
-	| "HitConfirmed" -- server to all: this character's punch hit this target
+	| "PunchStarted" -- server to all: this character started a swing (Left, Right, Uppercut, Cyclone or a kit swing's skill id), its place in the M1 string (0 for a skill), and a skill's windup
+	| "HitConfirmed" -- server to all: this character's swing hit this target: strength (0 for a stunning punch), the string step
 	| "Knockback" -- server to the target's client: launch velocity, and lift if airborne
 	| "BumpHappened" -- server to all: these two characters bumped
 	| "PropelRequest" -- client to server: I propelled, and how charged it was (0 to 1, only for how it looks)
@@ -52,8 +55,8 @@ export type EventName =
 	| "AbilityResult" -- server to client: how your buy or equip went: action, kit id, "ok" or why not
 	| "BlinkRequest" -- client to server: I blinked (Tempest's Q). No arguments, ever.
 	| "BlinkStarted" -- server to other clients: this character blinked
-	| "CycloneRequest" -- client to server: I pressed the Cyclone (Tempest's R). No arguments, ever.
-	| "KitSwingRequest" -- client to server: I pressed my kit's attack skill (Comet, Glacier, Maul, Breath). No arguments, ever: the server knows the kit.
+	| "CycloneRequest" -- client to server: I released the Cyclone (Tempest's R). No arguments, ever.
+	| "KitSwingRequest" -- client to server: I released my kit's attack skill. No arguments, ever: the server knows the kit.
 	| "KitMoveRequest" -- client to server: I used my kit's mobility skill (Jet, Slide, Pounce, Ascend). No arguments, ever: the server knows the kit.
 	| "KitMoveStarted" -- server to other clients: this character used this mobility skill (a skill id)
 	| "KitLanded" -- server to all: this character's leaping skill (a skill id) came down and slammed

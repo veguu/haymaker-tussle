@@ -25,6 +25,14 @@ export type Options = {
 	volume: number?,
 	-- Seconds after which it fades out (over FADE_SECONDS), for a long tail that would smear.
 	cut: number?,
+	-- Play only the last this-many seconds of it, so a riser's hard end lands on a moment.
+	last: number?,
+	-- Shifts the pitch WITHOUT changing the speed (a PitchShiftSoundEffect, 0.5 to 2): with `pitch` (which
+	-- changes both) it sets speed and pitch apart, e.g. faster but lower.
+	octave: number?,
+	-- Tone, in decibels per band (an EqualizerSoundEffect): `low` under about 400 Hz, `mid`, `high` above
+	-- about 4 kHz. Bass up and highs down make a hit sound flat and heavy.
+	eq: { low: number, mid: number, high: number }?,
 }
 
 local TEMPLATES = "SfxTemplates"
@@ -124,13 +132,29 @@ function Sfx.play(role: string, parent: Instance?, pitchVary: number?, options: 
 		if options and options.volume then
 			clone.Volume *= options.volume
 		end
-		clone.TimePosition = take.start
+		if options and options.octave then
+			local shift = Instance.new("PitchShiftSoundEffect")
+			shift.Octave = math.clamp(options.octave, 0.5, 2)
+			shift.Parent = clone
+		end
+		if options and options.eq then
+			local tone = Instance.new("EqualizerSoundEffect")
+			tone.LowGain = options.eq.low
+			tone.MidGain = options.eq.mid
+			tone.HighGain = options.eq.high
+			tone.Parent = clone
+		end
+		local from = take.start
+		if options and options.last then
+			from = math.max(take.length - options.last * clone.PlaybackSpeed, take.start)
+		end
+		clone.TimePosition = from
 		clone.Parent = parent or SoundService
 		clone:Play()
 		if not entry.looped then
 			-- PlaybackSpeed stretches real time, so scale the lifetime by it.
 			local speed = math.max(clone.PlaybackSpeed, 0.01)
-			local left = (take.length - take.start) / speed
+			local left = (take.length - from) / speed
 			local cut = options and options.cut
 			if cut and cut < left then
 				task.delay(cut, function()
@@ -150,6 +174,19 @@ function Sfx.play(role: string, parent: Instance?, pitchVary: number?, options: 
 		return nil
 	end
 	return result
+end
+
+--- Swaps what `role` plays, live (the Studio sound picker). Its cached templates are dropped so the next
+--- play uses the new takes.
+function Sfx.setRole(role: string, entry: SoundBank.Entry)
+	SoundBank[role] = entry
+	lastTake[role] = nil
+	local folder = templates()
+	for _, item in folder:GetChildren() do
+		if string.sub(item.Name, 1, #role + 1) == `{role}_` then
+			item:Destroy()
+		end
+	end
 end
 
 --- Stop a looping sound started with Sfx.play.

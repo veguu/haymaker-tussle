@@ -132,6 +132,38 @@ local SoundBank: { [string]: Entry } = {
 		name = "Heavy_punch_impact_#3-1770242809040",
 		creator = "MegaBloxxy",
 	},
+	-- A punch's WEIGHT (the user, 2026-11-16: "the punches are weak sounding and feel likes taps ... dont make
+	-- the punches sound like high pitched smacks either, i want them to sound like actual heavy blows", with
+	-- JoJo's "MUDA" rush as the reference, whose punches are nearly all under ~350 Hz). Gloves hitting a heavy
+	-- bag hard: whump and thud. Onsets and peaks measured in a play test 2026-11-16; volumes even out the peaks
+	-- (200, 75, 96, 177, 114). A fifth take (9113576289) was near silent and left out.
+	["punch_body"] = {
+		takes = {
+			{ id = 9113570289, length = 0.48, start = 0.02, volume = 0.75 },
+			{ id = 9113565281, length = 0.67, start = 0.07, volume = 2.0 },
+			{ id = 9113565276, length = 0.5, start = 0.07, volume = 1.55 },
+			{ id = 9113570179, length = 0.71, start = 0, volume = 0.85 },
+			{ id = 9113569029, length = 0.58, start = 0.02, volume = 1.3 },
+		},
+		looped = false,
+		name = "Boxing Hits, With Gloves, Hit Punching Bag Hard (SFX)",
+		creator = "ProSoundEffects",
+	},
+	-- The low BOOM under every punch, cut at about 0.3 s. Not a drum: a bass drum here "sounds like a drum"
+	-- (the user, 2026-11-16). The reference they gave (an anime punch sound-design video) has, per hit, a
+	-- noise-like boom under ~170 Hz sweeping down for 0.2-0.4 s, a full-range crack on top and a body between.
+	-- Each take starts on one boom of a multi-boom file (measured in a play test 2026-11-16); volumes even out
+	-- the peaks (133, 148, 331).
+	["punch_sub"] = {
+		takes = {
+			{ id = 9114362625, length = 2.89, start = 0.08, volume = 1.5 },
+			{ id = 9114362918, length = 2.47, start = 0.06, volume = 1.35 },
+			{ id = 1837830213, length = 3.29, start = 0.01, volume = 0.6 },
+		},
+		looped = false,
+		name = "Explosions, Dull, Thuddy (SFX) x2 + BOOM-Deep Boom 06",
+		creator = "ProSoundEffects / APMOfficial",
+	},
 	-- The light air of a swing, under `swing_heavy`.
 	["punch_swing"] = {
 		takes = { { id = 132239386768492, length = 0.416, start = 0.05, volume = 0.5 } },
@@ -154,5 +186,20 @@ local SoundBank: { [string]: Entry } = {
 		creator = "APMOfficial",
 	},
 }
+
+-- The roles still being chosen (Config/SoundCandidates, the ultimates' sounds): option A of each until the
+-- user picks with the Studio sound picker.
+local SoundCandidates = require(script.Parent.SoundCandidates)
+for role, options in SoundCandidates.OPTIONS do
+	if not SoundBank[role] and options[1] then
+		local first = options[1]
+		SoundBank[role] = {
+			takes = first.takes,
+			looped = false,
+			name = first.name,
+			creator = first.creator,
+		}
+	end
+end
 
 return SoundBank

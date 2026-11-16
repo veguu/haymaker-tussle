@@ -36,6 +36,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local Round = require(ReplicatedStorage.Shared.Core.Round)
 local Pond = require(ReplicatedStorage.Shared.Core.Pond)
 local TrainingLayout = require(ReplicatedStorage.Shared.Core.TrainingLayout)
+local Ultimates = require(ReplicatedStorage.Shared.Core.Ultimates)
 local Combatants = require(script.Parent.Parent.Combatants)
 
 local moveCfg = GameConfig.Movement
@@ -104,6 +105,15 @@ type Dummy = {
 	lastPunch: number?,
 	judged: any?,
 	clashSpot: Vector3?,
+	-- The M1 lock holding it: who, how far in front of them (fixed when it began), when last seen.
+	lockBy: Model?,
+	lockAhead: number?,
+	lockSeenAt: number?,
+	-- Its own ground punch: planted until `rootedUntil`, stepping forward from `stepAt` for StepSeconds.
+	rootedUntil: number?,
+	stepAt: number?,
+	stepDir: Vector3?,
+	stepSpeed: number?,
 }
 
 local DummyService = Knit.CreateService({
@@ -530,6 +540,30 @@ local function think(dummy: Dummy, root: BasePart, now: number): (number, number
 		dummy.judged = BotBrain.judgedPunch(punchCfg, botCfg.MisjudgeStuds, math.random())
 		Knit.GetService("CombatService")
 			:PunchAs(dummy.model, BotBrain.isWildSwing(botCfg, math.random()))
+		-- Planted, then a step forward at the strike, like a player's M1 (MovementController).
+		local body = dummy.model:FindFirstChildOfClass("Humanoid")
+		if body and body.FloorMaterial ~= Enum.Material.Air then
+			local face = Vector3.new(dummy.state.headingX, 0, dummy.state.headingZ)
+			if face.Magnitude > 0.01 then
+				face = face.Unit
+				local params = RaycastParams.new()
+				params.FilterType = Enum.RaycastFilterType.Exclude
+				params.FilterDescendantsInstances = CollectionService:GetTagged(Combatants.TAG)
+				params.RespectCanCollide = true
+				params.IgnoreWater = true
+				local reach = punchCfg.StepDistance
+					+ punchCfg.LockDistance
+					+ 2 * punchCfg.LockBodyRadius
+				local wall = workspace:Raycast(root.Position, face * reach, params)
+				local distance = Combat.punchStep(punchCfg, if wall then wall.Distance else nil)
+				dummy.rootedUntil = now + punchCfg.RootSeconds
+				dummy.stepAt = if distance > 0.05
+					then now + punchCfg.Windup + punchCfg.ActiveSeconds
+					else nil
+				dummy.stepDir = face
+				dummy.stepSpeed = distance / punchCfg.StepSeconds
+			end
+		end
 	end
 	return inputX, inputZ
 end
@@ -597,6 +631,92 @@ local function stepDummy(
 	end
 	dummy.clashSpot = nil
 
+	-- The target of someone's ultimate: set to its timeline, then flown off on its scripted flight
+	-- (UltimateService, Core/Ultimates). Nothing else moves it meanwhile.
+	local ult = Knit.GetService("UltimateService"):CarriedPose(dummy.model)
+	if ult then
+		local line = ult.line
+		local t = workspace:GetServerTimeNow() - ult.startedAt
+		humanoid.WalkSpeed = 0
+		humanoid:Move(Vector3.zero, false)
+		dummy.state = Momentum.stopped(dummy.state)
+		dummy.lastHit = now
+		if t < line.cinematic then
+			local _, at = Ultimates.pose(line, t, Vector3.zero)
+			local spot = ult.anchor:PointToWorldSpace(at)
+			-- facing back toward the attacker, who stands behind them (+Z in the anchor)
+			local toward = ult.anchor:PointToWorldSpace(at + Vector3.new(0, 0, 1))
+			root.CFrame = CFrame.lookAt(spot, Vector3.new(toward.X, spot.Y, toward.Z))
+			root.AssemblyLinearVelocity = Vector3.zero
+		else
+			local from = ult.flightFrom or root.Position
+			local share = (t - line.cinematic) / GameConfig.Ultimate.FlightSeconds
+			local spot = Ultimates.flightPoint(from, ult.flightEnd, share, 18)
+			root.CFrame = CFrame.new(spot) * CFrame.Angles(share * 14, share * 6, 0)
+			root.AssemblyLinearVelocity = (ult.flightEnd - from) / GameConfig.Ultimate.FlightSeconds
+		end
+		return
+	end
+
+	-- Stunned by a punch of someone's string: LOCKED in front of them, facing them, the same way a
+	-- player's own client does it (MovementController): held at the distance it was at when the lock
+	-- began (Combat.lockDistance) and FOLLOWING the spot smoothly, carried at the puncher's speed so their
+	-- step moves both (Combat.lockFollow). Never snapped or dragged in.
+	local locked = dummy.model:FindFirstChild("HT_DraggedBy")
+	local by = if locked and locked:IsA("ObjectValue") then locked.Value else nil
+	local byRoot = if by and by:IsA("Model") then Combatants.rootOf(by) else nil
+	if stunned and not held and byRoot and not dummy.stationary then
+		local punch = GameConfig.Punch
+		local look = byRoot.CFrame.LookVector
+		local moving = byRoot.AssemblyLinearVelocity
+		local from = byRoot.Position
+		if by ~= dummy.lockBy or now - (dummy.lockSeenAt or -math.huge) > 0.4 then
+			local gap = Vector3.new(root.Position.X - from.X, 0, root.Position.Z - from.Z)
+			dummy.lockBy = by :: Model
+			dummy.lockAhead = Combat.lockDistance(punch, gap.Magnitude)
+		end
+		dummy.lockSeenAt = now
+		dummy.stepAt = nil
+		-- The spot CombatService picked for this punch (HT_LockSpot: in front of them, a step on), still
+		-- between punches; without one, in front of their body now.
+		local lockSpot = dummy.model:GetAttribute("HT_LockSpot") :: Vector3?
+		local x, z
+		if lockSpot then
+			x, z = lockSpot.X, lockSpot.Z
+			moving = Vector3.zero
+		else
+			x, z = Combat.lockSpot(punch, from.X, from.Z, look.X, look.Z, dummy.lockAhead)
+		end
+		-- Never through a wall: it stops at the first solid thing between the puncher and the spot.
+		local start = byRoot.Position
+		local toward = Vector3.new(x - start.X, 0, z - start.Z)
+		if not lockSpot and toward.Magnitude > 0.01 then
+			local params = RaycastParams.new()
+			params.FilterType = Enum.RaycastFilterType.Exclude
+			params.FilterDescendantsInstances = CollectionService:GetTagged(Combatants.TAG)
+			params.RespectCanCollide = true
+			params.IgnoreWater = true
+			local hit = workspace:Raycast(
+				start,
+				toward.Unit * (toward.Magnitude + punch.LockBodyRadius),
+				params
+			)
+			x, z = Combat.clipLock(punch, start.X, start.Z, x, z, if hit then hit.Distance else nil)
+		end
+		local nx, nz =
+			Combat.lockFollow(punch, root.Position.X, root.Position.Z, x, z, moving.X, moving.Z, dt)
+		local spot = Vector3.new(nx, root.Position.Y, nz)
+		local stepped = Vector3.new(nx - root.Position.X, 0, nz - root.Position.Z)
+		humanoid.WalkSpeed = 0
+		humanoid:Move(Vector3.zero, false)
+		root.CFrame = CFrame.lookAt(spot, Vector3.new(from.X, spot.Y, from.Z))
+		local flat = if dt > 0 then stepped / dt else Vector3.zero
+		root.AssemblyLinearVelocity = Vector3.new(flat.X, root.AssemblyLinearVelocity.Y, flat.Z)
+		dummy.state = Momentum.stopped(dummy.state)
+		dummy.lastHit = now
+		return
+	end
+
 	local busy = air ~= nil or stunned or (not grounded and not dummy.stationary)
 	if busy then
 		dummy.busySince = dummy.busySince or now
@@ -651,6 +771,41 @@ local function stepDummy(
 	local inputX, inputZ = 0, 0
 	if fighting and not air and not stunned then
 		inputX, inputZ = think(dummy, root, now)
+	end
+	-- Its own M1: planted (no running) for RootSeconds, with the step forward at the strike.
+	if dummy.rootedUntil and now < dummy.rootedUntil and not air and not stunned then
+		inputX, inputZ = 0, 0
+		dummy.state = Momentum.stopped(dummy.state)
+		local stepAt = dummy.stepAt
+		local dir = dummy.stepDir
+		if stepAt and dir and now >= stepAt and now < stepAt + GameConfig.Punch.StepSeconds then
+			local speed = dummy.stepSpeed or 0
+			humanoid.WalkSpeed = 0
+			humanoid:Move(Vector3.zero, false)
+			dummy.align.CFrame = CFrame.lookAt(Vector3.zero, dir)
+			-- moved exactly, not walked (a walked step came out short), never past the step's end
+			local left = stepAt + GameConfig.Punch.StepSeconds - now
+			-- never into the body in front (Combat.stepRoom): pushed into one, a body gets flung
+			local others: { { x: number, z: number } } = {}
+			for _, other in CollectionService:GetTagged(Combatants.TAG) do
+				local otherRoot = other ~= dummy.model and Combatants.rootOf(other)
+				if otherRoot then
+					local offset = otherRoot.Position - root.Position
+					if offset.Magnitude < 10 then
+						table.insert(others, { x = offset.X, z = offset.Z })
+					end
+				end
+			end
+			local move = math.min(
+				speed * math.min(dt, left),
+				Combat.stepRoom(GameConfig.Punch, dir.X, dir.Z, others)
+			)
+			root.CFrame = root.CFrame + dir * move
+			local rate = if dt > 0 then move / dt else 0
+			local v = root.AssemblyLinearVelocity
+			root.AssemblyLinearVelocity = Vector3.new(dir.X * rate, v.Y, dir.Z * rate)
+			return
+		end
 	end
 	if air ~= "float" then
 		dummy.steerX, dummy.steerZ = 0, 0

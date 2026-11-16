@@ -332,9 +332,7 @@ local function launchFrom(player: Player, station: any, pad: any)
 	)
 	Knit.GetService("StaggerService")
 		:Set(character, math.floor(pad.StaggerShare * staggerMax + 0.5), false)
-	if pad.Launched then
-		Knit.GetService("KickService"):MarkLaunched(character, character)
-	end
+	-- (No air kick follows a launch pad any more: the air kick is gone, 2026-11-15.)
 	task.delay(LAUNCH_SETTLE_SECONDS, function()
 		if character.Parent then
 			Knit.GetService("KnockbackService"):Launch(

@@ -1481,3 +1481,272 @@ Build stamp unchanged (`kits-3+lobby-4+ui-1`). Committed and pushed with everyth
   Cast.LastReach 12 for the throw (SkillCastService). Gates pass. NOT RE-PLAYED: Play was stopped before the
   re-test. Next: re-play it (walk toward the dummy with W and press R while moving; the lunge follows the
   movement controller's facing, not the root's CFrame), then Tempest and Dragon.
+
+## kits-4 AGREED DESIGN (2026-11-15, the user: "the lineups are good for the starting point")
+Everything is reworked: rules, moves, VFX, animations, sounds. Order: rules first (user tests), then kits two at
+a time (Base+Tempest, Inferno+Frost, Beast+Dragon, Bruiser+Trickster), each shown (animation contact sheets,
+then moves and VFX in Play, then a sound board) and approved before the next. Animations NOT uploaded yet.
+RULES
+- M1 is a 4-hit string: hits 1-3 stun (about 0.4 s, almost no push), only hit 4 knocks back. Resets on a miss or
+  about 1 s without a hit. Stunned players can't act at all, Q included.
+- No speed scaling anywhere (Knockback.SpeedBonus, every ArcPerStud, the Uppercut's). Stagger meter stays.
+- No held punches. No charged-dash hit (DashHit removed; a dash collision is only a bump).
+- The air kick chain (jump, Space, chase, attach, QTE flip, spike) is removed. M1 in the air glides up to about
+  16 studs toward the aim and punches with a normal hitbox, no AoE, and it counts as hit 1 of the string.
+- R is held for every kit: charge fills over 1.0 s, movement at half speed, getting hit cancels it, a tap fires a
+  weak version. PERFECT: release inside the last 0.05 s (0.95-1.00 s). Meant to be extremely hard and extremely
+  rewarding (it replaces the air kick's skill test): much stronger throw, impact frame, hit-stop, its own VFX.
+KITS (Q mobility / R close-range held attack / M1 string)
+- Base, boxer, white+gold: Slip Step (weaving dash, makes punches miss) / Haymaker (corkscrew overhand, cone
+  shockwave) / jab, cross, lead hook, overhand.
+- Tempest, wind palm, cyan+white: Gale Step (two air dashes any way) / Tornado (pull in, release flings out) /
+  palm thrust, spinning backhand, rising palm, double palm.
+- Inferno, explosive striker, orange+red+black: Jet Fist (punch the floor, rocket forward, fire trail) /
+  Eruption (uppercut into a fire pillar) / jab, body hook, spinning backfist, exploding straight.
+- Frost, ice rush (Frigid Rush), white+cyan+blue: Ice Slide like Frozone (a smooth ice path under you, usable in
+  the air, NO freeze) / Glacier stomp, SMALLER and NARROWER than now / ice jab, cross, spinning hook, palm burst.
+- Beast, claws, red+black: Pounce (leap onto nearest, landing slam) / Frenzy (dragging claw rush, charge adds
+  hits 3 to 6) / left rake, right rake, double claw, lunging swipe.
+- Dragon, dragon kung fu, violet+gold: Wings (wingbeat any way incl. up, short glide) / Dragon's Maw (dragon head
+  model on the fist, lunge-bite grab and hurl; the only grab) / claw palm, tail-whip backfist, rising claw,
+  two-palm flame push.
+- Bruiser, wrestler, gold+brown: Bull Rush (armoured charge carrying the first hit) / Earthshatter (travelling
+  ring of rock spikes, charge grows it) / hammer fist, body blow, clothesline, double-axe handle.
+- Trickster, feints, pink+white: Phantom Step (dash leaving a decoy, Q again swaps) / Counter (held stance; hit
+  while holding = teleport behind and launch; released unhit = quick backfist) / flicker jab x3, spinning heel.
+VFX: references V01 Mumen Rider, V02 Frigid Rush, V10 Weapon Switcher: full-size one-frame pops, a quiet beat
+before the biggest hit, dark shapes behind bright cores, crescents of THIN strands only (no solid two-tone
+crescents), plus impact frames, hit-stop, camera kick, colour flashes, shockwaves, Glass-bubble distortion.
+SOUNDS: 3-4 licensed candidates per slot on a Studio sound board; the user picks.
+
+## kits-4a (2026-11-15): the new combat rules (step 1 of the kits-4 design)
+Build `kits-4a+lobby-4+ui-1`. Rojo connected (the user clicked Connect). NOT committed.
+- M1 STRING: Punch.ComboHits 4. Hits 1-3 stun (StatusService:Stun, Punch.StunSeconds 0.5) and DRAG: an ObjectValue
+  HT_DraggedBy in the target points at the puncher, and whoever moves the target's body (its own client in
+  MovementController, or DummyService) steers it to a spot Punch.DragLead 3.2 studs in front of the puncher at
+  the puncher's velocity plus a spring (Combat.dragFollow, DragSpring 8, DragMax 90). Only the FIRST fighter a
+  punch reaches is dragged (several dragged to one spot piled up and stun-locked, seen with bots). Hit 4 knocks
+  back at Knockback.BaseSpeed 85 x stagger. Miss or ComboResetSeconds 1 without a hit: back to hit 1.
+- Speed adds nothing anywhere: SpeedBonus*, every ArcPerStud and ArcMax gone; R throws are now fixed ArcBase
+  (Uppercut 125, Cyclone 125, Meteor 150, Glacier 52, Frenzy 115, Breath 125, Slam 120, Backfist 140).
+- No held punches (PunchReady remote, ReleaseWindup etc. gone). No launching kick (HeavyKick config and side
+  gone). The dive kick is replaced by the AIR PUNCH: a click in the air glides up to Punch.AirReach 16 studs
+  over AirGlideSeconds 0.18 toward the lock-on target / the fighter under the cursor / the cursor spot, and the
+  server gives it AirWindup 0.22 and makes it hit 1 of the string. Training pads no longer MarkLaunched. The
+  kick chain's code is still there but nothing starts it (cleanup debt). Core/DashHit deleted (it was unused).
+- HELD R for every kit: SkillChargeStart (no args) then the release request with the client's measured hold
+  (Combat.trustedHold: believed within SkillCharge.Tolerance 0.15 of the server's own). Combat.chargePower:
+  TapPower 0.55 rising to 1 at FullSeconds 1, which is also MaxHoldSeconds (it fires itself). PERFECT is
+  PerfectStart 0.90 to PerfectEnd 0.95 s (the user moved it off the end), PerfectPower 1.9, SkillPerfect remote,
+  a white flash and an impact frame (FxController:PerfectRelease / PerfectImpact, first pass). Moving at
+  MoveShare 0.5 while charging (HT_Charging, client only); others see the wind-up (HT_ChargingSkill, server).
+  Hit or stunned or Q while charging cancels it. Ui/ChargeBar draws the bar and the white Perfect band.
+- PLAYED in Studio on the practice dummies: 4 of 4 punches landed on the run (steps 1-3 stun, step 4 strength
+  176), the dummy dragged along; the air punch locked on glided 14 studs and stunned (step 1, air); Frenzy held
+  0.909 s gave PERFECT from the server, 0.892 s and 0.957 s did not. TestBot1 landed a full string on me
+  (step 4 strength 193-329). Console clean.
+- NOT CHECKED: the drag on a PLAYER being dragged (needs a second client), the Perfect flash and impact frame
+  by eye, phones and gamepads (L2 hold), the R wind-up pose seen by others. Tutorial's fast-hit step no longer
+  fits (tutorial is off). Clash strength now uses BaseSpeed 85 (was 23), not re-tuned.
+
+## kits-4b (2026-11-15): M1 lock, plain R hold, Perfect removed
+Same build stamp (kits-4a). NOT committed.
+- User: "dragging isn't what I want, lock them in front of you". Hits 1-3 now LOCK the first fighter a punch reaches
+  Punch.LockDistance 3.2 studs in front of the puncher (Combat.lockSpot), facing them, at their velocity, led by
+  LockLeadSeconds 0.1 for the lag on the puncher's body. Set by CFrame every frame, by the target's own client
+  (MovementController) or DummyService. PLAYED: 4 of 4 hits on the run, the dummy held 3.5-4.5 studs ahead
+  (client view). It is placed directly, so it can be pushed through a low wall (seen once).
+- User: "remove the charging, you can still hold it up to 3 s but no timing". GameConfig.SkillHold
+  (MaxHoldSeconds 3, MoveShare 0.5, ReleaseWindup 0.12). Same strength however long it is held. Removed:
+  chargePower, trustedHold, the Perfect window and PerfectPower, the SkillPerfect remote, Ui/ChargeBar, the
+  Perfect flash and the old flash "impact frame" (user: "it just flashes"). Release requests carry no arguments
+  again. Gates: 481 tests (the two charge tests went), selene 0, stylua, rojo build, fx_smoke 7/7.
+- NEXT (not built, design to agree): an ULTIMATE METER filled by landing hits, draining after 3 s without one;
+  at full, a kit's ultimate is a locked follow-up used after the 4th M1 knocks someone away, built to ring them
+  out, super flashy, with real impact frames (vault: 63 VFX Creation/Impact Frames - What They Are and How to
+  Build Them in Roblox.md, from the user's 3 references).
+
+## kits-4c (2026-11-15): ultimate meter, G follow-up, shared ultimate engine, Base "Final Bell"
+Build `kits-4c+lobby-4+ui-1`. NOT committed. User answers: key G; full meter holds then drains; window after a
+4th-hit knockback OR an R throw; four strings fill it; impact frames on ultimates only, each fitting its kit;
+cinematic camera on both screens; the M1 lock stops at walls and stays close.
+- LOCK: Punch.LockDistance 2.8; Combat.clipLock clips it at the first wall on a ray from the puncher
+  (LockBodyRadius 1.4 kept clear), in MovementController and DummyService.
+- METER: Core/UltimateMeter (pure, tests/UltimateMeter.spec): GameConfig.Ultimate StunHitGain 5, FinisherGain 10,
+  SkillHitGain 15 (4 strings = 100), drains DrainPerSecond 12 after DrainDelaySeconds 3; full holds
+  ReadyHoldSeconds 8, refreshed by every hit. Server UltimateService keeps it, publishes Player HT_Ult /
+  HT_UltReady; CombatService calls Gain (stun hits, finishers, R swings) and OpenWindow (finisher, R swing,
+  SkillHit). Ui/UltimateMeter: gold bar above the vitals, G cap when full, big G prompt with a closing ring.
+- WINDOW + START: UltimateWindow (1.2 s) -> G (DPadUp; touch button "Ult") -> UltimateRequest (no args) ->
+  UltimateStarted to all with the anchor frame (at the target, facing outward from the arena's middle, or away
+  from the attacker off the arena), attacker start, shared start time, flight end. HT_Ultimate on both; CanFight
+  refuses either side; their punches/skills refused.
+- ENGINE: Core/Ultimates (pure, shared, tests/Ultimates.spec): timelines (keys for both bodies, camera shots,
+  cues), pose(), cuesBetween(), flightEnd() (past the arena oval + PlayAreaMargin + FlightPastEdge and
+  FlightBelow under the elimination line, so Round.isOut is certain; tested from 4 spots), flightPoint().
+  UltimateController sets the local body and runs the camera; DummyService poses a bot target
+  (UltimateService:CarriedPose). Ring-out credit NoteHit at the throw. NOTE Lune's CFrame.lookAt is wrong for
+  exactly -Z; the anchor is built with fromMatrix.
+- BASE "FINAL BELL" (every kit uses it until each gets its own with its kit): blink with gold afterimages,
+  14 solid gold phantom fists with sparks and rings, a dim quiet beat with gold gathering, IMPACT FRAME, white
+  flash + 3 gold shockwaves, gold trail and rings on the flight. Fx/ImpactFrame: two-tone frames (flat
+  background, fighters as ViewportFrame silhouettes, Leaf ink speed lines, Star flares, white glow with a black
+  core), per-kit frame lists (BASE: white/black/gold/black/white).
+- PLAYED: meter rose 5, 10 on hits; with the meter filled by a test script, a 4-hit string opened the window, G
+  started it, it ended on time (3.3 s); the dummy was 155 studs out along the throw 2.25 s in; screenshots of
+  the barrage and of the impact frames (white, gold, black frames) look right. Console clean.
+- NOT DONE: every other kit's own ultimate and impact frame (with each kit pair), sounds, a PLAYER as the
+  target (needs 2 clients), gamepad and touch for G, phones; impact-frame holds count rendered frames so they
+  last longer at low fps.
+
+## kits-4d (2026-11-15): ultimate sounds + Studio sound picker, cut-based camera, flashier impact frame, bell slot
+Build `kits-4d+lobby-4+ui-1`. NOT committed.
+- SOUNDS: Config/SoundCandidates lists 3-4 Roblox-licensed options (ProSoundEffects / APMOfficial, ids from Creator
+  Store searches this session, lengths MEASURED in Studio, all 24 load) for ult_ready, ult_blink, ult_barrage,
+  ult_windup, ult_impact, ult_frame, ult_launch; SoundBank takes option A of each until the user picks. ult_bell
+  ("the final bell should have a bell sound at the last hit") is EMPTY: no licensed boxing bell found; silent
+  until an id is given. Ui/SoundPicker (Studio only, F7) plays each option and swaps it in live (Sfx.setRole)
+  and prints the picks to Output. Sfx gained options.last (play the last N s, so the windup riser's hard end
+  lands on the hit) and setRole. Long stings are cut with a fade (ready 1.8 s, frame 1.6 s, impact 3 s).
+- CAMERA (user: "I don't like how it just rotates around, should be more thematic"): Timeline.shots, separate from
+  body keys; Ultimates.shot gives position, look, FOV, roll, shake; cut shots snap, others ease. Final Bell: wide
+  snap-zoom on the blink, five hard cuts through the barrage at three-quarter angles (storyboarded in Studio so
+  neither fighter hides the other), a low tilted hero push-in on the wind-up, a hard cut to wide + zoom-punch and
+  shake on the hit, a chase shot widening to flightFov 96. Cinematic now 2.05 s (impact held 0.3 s). The camera
+  shakes in a set pattern; FOV restored after.
+- IMPACT FRAME (user: "more flashy"): 8 frames ~0.3 s, held by time not rendered frames; pure white opener,
+  zoom + shake per frame, red/cyan split silhouettes, thick ring, crossing beams, burst moved BEHIND the figures
+  (in front it washed them grey). Seen in Studio.
+- NOT DONE: the user's sound picks; the bell id; sound onsets (start) for the picks; other kits' ultimates.
+
+## kits-4e (2026-11-15): bell, music off, ready sting, the barrage on a beat
+Build `kits-4e+lobby-4+ui-1`. NOT committed.
+- BELL: ult_bell holds two COMMUNITY "dong" uploads (no licensed bell exists; the user accepted "just a regular
+  dong ... like the big ben"). The user asked first for faster and higher, then "lower pitch actually, just keep
+  the speed": it plays at 1.4x speed with a PitchShiftSoundEffect of 0.6 (pitch about 0.84 of the file), cut at 2 s.
+- MUSIC OFF: `src/client/Ui/playlist.client.luau` deleted (the user: "remove the music that plays"). The menu's
+  Music toggle now does nothing (the teammate's UI: ask before touching it).
+- Sfx.Options gained `octave` (pitch without speed) and `eq` ({low, mid, high} dB, an EqualizerSoundEffect).
+- READY (user: "a short notification sound ... cool sounding to hype you up"): ult_ready options are now short
+  ProSoundEffects stings (Sword Whip 302/702: metal slide into a ching and ring; Magic Burst 4/2), played 1.1 s
+  from just before the swell.
+- BARRAGE (REVISED below; user: "more varied ... lower pitched and flat and bassy ... shouldnt sound with each hit because they
+  all start to over lap ... more timed so itll flow"): the 14 fists are silent; UltimateFx plays 7 beats at
+  0.07, 0.30, 0.50, 0.67, 0.81, 0.92, 1.01 s (gaps closing 0.23 to 0.09), pitch 0.78 rising slightly, eq
+  {low 7, mid -2, high -12}, cut 0.26 s; the last beat is louder with a low boom. Option A is ProSoundEffects
+  Body Impact 1-5 + Big Thuds Wall Impact (whompy slams; onsets measured by PlaybackLoudness in a play test,
+  volumes even out their peaks); B mixes those with the old crack-and-thud set; C and D are the old sets.
+- The F7 picker auditions each role the way the game plays it (SoundCandidates.AUDITION: options, and beats
+  for the barrage).
+- Verified in Studio: all new ids load; the barrage cue fires exactly 7 sounds on the beats above, each a
+  different take from the last, EQ attached, starting on the onset; ready sting and bell play. Console clean
+  apart from `rbxassetid://203785492` "asset type does not match" (not in our source or the server tree; it shows
+  at client start, before any ultimate plays). Gates: build, 492 tests, selene, stylua, fx_smoke.
+- The user's reference cutscene (youtube shorts Yde2yYu9_lM) is a guide to what's good, NOT something to copy
+  (the user, 2026-11-15). No title or K.O. cards.
+- NOT DONE: the user's picks (F7); other kits' ultimates.
+- BARRAGE REVISED (user: "the new punch sounds are super weird and dont sound like punches at all... sounds like
+  a burp"): the Body Impact slams are gone. ult_barrage A is now both ProSoundEffects "Punch Some Crack And Thud"
+  sets in one bag (10 takes), played at pitch 0.88 rising to 0.94, eq {low 4, mid 0, high -4}, cut 0.3 s. Lesson:
+  a slowed, high-cut non-punch file reads as a burp; deepen real punches gently instead.
+- READY REVISED (user: the Sword Whip "sounds like a sword slash or something but its supposed to sound like a
+  power up"): ult_ready A-C are ProSoundEffects "Spaceship Blast High Pitch Energy Charge Up" takes (9125973461,
+  9125975059, 9125973882) that rise into a peak about 1 s in; played 1.4 s from just before the rise. D is
+  Magic Burst 4.
+- REFERENCE STUDY (3 more cutscenes the user sent "to study", read as 6 fps contact sheets in scratchpad/cutref):
+  Type Soul "Orlando Furioso" QlvfbPbCYCM, Heroes Battlegrounds "Human Battery" finishers C2vCVdNRLms, HBG
+  "Azure Flames" finisher sfZyOKF50so. What they share: (1) the whole cutscene gets its own colour grade
+  (Orlando: the world goes black-and-white, high contrast; Human Battery: warm gold-orange); (2) extreme
+  close-ups, fists and faces filling the frame, things entering the frame; (3) near-black beats right before
+  the big hit; (4) 2-4 frame stylised impact frames (black with one white slash line, then inverted white
+  with black ink stars; a black ink symbol on yellow speed lines); (5) an ending beat (a cracked-glass
+  overlay held about 2 s, or a fade to dark) before control returns. Not applied yet: the user decides which.
+
+## kits-4f (2026-11-15): Final Bell gets a grade, close-up, dark beat and dip; bell out; ready = hype sting
+Build `kits-4f+lobby-4+ui-1`. NOT committed. The user picked these from the references ("all four ideas are
+pretty good"), then "dont do the cracked screen".
+- TIMELINE (Core/Ultimates FINAL_BELL): the haymaker now lands at 1.9 (was 1.75), cinematic 2.2, attackerFree
+  2.55. New shots: the hero push-in ends 1.62; a cut to an EXTREME CLOSE-UP from just in front of the
+  attacker (fov 34 easing to 27) 1.62-1.82; new cue `dark` at 1.82; hit cut 1.9, zoom-punch 2.03, chase 2.2.
+  `grade` field on Timeline. Everything else (server delays, DummyService, flight) reads the timeline.
+- Fx/CutsceneScreen (new): `grade(spec, fadeIn)` (a ColorCorrectionEffect; Final Bell warm gold, saturation
+  -0.2, contrast 0.35) and `blackout(floor, in, hold, out)` (ScreenGui, DisplayOrder 95, under ImpactFrame's
+  100). Fighters' screens only. UltimateController grades at start; the DIP: black in 0.2 s, held 0.15 s, out
+  0.35 s, timed so the camera hands back (ending + 0.1) under full black, and the grade is removed there.
+  UltimateFx `dark` cue: near-black (0.08) cut in for 0.08 s, cut out on the hit where the impact frame's white
+  takes over. Windup riser, dim and orb retimed to the 0.5 s gap (WINDUP_SECONDS).
+- NOTE: EnvironmentKit (teammate) switches OFF extra ColorCorrectionEffects whenever map lighting applies, so a
+  map change mid-cutscene ends the grade early. Harmless; not touched.
+- BELL REMOVED (user: "a bit too silly, just give like a louder cooler punch sound thats ... amped up"): new role
+  ult_haymaker (Punch Some Crack And Thud takes) at pitch 0.82, volume 2.6, eq {low 7, mid 2, high 0}, layered
+  with punch_hit (2.0) and boom_low (1.4, pitch 0.8) on top of ult_impact. The community bell ids are gone.
+- READY (user: "like a power up in a video game ... like a level up ... like you got an achievement, but make it
+  hype sounding for a fighting game"): no game level-up sting exists in the licensed catalogue (searched level
+  up, achievement, game bonus, success, arcade, power up). A-D are APM hype stings (Hustler Sting 2 from
+  "Sports Hype Bangers", Gladiators link, Reach For It, Fortune Fun Win); E-F are COMMUNITY uploads that say
+  they are original (DailySoundsFX "Energy Charge Up", EasyPlay "Level Up"), for the user to choose only. All
+  six measured in a play test. Played 1.6 s. Picker panel widened for six options.
+- Test: "final bell: close-up, then the dark beat, then the hit" (493 pass). Gates: build, tests, selene, stylua.
+- NOT SEEN: the close-up framing, grade and dip on screen. Studio's 3D view did not render into captures this
+  time (only the HUD; the window was likely in the background), so the storyboard could not be checked.
+
+## kits-4g (2026-11-16): M1 plants you and steps both forward; seamless lock; heavy punch sounds; short ready
+Build `kits-4g+lobby-4+ui-1`. NOT committed. The user: "make the m1 combos slow you down so you cant run while
+m1ing ... you stop moving but each punch should knock both you and your target forward in the direction youre
+facing" (reference: TSB Garou "Flowing Water", the pair travels forward together); "the locked m1s are really
+buggy ... they kind of just drag the person to you and teleport them ... i want them to be right infront of you
+seamlessly"; punches "weak sounding ... like taps ... dont make the punches sound like high pitched smacks either,
+i want them to sound like actual heavy blows" (reference: JoJo "MUDA" rush; its spectrogram is nearly all under
+~350 Hz); the ready sound "short but powerful kind of notificaition sound".
+- PLANT + STEP (MovementController `_punchThrown`, DummyService for bots): a ground M1 stops running dead and roots
+  for Punch.RootSeconds (0.5); at the strike (Windup) you glide Punch.StepDistance (2.2) over StepSeconds (0.12)
+  along the way the BODY faces (root look, not the momentum heading), shorter near a wall (Combat.punchStep).
+  CombatService: no M1 pays the old aftermath (backward recoil / miss slowdown) any more.
+- LOCK: the SERVER picks the held spot once per stunning punch (CombatService `lockSpotFor` -> StatusService
+  Stun(..., spot) -> attribute HT_LockSpot): in front of the puncher at the distance the target was when the hold
+  began (Combat.lockDistance, 2.4-4) PLUS the step, clipped at walls. The target's mover (its client, or
+  DummyService) glides to it (Combat.lockFollow: LockFollowRate 26, never faster than LockCatchUpSpeed 36) and
+  faces the puncher. MEASURED before this (the old per-frame chase of the puncher's body): the puncher's step ran
+  INTO the target (gap 3.5 -> 1.1 studs) and the target caught up ~0.3 s later, which read as drag and teleport.
+  The server spot is still between punches, so nothing chases a late body. Old chase kept only as a fallback.
+  Config Punch: LockMinDistance, LockMaxDistance, LockFollowRate, LockCatchUpSpeed, LockCarryMax, StepDistance,
+  StepSeconds, RootSeconds (LockLeadSeconds removed); design/game.json in the same order.
+- SOUNDS: new SoundBank roles punch_body (ProSoundEffects "Boxing Hits, With Gloves, Hit Punching Bag Hard", 5
+  takes, onsets/peaks measured) and punch_sub (APM "Bass Drum Sounds (a)", cut 0.3). Every M1 and kit-skill hit is
+  now punch_body (pitch 0.88, eq low +5 / high -4) + punch_sub + a faint crack (0.3) instead of a loud crack. The
+  ult barrage A is the bag hits with a sub per beat; the haymaker adds both. ult_ready A-C are ProSoundEffects
+  "Magic Burst" stings (one beefy impact, glowing tail) cut at 1 s with a sub thump under (UltimateMeter).
+  SoundCandidates.AUDITION gained `with` (a layer the picker plays under, as the game does).
+- Tests: lockDistance, lockFollow (carried with the step, no jump across a gap, settles), punchStep, catch-up >
+  step speed (496 pass). Gates: build, tests, selene, stylua, fx_smoke.
+- (SUPERSEDED by kits-4h, verified) NOT VERIFIED IN STUDIO: Studio restarted mid-session and the Rojo plugin did not reconnect, so the place holds
+  everything up to the first plant/step version only (no server spot, no root-look step, no new sounds). The one
+  run on that version showed the string working (3 stuns, 4th launched ~120 studs) and the step-into-target
+  problem the server spot fixes.
+
+## kits-4h (2026-11-16): the string verified in Studio; exact step that never shoves; punches = crack + body + boom
+Same build stamp (kits-4g). NOT committed. After the user reconnected Rojo:
+- STEP: starts at Windup + ActiveSeconds (when the server has placed the target's spot), StepSeconds 0.15, moved
+  by CFrame each frame (a walked step came out ~2/3 long), and NEVER into the body in front (Combat.stepRoom stops
+  it LockMinDistance short of anyone ahead). Measured: moving by position straight into a target the server had
+  not moved yet made Roblox shove the bodies apart and fling the puncher ~8 studs in 0.1 s; stepRoom fixed it.
+  Bots step the same way (DummyService).
+- MEASURED (Practice Dummy 1, 4-hit string at 0.45 s, Studio running slow): hits 1-3 stunned and held it, the two
+  travelled ~7 studs forward together, the gap stayed 2.4-4.3 studs (never under LockMinDistance), the dummy
+  never moved faster than 28 studs/s (no jumps), the puncher's fastest was the step (21 studs/s), hit 4 launched it
+  ~122 studs. The stun lapsed for ~0.15 s between two punches (presses 0.45 s apart vs StunSeconds 0.5, with slow
+  frames); the hold re-took at the same distance.
+- SOUNDS: the user heard the bass drum ("sounds like a drum ... is that the punch sound?") and sent a punch
+  sound-design reference (youtube obti3wLCshs, Itadori combo). Its spectrogram: per hit a full-range crack up past
+  8 kHz, a body, and a noise-like boom under ~170 Hz sweeping down 0.2-0.4 s. punch_sub is now booms, not a drum:
+  ProSoundEffects "Explosions, Dull, Thuddy" x2 (each take starts on one boom of a multi-boom file) + APM "Deep
+  Boom 06", cut 0.3. punch_crack is back at 0.8 (normal pitch). Verified: each hit plays crack + body + boom, a
+  different take each time; the launch adds boom_low + launch.
+- Tests: stepRoom (497 pass). Gates: build, tests, selene, stylua.
+- NOT HEARD by me (no ears): whether the new mix reads as a heavy blow. NOT TESTED: a player as the target (two
+  clients), the ultimate with the new layers, a wall in front during a string.
+- THE USER, after trying kits-4h (2026-11-16): the punches "still sound nothing like a punch and a bassy drum";
+  next time go back over ALL the references they have sent (punch sound: JoJo MUDA aSHcFlNOElE, Itadori combo
+  obti3wLCshs; cutscenes: Yde2yYu9_lM, QlvfbPbCYCM, C2vCVdNRLms, sfZyOKF50so; movement: TSB Garou zP6MFM_SamU).
+  The boom layer (punch_sub) is the likeliest "bassy drum"; consider dropping it and sourcing designed anime-style
+  punch hits instead. Committed at their request so they could stop for the night.

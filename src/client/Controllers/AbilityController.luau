@@ -328,6 +328,8 @@ function AbilityController:KnitStart()
 		SLOT_ACTIONS.mobility,
 		function(_name: string, inputState: Enum.UserInputState)
 			if inputState == Enum.UserInputState.Begin then
+				-- Moving off cancels an attack skill being charged.
+				Knit.GetController("CombatController"):CancelCharge()
 				self:Use("mobility")
 			end
 			return Enum.ContextActionResult.Sink
@@ -337,12 +339,31 @@ function AbilityController:KnitStart()
 		Enum.KeyCode.Q,
 		Enum.KeyCode.ButtonB
 	)
-	-- R / L2: attack.
+	-- R / L2: attack. HELD (2026-11-15): pressing winds it up, letting go throws it (by itself after
+	-- SkillHold.MaxHoldSeconds). How long it was held changes nothing (CombatController).
 	ContextActionService:BindAction(
 		SLOT_ACTIONS.attack,
 		function(_name: string, inputState: Enum.UserInputState)
+			local combat = Knit.GetController("CombatController")
+			local skill = self:GetSkill("attack")
 			if inputState == Enum.UserInputState.Begin then
-				self:Use("attack")
+				if skill.built and combat:IsSkill(skill.id) then
+					if not combat:StartCharge(skill.id) then
+						self.SkillBlocked:Fire("attack")
+					end
+				else
+					self:Use("attack")
+				end
+			elseif
+				inputState == Enum.UserInputState.End
+				or inputState == Enum.UserInputState.Cancel
+			then
+				if combat:IsCharging() then
+					local went = combat:ReleaseCharge()
+					if TIMINGS[skill.id] then
+						(if went then self.SkillUsed else self.SkillBlocked):Fire("attack")
+					end
+				end
 			end
 			return Enum.ContextActionResult.Pass
 		end,

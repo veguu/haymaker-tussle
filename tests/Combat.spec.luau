@@ -20,7 +20,6 @@ local PUNCH: Combat.PunchSettings = {
 }
 local KNOCK: Combat.KnockbackSettings = {
 	BaseSpeed = 55,
-	SpeedBonusPerStud = 0.9,
 	UpwardFraction = 0.18,
 	UpwardMax = 16,
 	AirborneUpwardFraction = 0,
@@ -49,30 +48,11 @@ local function hitAt(distance: number, degrees: number, side: string?): (boolean
 end
 
 return {
-	["a punch from standing still still has real strength"] = function()
-		assert(Combat.punchStrength(KNOCK, STAGGER, 0, 0) == 55, "expected the base strength")
-	end,
-
-	["a punch at speed is substantially stronger"] = function()
-		local still = Combat.punchStrength(KNOCK, STAGGER, 0, 0)
-		local fast = Combat.punchStrength(KNOCK, STAGGER, 36, 0)
-		assert(fast > still * 1.5, `expected much stronger at speed: {still} vs {fast}`)
-	end,
-
-	["speed's bonus stops at SpeedBonusMax"] = function()
-		local capped = table.clone(KNOCK)
-		capped.SpeedBonusMax = 40
-		assert(Combat.punchStrength(capped, STAGGER, 1000, 0) == 95, "the bonus wasn't capped")
-		assert(Combat.punchStrength(capped, STAGGER, 10, 0) == 64, "a small bonus was changed")
-	end,
-
-	["the real settings: running more than doubles a standing punch"] = function()
+	["a punch's strength is its base times stagger: no bonus for speed"] = function()
+		assert(Combat.punchStrength(KNOCK, STAGGER, 0) == 55, "expected the base strength")
 		local GameConfig = require("../src/shared/Config/GameConfig")
 		local knock: any = GameConfig.Knockback
-		local stagger: any = GameConfig.Stagger
-		local still = Combat.punchStrength(knock, stagger, 0, 0)
-		local running = Combat.punchStrength(knock, stagger, 36, 0)
-		assert(running >= still * 2, `running {running} vs standing {still}`)
+		assert(knock.SpeedBonusPerStud == nil and knock.SpeedBonusMax == nil, "no speed terms left")
 	end,
 
 	["stagger raises knockback up to its cap"] = function()
@@ -91,11 +71,11 @@ return {
 
 	["a punch uses the stagger from before the hit"] = function()
 		local before = 0
-		local strength = Combat.punchStrength(KNOCK, STAGGER, 0, before)
+		local strength = Combat.punchStrength(KNOCK, STAGGER, before)
 		local after = Combat.addStagger(STAGGER, before)
 		assert(strength == 55, "this hit's stagger must not affect this hit")
 		assert(
-			Combat.punchStrength(KNOCK, STAGGER, 0, after) > strength,
+			Combat.punchStrength(KNOCK, STAGGER, after) > strength,
 			"it must affect the next one"
 		)
 	end,
@@ -257,56 +237,141 @@ return {
 		assert(Combat.nextSwing("Uppercut") == "Right", "anything else goes back to the right")
 	end,
 
-	["a held punch throws fast; a tap, or a hold too short, takes the full windup"] = function()
+	["the M1 string: four punches, the first three stun, only the last knocks back"] = function()
 		local GameConfig = require("../src/shared/Config/GameConfig")
 		local punch: any = GameConfig.Punch
-		assert(Combat.releaseWindup(punch, nil, 10) == punch.Windup, "a tap")
+		assert(punch.ComboHits == 4, "a 4-punch string")
+		assert(Combat.comboStep(punch, nil, 10, nil) == 1, "nothing before: the first")
+		assert(Combat.comboStep(punch, 2, 10, 9.5) == 2, "soon after a hit: the next")
 		assert(
-			Combat.releaseWindup(punch, 9.99, 10) == punch.Windup,
-			"a hold shorter than the draw-back"
+			Combat.comboStep(punch, 3, 10, 10 - punch.ComboResetSeconds) == 1,
+			"a pause starts it over"
 		)
-		assert(
-			Combat.releaseWindup(punch, 9, 10) == punch.ReleaseWindup,
-			"held: only the release is left"
-		)
-		assert(
-			Combat.releaseWindup(punch, 10 - punch.ReadyMaxSeconds - 1, 10) == punch.Windup,
-			"a stale hold"
-		)
-		assert(punch.ReleaseWindup < punch.Windup, "the release is quicker than a full swing")
+		assert(Combat.comboStep(punch, 9, 10, 9.9) == 1, "nonsense starts it over")
+		assert(Combat.comboStep(punch, 0 / 0, 10, 9.9) == 1, "NaN starts it over")
+		assert(Combat.comboAfter(punch, 1, 1) == 2 and Combat.comboAfter(punch, 3, 1) == 4)
+		assert(Combat.comboAfter(punch, 4, 1) == 1, "after the last, the first again")
+		assert(Combat.comboAfter(punch, 3, 0) == 1, "a miss starts it over")
+		for step = 1, 3 do
+			assert(not Combat.isFinisher(punch, step), `punch {step} stuns`)
+		end
+		assert(Combat.isFinisher(punch, 4), "the fourth knocks back")
+		assert(punch.StunSeconds > punch.Cooldown, "the stun outlasts the gap to the next punch")
 	end,
 
-	["the heavy uppercut always arcs: a fixed lift, further out with speed"] = function()
+	["a stunned target is locked right in front of the puncher, wherever they face"] = function()
+		local GameConfig = require("../src/shared/Config/GameConfig")
+		local punch: any = GameConfig.Punch
+		local d = punch.LockDistance
+		local x, z = Combat.lockSpot(punch, 10, 20, 1, 0)
+		assert(near(x, 10 + d, 0.001) and near(z, 20, 0.001), "facing +X: ahead along +X")
+		x, z = Combat.lockSpot(punch, 0, 0, 0, -5)
+		assert(near(x, 0, 0.001) and near(z, -d, 0.001), "the facing's length doesn't matter")
+		x, z = Combat.lockSpot(punch, 0, 0, 0, 0)
+		assert(near(x, 0, 0.001) and near(z, -d, 0.001), "no facing: straight ahead")
+		x, z = Combat.lockSpot(punch, 0 / 0, 0, 1, 0)
+		assert(x == 0 and z == 0, "NaN puts them nowhere strange")
+		assert(d > 2 and d < 5, "close enough for the next punch, far enough not to overlap")
+	end,
+
+	["a locked target stops at a wall and never goes through it"] = function()
+		local GameConfig = require("../src/shared/Config/GameConfig")
+		local punch: any = GameConfig.Punch
+		local d = punch.LockDistance
+		local x, z = Combat.clipLock(punch, 0, 0, d, 0, nil)
+		assert(x == d and z == 0, "nothing in the way: the full spot")
+		x, z = Combat.clipLock(punch, 0, 0, d, 0, 2)
+		assert(
+			near(x, math.max(2 - punch.LockBodyRadius, 0), 0.001),
+			"a wall 2 studs out: short of it"
+		)
+		x, z = Combat.clipLock(punch, 0, 0, d, 0, 0.5)
+		assert(x == 0 and z == 0, "a wall right there: it stays at the puncher's front")
+		x, z = Combat.clipLock(punch, 5, 5, 5, 5, 1)
+		assert(x == 5 and z == 5, "no length: the puncher's own spot")
+		assert(d <= 3, "close to the puncher")
+	end,
+
+	["the lock holds them where they were, never dragged in"] = function()
+		local GameConfig = require("../src/shared/Config/GameConfig")
+		local punch: any = GameConfig.Punch
+		assert(Combat.lockDistance(punch, 3.3) == 3.3, "a normal distance is kept as it is")
+		assert(Combat.lockDistance(punch, 0.5) == punch.LockMinDistance, "never inside each other")
+		assert(Combat.lockDistance(punch, 9) == punch.LockMaxDistance, "never left out of reach")
+		assert(Combat.lockDistance(punch, nil) == punch.LockDistance, "unknown: the usual distance")
+		local x, z = Combat.lockSpot(punch, 0, 0, 1, 0, 3.5)
+		assert(near(x, 3.5, 0.001) and near(z, 0, 0.001), "the spot is at the held distance")
+		assert(punch.LockMaxDistance < punch.Range, "a held target is still in punching range")
+	end,
+
+	["a locked target follows smoothly, carried along with the puncher's step"] = function()
+		local GameConfig = require("../src/shared/Config/GameConfig")
+		local punch: any = GameConfig.Punch
+		local dt = 1 / 60
+		-- Already on the spot while the puncher steps at 18 studs/s: carried exactly along, no gap opens.
+		local x, z = Combat.lockFollow(punch, 3, 0, 3 + 18 * dt, 0, 18, 0, dt)
+		assert(near(x, 3 + 18 * dt, 0.0001) and near(z, 0, 0.0001), "moves with the step")
+		-- A gap closes a little each frame and never jumps: at most LockCatchUpSpeed per second.
+		x = Combat.lockFollow(punch, 0, 0, 10, 0, 0, 0, dt)
+		assert(x > 0 and x <= punch.LockCatchUpSpeed * dt + 0.0001, "no teleport across a gap")
+		-- Over a quarter of a second a small gap is all but gone.
+		local at = 2
+		for _ = 1, 15 do
+			at = Combat.lockFollow(punch, at, 0, 3, 0, 0, 0, dt)
+		end
+		assert(near(at, 3, 0.05), `settles on the spot (at {at})`)
+		-- Bad numbers leave it where it is.
+		x, z = Combat.lockFollow(punch, 1, 2, 0 / 0, 0, 0, 0, dt)
+		assert(x == 1 and z == 2, "NaN spot: stays")
+		x, z = Combat.lockFollow(punch, 1, 2, 5, 5, 0, 0, 0)
+		assert(x == 1 and z == 2, "no time: stays")
+	end,
+
+	["a punch steps the puncher forward, shorter near a wall"] = function()
+		local GameConfig = require("../src/shared/Config/GameConfig")
+		local punch: any = GameConfig.Punch
+		assert(Combat.punchStep(punch, nil) == punch.StepDistance, "open ground: the full step")
+		local room = punch.LockDistance + 2 * punch.LockBodyRadius
+		assert(Combat.punchStep(punch, room + 1) == 1, "a wall ahead: only what fits")
+		assert(Combat.punchStep(punch, room - 1) == 0, "right at a wall: no step")
+		assert(
+			punch.StepDistance > 1 and punch.StepDistance < punch.LockMaxDistance,
+			"a step, not a dash"
+		)
+		assert(punch.RootSeconds >= punch.Cooldown, "planted from one punch to the next")
+		assert(
+			punch.StepDistance / punch.StepSeconds < punch.LockCatchUpSpeed,
+			"a held target can keep up with the puncher's step"
+		)
+	end,
+
+	["a punch's step never walks into the body in front"] = function()
+		local GameConfig = require("../src/shared/Config/GameConfig")
+		local punch: any = GameConfig.Punch
+		assert(Combat.stepRoom(punch, 1, 0, {}) == math.huge, "nobody there: no limit")
+		local room = Combat.stepRoom(punch, 1, 0, { { x = 3.5, z = 0 } })
+		assert(near(room, 3.5 - punch.LockMinDistance, 0.001), "stops at the held distance")
+		assert(Combat.stepRoom(punch, 1, 0, { { x = 2, z = 0 } }) == 0, "already close: no step")
+		assert(
+			Combat.stepRoom(punch, 1, 0, { { x = -3, z = 0 } }) == math.huge,
+			"behind doesn't count"
+		)
+		assert(
+			Combat.stepRoom(punch, 1, 0, { { x = 3, z = 5 } }) == math.huge,
+			"well off to the side doesn't"
+		)
+	end,
+
+	["attack skills throw the same at any speed, scaled by stagger"] = function()
 		local GameConfig = require("../src/shared/Config/GameConfig")
 		local upper: any = GameConfig.Uppercut
-		local slowOut, slowUp = Combat.uppercutArc(upper, 0, 1)
-		local fastOut, fastUp = Combat.uppercutArc(upper, 40, 1)
-		assert(fastOut > slowOut, "faster throws them further")
-		assert(slowUp == upper.Lift and fastUp == upper.Lift, "the lift is the same at any speed")
-		assert(Combat.uppercutArc(upper, 1000, 1) == upper.ArcMax, "capped")
-		assert(Combat.uppercutArc(upper, 0 / 0, 1) == upper.ArcBase, "NaN counts as standing")
-		assert(Combat.uppercutArc(upper, 0, 2) == upper.ArcBase * 2, "stagger scales the push")
-		assert(upper.Windup > GameConfig.Punch.Windup, "telegraphed: slower than a punch")
-		local punch: any = GameConfig.Punch
-		assert(punch.HoldMaxSeconds < punch.ReadyMaxSeconds, "a full hold still releases fast")
-	end,
-
-	["a heavy kick launches only from speed; slower, its arc grows with speed"] = function()
-		local GameConfig = require("../src/shared/Config/GameConfig")
-		local kick: any = GameConfig.HeavyKick
-		assert(Combat.kickLaunches(kick, kick.LaunchSpeed), "at the line it launches")
-		assert(not Combat.kickLaunches(kick, kick.LaunchSpeed - 1), "under it, no launch")
-		assert(not Combat.kickLaunches(kick, 0 / 0), "NaN never launches")
-		local slowOut, slowUp = Combat.heavyKickArc(kick, 0, 1)
-		local fastOut, fastUp = Combat.heavyKickArc(kick, 25, 1)
-		assert(fastOut > slowOut and fastUp > slowUp, "faster kicks throw further and higher")
-		assert(slowUp > 0, "even standing, it lifts them")
-		local maxOut = Combat.heavyKickArc(kick, 1000, 1)
-		assert(maxOut == kick.ArcMax, "capped")
-		assert(
-			kick.Windup > GameConfig.Punch.Windup,
-			"the kick is telegraphed: slower than a punch"
-		)
+		local out, up = Combat.uppercutArc(upper, 1, 1)
+		assert(out == upper.ArcBase and up == upper.Lift, "full charge: its own numbers")
+		local tapOut, tapUp = Combat.uppercutArc(upper, 1, 0.5)
+		assert(tapOut == upper.ArcBase * 0.5 and tapUp == upper.Lift * 0.5, "half charge, half")
+		assert(Combat.uppercutArc(upper, 2, 1) == upper.ArcBase * 2, "stagger scales the push")
+		assert(Combat.uppercutArc(upper, 1, 0 / 0) == upper.ArcBase, "NaN counts as full")
+		assert(upper.ArcPerStud == nil and upper.ArcMax == nil, "no speed terms left")
 	end,
 
 	["a pause sends the combo back to the first swing"] = function()
