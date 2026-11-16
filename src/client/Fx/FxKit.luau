@@ -46,6 +46,11 @@ FxKit.Tex = {
 	Dust = "rbxassetid://122673105804911", -- soft streaks fanning out from an empty middle
 	Star = "rbxassetid://124927142938107", -- a four-point glint
 	Ribbon = "rbxassetid://136226108329170", -- a bright tip edge, thinning streaks (for Trails)
+	-- The ability kits' shapes (design/vfx/draw_kit_shapes.ps1, 2026-11-15). All plain white, to be tinted.
+	Claw = "rbxassetid://90850328041429", -- a thick crescent pointed at both ends, bulge at the top
+	Shard = "rbxassetid://91703865151068", -- an ice crystal standing on the image's centre, pointing up
+	Leaf = "rbxassetid://107713021393708", -- a lens pointed at both ends, lying along X, tip to the right
+	Pinwheel = "rbxassetid://125971836125924", -- a ring broken into five crescents
 }
 
 FxKit.WHITE = Color3.new(1, 1, 1)

@@ -42,6 +42,28 @@ local SoundBank: { [string]: Entry } = {
 		name = "Ground Rocks Impact Small Slam",
 		creator = "GleonoffG",
 	},
+	-- THE FROST KIT (2026-11-15). Ice breaking: a block of ice dropped on concrete, two takes. Used for
+	-- the Glacier coming up, a freeze, and ice shattering (FxController sets the pitch for each).
+	-- NOT YET MEASURED: `start` and `volume` are first guesses, not sampled like the rest of this file.
+	["ice_shatter"] = {
+		takes = {
+			{ id = 9114855870, length = 2.1, start = 0, volume = 1.2 },
+			{ id = 9114856215, length = 2.0, start = 0, volume = 1.2 },
+		},
+		looped = false,
+		name = "Ice Block Drop To Concrete Shatter (SFX)",
+		creator = "ProSoundEffects",
+	},
+	-- A thin, fast swish: the Frostbite's dash, over the ordinary gust.
+	["ice_whoosh"] = {
+		takes = {
+			{ id = 9126283592, length = 0.7, start = 0, volume = 1.4 },
+			{ id = 9126283272, length = 0.6, start = 0, volume = 1.4 },
+		},
+		looped = false,
+		name = "Wood Swish Ruler Whoosh Fast Movement In Air (SFX)",
+		creator = "ProSoundEffects",
+	},
 	-- The dash: a sharp, hissing gust of air. Each file swells from 0.1 s to its peak at about 0.45 s
 	-- and is gone by 0.9 s, so it starts 0.3 s in, already more than half way up: a sharp start that
 	-- peaks about 0.13 s after the press.

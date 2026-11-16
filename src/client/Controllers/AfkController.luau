@@ -8,15 +8,14 @@
 -- out" on the yellow, and "AFK / locked in round" dimmed while you're fighting. Mouse, touch and gamepad
 -- all press it (it's a normal selectable button).
 
-local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Typography = require(ReplicatedStorage.Shared.Typography)
+local HudMotion = require(script.Parent.Parent.Ui.HudMotion)
 local HudTheme = require(script.Parent.Parent.Ui.HudTheme)
 
 local AFK = "HT_AFK"
@@ -114,30 +113,14 @@ function AfkController:KnitStart()
 		)
 	end
 
-	local function tweenPress(value: number, seconds: number)
-		if GuiService.ReducedMotionEnabled then
-			press.Scale = 1
-			return
-		end
-		TweenService
-			:Create(
-				press,
-				TweenInfo.new(seconds, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-				{
-					Scale = value,
-				}
-			)
-			:Play()
-	end
-
 	button.MouseButton1Down:Connect(function()
-		tweenPress(S.PressScale, S.PressSeconds)
+		HudMotion.pressDown(press, S.PressScale)
 	end)
 	button.MouseButton1Up:Connect(function()
-		tweenPress(1, S.ReleaseSeconds)
+		HudMotion.pressUp(press)
 	end)
 	button.MouseLeave:Connect(function()
-		tweenPress(1, S.ReleaseSeconds)
+		HudMotion.pressUp(press)
 	end)
 	button.Activated:Connect(function()
 		if player:GetAttribute(IN_ROUND) ~= true then

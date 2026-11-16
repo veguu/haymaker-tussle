@@ -30,9 +30,24 @@ local function seconds(value: any): number
 	return value
 end
 
---- Is this move an attack (one with Hit and Miss numbers)?
-function Endlag.isAttack(move: string): boolean
-	return ATTACKS[move] == true
+--- Is this move an attack (one with Hit and Miss numbers)? With `cfg`, a move that isn't one of the
+--- built-in four counts too if the settings give it a Miss number (a kit's attack skill).
+function Endlag.isAttack(move: string, cfg: Settings?): boolean
+	return ATTACKS[move] == true or (cfg ~= nil and cfg[move .. "Miss"] ~= nil)
+end
+
+--- The settings with `extra` numbers laid over them (Config/Abilities.Endlag: the kits' skills). A
+--- new table; neither is changed. `extra` never switches endlag on or off or changes the tolerance.
+function Endlag.with(cfg: Settings, extra: { [string]: number }?): Settings
+	local merged = table.clone(cfg) :: any
+	if extra then
+		for name, value in extra do
+			if name ~= "Enabled" and name ~= "Tolerance" and typeof(value) == "number" then
+				merged[name] = value
+			end
+		end
+	end
+	return merged
 end
 
 --- The recovery a move owes once it's over: an attack's Miss (or Hit, with `hit`) seconds, anything
@@ -41,7 +56,7 @@ function Endlag.recovery(cfg: Settings, move: string, hit: boolean?): number
 	if not cfg.Enabled then
 		return 0
 	end
-	if ATTACKS[move] then
+	if Endlag.isAttack(move, cfg) then
 		return seconds(cfg[move .. (if hit then "Hit" else "Miss")])
 	end
 	return seconds(cfg[move])
@@ -67,7 +82,7 @@ end
 --- An attack landed at `hitAt`: its lock is cut to its Hit seconds from then. It only ever shortens
 --- the lock, and never to before `hitAt` itself.
 function Endlag.landed(cfg: Settings, move: string, busyUntil: number, hitAt: number): number
-	if not cfg.Enabled or not ATTACKS[move] then
+	if not cfg.Enabled or not Endlag.isAttack(move, cfg) then
 		return busyUntil
 	end
 	return math.min(busyUntil, hitAt + Endlag.recovery(cfg, move, true))

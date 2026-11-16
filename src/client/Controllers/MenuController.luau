@@ -17,13 +17,13 @@ local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local Abilities = require(ReplicatedStorage.Shared.Config.Abilities)
 local AbilityKit = require(ReplicatedStorage.Shared.Core.AbilityKit)
 local Typography = require(ReplicatedStorage.Shared.Typography)
+local HudMotion = require(script.Parent.Parent.Ui.HudMotion)
 local HudTheme = require(script.Parent.Parent.Ui.HudTheme)
 
 local book: any = Abilities
@@ -699,16 +699,11 @@ function MenuController:KnitStart()
 				Enum.KeyCode.ButtonB
 			)
 			redraw()
-			if not GuiService.ReducedMotionEnabled then
+			-- the sheet opens on the motion tokens (UI 0e): panel time, enter easing; no scale under reduced motion
+			if not HudMotion.reduced() then
 				panelScale.Scale = 0.94
-				TweenService:Create(
-					panelScale,
-					TweenInfo.new(M.Open, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-					{
-						Scale = 1,
-					}
-				):Play()
 			end
+			HudMotion.play(panelScale, "open", { Scale = 1 }, "panel", "enter")
 			if
 				UserInputService.GamepadEnabled
 				and UserInputService:GetLastInputType().Name:match("Gamepad")

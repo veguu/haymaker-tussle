@@ -1,7 +1,7 @@
 --!strict
 -- GENERATED FILE - DO NOT EDIT BY HAND.
 -- Source: design/game.json `config`
--- Regenerate: python ~/.claude/skills/create-roblox-game/scripts/gen_config.py --dir <game>
+-- Regenerate: python tools/gen_config.py
 -- Every tunable in the game lives here, so a balance pass is a data edit to the
 -- contract and never a code edit. `gen_config.py --check` fails if this file and
 -- the contract have drifted apart.
@@ -100,12 +100,12 @@ local GameConfig = {
 		Roots = false,
 		RootAfter = 0.15,
 		Cooldown = 5,
-		Range = 6,
-		Degrees = 35,
-		Lift = 85,
-		ArcBase = 25,
-		ArcPerStud = 1.3,
-		ArcMax = 90,
+		Range = 8.5,
+		Degrees = 50,
+		Lift = 100,
+		ArcBase = 70,
+		ArcPerStud = 1.6,
+		ArcMax = 170,
 		TrailSeconds = 1.2,
 		TrailWidth = 2.4,
 	},

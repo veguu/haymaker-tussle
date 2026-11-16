@@ -128,6 +128,35 @@ function AbilityKit.addCoins(profile: Profile, amount: any): Profile?
 	return nextProfile
 end
 
+--- A test balance: a new profile with its Coins raised to `amount` (whole Coins, up to MAX_COINS), or
+--- nil when it already has that many or `amount` isn't a real number. It never lowers them. The old
+--- profile is never changed.
+function AbilityKit.topUp(profile: Profile, amount: any): Profile?
+	if typeof(amount) ~= "number" or not isFinite(amount) then
+		return nil
+	end
+	local target = math.min(math.floor(amount), AbilityKit.MAX_COINS)
+	if profile.coins >= target then
+		return nil
+	end
+	local nextProfile = copy(profile)
+	nextProfile.coins = target
+	return nextProfile
+end
+
+--- Is this user id on a test balance's list (`grant`: { Amount, UserIds })? False for anything
+--- malformed.
+function AbilityKit.onTestList(grant: any, userId: any): boolean
+	if
+		typeof(grant) ~= "table"
+		or typeof(grant.UserIds) ~= "table"
+		or typeof(userId) ~= "number"
+	then
+		return false
+	end
+	return table.find(grant.UserIds, userId) ~= nil
+end
+
 --- Equips an owned kit: a new profile and "ok"; or nil and "unknown", "notOwned" or "equipped".
 function AbilityKit.equip(book: Book, profile: Profile, kitId: any): (Profile?, string)
 	local kit = AbilityKit.kit(book, kitId)

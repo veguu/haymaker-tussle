@@ -4,27 +4,35 @@
 -- for the whole game. Sizes are pixels at a 1280 x 720 window; HudController scales the HUD by
 -- `Scale`. Times are seconds.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+local Tokens = require(ReplicatedStorage.Shared.Tokens)
 
 local HudTheme = {}
 
+-- Re-pointed to the Golden Hour tokens (UI Phase 0d, 2026-11-15; Shared/Tokens, vault UI Research/Design
+-- System/Color Palette). One colour, one job: coral = YOU, teal = ready/recovering, gold = earned, ink/ivory/
+-- stone = neutral. The names stay so every screen picks the palette up with no code change; screens move to
+-- Tokens directly as they are rebuilt (Phase 1+), then this table goes.
+local T = Tokens.colour
 HudTheme.Colour = {
-	Panel = Color3.fromRGB(16, 23, 33),
-	PanelRaised = Color3.fromRGB(34, 45, 60),
-	Track = Color3.fromRGB(44, 56, 72),
-	Accent = Color3.fromRGB(255, 196, 61), -- the arena ring yellow
-	AccentHot = Color3.fromRGB(255, 132, 64), -- stagger high: you'll fly
-	Text = Color3.fromRGB(242, 239, 230),
-	Muted = Color3.fromRGB(150, 162, 178),
-	Dim = Color3.fromRGB(96, 108, 124),
-	Over = Color3.fromRGB(130, 210, 255), -- speed past normal running
-	Miss = Color3.fromRGB(160, 170, 185),
-	Blocked = Color3.fromRGB(255, 96, 84),
-	OnAccent = Color3.fromRGB(16, 23, 33), -- dark lettering on the yellow
+	Panel = T("ink.900"),
+	PanelRaised = T("ink.800"),
+	Track = T("ink.600"),
+	Accent = T("coral.500"), -- you: your stagger, your selection, on/active
+	AccentHot = T("danger.600"), -- critical stagger (the palette's fill colour; the text use goes in Phase 1b)
+	Text = T("ivory.50"),
+	Muted = T("stone.300"),
+	Dim = T("stone.500"), -- disabled, non-essential only
+	Over = T("teal.400"), -- speed past normal running (no own job in the palette yet; Phase 1 decides)
+	Miss = T("stone.300"),
+	Blocked = T("danger.600"),
+	OnAccent = T("ink.900"), -- dark lettering on coral
 }
 
 HudTheme.Transparency = {
-	Panel = 0.15, -- the compact dark backing behind light HUD text
+	Panel = Tokens.surface[1].transparency, -- 0.12, the HUD maximum: more and coral loses contrast on paving
 	Stepped = 0.55, -- groups that step back while a timed prompt or clash has priority
 	-- The controls list has no panel (user, 2026-11-09): light text with a thin dark outline, and key
 	-- caps as faint see-through tags.
@@ -257,8 +265,8 @@ HudTheme.Menu = {
 	Gap = 8,
 	Pad = 14,
 	CardButton = 136,
-	Coin = Color3.fromRGB(255, 196, 61),
-	Good = Color3.fromRGB(120, 220, 140),
+	Coin = T("gold.400"), -- earned
+	Good = T("teal.400"), -- confirmed
 	Backdrop = 0.45,
 	Open = 0.16,
 	Toast = 2.4, -- seconds a notice stays

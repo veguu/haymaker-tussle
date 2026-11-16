@@ -1336,3 +1336,148 @@ Movement piece, build `combat-5`, is in Studio for the user to try. Combat has n
   vegetation moving 43-45 of 45 (rest at range edge), crown moving, rocks/soil/ruins/stall still; PlantAvgMs 0.25
   (both fields), peak 0.99. Phones/low graphics: existing 30 Hz + shorter ranges. Build vfx-14+lobby-4+ui-0b,
   Rojo push PASS 143.
+
+## kits-1 (2026-11-15): six ability kits built, every R made strong
+Build `kits-1+lobby-4+ui-1`. NOT committed, NOT pushed, NOT tried by the user. Rojo not running.
+- ASKED (user): "at least 4 very unique very fun new movesets" with elements and concepts like dragon or beast,
+  VFX "just like the references", "very detailed very flashy"; then: finish Bruiser and Trickster; make the R
+  moves strong ("the basic one and the tempest one are pretty weak"), meaning harder throws, "bigger hitboxes
+  and stronger effects".
+- KITS (Config/Abilities; shop order Base, Tempest, Inferno, Frost, Beast, Dragon, Bruiser, Trickster):
+  Inferno 600: Jet (burst any way the keys point, 105 for 0.3 s) / Comet (lunging punch, flat and far).
+  Frost 600: Slide (72 for 1.1 s, steers) / Glacier (rooted, wide, throws straight up).
+  Beast 800: Pounce (leap that lands on the nearest fighter within 46) / Maul (fast wide claw, 3.5 s cooldown).
+  Dragon 1000: Ascend (95 up, works in the air) / Breath (rooted, 22 studs long, narrow).
+  Bruiser 500: Charge (80 for 0.6 s; the first punch on it in 0.75 s throws 0.2 as hard) / Slam (rooted, all round).
+  Trickster 750: Flip (leap away from the nearest fighter) / Backfist (fast, all round, body spins).
+- HOW: mobility skills are `Abilities.KitMoves` run by Core/SkillMove (pure, tested): a burst is a Momentum dash
+  with its own length, speed and steering; a leap is a jump with its own speeds. MovementController starts them
+  on its step (`SkillMove(id, cfg)`), AbilityService shows everyone else (KitMoveRequest, no arguments: the
+  server reads the skill off the kit; KitMoveStarted). Attack skills are `Abilities.KitSwings`, each a HEAVY
+  entry in CombatService with side = skill id, through one KitSwingRequest (no arguments). They borrow swing
+  clips (AnimController). Recovery numbers are `Abilities.Endlag`, laid over GameConfig.Endlag by Endlag.with.
+- STRONGER R: Uppercut (GameConfig AND design/game.json) Range 6 -> 8.5, Degrees 35 -> 50, Lift 85 -> 100,
+  ArcBase 25 -> 70, ArcPerStud 1.3 -> 1.6, ArcMax 90 -> 170. Cyclone Range 7.5 -> 10.5, Lift 38 -> 45, ArcBase
+  42 -> 85, ArcPerStud 0.7 -> 1.2, ArcMax 85 -> 160. A test holds every R to a standing throw of at least twice
+  a standing punch. (For scale: a running punch reaches about 143.)
+- EFFECTS: Fx/KitFxCommon (palettes, layer recipes, pieces placed as the camera sees them, streams on a moving
+  body) and one module per kit (InfernoFx, FrostFx, BeastFx, DragonFx, BruiserFx, TricksterFx), plus Fx/SkillFx
+  for the Uppercut's column and the Cyclone's whirl (plain white). Each header cites the reference frames it
+  follows. These are coloured and big on purpose: the plain rule still holds for everything else. Four new
+  textures (design/vfx/draw_kit_shapes.ps1: Claw, Shard, Leaf, Pinwheel), ids in FxKit.Tex. FxController:
+  KitMove, KitSwing (windup now, strike after the windup unless KitSwingCancel), KitHit, UppercutHit.
+- SAVED FROM THE PLACE (dumpl's, not from his folder): ui-0c..ui-0e (9 changed, 2 new) and later ui-1
+  (HudController, HudLogic, new Ui/Components), each file verified by checksum against the place.
+- CHECKED: rojo build OK, 481 Lune tests (20 new in SkillMove.spec), selene 0, stylua clean. New
+  `lune run lune/fx_smoke`: builds every rig and calls every effect once on Lune's Roblox instances (7 of 7,
+  1028 emitters); it catches wrong property names, not looks. SEEN IN PLAY (modules pasted into a Play client,
+  slow motion, pale lobby floor): the Maul's three claws and its hit. First pass was washed out to white and the
+  black slivers were too long; star spikes and body layers were retuned for every kit (colour ramps no longer
+  start at white, LightEmission 0.45-0.5).
+- NOT TESTED: any gameplay in Studio (no Rojo sync: the place is shared and was changing). No effect but the
+  Maul's has been seen. Phones, 25 fighters, grass. Balance is a first guess.
+- TEST BALANCE (user: "me and my friend have like 20000 coins"): Abilities.TestCoins lists two Roblox user ids (the user's,
+  and the other account in the Team Create session: my reading of "my friend"); PlayerDataService raises their Coins
+  to 20000 on joining if they have fewer (AbilityKit.topUp, never lowers; 2 tests, 483 in all). It is saved like any
+  other change, and it refills on every join. Empty the list before release. Gates green; not tried in Play.
+
+## kits-2 (2026-11-15, IN PROGRESS): the rework, Frost first
+Build `kits-2+lobby-4+ui-1`. Rojo is serving from this folder and connected. NOT committed, NOT pushed.
+- WHY: the user tried kits-1 and rejected it: "all of them seem very similar", most Q moves "too weak, too similar
+  to the base dash, or just useless like the beast one" (Base, Tempest and Trickster's were fine), R moves "the
+  same for all of them" and "underwhelming", VFX "way too thin", "too bright so its hard to see", wants "multiple
+  colors and shades", "REALLY big", and solid models mixed in ("the ice should be made out of a solid model").
+  Also wanted per kit: its own M1 animations and hit effects, its own air-kick and jump-kick style, its own
+  sounds. All cosmetic (same damage and timing).
+- AGREED DESIGN (my proposal, the user's answers): Base stays as it is. Tempest: Gale Step (blink plus a wind
+  burst that pushes) / Tornado (travels, pulls in, throws up). Inferno: Blast Jump (explosion knocks back those
+  close) / Meteor (ring on the floor, then a rock falls, 12-stud blast). Frost: freezing dash / Glacier stomp
+  ("i would prefer the glacier stomp, a freeze ability is fine"). Beast: Pounce that slams on landing / Frenzy
+  (four claw hits that drag, last one throws). Dragon: Wings (hold to glide) / Breath held 1 s, sweepable,
+  pushes continuously, dragon head model. Bruiser: Bull Rush (rams and carries the first fighter) / Earthshatter
+  (travelling shockwave ring you can jump, rock spikes). Trickster: keep the Flip (it was liked), add a decoy
+  to swap back to / Backstab (appear behind the nearest fighter). Models from Blender (open, 5.2), free
+  Creator Store sounds. Build one kit, show it, then the rest two at a time.
+- REFERENCES: 13 new YouTube links (ids in the vault's `63 VFX Creation/VFX Reference Library.md`). Studied so
+  far at low rate: the three ice ones and Pidgey's Excalibur. What they share: solid meshes with particles,
+  opaque saturated colour masses, a dark shade behind, white only in thin cores and first frames, huge size.
+- DONE, FROST: `Frostbite` (Q, was Slide): dash 112 for 0.42 s any way the keys point; the server sweeps and
+  freezes everyone within 6.5 studs for 1.1 s (new Services/StatusService: HT_Frozen + HT_Stunned, remotes
+  Frozen / Thawed, no refreeze for 1.5 s); a hit on a frozen fighter shatters the ice and throws 1.6x.
+  `Glacier` (R): Range 15, 110 degrees, Lift 145. New Fx/KitModels (solid pieces: erupt white-hot, stand, sink;
+  thrown debris) and a rewritten Fx/FrostFx (21 crystals in three waves, navy smoke, stain, rings, rays,
+  three-tone arcs, chips, snow, violet motes; a freeze block; shatter; the kit's own punch hit and landing).
+  FxController: kitOf(character) picks a kit's cosmetic punch and landing looks.
+- ICE MESHES: design/kits/ice_kit.py (run in Blender) -> design/kits/out/export/ice_kit.glb (5 pieces: SpikeTall,
+  SpikeThick, Clump, Block, Shard; vertex-coloured, 1 unit tall, root at the bottom). NOT UPLOADED: the folder
+  is not on the approved Open Cloud upload list (Assistant Settings -> MCP Permissions). Until
+  ReplicatedStorage.HT_KitModels holds them, KitModels shows plain blocks.
+- CHECKED: gates green (rojo build, 484 Lune tests, selene 0, stylua), fx_smoke 7 of 7. SEEN IN PLAY, slow
+  motion, on grass: the Glacier with stand-in blocks: about three character heights tall, four blues, dark
+  arcs with white cores, rings. Much thicker than kits-1.
+- NOT DONE FOR FROST: real meshes in the place; its sounds; M1 and kick ANIMATIONS (only the effects differ so
+  far; AnimClips is generated by animations/build_clips.py and this PC has no Python, so new clips need a Luau
+  generator); nothing played against a fighter (freeze, shatter, the stomp's throw).
+- THE OTHER FIVE KITS are still kits-1.
+- LATER THE SAME DAY (the user approved the upload folder): the ice kit is Open Cloud Model 94341799888558 (group
+  2970443), inserted as a package at ReplicatedStorage.HT_KitModels.IceKit in the place (not in Rojo's tree, like
+  HT_GrassKit). The crystals read navy on Material Ice, so they are SmoothPlastic, Reflectance 0.15, Transparency
+  0.1, in four paler blues (vertex colours darken the roots). Sounds: `ice_shatter` and `ice_whoosh` in SoundBank
+  (ProSoundEffects; start and volume NOT measured). PLAYED IN STUDIO as the user's account, Frost equipped, on
+  Practice Dummy 1 in the lobby: Q through the dummy set HT_Frozen and HT_Stunned on it (server); R threw it about
+  31 studs up (y 129 -> 160). SEEN at full speed from the player's camera: the cluster stands in front, about three
+  character heights. Two fixes from that: the two crystals behind the thrower put the camera inside the ice
+  (removed), and the snow sparkles were far too big (halved). The test balance works: 20000 Coins, every kit owned.
+  Gates green at the end: 484 tests, selene 0, stylua, fx_smoke 7 of 7.
+- THE USER TRIED FROST (kits-2) AND SAID "Yes, do the rest". Later: "also make sure to update the m1 animations".
+
+## kits-3 (2026-11-15): Inferno and Beast reworked, kit punches, shared cast machinery
+Build `kits-3+lobby-4+ui-1`. Rojo serving and connected. NOT committed, NOT pushed, NOT tried by the user.
+- SHARED: `CombatService:SkillHit(attacker, target, away, strength, up)` is how anything that isn't a swing
+  lands a hit (CanFight, stagger, ring-out credit, ice, armour, HitConfirmed). `Services/SkillCastService`
+  runs a KitSwing that has a `Cast` (CombatService.heavy hands it over after the usual press, kit, cooldown and
+  endlag checks): kinds "meteor" and "frenzy". AbilityService: a KitMove with `Blast` throws everyone close at
+  once; with `Slam` the server watches for the landing, throws everyone close and fires KitLanded. New remotes
+  KitCast (attacker, skill id, position) and KitLanded (character, skill id). Core/SkillMove.inFan (tested).
+- INFERNO: `Blastoff` (Q, was Jet): leap 78 up / 54 forward, blast radius 10, push 90, lift 48. `Meteor` (R, was
+  Comet): rooted 0.45 s, lands 16 studs ahead 0.35 s later, radius 13, throw 150, lift 80, cooldown 8.
+- BEAST: `Pounce` now lands ON the nearest fighter within 52 and slams (radius 8.5, push 80, lift 58).
+  `Frenzy` (R, was Maul): lunge 64 for 0.58 s, four hits 0.14 s apart; the first three drag (72 the way you
+  face), the last reaches all round and throws at 115, lift 44, cooldown 6.
+- KIT PUNCHES (cosmetic): `Shared/AnimVariants` (pure, 7 tests) derives clips from Config/AnimClips by mirroring,
+  reversing and copying one arm onto the other: Frost ChopLeft/ChopRight (the uppercut backward), Inferno
+  RiseLeft + Uppercut, Beast RakeLeft/RakeRight (both arms). AnimController plays AnimVariants.swing(kit, side)
+  for Left and Right; the swing, its timing and its strike marker are unchanged. STUDIO ONLY like every clip:
+  Config/AnimAssetIds is empty, so no clip of any kind plays in a live game until clips are uploaded.
+- MODELS: design/kits/rock_claw_kit.py -> rock_claw_kit.glb, Open Cloud Model 89330300578027 (group), package at
+  ReplicatedStorage.HT_KitModels.RockClawKit: Rock_Meteor, Rock_ChunkA/B, Claw_Blade, Claw_Fang. Blender 5.2
+  CRASHED when objects were selected under temp_override in a scene that isn't the window's; each kit file now
+  has its own scene and exports with use_active_scene.
+- EFFECTS: KitFxCommon.thick(tones) is the shared thick layer set (dark smoke, haze, chips, motes, flash, floor
+  rings, stain, three-tone arcs, rays, three-tone star, lens sparks). KitModels gained sweep (a claw swiping
+  across) and whole-size thrown pieces (the meteor). InfernoFx and BeastFx rewritten on them; each kit's punch
+  hit and landing look goes through FxController's kitOf / kitLanding.
+- PLAYED IN STUDIO as the user's account on Practice Dummy 1: Meteor threw it about 125 studs (z 376 -> 250);
+  Blastoff launched the player; Frenzy dragged it 10 studs but the LAST HIT MISSED (the lunge outran the drag),
+  fixed afterwards (drag 34 -> 72, last hit all round) and NOT re-played; Pounce landed on it from 22 studs and
+  the slam threw it 39 studs. SEEN from a side camera: the Meteor before and at impact, the Blastoff, a Frenzy
+  swipe, the Pounce's slam. Poses seen frozen: the chop (arm overhead, then down) and the rake at its strike.
+- CHECKED at the end: rojo build, 491 Lune tests, selene 0, stylua, fx_smoke 7 of 7 (2254 emitters preloaded).
+- NOT DONE: Tempest, Dragon, Bruiser and Trickster are still kits-1 (their effects are the thin first version).
+  KICK animations for any kit. Sounds for Inferno and Beast are the existing ones at other pitches. Balance is
+  a first guess (the Meteor's 125 studs on a staggered dummy is a lot).
+- STILL NOT DONE FOR FROST: kick animations; the shatter bonus was not measured; the freeze was not seen
+  from outside (the block of ice round a frozen fighter); nothing tried on a phone or with other players.
+
+## kits-3b (2026-11-15): solid crescents removed, Frenzy drag fixed
+Build stamp unchanged (`kits-3+lobby-4+ui-1`). Committed and pushed with everything before it.
+- The user tried the kits and asked for the "solid 2 color crescent things" on top of every effect to go. REMOVED:
+  KitFxCommon thick.arcs (and its type and ARC_SHAPE), Frost's own arcs/placeArcs (Frostbite start, Glacier),
+  Inferno's (Blastoff, Meteor, landing), Beast's (Pounce spring, slam, landing, the Frenzy claw fan and its
+  black slivers) and Trickster's Backfist crescent sweep. Solid claw blades, smoke, rings, rays, stars stay.
+  Rule for the remaining kits: no crescent layer over an effect (memory vfx-no-solid-crescents).
+- FRENZY measured in Play with a server probe: at DragPush 72 against the 64 lunge each drag shoved the dummy
+  further ahead; hits 2-3 landed, the throw found it 12 studs away and missed. Now DragPush 56 and a new
+  Cast.LastReach 12 for the throw (SkillCastService). Gates pass. NOT RE-PLAYED: Play was stopped before the
+  re-test. Next: re-play it (walk toward the dummy with W and press R while moving; the lunge follows the
+  movement controller's facing, not the root's CFrame), then Tempest and Dragon.

@@ -25,6 +25,35 @@ return {
 		assert(#found == 0, table.concat(found, "; "))
 	end,
 
+	["a test balance raises Coins to its amount and never lowers them"] = function()
+		local profile = AbilityKit.newProfile(BOOK)
+		local topped = AbilityKit.topUp(profile, 20000)
+		assert(topped and topped.coins == 20000)
+		assert(profile.coins == BOOK.StarterCoins, "the old profile is never changed")
+		assert(AbilityKit.topUp(topped :: any, 20000) == nil, "already there: nothing to do")
+		local rich = AbilityKit.addCoins(topped :: any, 5000)
+		assert(rich and AbilityKit.topUp(rich, 20000) == nil, "more than the amount is left alone")
+		assert(AbilityKit.topUp(profile, 0 / 0) == nil and AbilityKit.topUp(profile, "lots") == nil)
+		local huge = AbilityKit.topUp(profile, 1e30)
+		assert(huge and huge.coins == AbilityKit.MAX_COINS)
+	end,
+
+	["only listed accounts are on the test balance, and it buys every kit"] = function()
+		local grant = BOOK.TestCoins
+		assert(typeof(grant.Amount) == "number" and #grant.UserIds >= 1)
+		for _, userId in grant.UserIds do
+			assert(AbilityKit.onTestList(grant, userId))
+		end
+		assert(not AbilityKit.onTestList(grant, 1))
+		assert(not AbilityKit.onTestList(grant, "210649679"), "a string is not a user id")
+		assert(not AbilityKit.onTestList(nil, 1) and not AbilityKit.onTestList({}, 1))
+		local total = 0
+		for _, kitId in BOOK.Order do
+			total += BOOK.Kits[kitId].price
+		end
+		assert(grant.Amount >= total, `every kit together costs {total}`)
+	end,
+
 	["Base is the Dash and the Uppercut"] = function()
 		local base = BOOK.Kits[BOOK.DefaultKit]
 		assert(base.mobility.id == "Dash" and base.mobility.built)

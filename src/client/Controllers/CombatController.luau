@@ -251,6 +251,12 @@ function CombatController:KnitStart()
 			last = -math.huge,
 		},
 	}
+	-- The newer kits' attack skills (Config/Abilities.KitSwings): each a heavy move, all through one
+	-- remote that names nothing (the server knows the kit).
+	local kitSwingRemote = Net.client("KitSwingRequest")
+	for skillId, swing in Abilities.KitSwings :: { [string]: any } do
+		heavies[skillId] = { cfg = swing, remote = kitSwingRemote, last = -math.huge }
+	end
 	local function throwHeavy(side: string): boolean
 		local move = heavies[side]
 		local now = os.clock()
@@ -274,12 +280,32 @@ function CombatController:KnitStart()
 		undoPress, undoSide = lastPress, nextSide
 		lastPress = now
 		recovery = 0
-		endlag:Start(side, move.cfg.Windup + punchCfg.ActiveSeconds)
+		endlag:Start(
+			side,
+			move.cfg.Windup
+				+ punchCfg.ActiveSeconds
+				+ (if move.cfg.Cast then move.cfg.Cast.Lead or 0 else 0)
+		)
 		anim:PlaySwing(character, side)
 		fx:Swing(character)
 		-- The launching kick roots you through its windup. The uppercut doesn't: you keep running.
 		if move.cfg.Roots ~= false then
 			movement:HeavyKickStarted(move.cfg.Windup + move.cfg.RootAfter)
+		end
+		-- A kit's attack skill: its own windup and strike effects (FxController ignores the sides that
+		-- have none), and the lunge some of them carry.
+		fx:KitSwing(character, side)
+		do
+			local lunge = move.cfg.Lunge
+			if lunge then
+				movement:SkillMove(nil, {
+					Kind = "burst",
+					Aim = "face",
+					Speed = lunge.Speed,
+					Seconds = lunge.Seconds,
+					Turn = 0.2,
+				})
+			end
 		end
 		move.remote:FireServer()
 		self.PunchEvent:Fire("thrown")
@@ -398,6 +424,8 @@ function CombatController:KnitStart()
 			end
 			if (kind == "cancelled" or kind == "refused") and attacker then
 				anim:CancelSwing(attacker)
+				-- A kit's attack skill that never got to strike doesn't show its strike.
+				fx:KitSwingCancel(attacker)
 			end
 		end)
 	end
@@ -422,6 +450,7 @@ function CombatController:KnitStart()
 			nextSide = Combat.nextSwing(side)
 		elseif attacker and attacker.Parent then
 			fx:Swing(attacker)
+			fx:KitSwing(attacker, side)
 		end
 	end)
 
@@ -433,10 +462,17 @@ function CombatController:KnitStart()
 					-- An uppercut's arc leaves a trail behind the body it threw.
 					if anim:LastSwing(attacker) == "Uppercut" then
 						fx:LaunchTrail(target)
+						fx:UppercutHit(target)
 					end
 					flash(target)
 					anim:HitLanded(attacker, target, strength)
-					fx:HitBurst(target, attacker, strength, anim:StrikeTip(attacker))
+					-- A kit's attack skill lands with its own hit, in its kit's look.
+					local swing = anim:LastSwing(attacker)
+					if swing and (Abilities.KitSwings :: any)[swing] then
+						fx:KitHit(target, attacker, swing, strength)
+					else
+						fx:HitBurst(target, attacker, strength, anim:StrikeTip(attacker))
+					end
 				end
 			end)
 		end

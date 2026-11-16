@@ -25,9 +25,20 @@ local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local AnimClips = require(ReplicatedStorage.Shared.Config.AnimClips)
 local AnimAssetIds = require(ReplicatedStorage.Shared.Config.AnimAssetIds)
 local AnimSequence = require(ReplicatedStorage.Shared.AnimSequence)
+local AnimVariants = require(ReplicatedStorage.Shared.AnimVariants)
 local Net = require(ReplicatedStorage.Shared.Net)
 
 local cfg = GameConfig.Animation
+-- Every clip that is played: the baked ones, and each kit's own punches made from them
+-- (Shared/AnimVariants).
+local Clips: any = AnimVariants.all(AnimClips :: any)
+
+-- The kit a fighter is wearing, for the punches it throws. Nil for bots and bodies with no player.
+local function kitOf(model: Model): string?
+	local player = game:GetService("Players"):GetPlayerFromCharacter(model)
+	local kit = player and player:GetAttribute("HT_Kit")
+	return if typeof(kit) == "string" then kit else nil
+end
 local maxSpeed = GameConfig.Movement.MaxSpeed
 local COMBATANT_TAG = "HT_Combatant"
 local OFF_WEIGHT = 0.001 -- a looping track stays running and in step, without showing
@@ -69,6 +80,13 @@ local SWING_WINDUPS: { [string]: number } = {
 	Uppercut = GameConfig.Uppercut.Windup,
 	Cyclone = Abilities.Cyclone.Windup,
 }
+-- The newer kits' attack skills (Config/Abilities.KitSwings) borrow a swing clip each, stretched to
+-- their own windup: AnimClips has no room for more clips.
+for skillId, swing in Abilities.KitSwings :: { [string]: any } do
+	SWING_ARMS[skillId] = swing.Arm
+	SWING_CLIPS[skillId] = swing.Clip
+	SWING_WINDUPS[skillId] = swing.Windup
+end
 -- Someone else holding a punch back, from the server's attribute (the swing it will be).
 local READY_ATTRIBUTE = "HT_PunchReady"
 
@@ -161,7 +179,7 @@ local function setUpFighter(model: Model): Fighter?
 	for name, animation in animations do
 		local track = (animator :: Animator):LoadAnimation(animation)
 		fighter.tracks[name] = track
-		if (AnimClips :: any)[name].strike then
+		if Clips[name].strike then
 			track:GetMarkerReachedSignal(STRIKE_EVENT):Connect(function()
 				-- The lead-in was slowed to the windup. From the strike on, the swing plays at its own pace.
 				if track.Speed > 0 and track.Speed < 1 then
@@ -229,7 +247,7 @@ end
 -- A running swing's body turn, at this moment in its clip. It's in degrees toward the punch.
 local function swingTurn(fighter: Fighter): number
 	local name = fighter.swingName
-	local clip = name and (AnimClips :: any)[name]
+	local clip = name and Clips[name]
 	local track = name and fighter.tracks[name]
 	if not clip or not clip.turn or not track or not track.IsPlaying then
 		return 0
@@ -362,7 +380,7 @@ local function updateFighter(model: Model, dt: number)
 	end
 	-- A held punch waits drawn back at its clip's hold point.
 	local heldTrack = fighter.heldSwing and fighter.tracks[fighter.heldSwing]
-	local holdAt = fighter.heldSwing and (AnimClips :: any)[fighter.heldSwing].hold
+	local holdAt = fighter.heldSwing and Clips[fighter.heldSwing].hold
 	if
 		heldTrack
 		and holdAt
@@ -391,7 +409,7 @@ local function updateFighter(model: Model, dt: number)
 			want = base
 		end
 		local other = fighter.tracks[want]
-		local otherHold = other and (AnimClips :: any)[want].hold
+		local otherHold = other and Clips[want].hold
 		if want ~= name and other and otherHold then
 			other:Play(cfg.HoldSwapFade, 1, 0)
 			other.TimePosition = otherHold
@@ -537,7 +555,8 @@ end
 
 --- Throws a swing on a fighter. `side` is the server's: Left, Right or Uppercut.
 function AnimController:PlaySwing(model: Model, side: string)
-	local clip = SWING_CLIPS[side]
+	-- An ordinary punch is the kit's own, when the kit has one (only the look: the swing is the same).
+	local clip = AnimVariants.swing(kitOf(model), side) or SWING_CLIPS[side]
 	local fighter = fighters[model]
 	if not clip or not fighter then
 		return
@@ -562,13 +581,10 @@ function AnimController:PlaySwing(model: Model, side: string)
 	then
 		chosen = held
 	end
-	for name in SWING_CLIPS do
-		local base = SWING_CLIPS[name]
-		for _, variant in { base, `{base}Run` } do
-			local track = fighter.tracks[variant]
-			if track and track.IsPlaying and variant ~= chosen then
-				track:Stop(SWING_FADE)
-			end
+	-- Every other swing stops: the boxer's and the kits' alike (a swing clip is one with a strike).
+	for name, other in fighter.tracks do
+		if name ~= chosen and Clips[name].strike and other.IsPlaying then
+			other:Stop(SWING_FADE)
 		end
 	end
 	local track = fighter.tracks[chosen]
@@ -588,11 +604,18 @@ function AnimController:PlaySwing(model: Model, side: string)
 		fighter.strikeTip = nil
 		-- The lead-in to the strike is stretched over the whole windup, so the fist lands when the server
 		-- decides the hit.
-		local strike = (AnimClips :: any)[chosen].strike or 0
+		local strike = Clips[chosen].strike or 0
 		local windup = math.max(SWING_WINDUPS[side] or GameConfig.Punch.Windup, 0.01)
 		if side == "Cyclone" then
 			fighter.spinAt = os.clock()
 			fighter.spinSeconds = Abilities.Cyclone.SpinSeconds
+		else
+			-- A kit swing that spins the body too (the Trickster's Backfist).
+			local kitSwing = (Abilities.KitSwings :: any)[side]
+			if kitSwing and kitSwing.Spin then
+				fighter.spinAt = os.clock()
+				fighter.spinSeconds = kitSwing.Spin
+			end
 		end
 		if held == chosen and track.IsPlaying then
 			-- Let go of a held punch: it carries on from where it waited, ReleaseWindup from the strike.
@@ -606,7 +629,7 @@ end
 --- A punch held back: its swing plays up to the clip's hold point (where the arm is drawn back) and
 --- waits there until it's thrown (PlaySwing carries on from there) or let go (CancelSwing).
 function AnimController:HoldSwing(model: Model, side: string)
-	local clip = SWING_CLIPS[side]
+	local clip = AnimVariants.swing(kitOf(model), side) or SWING_CLIPS[side]
 	local fighter = fighters[model]
 	if not clip or not fighter then
 		return
@@ -621,7 +644,7 @@ function AnimController:HoldSwing(model: Model, side: string)
 		then `{clip}Run`
 		else clip
 	local track = fighter.tracks[chosen]
-	if not track or not (AnimClips :: any)[chosen].hold then
+	if not track or not Clips[chosen].hold then
 		return
 	end
 	if fighter.swingName and fighter.swingName ~= chosen then
@@ -796,7 +819,7 @@ end
 
 function AnimController:KnitStart()
 	local missing = {}
-	for name, clip in AnimClips :: any do
+	for name, clip in Clips do
 		local animation = Instance.new("Animation")
 		animation.Name = name
 		local id = AnimAssetIds[name]

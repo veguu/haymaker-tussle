@@ -20,6 +20,7 @@ local Abilities = require(ReplicatedStorage.Shared.Config.Abilities)
 local AbilityKit = require(ReplicatedStorage.Shared.Core.AbilityKit)
 local Blink = require(ReplicatedStorage.Shared.Core.Blink)
 local Payout = require(ReplicatedStorage.Shared.Core.Payout)
+local SkillMove = require(ReplicatedStorage.Shared.Core.SkillMove)
 local Net = require(ReplicatedStorage.Shared.Net)
 
 local book: any = Abilities
@@ -148,6 +149,48 @@ local TIMINGS: { [string]: () -> (number, number, boolean) } = {
 	end,
 }
 
+-- THE NEWER KITS (Inferno, Frost, Beast, Dragon; Config/Abilities.KitMoves and KitSwings). A mobility
+-- skill is this client's own move, like the dash: MovementController starts it on its next step, shows
+-- it, and tells the server, which shows everyone else. An attack skill is a heavy swing, like the Cyclone.
+local lastKitMove: { [string]: number } = {}
+
+local function kitMove(skillId: string): boolean
+	local move = book.KitMoves[skillId]
+	local character = Players.LocalPlayer.Character
+	local now = os.clock()
+	if
+		not move
+		or not character
+		or not canAct(character)
+		or not SkillMove.ready(move, now, lastKitMove[skillId])
+		or not Knit.GetController("MovementController"):SkillMove(skillId, move)
+	then
+		return false
+	end
+	lastKitMove[skillId] = now
+	return true
+end
+
+for skillId, move in book.KitMoves :: { [string]: any } do
+	HANDLERS[skillId] = function()
+		return kitMove(skillId)
+	end
+	TIMINGS[skillId] = function()
+		local character = Players.LocalPlayer.Character
+		return (lastKitMove[skillId] or -math.huge) + move.Cooldown,
+			move.Cooldown,
+			character ~= nil and canAct(character)
+	end
+end
+for skillId in book.KitSwings :: { [string]: any } do
+	HANDLERS[skillId] = function()
+		return Knit.GetController("CombatController"):ThrowSkill(skillId)
+	end
+	TIMINGS[skillId] = function()
+		return Knit.GetController("CombatController"):GetSkillTiming(skillId)
+	end
+end
+
 --- The kit you're wearing, by id.
 function AbilityController:GetKitId(): string
 	local kitId = Players.LocalPlayer:GetAttribute("HT_Kit")
@@ -212,8 +255,8 @@ function AbilityController:Use(slot: string): boolean
 		return false
 	end
 	local went = handler()
-	if went and skill.id == "Blink" then
-		endlag:Start("Blink")
+	if went and (skill.id == "Blink" or book.KitMoves[skill.id]) then
+		endlag:Start(skill.id)
 	end
 	-- The Base kit's skills tell the HUD themselves (MovementController, CombatController).
 	if TIMINGS[skill.id] then
@@ -252,8 +295,23 @@ function AbilityController:KnitStart()
 			end
 		end)
 	end
+	local kitMoveStarted = Net.client("KitMoveStarted")
+	if kitMoveStarted then
+		-- Someone else's Jet, Slide, Pounce or Ascend: which way it goes is read off their body.
+		kitMoveStarted.OnClientEvent:Connect(function(character: any, skillId: any)
+			if
+				typeof(character) == "Instance"
+				and character:IsA("Model")
+				and typeof(skillId) == "string"
+				and book.KitMoves[skillId]
+			then
+				Knit.GetController("FxController"):KitMove(character, skillId)
+			end
+		end)
+	end
 	player.CharacterAdded:Connect(function()
 		lastBlink = -math.huge
+		table.clear(lastKitMove)
 	end)
 	-- What the round just paid, as a notice. The Coins themselves arrive as the HT_Coins attribute.
 	local earned = Net.client("CoinsEarned")

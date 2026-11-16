@@ -14,6 +14,6 @@ Knit.Start()
 		-- running the code on disk. Check the Rojo plugin is actually CONNECTED
 		-- and syncing before debugging anything else - an established connection
 		-- is not the same as an accepted one.
-		print("[Haymaker Tussle] Server started - BUILD vfx-14+lobby-4+ui-0b")
+		print("[Haymaker Tussle] Server started - BUILD kits-3+lobby-4+ui-1")
 	end)
 	:catch(warn)

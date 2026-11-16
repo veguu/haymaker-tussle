@@ -105,12 +105,12 @@ R (L2). A slow, telegraphed uppercut on its own cooldown. You keep your momentum
 | `Roots` | false | Whether the uppercut holds you still through its windup and costs you speed afterwards, the way the launching kick does. Off: you keep running the whole time, and a hit or a miss takes no speed and gives no recoil. |
 | `RootAfter` | 0.15 | Only when `Roots` is on: the thrower stays rooted this long after the strike too. |
 | `Cooldown` | 5 | Seconds between uppercuts. An uppercut also starts the punch cooldown. |
-| `Range` | 6 | Its reach, the same way a punch's `Range` works (plus `Punch.TargetRadius`). |
-| `Degrees` | 35 | Its arc either side of straight ahead. |
-| `Lift` | 85 | Upward speed it gives, at any speed: about 18 studs high (measured 18.2 on a dummy). |
-| `ArcBase` | 25 | Outward speed when thrown standing still... |
-| `ArcPerStud` | 1.3 | ...plus this per stud/s the thrower was going at the press... |
-| `ArcMax` | 90 | ...up to this. Stagger multiplies it like any hit. |
+| `Range` | 8.5 | Its reach, the same way a punch's `Range` works (plus `Punch.TargetRadius`). |
+| `Degrees` | 50 | Its arc either side of straight ahead. |
+| `Lift` | 100 | Upward speed it gives, at any speed (85 measured 18.2 studs high on a dummy; 100 not measured). |
+| `ArcBase` | 70 | Outward speed when thrown standing still... |
+| `ArcPerStud` | 1.6 | ...plus this per stud/s the thrower was going at the press... |
+| `ArcMax` | 170 | ...up to this. Stagger multiplies it like any hit. |
 | `TrailSeconds` | 1.2 | How long the streak behind the thrown body keeps drawing. |
 | `TrailWidth` | 2.4 | How wide that streak is, in studs. |
 

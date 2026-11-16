@@ -249,6 +249,15 @@ function PlayerDataService:KnitStart()
 			dirty = false,
 			saving = false,
 		}
+		-- The builders' test balance (Config/Abilities.TestCoins): raised to its amount on joining,
+		-- never lowered. Decided here from the server's own UserId; no client can ask for it.
+		if AbilityKit.onTestList(book.TestCoins, player.UserId) then
+			local topped = AbilityKit.topUp(entry.profile, book.TestCoins.Amount)
+			if topped then
+				entry.profile = topped
+				entry.dirty = true
+			end
+		end
 		entries[player] = entry
 		publish(self, player, entry)
 	end

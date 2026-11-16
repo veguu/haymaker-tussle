@@ -24,7 +24,7 @@ export type EventName =
 	| "UppercutRequest" -- client to server: I pressed the heavy uppercut. No arguments, ever.
 	| "DiveRequest" -- client to server: I started a dive kick out of a jump. No arguments, ever.
 	| "DiveLanded" -- server to all: this character's dive kick landed here, and whether it hit anyone
-	| "PunchStarted" -- server to all: this character started a swing: Left, Right, Uppercut, Kick or Cyclone
+	| "PunchStarted" -- server to all: this character started a swing: Left, Right, Uppercut, Kick, Cyclone or a kit swing's skill id
 	| "HitConfirmed" -- server to all: this character's punch hit this target
 	| "Knockback" -- server to the target's client: launch velocity, and lift if airborne
 	| "BumpHappened" -- server to all: these two characters bumped
@@ -53,6 +53,13 @@ export type EventName =
 	| "BlinkRequest" -- client to server: I blinked (Tempest's Q). No arguments, ever.
 	| "BlinkStarted" -- server to other clients: this character blinked
 	| "CycloneRequest" -- client to server: I pressed the Cyclone (Tempest's R). No arguments, ever.
+	| "KitSwingRequest" -- client to server: I pressed my kit's attack skill (Comet, Glacier, Maul, Breath). No arguments, ever: the server knows the kit.
+	| "KitMoveRequest" -- client to server: I used my kit's mobility skill (Jet, Slide, Pounce, Ascend). No arguments, ever: the server knows the kit.
+	| "KitMoveStarted" -- server to other clients: this character used this mobility skill (a skill id)
+	| "KitLanded" -- server to all: this character's leaping skill (a skill id) came down and slammed
+	| "KitCast" -- server to all: this character threw this attack skill (a skill id), and it will land at this position
+	| "Frozen" -- server to all: this character was frozen in ice (the Frost kit's Frostbite), for this many seconds
+	| "Thawed" -- server to all: this character's ice is gone, and whether a hit broke it
 	| "CoinsEarned" -- server to client: what the round just paid you: total Coins, and each line (label, Coins)
 
 local Net = {}

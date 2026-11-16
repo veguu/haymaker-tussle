@@ -132,4 +132,36 @@ function HudLogic.catchUp(from: number, to: number, elapsed: number, seconds: nu
 	return from + (to - from) * eased
 end
 
+-- Golden Hour combat HUD (UI Phase 1, 2026-11-15; vault UI Specifications/Combat HUD) ---------------------
+
+export type StaggerBand = "calm" | "rising" | "critical"
+
+--- Your stagger's band: calm under 40 % of the max, rising to 70 %, critical from 70 %.
+function HudLogic.staggerBand(value: number, max: number): StaggerBand
+	local share = value / math.max(max, 1)
+	if share >= 0.7 then
+		return "critical"
+	elseif share >= 0.4 then
+		return "rising"
+	end
+	return "calm"
+end
+
+--- The knockback multiplier as the caption shows it: one decimal, no trailing zero dance ("1.0", "3.4", "6.0").
+function HudLogic.multiplierText(multiplier: number): string
+	return string.format("%.1f", math.floor(multiplier * 10 + 0.5) / 10)
+end
+
+--- Recovering: the value went down and nothing raised it for `delay` seconds (the server's recovery delay).
+--- A drop sooner than that is hit relief (you landed a hit), not recovery.
+function HudLogic.recovering(
+	value: number,
+	previous: number,
+	now: number,
+	lastRise: number,
+	delay: number
+): boolean
+	return value < previous and now - lastRise >= delay
+end
+
 return HudLogic

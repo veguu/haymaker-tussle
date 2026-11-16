@@ -16,9 +16,18 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Sfx = require(ReplicatedStorage.Shared.Sfx)
 local GroundBreak = require(ReplicatedStorage.Shared.Core.GroundBreak)
+local Abilities = require(ReplicatedStorage.Shared.Config.Abilities)
 local AirFx = require(script.Parent.Parent.Fx.AirFx)
+local BeastFx = require(script.Parent.Parent.Fx.BeastFx)
+local BruiserFx = require(script.Parent.Parent.Fx.BruiserFx)
 local ClashFx = require(script.Parent.Parent.Fx.ClashFx)
 local DashFx = require(script.Parent.Parent.Fx.DashFx)
+local DragonFx = require(script.Parent.Parent.Fx.DragonFx)
+local FrostFx = require(script.Parent.Parent.Fx.FrostFx)
+local FxKit = require(script.Parent.Parent.Fx.FxKit)
+local InfernoFx = require(script.Parent.Parent.Fx.InfernoFx)
+local SkillFx = require(script.Parent.Parent.Fx.SkillFx)
+local TricksterFx = require(script.Parent.Parent.Fx.TricksterFx)
 local KickHitFx = require(script.Parent.Parent.Fx.KickHitFx)
 local PunchHitFx = require(script.Parent.Parent.Fx.PunchHitFx)
 local StepBurstFx = require(script.Parent.Parent.Fx.StepBurstFx)
@@ -183,14 +192,33 @@ function FxController:AirPunchGust(character: Model, direction: Vector3)
 	AirFx.gust(root.Position, direction)
 end
 
+-- The kit a body is wearing, for the looks a kit gives its ordinary moves (its own punch hit, its own
+-- landing). Nil for bots and bodies with no player.
+local function kitOf(character: Model?): string?
+	local player = character and Players:GetPlayerFromCharacter(character)
+	local kit = player and player:GetAttribute("HT_Kit")
+	return if typeof(kit) == "string" then kit else nil
+end
+
+-- A kit's own landing where a kick connects, a kicked body lands or a dive reaches the floor.
+local function kitLanding(kit: string?, at: Vector3)
+	if kit == "Frost" then
+		FrostFx.landing(at)
+	elseif kit == "Inferno" then
+		InfernoFx.landing(at)
+	elseif kit == "Beast" then
+		BeastFx.landing(at)
+	end
+end
+
 --- A landed hit on the target, sending them away from the attacker.
 function FxController:HitBurst(target: Model, attacker: Model?, strength: number, tip: Vector3?)
-	local root = target:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local root = target:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked just below)
 	if not root then
 		return
 	end
 	local away = root.CFrame.LookVector
-	local attackerRoot = attacker and attacker:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local attackerRoot = attacker and attacker:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked just below)
 	if attackerRoot then
 		local offset = root.Position - attackerRoot.Position
 		local flat = Vector3.new(offset.X, 0, offset.Z)
@@ -203,7 +231,17 @@ function FxController:HitBurst(target: Model, attacker: Model?, strength: number
 	local center = tip or root.Position - away * 0.8
 	-- The hit itself: the replica of the reference's punch hit (Fx/PunchHitFx), all particles.
 	-- A strong hit is the reference's heavy hit, which carries its own size.
-	PunchHitFx.play(center, away, if strong then 1 else scale, nil, strong)
+	-- A kit with its own punch shows that instead (cosmetic only: the hit is the same hit).
+	local wears = kitOf(attacker)
+	if wears == "Frost" then
+		FrostFx.punch(center, strong)
+	elseif wears == "Inferno" then
+		InfernoFx.punch(center, strong)
+	elseif wears == "Beast" then
+		BeastFx.punch(center, away, strong)
+	else
+		PunchHitFx.play(center, away, if strong then 1 else scale, nil, strong)
+	end
 
 	-- The crack on top, the old impact as its body, and on a strong hit a deep boom for weight.
 	Sfx.play("punch_crack", root, PITCH_VARY, { volume = 1.25 })
@@ -264,8 +302,8 @@ end
 
 --- A third party's punch bouncing off a clash: a hard flash where they connected, thrown back at them.
 function FxController:ClashRepel(target: Model, attacker: Model)
-	local rootT = target:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local rootA = attacker:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local rootT = target:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked just below)
+	local rootA = attacker:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked just below)
 	if not rootT or not rootA then
 		return
 	end
@@ -352,6 +390,10 @@ function FxController:KickImpact(
 		)
 	else
 		StepBurstFx.play(position + up * 0.5, math.clamp(0.8 + 0.5 * power, 0.7, 1.5))
+	end
+	-- A kit with its own kick shows it where the kick connects or the body lands (cosmetic only).
+	if hit or landing then
+		kitLanding(kitOf(attacker), FxKit.floorUnder(position + up * 2, 14) or position)
 	end
 
 	-- One sound per moment: the kick's crack where it connects, then the ground slam where the body
@@ -687,6 +729,7 @@ end
 --- A dive kick reaching the floor: the floor breaks and a blast goes off under the kicker.
 function FxController:DiveLanded(character: Model, at: Vector3, hit: boolean)
 	self:GroundBlast(character, at, if hit then 1 else 0.6)
+	kitLanding(kitOf(character), at)
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if root then
 		Sfx.play("ground_break", root, PITCH_VARY)
@@ -750,7 +793,314 @@ function FxController:Swing(character: Model)
 	end
 end
 
+-- THE KITS' SKILLS (Config/Abilities.KitMoves and KitSwings; Fx/InfernoFx, FrostFx, BeastFx, DragonFx,
+-- BruiserFx, TricksterFx, and Fx/SkillFx for the Cyclone and the Uppercut). Unlike the rest of the
+-- game's effects these are big and coloured: the user asked for that on 2026-11-15.
+
+local function flatLookOf(root: BasePart): Vector3
+	return FxKit.flat(root.CFrame.LookVector)
+end
+
+-- Calls `callback` with the floor point under `root` once it comes back down, for a leap's landing.
+local function whenLanded(character: Model, root: BasePart, callback: (at: Vector3) -> ())
+	task.spawn(function()
+		local started = os.clock()
+		task.wait(0.25)
+		while character.Parent and root.Parent and os.clock() - started < 2.5 do
+			if root.AssemblyLinearVelocity.Y <= 1 then
+				local at = FxKit.floorUnder(root.Position, 3.8)
+				if at then
+					callback(at)
+					return
+				end
+			end
+			task.wait(0.03)
+		end
+	end)
+end
+
+--- A kit's mobility skill starting on `character` (Blastoff, Frostbite, Pounce, Ascend, Charge,
+--- Flip). `direction` is the way it goes; without it (someone else's: only that it started is known)
+--- it is read off their body.
+function FxController:KitMove(character: Model, skillId: string, direction: Vector3?, _foe: Model?)
+	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked on the next line)
+	local move = (Abilities.KitMoves :: any)[skillId]
+	if not root or not move then
+		return
+	end
+	local way = direction
+	if not way or way.Magnitude < 0.01 then
+		local moving = root.AssemblyLinearVelocity
+		local level = Vector3.new(moving.X, 0, moving.Z)
+		way = if level.Magnitude > 4 then level.Unit else flatLookOf(root)
+	end
+	local mine = character == Players.LocalPlayer.Character
+	if skillId == "Blastoff" then
+		InfernoFx.blastoff(root, way)
+		Sfx.play("boom_mid", root, 0, { pitch = 1.25, volume = 0.9, cut = 0.6 })
+		Sfx.play("ground_break", root, PITCH_VARY, { pitch = 1.1, volume = 0.8 })
+		Sfx.play("dash", root, PITCH_VARY, { pitch = 0.75, volume = 0.9, cut = 0.5 })
+		if mine then
+			self:CameraKick(0.5)
+		end
+	elseif skillId == "Frostbite" then
+		FrostFx.frostbite(root, way, move.Seconds)
+		Sfx.play("ice_whoosh", root, PITCH_VARY, { pitch = 0.9, volume = 1 })
+		Sfx.play("ice_shatter", root, PITCH_VARY, { pitch = 1.5, volume = 0.5, cut = 0.5 })
+		Sfx.play("dash", root, PITCH_VARY, { pitch = 1.4, volume = 0.6, cut = 0.6 })
+		Sfx.play("propel", root, PITCH_VARY, { pitch = 1.25, volume = 0.45 })
+	elseif skillId == "Charge" then
+		BruiserFx.charge(root, way, move.Seconds)
+		Sfx.play("dash", root, PITCH_VARY, { pitch = 0.7, volume = 0.9, cut = 0.5 })
+		Sfx.play("bump", root, 0, { pitch = 0.7, volume = 0.7 })
+	elseif skillId == "Pounce" then
+		-- The landing's slam is shown when the server says it landed (KitLanded).
+		BeastFx.pounce(root, way, 0.5)
+		Sfx.play("swing_heavy", root, PITCH_VARY, { pitch = 1.2, volume = 0.8 })
+		Sfx.play("propel", root, PITCH_VARY, { pitch = 0.9, volume = 0.6 })
+	elseif skillId == "Flip" then
+		TricksterFx.flip(root, 0.5)
+		Sfx.play("dash", root, PITCH_VARY, { pitch = 1.6, volume = 0.7, cut = 0.35 })
+		whenLanded(character, root, function(at)
+			TricksterFx.land(at)
+		end)
+	elseif skillId == "Ascend" then
+		DragonFx.ascend(root, 0.6)
+		local torso = character:FindFirstChild("Torso")
+		AirFx.ribbon(if torso and torso:IsA("BasePart") then torso else root, 0.6, 2.4, 0.35)
+		Sfx.play("launch", root, PITCH_VARY, { volume = 0.8 })
+		Sfx.play("propel", root, PITCH_VARY, { pitch = 0.8, volume = 0.6 })
+	end
+	if mine and move.Kind == "burst" then
+		self:DashZoom(move.Seconds, 0)
+	end
+end
+
+--- A leaping kit skill came down and slammed (the server's word: the Beast's Pounce).
+function FxController:KitLanded(character: Model, skillId: string)
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not root or not root:IsA("BasePart") or skillId ~= "Pounce" then
+		return
+	end
+	local at = FxKit.floorUnder(root.Position, 8) or root.Position - Vector3.yAxis * 3
+	BeastFx.slam(at)
+	Sfx.play("ground_break", root, PITCH_VARY, { pitch = 0.9, volume = 1 })
+	Sfx.play("boom_low", root, 0, { pitch = 1.2, volume = 0.8, cut = 0.5 })
+	Sfx.play("punch_crack", root, PITCH_VARY, { pitch = 0.8, volume = 1 })
+	if character == Players.LocalPlayer.Character then
+		self:CameraKick(0.55)
+	end
+end
+
+--- A kit attack skill that lands away from its caster was just thrown (the server's word: the
+--- Inferno's Meteor), and will land at `position`.
+function FxController:KitCast(attacker: Model, side: string, position: Vector3)
+	local swing = (Abilities.KitSwings :: any)[side]
+	local cast = swing and swing.Cast
+	if side ~= "Meteor" or not cast then
+		return
+	end
+	InfernoFx.meteor(position, swing.Windup, cast.Fall, cast.Radius)
+	local root = attacker:FindFirstChild("HumanoidRootPart")
+	local seconds = swing.Windup + cast.Fall
+	if root then
+		Sfx.play("dash_charge", root, 0, { pitch = 0.8, volume = 0.7, cut = seconds })
+	end
+	task.delay(seconds * FxKit.slowness(), function()
+		-- The blast is heard where it lands: a short-lived anchor for the sounds.
+		local anchor = Instance.new("Attachment")
+		anchor.WorldPosition = position
+		anchor.Parent = workspace.Terrain
+		game:GetService("Debris"):AddItem(anchor, 4)
+		Sfx.play("boom_low", anchor, 0, { pitch = 0.9, volume = 1.2, cut = 0.9 })
+		Sfx.play("boom_mid", anchor, 0, { pitch = 1, volume = 1, cut = 0.8 })
+		Sfx.play("ground_break", anchor, PITCH_VARY, { pitch = 0.8, volume = 1.1 })
+		local mine = Players.LocalPlayer.Character
+		local myRoot = mine and mine:FindFirstChild("HumanoidRootPart")
+		if myRoot and myRoot:IsA("BasePart") and (myRoot.Position - position).Magnitude <= 60 then
+			self:CameraKick(0.8)
+		end
+	end)
+end
+
+-- Each character's latest kit swing, so a swing that was cancelled or replaced never shows its strike.
+local swingTokens: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
+
+--- A kit's attack skill starting on `character` (side = its skill id; and the Cyclone): what shows
+--- through the windup now, and its strike when the windup is over, hit or miss, unless
+--- KitSwingCancel is called first. Any other side does nothing. (The Meteor is shown from KitCast.)
+function FxController:KitSwing(character: Model, side: string)
+	local swing = (Abilities.KitSwings :: any)[side]
+		or (if side == "Cyclone" then Abilities.Cyclone else nil)
+	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked on the next line)
+	if not swing or not root then
+		return
+	end
+	local token = (swingTokens[character] or 0) + 1
+	swingTokens[character] = token
+	local arm = Knit.GetController("AnimController"):SwingArm(character) :: BasePart?
+	local look = flatLookOf(root)
+	local fist = if arm
+		then (arm.CFrame * CFrame.new(0, -arm.Size.Y / 2, 0)).Position
+		else root.Position + look * 1.5
+	local mouth = root.Position + Vector3.yAxis * 1.4 + look * 1.4
+
+	-- Through the windup.
+	if side == "Glacier" then
+		FrostFx.windup(root, arm, look, swing.Windup)
+	elseif side == "Frenzy" then
+		BeastFx.glint(fist)
+	elseif side == "Breath" then
+		DragonFx.windup(mouth)
+	elseif side == "Slam" then
+		BruiserFx.windup(root.Position + Vector3.yAxis * 3.2 + look * 0.8)
+	elseif side == "Backfist" then
+		TricksterFx.glint(fist)
+	end
+	if swing.Windup >= 0.3 and side ~= "Meteor" then
+		Sfx.play("dash_charge", root, 0, { pitch = 1.1, volume = 0.5, cut = swing.Windup })
+	end
+
+	-- The strike.
+	local slow = FxKit.slowness()
+	task.delay(swing.Windup * slow, function()
+		if swingTokens[character] ~= token or not root.Parent or not character.Parent then
+			return
+		end
+		local way = flatLookOf(root)
+		local kick = 0
+		if side == "Glacier" then
+			FrostFx.strike(root, way)
+			Sfx.play("ice_shatter", root, PITCH_VARY, { pitch = 0.8, volume = 1.2 })
+			Sfx.play("ground_break", root, PITCH_VARY, { pitch = 1.2, volume = 0.9 })
+			Sfx.play("boom_low", root, 0, { pitch = 1.3, volume = 0.6, cut = 0.5 })
+			kick = 0.4
+		elseif side == "Frenzy" then
+			-- Four swipes, as the server throws four hits; each faces wherever the body faces by then.
+			local cast = swing.Cast
+			for index = 1, cast.Hits do
+				task.delay((index - 1) * cast.Every * slow, function()
+					if swingTokens[character] ~= token or not root.Parent then
+						return
+					end
+					local last = index == cast.Hits
+					BeastFx.swipe(root, flatLookOf(root), index, last)
+					Sfx.play(
+						"punch_swing",
+						root,
+						PITCH_VARY,
+						{ pitch = if last then 1.1 else 1.5, volume = if last then 1.1 else 0.8 }
+					)
+					if last then
+						Sfx.play("swing_heavy", root, PITCH_VARY, { pitch = 1.1, volume = 0.9 })
+					end
+				end)
+			end
+			kick = 0.25
+		elseif side == "Breath" then
+			DragonFx.strike(root.Position + Vector3.yAxis * 1.4 + way * 1.4, way, swing.Range)
+			Sfx.play("boom_low", root, 0, { pitch = 1.4, volume = 0.8, cut = 0.6 })
+			Sfx.play("launch", root, PITCH_VARY, { volume = 0.7 })
+			kick = 0.45
+		elseif side == "Slam" then
+			local ground = BruiserFx.strike(root)
+			if ground then
+				self:GroundBlast(character, ground, 0.7)
+			end
+			Sfx.play("ground_break", root, PITCH_VARY, { volume = 1 })
+			Sfx.play("boom_low", root, 0, { pitch = 1, volume = 0.9, cut = 0.7 })
+			kick = 0.6
+		elseif side == "Backfist" then
+			TricksterFx.strike(root, way)
+			Sfx.play("punch_swing", root, PITCH_VARY, { pitch = 1.6, volume = 0.9 })
+			kick = 0.2
+		elseif side == "Cyclone" then
+			SkillFx.cycloneStrike(root, swing.Range)
+			Sfx.play("propel", root, PITCH_VARY, { pitch = 1.2, volume = 0.7 })
+			kick = 0.25
+		end
+		if kick > 0 and character == Players.LocalPlayer.Character then
+			self:CameraKick(kick)
+		end
+	end)
+end
+
+--- That character's kit swing was refused or beaten: its strike is not shown.
+function FxController:KitSwingCancel(character: Model)
+	swingTokens[character] = (swingTokens[character] or 0) + 1
+end
+
+--- A kit's attack skill landing on `target` (side = its skill id), in its kit's look, in place of the
+--- ordinary hit.
+function FxController:KitHit(target: Model, attacker: Model?, side: string, strength: number)
+	local root = target:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked just below)
+	if not root then
+		return
+	end
+	local away = root.CFrame.LookVector
+	local attackerRoot = attacker and attacker:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked just below)
+	if attackerRoot then
+		local offset = root.Position - attackerRoot.Position
+		local flat = Vector3.new(offset.X, 0, offset.Z)
+		if flat.Magnitude > 0.01 then
+			away = flat.Unit
+		end
+	end
+	if side == "Meteor" then
+		InfernoFx.hit(root, away)
+	elseif side == "Glacier" then
+		FrostFx.hit(root, away)
+	elseif side == "Frenzy" then
+		BeastFx.hit(root, away)
+	elseif side == "Breath" then
+		DragonFx.hit(root, away)
+	elseif side == "Slam" then
+		BruiserFx.hit(root, away)
+	elseif side == "Backfist" then
+		TricksterFx.hit(root, away)
+	else
+		self:HitBurst(target, attacker, strength)
+		return
+	end
+	Sfx.play("punch_crack", root, PITCH_VARY, { volume = 1.25 })
+	Sfx.play("punch_hit", root, PITCH_VARY, { volume = 0.6 })
+	Sfx.play("boom_low", root, 0, { pitch = 1.1, volume = 0.8, cut = 0.5 })
+	Sfx.play("launch", root, PITCH_VARY)
+	-- Smoke left along the flight path, so the throw is readable across the arena.
+	AirFx.trail(root, cfg.TrailPuffs * cfg.TrailPuffSeconds)
+	local mine = Players.LocalPlayer.Character
+	if mine and (mine == target or mine == attacker) then
+		self:CameraKick(0.45)
+	end
+end
+
+--- The Uppercut landing on `target`: a column over the ordinary hit (Fx/SkillFx).
+function FxController:UppercutHit(target: Model)
+	local root = target:FindFirstChild("HumanoidRootPart")
+	if root and root:IsA("BasePart") then
+		SkillFx.uppercutHit(root)
+		local mine = Players.LocalPlayer.Character
+		if mine then
+			local myRoot = mine:FindFirstChild("HumanoidRootPart")
+			if
+				myRoot
+				and myRoot:IsA("BasePart")
+				and (myRoot.Position - root.Position).Magnitude <= cfg.KickShakeRange
+			then
+				self:CameraKick(0.4)
+			end
+		end
+	end
+end
+
 function FxController:KnitInit()
+	task.spawn(InfernoFx.preload)
+	task.spawn(FrostFx.preload)
+	task.spawn(BeastFx.preload)
+	task.spawn(DragonFx.preload, (Abilities.KitSwings :: any).Breath.Range)
+	task.spawn(BruiserFx.preload)
+	task.spawn(TricksterFx.preload)
+	task.spawn(SkillFx.preload, Abilities.Cyclone.Range)
 	local made = Instance.new("Folder")
 	made.Name = "HT_Fx"
 	made.Parent = workspace
@@ -794,6 +1144,69 @@ local function driftSmoke(character: Model)
 end
 
 function FxController:KnitStart()
+	-- Frozen and thawed (the Frost kit's Frostbite; StatusService decides both).
+	task.spawn(function()
+		local frozen = Net.client("Frozen")
+		if frozen then
+			frozen.OnClientEvent:Connect(function(character: any, seconds: any)
+				if
+					typeof(character) == "Instance"
+					and character:IsA("Model")
+					and typeof(seconds) == "number"
+				then
+					FrostFx.freeze(character, seconds)
+					local root = character:FindFirstChild("HumanoidRootPart")
+					if root then
+						Sfx.play(
+							"ice_shatter",
+							root,
+							PITCH_VARY,
+							{ pitch = 1.3, volume = 0.9, cut = 0.8 }
+						)
+						Sfx.play("punch_crack", root, PITCH_VARY, { pitch = 1.6, volume = 0.7 })
+					end
+				end
+			end)
+		end
+		local landed = Net.client("KitLanded")
+		if landed then
+			landed.OnClientEvent:Connect(function(character: any, skillId: any)
+				if
+					typeof(character) == "Instance"
+					and character:IsA("Model")
+					and typeof(skillId) == "string"
+				then
+					self:KitLanded(character, skillId)
+				end
+			end)
+		end
+		local cast = Net.client("KitCast")
+		if cast then
+			cast.OnClientEvent:Connect(function(attacker: any, side: any, position: any)
+				if
+					typeof(attacker) == "Instance"
+					and attacker:IsA("Model")
+					and typeof(side) == "string"
+					and typeof(position) == "Vector3"
+				then
+					self:KitCast(attacker, side, position)
+				end
+			end)
+		end
+		local thawed = Net.client("Thawed")
+		if thawed then
+			thawed.OnClientEvent:Connect(function(character: any, broken: any)
+				if typeof(character) == "Instance" and character:IsA("Model") then
+					FrostFx.thaw(character, broken == true)
+					local root = character:FindFirstChild("HumanoidRootPart")
+					if root and broken == true then
+						Sfx.play("ice_shatter", root, PITCH_VARY, { pitch = 1.05, volume = 1.2 })
+						Sfx.play("punch_crack", root, PITCH_VARY, { pitch = 1.3, volume = 0.9 })
+					end
+				end
+			end)
+		end
+	end)
 	-- Someone was dashed into: shown as a hit, at the body, sized by how hard.
 	local dashHit = Net.client("DashHit")
 	if dashHit then

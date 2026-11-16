@@ -27,6 +27,8 @@
 -- more, which is 0: always); a target that can't be launched gets its arc instead.
 -- THE CYCLONE (Tempest's R, CycloneRequest, no arguments): a spinning hook, side "Cyclone", whose reach goes
 -- all the way round. Everyone it reaches is thrown outward in a low arc (Config/Abilities.Cyclone).
+-- THE NEWER KITS' ATTACK SKILLS (KitSwingRequest, no arguments; Config/Abilities.KitSwings): Comet,
+-- Glacier, Maul and Breath, each a heavy move with side = its skill id and an arc on its own numbers.
 -- The kick roots the thrower through the windup (the client keeps itself still; HT_KickWindup marks it).
 -- The uppercut doesn't (Uppercut.Roots false): they keep running, and it costs them no speed, hit or miss.
 -- For both, the server measures how fast they were going at the press.
@@ -71,6 +73,15 @@ local HEAVY: { [string]: { cfg: any, hitbox: any, skill: string? } } = {
 	Uppercut = { cfg = upperCfg, hitbox = upperHitbox, skill = "Uppercut" },
 	Cyclone = { cfg = cycloneCfg, hitbox = cycloneHitbox, skill = "Cyclone" },
 }
+-- The newer kits' attack skills (Config/Abilities.KitSwings: Comet, Glacier, Maul, Breath): each a heavy
+-- move of its own, side = its skill id, all asked for through the one KitSwingRequest remote.
+local kitSwings = Abilities.KitSwings :: { [string]: any }
+for skillId, swing in kitSwings do
+	local hitbox = table.clone(punchCfg) :: any
+	hitbox.Range = swing.Range
+	hitbox.UppercutDegrees = swing.Degrees
+	HEAVY[skillId] = { cfg = swing, hitbox = hitbox, skill = skillId }
+end
 -- The drawing is sent whenever it could be wanted, and each client decides whether to show it.
 local SHOW_DEBUG = GameConfig.Debug.ShowHitbox or GameConfig.Training.Enabled
 
@@ -160,6 +171,52 @@ local function recordFor(player: Player): PunchRecord
 		records[player] = record
 	end
 	return record
+end
+
+--- A kit skill that is not a swing lands on `target` (a blast, a slam, a cast: AbilityService and
+--- SkillCastService decide who it reaches). `away` is the flat unit way they are thrown, `strength`
+--- the speed, `up` the lift. It is a hit like any other: refused between fighters who may not fight,
+--- it adds stagger and is multiplied by it, credits the attacker, breaks ice and is shrugged off by
+--- armour. Returns whether it landed.
+function CombatService:SkillHit(
+	attacker: Model,
+	target: Model,
+	away: Vector3,
+	strength: number,
+	up: number
+): boolean
+	if
+		target == attacker
+		or not Combatants.isAlive(target)
+		or not Combatants.isAlive(attacker)
+		or not self:CanFight(attacker, target)
+	then
+		return false
+	end
+	local stagger = Knit.GetService("StaggerService")
+	local before = stagger:Get(target)
+	local out = strength * Combat.staggerMultiplier(staggerCfg, before)
+	local lift = up
+	stagger:AddHit(target)
+	self:MarkHit(target)
+	notePairHit(attacker, target, os.clock())
+	Knit.GetService("RoundService"):NoteHit(target, attacker)
+	if Knit.GetService("StatusService"):Shatter(target) then
+		local bonus = (Abilities.KitMoves :: any).Frostbite.Freeze.ShatterBonus
+		out *= bonus
+		lift *= bonus
+	end
+	local armored = Knit.GetService("AbilityService"):TakeArmor(target)
+	if armored then
+		out *= armored
+		lift *= armored
+	end
+	Knit.GetService("KnockbackService"):Launch(target, away.X * out, away.Z * out, lift, lift)
+	self._hitConfirmed:FireAllClients(attacker, target, math.floor(out))
+	trace(
+		`{attacker.Name} skill hit {target.Name}: strength {math.floor(out)}, lift {math.floor(lift)}`
+	)
+	return true
 end
 
 --- May these two fight each other right now? The round step adds its own rule for the 1v1 arena.
@@ -286,6 +343,28 @@ local function landHit(self: any, punch: Punch, target: Model, at: Vector3, from
 			Combat.staggerMultiplier(staggerCfg, before)
 		)
 		airUp = up
+	elseif kitSwings[punch.side] then
+		-- A newer kit's attack skill: the same kind of arc again, on that skill's own numbers.
+		strength, up = Combat.uppercutArc(
+			kitSwings[punch.side],
+			attackerSpeed,
+			Combat.staggerMultiplier(staggerCfg, before)
+		)
+		airUp = up
+	end
+	-- Frozen in ice (the Frost kit's Frostbite): the hit breaks it, and throws them harder for it.
+	if Knit.GetService("StatusService"):Shatter(target) then
+		local bonus = (Abilities.KitMoves :: any).Frostbite.Freeze.ShatterBonus
+		strength *= bonus
+		up *= bonus
+		airUp *= bonus
+	end
+	-- Mid-Charge (the Bruiser's Q), the first hit is mostly shrugged off.
+	local armored = Knit.GetService("AbilityService"):TakeArmor(target)
+	if armored then
+		strength *= armored
+		up *= armored
+		airUp *= armored
 	end
 	knockback:Launch(target, away.X * strength, away.Z * strength, up, airUp)
 	self._hitConfirmed:FireAllClients(punch.attacker, target, math.floor(strength))
@@ -734,6 +813,7 @@ function CombatService:KnitInit()
 	self._heavyKickRequest = Net.server("HeavyKickRequest")
 	self._uppercutRequest = Net.server("UppercutRequest")
 	self._cycloneRequest = Net.server("CycloneRequest")
+	self._kitSwingRequest = Net.server("KitSwingRequest")
 	self._punchStarted = Net.server("PunchStarted")
 	self._hitConfirmed = Net.server("HitConfirmed")
 	self._punchResult = Net.server("PunchResult")
@@ -887,8 +967,18 @@ function CombatService:KnitStart()
 		end
 		self._punchStarted:FireAllClients(attacker, side)
 		trace(`{player.Name} heavy {side} at speed {math.floor(speed)}`)
-		Knit.GetService("EndlagService")
-			:Start(attacker, side, now, move.cfg.Windup + punchCfg.ActiveSeconds)
+		local cast = move.cfg.Cast
+		Knit.GetService("EndlagService"):Start(
+			attacker,
+			side,
+			now,
+			move.cfg.Windup + punchCfg.ActiveSeconds + (if cast then cast.Lead or 0 else 0)
+		)
+		-- A swing with a cast is not a swing: what happens after the windup is the cast's.
+		if cast then
+			Knit.GetService("SkillCastService"):Start(attacker, side, move.cfg)
+			return
+		end
 		startPunch(
 			self,
 			attacker,
@@ -919,6 +1009,14 @@ function CombatService:KnitStart()
 	end)
 	self._cycloneRequest.OnServerEvent:Connect(function(player: Player, ...)
 		kitHeavy("Cyclone", player, ...)
+	end)
+	-- A newer kit's attack skill. The request names nothing: the server looks up which swing the kit
+	-- this player is wearing gives, if any.
+	self._kitSwingRequest.OnServerEvent:Connect(function(player: Player, ...)
+		local side = Knit.GetService("AbilityService"):KitSwingOf(player)
+		if side and HEAVY[side] then
+			kitHeavy(side, player, ...)
+		end
 	end)
 
 	RunService.Heartbeat:Connect(function()

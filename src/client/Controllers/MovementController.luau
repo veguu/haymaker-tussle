@@ -41,6 +41,7 @@ local KickMeter = require(ReplicatedStorage.Shared.Core.KickMeter)
 local AimAssist = require(ReplicatedStorage.Shared.Core.AimAssist)
 local Jump = require(ReplicatedStorage.Shared.Core.Jump)
 local Momentum = require(ReplicatedStorage.Shared.Core.Momentum)
+local SkillMove = require(ReplicatedStorage.Shared.Core.SkillMove)
 local TrainingLayout = require(ReplicatedStorage.Shared.Core.TrainingLayout)
 local Lobby = require(ReplicatedStorage.Shared.Core.Lobby)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -53,6 +54,7 @@ local INPUT_STALE_SECONDS = 0.25
 local MIN_LIFT = 1 -- below this a knock isn't a lift, just the floor's own tiny motion
 local LAND_CHECK_SECONDS = 0.25 -- a jump can't count as landed this soon
 local PUSH_GRACE_SECONDS = 0.05 -- a body gets this long to catch up with its own push
+local SKILL_MOVE_WAIT = 0.15 -- a kit move the step can't start within this long is dropped
 local UNDO_SECONDS = 1 -- a refused punch's push is taken back only if the answer comes this soon
 
 local cfg = GameConfig.Movement
@@ -240,6 +242,9 @@ function MovementController:_bind(
 	local lean = 0
 	-- The dash goes on the press, always a plain one: there is no charging it (user, 2026-11-12).
 	local propelRequested = false
+	-- A kit's mobility skill, or an attack skill's lunge, waiting for the next step (Core/SkillMove).
+	-- `id` is the skill to show and tell the server about; a lunge has none.
+	local skillMove: { id: string?, cfg: any, at: number }? = nil
 	local knockGraceUntil = 0
 	local kick: DiveKick.State? = nil
 	local kickTarget: Model? = nil
@@ -586,6 +591,7 @@ function MovementController:_bind(
 		slammed = false
 		steerX, steerZ, pushX, pushZ, lift = 0, 0, 0, 0, 0
 		punchRequested, propelRequested, kickRequested = false, false, false
+		skillMove = nil
 		lastPush = nil
 		lifts, liftUntil, liftSet = AirRecovery.newLifts(), 0, false
 		state = if face and face.Magnitude > 0.01
@@ -654,6 +660,47 @@ function MovementController:_bind(
 	trove:Add(function()
 		self._requestDash = nil
 	end)
+
+	-- A kit's mobility skill (Jet, Slide, Pounce, Ascend) or an attack skill's lunge: it goes on the
+	-- next step, where the keys and the body's travel are known. A request the step can't get to within
+	-- a moment (stunned, mid-kick) is dropped, not saved up.
+	self._requestSkillMove = function(id: string?, move: any)
+		skillMove = { id = id, cfg = move, at = os.clock() }
+	end
+	trove:Add(function()
+		self._requestSkillMove = nil
+	end)
+
+	-- The nearest other fighter within `range` studs, for a move aimed at one: who, the flat offset to
+	-- them, and how far.
+	local function nearestFoe(range: number): (Model?, number?, number?, number?)
+		local found: { Model } = {}
+		local offsets: { { x: number, z: number } } = {}
+		for _, other in CollectionService:GetTagged("HT_Combatant") do
+			if other == character or not other:IsA("Model") then
+				continue
+			end
+			local otherRoot = other:FindFirstChild("HumanoidRootPart")
+			local otherHumanoid = other:FindFirstChildOfClass("Humanoid")
+			if
+				not otherRoot
+				or not otherRoot:IsA("BasePart")
+				or not otherHumanoid
+				or otherHumanoid.Health <= 0
+				or other:GetAttribute("HT_Spectating") ~= nil
+			then
+				continue
+			end
+			local offset = otherRoot.Position - root.Position
+			table.insert(found, other)
+			table.insert(offsets, { x = offset.X, z = offset.Z })
+		end
+		local index, distance = SkillMove.nearest(range, offsets)
+		if index then
+			return found[index], offsets[index].x, offsets[index].z, distance
+		end
+		return nil, nil, nil, nil
+	end
 
 	-- Space: jumps at someone you launched; else, holding punch, the launching kick; else an ordinary jump.
 	-- The timed press once attached, and the dive out of a jump, are a left click (below).
@@ -893,6 +940,13 @@ function MovementController:_bind(
 			inputX, inputZ = 0, 0
 			drive, side = "side", 0
 		end
+		-- Frozen in ice (the Frost kit's Frostbite; StatusService): held where they are. Nothing they
+		-- were doing carries on: no travel, no push, no steering. They still fall.
+		if character:GetAttribute("HT_Frozen") ~= nil then
+			state = Momentum.stopped(state)
+			pushX, pushZ, steerX, steerZ = 0, 0, 0, 0
+			skillMove = nil
+		end
 		-- Anywhere in the air without something else moving the body, the keys steer it.
 		local freeAir = not grounded and not floating and not airRun and not kick and not stunned
 		if not floating and not freeAir then
@@ -1112,6 +1166,7 @@ function MovementController:_bind(
 				and kickTarget:FindFirstChild("HumanoidRootPart") :: BasePart?
 			local before = kick.phase
 			propelRequested = false -- no propel during the committed jump or the kick
+			skillMove = nil
 			punchRequested = false
 			pushX, pushZ, lift = 0, 0, 0
 			-- The jump is a jump, and lasts until you land, whatever happens to anyone else. Once
@@ -1275,6 +1330,65 @@ function MovementController:_bind(
 				pushGraceUntil = now + PUSH_GRACE_SECONDS
 				lastPush = { x = addX, z = addZ, up = up, at = now, lifted = lifted }
 				fx:AirPunchGust(character, Vector3.new(dirX, 0, dirZ))
+			end
+		end
+
+		-- A kit's mobility skill or an attack skill's lunge (Core/SkillMove). A burst is a dash with its
+		-- own length, speed and steering; a leap is a jump with its own speeds, flown as an air run.
+		if skillMove then
+			local request = skillMove
+			skillMove = nil
+			local move = request.cfg
+			if now - request.at <= SKILL_MOVE_WAIT then
+				local moving = root.AssemblyLinearVelocity
+				local faceX, faceZ = Momentum.facing(state)
+				local foe: Model? = nil
+				local foeX: number?, foeZ: number?, foeDistance: number? = nil, nil, nil
+				if move.Aim == "foe" or move.Aim == "away" then
+					foe, foeX, foeZ, foeDistance = nearestFoe(move.Range or 0)
+				end
+				local dirX, dirZ = SkillMove.direction(
+					move.Aim,
+					inputX,
+					inputZ,
+					cfg.InputDeadzone,
+					moving.X,
+					moving.Z,
+					jumpCfg.MoveMinSpeed,
+					faceX,
+					faceZ,
+					foeX,
+					foeZ
+				)
+				if dirX and dirZ then
+					if move.Kind == "leap" then
+						local up, forward = SkillMove.leap(move, workspace.Gravity, foeDistance)
+						state = Momentum.moving(state, dirX, dirZ, forward)
+						airRun = { t = 0, gravityScale = jumpCfg.GravityScale, keep = forward }
+						jumping = true
+						slammed = false
+						liftUntil, liftSet = 0, false
+						humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+						local vx, vz = Momentum.velocity(state)
+						root.AssemblyLinearVelocity = Vector3.new(vx, up, vz)
+					else
+						state = SkillMove.burst(
+							state :: any,
+							dirX,
+							dirZ,
+							move.Speed,
+							move.Seconds or 0.2,
+							move.Turn
+						) :: any
+					end
+					if request.id then
+						fx:KitMove(character, request.id, Vector3.new(dirX, 0, dirZ), foe)
+						local remote = self._kitMoveRemote
+						if remote then
+							remote:FireServer()
+						end
+					end
+				end
 			end
 		end
 
@@ -1488,6 +1602,18 @@ function MovementController:RequestDash(): boolean
 	return false
 end
 
+--- A kit's mobility skill (`id`: Jet, Slide, Pounce, Ascend, with its numbers from
+--- Config/Abilities.KitMoves), or with no id an attack skill's lunge: asks for it on the next
+--- movement step. False when there's no body to move.
+function MovementController:SkillMove(id: string?, move: any): boolean
+	local request = self._requestSkillMove
+	if request then
+		request(id, move)
+		return true
+	end
+	return false
+end
+
 function MovementController:PunchThrown(swing: string?)
 	if self._punchThrown then
 		self._punchThrown(swing)
@@ -1533,6 +1659,7 @@ function MovementController:KnitStart()
 		warn("[Haymaker Tussle] knockback remote missing")
 	end
 	local propelRemote = Net.client("PropelRequest")
+	self._kitMoveRemote = Net.client("KitMoveRequest")
 	local bodyReset = Net.client("BodyReset")
 	if bodyReset then
 		bodyReset.OnClientEvent:Connect(function(face: Vector3?)

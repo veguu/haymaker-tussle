@@ -12,10 +12,12 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
+local Abilities = require(ReplicatedStorage.Shared.Config.Abilities)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Endlag = require(ReplicatedStorage.Shared.Core.Endlag)
 
-local cfg: any = GameConfig.Endlag
+-- GameConfig's numbers, with the kits' skills' laid over them (Config/Abilities.Endlag).
+local cfg: any = Endlag.with(GameConfig.Endlag :: any, Abilities.Endlag)
 local SKILL_ATTRIBUTE = "HT_Skill"
 
 local EndlagController = Knit.CreateController({

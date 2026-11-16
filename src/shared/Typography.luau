@@ -1,60 +1,125 @@
 --!strict
--- Typography - the one type family for every piece of game-owned text, and the text roles that say
--- which weight and size each kind of text uses. Change FAMILY here and the whole game follows,
--- client and server (world labels are made on the server).
---
--- FAMILY is Roblox's built-in Montserrat. League Spartan was the intended face, but on 2026-11-08 it
--- was not loadable: there is no rbxasset://fonts/families/LeagueSpartan.json (TextService:
--- GetFamilyInfoAsync fails), no Enum.Font entry, and no League Spartan font family on the Creator
--- Store. Montserrat's family info in Studio lists Thin to Black, so every weight below is genuine.
--- To switch later, put the League Spartan family's asset id (rbxassetid://...) in FAMILY.
+-- Typography - the type for every piece of game-owned text, client and server (world labels are made on the
+-- server). UI Phase 0c (2026-11-15): the Golden Hour faces from one Roblox-native family, measured loadable in
+-- Studio 2026-11-14 (vault UI Research/Design System/Typography):
+--   text    = Builder Sans      (everything people read; FAMILY)
+--   display = Builder Extended  (headings, big numerals, short caps labels)
+--   mono    = Builder Mono      (ticking figures)
+-- Roles come from Tokens.type through Core/TypeRoles. The old role names (Headline, Stat, Button, ...) still
+-- work as aliases at their old sizes, so every screen keeps its layout until it is rebuilt.
+-- Same API as before: face, apply, adopt and the HT_TextRole attribute. NEW: FAMILIES, resolve, textScale, and
+-- reading roles follow Roblox's PreferredTextSize setting (re-applied live when the player changes it).
+
+local Tokens = require(script.Parent.Tokens)
+local TypeRoles = require(script.Parent.Core.TypeRoles)
 
 local Typography = {}
 
-Typography.FAMILY = "rbxasset://fonts/families/Montserrat.json"
+Typography.FAMILIES = {
+	text = Tokens.family.text,
+	display = Tokens.family.display,
+	mono = Tokens.family.mono,
+}
+
+-- The reading family. Role-less text is moved onto it by adopt().
+Typography.FAMILY = Typography.FAMILIES.text
 
 export type Role = {
+	family: string,
 	weight: Enum.FontWeight,
 	size: number,
 	lineHeight: number?,
+	scalable: boolean?,
 }
 
--- Every kind of text, by job. Sizes are pixels at a 1280 x 720 window, before the HUD's scale. Nothing
--- is under 15: the LihFolk UI spec's floor (see Haymaker Tussle/UI Rules.md).
-Typography.Roles = {
-	Headline = { weight = Enum.FontWeight.ExtraBold, size = 40 }, -- results headline
-	Winner = { weight = Enum.FontWeight.ExtraBold, size = 34 }, -- winner's name
-	Announce = { weight = Enum.FontWeight.Bold, size = 20 }, -- FINAL TWO, round state, results words
-	Stat = { weight = Enum.FontWeight.Bold, size = 32 }, -- your stagger %, the survivor count
-	StatSmall = { weight = Enum.FontWeight.Bold, size = 18 }, -- a target's stagger, totals
-	Action = { weight = Enum.FontWeight.SemiBold, size = 17 }, -- Punch, Propel, Air Kick, prompt words
-	Button = { weight = Enum.FontWeight.SemiBold, size = 17 }, -- primary buttons, menu headings
-	Name = { weight = Enum.FontWeight.SemiBold, size = 16 }, -- player names
-	Key = { weight = Enum.FontWeight.Medium, size = 15 }, -- key caps and bindings
-	Value = { weight = Enum.FontWeight.Medium, size = 15 }, -- cooldown seconds, speed, short status
-	Label = { weight = Enum.FontWeight.Medium, size = 15 }, -- small labels: STAGGER, SPEED, ROUND 04
-	Body = { weight = Enum.FontWeight.Regular, size = 16, lineHeight = 1.2 }, -- help and descriptions
-	World = { weight = Enum.FontWeight.Bold, size = 16 }, -- world-space labels over heads and stations
-}
+local function build(name: string): Role
+	local r = TypeRoles.resolve(Tokens, name)
+	return {
+		family = Typography.FAMILIES[r.face],
+		weight = (Enum.FontWeight :: any)[r.weight],
+		size = r.size,
+		lineHeight = r.lineHeight,
+		scalable = r.scalable,
+	}
+end
 
---- The FontFace for a role (or a bare weight).
+-- Every role by name, new and old, resolved once.
+Typography.Roles = {} :: { [string]: Role }
+for name in Tokens.type do
+	Typography.Roles[name] = build(name)
+end
+for name in TypeRoles.ALIASES do
+	Typography.Roles[name] = build(name)
+end
+
+--- The FontFace for a role (or a bare weight, on the reading family).
 function Typography.face(role: Role | Enum.FontWeight): Font
-	local weight = if typeof(role) == "EnumItem" then role else (role :: Role).weight
-	return Font.new(Typography.FAMILY, weight :: Enum.FontWeight, Enum.FontStyle.Normal)
+	if typeof(role) == "EnumItem" then
+		return Font.new(Typography.FAMILY, role :: Enum.FontWeight, Enum.FontStyle.Normal)
+	end
+	local r = role :: Role
+	return Font.new(r.family or Typography.FAMILY, r.weight, Enum.FontStyle.Normal)
+end
+
+-- The player's text-size multiplier (1 on the server and wherever the setting can't be read).
+local scale = 1
+local watching = false
+local applied: { [Instance]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+
+local function readScale(): number
+	local ok, value = pcall(function()
+		return (game:GetService("GuiService") :: any).PreferredTextSize.Name
+	end)
+	return TypeRoles.textScale(if ok then value else nil)
+end
+
+--- The multiplier Roblox's text-size setting asks for (Medium 1 ... Largest 1.5).
+function Typography.textScale(): number
+	return scale
+end
+
+local function style(object: TextLabel | TextButton | TextBox, role: Role)
+	object.FontFace = Typography.face(role)
+	object.TextSize = if role.scalable then math.floor(role.size * scale + 0.5) else role.size
+	object.LineHeight = role.lineHeight or 1
+end
+
+local function watch()
+	if watching or not game:GetService("RunService"):IsClient() then
+		return
+	end
+	watching = true
+	scale = readScale()
+	pcall(function()
+		game:GetService("GuiService")
+			:GetPropertyChangedSignal("PreferredTextSize")
+			:Connect(function()
+				scale = readScale()
+				for object in applied do
+					local name = object.Parent and object:GetAttribute("HT_TextRole")
+					local role = name and Typography.Roles[name]
+					if role and role.scalable then
+						style(object :: any, role)
+					end
+				end
+			end)
+	end)
 end
 
 --- Styles one text object for a role: family, weight, size and line height. Colour stays the caller's.
---- The role's name is kept as an attribute, so the default below leaves it alone.
+--- The role's name is kept as an attribute, so adopt() leaves it alone.
 function Typography.apply(object: TextLabel | TextButton | TextBox, roleName: string)
-	local role = (Typography.Roles :: any)[roleName] :: Role
+	local role = Typography.Roles[roleName]
 	assert(role, `no text role {roleName}`)
-	object.FontFace = Typography.face(role)
-	object.TextSize = role.size
-	object.LineHeight = role.lineHeight or 1
+	watch()
+	style(object, role)
 	object:SetAttribute("HT_TextRole", roleName)
+	if role.scalable then
+		applied[object] = true
+	end
 end
 
--- The weight a role-less text object gets: its old weight, kept, on the family.
+-- Role-less text: moved onto the reading family, keeping its weight (snapped to one Builder Sans has).
 local function adoptOne(object: Instance)
 	if
 		(object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox"))
@@ -63,7 +128,8 @@ local function adoptOne(object: Instance)
 		local text = object :: TextLabel
 		local face = text.FontFace
 		if face.Family ~= Typography.FAMILY then
-			text.FontFace = Font.new(Typography.FAMILY, face.Weight, Enum.FontStyle.Normal)
+			local weight = (Enum.FontWeight :: any)[TypeRoles.snap("text", face.Weight.Name)]
+			text.FontFace = Font.new(Typography.FAMILY, weight, Enum.FontStyle.Normal)
 		end
 	end
 end
