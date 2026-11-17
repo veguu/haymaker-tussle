@@ -2922,3 +2922,43 @@ was in a Play session I did not start. 533 tests, gates green. NOT in the mockup
   in and out by eye; Reduced Motion; phones; the published game.
 - NEXT: the spectate panel and chip in the new look, then the class-name band; then phone, gamepad and Reduced
   Motion tests.
+
+## ui-9c (2026-11-18): the spectate panel and chip in the fight-poster look (NOT COMMITTED)
+ui-9b (the feed) was approved and committed as de02000. Build `kits-7c+lobby-4+ui-9c`, 533 tests, gates green,
+synced (178 scripts match, origin/main had nothing new), place saved (version in the UI Map). NOT in the mockup:
+designed here from the kit's own pieces.
+- `SpectateController`: the old hidden button, its helpers and the grey rounded panel are gone. The panel is two
+  rough-cut tabs (`PosterKit.cut` "act", 40 tall): MY VIEW and FIGHTER POV; the one that is on is yellow and says
+  ON, the other is cream. Under them: previous and next (the "close" shape; light violet when there is someone
+  else to turn to, dark with dim lettering and switched off when not) and between them who you are watching on a
+  slanted ink plate (`Shapes.slant`). The buttons press and sound like every poster button (`PosterKit.pressable`)
+  and drift in their own group (`Drift` "spectate", shown only while the panel is; a switched-off arrow holds
+  still). Sizes in `HudTheme.Spectate` (`Tab`, `Lean`, `Chip`). The rules (Core/Spectate), the camera and what
+  opens the panel (More page, `Toggle`) are unchanged.
+- `HudController`: the SPECTATING chip is a 170 x 32 slanted ink plate (was a 200 x 40 cut panel); the spectate
+  panel stands 12 units above it, bottom centre.
+- SEEN in my own play test (1118 x 536), opened the real way (MORE strip, Spectate row): MY VIEW ON yellow,
+  "N fighting" on the plate; pressing FIGHTER POV put the camera behind Bot 4, turned that tab yellow with ON, lit
+  both arrows and named the fighter; panel 208 x 65 px over the chip, nothing touching. Console: only known lines.
+- NOT TESTED: the arrows really changing the fighter (I pressed next once but did not read the name before and
+  after); "X is out" notices; the round ending while watching; "FIGHTER POV  ON" is a tight fit in its tab; a
+  gamepad; phones; Reduced Motion; the published game.
+- NEXT: the class-name band when an ultimate is used; then phone, gamepad and Reduced Motion tests.
+
+## ui-9d (2026-11-18): the spectate camera is free to turn and zoom (NOT COMMITTED)
+The owner: "while spectated you should make it so you're able to freely move your camera around". Build
+`kits-7c+lobby-4+ui-9d`, 533 tests, gates green, synced, place saved v441.
+- `SpectateController.watch`: Fighter POV is now the game's ORDINARY camera (`CameraType` Custom) with the watched
+  fighter's Humanoid as `CameraSubject`, set on every watch (so the arrows move it). It was a Scriptable camera
+  fixed behind the fighter. A body with no Humanoid still gets the old fixed view (`step()`, skipped while `free`).
+  `restore()` already put the camera back on your own Humanoid. `Lobby.Spectate` Back / Up / LookAhead / Smooth in
+  the config are now used only by that fallback. Your avatar's controls are still off while you watch.
+- SEEN in my own play test: subject Bot 1, Custom camera, still Bot 1 after 1.5 s (nothing pulls it back; the lock
+  camera and shift lock did not interfere); three scroll steps took it from 13 to 34.7 studs; the Left key turned
+  it and it stayed turned; the next arrow moved it to Bot 23 and the plate said so (this also settles ui-9c's
+  untested arrows); MY VIEW put the subject back on my own character and cleared `HT_Spectating`.
+  Console: only the known lines.
+- NOT TESTED: turning with the mouse (the test tool's right-drag did not turn it; the Left key did, through the same
+  camera), touch and gamepad turning, the fighter going out while you watch, the round ending while you watch,
+  the published game.
+- NEXT: the class-name band when an ultimate is used; then phone, gamepad and Reduced Motion tests.

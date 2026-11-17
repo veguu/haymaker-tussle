@@ -928,14 +928,15 @@ function HudController:KnitStart()
 	local feedRows: { FeedRow } = {}
 
 	-- Spectating: a small strip at the bottom centre while you are out ---------------------------------------
-	local spectate = group(gui, "Spectate", Vector2.new(200, 40))
+	-- the SPECTATING chip: a small slanted ink plate, like the top strip's
+	local spectate = group(gui, "Spectate", HudTheme.Spectate.Chip)
 	spectate.holder.AnchorPoint = Vector2.new(0.5, 1)
-	local spectatePanel =
-		Components.cut(spectate.fade, 1, "line.500", { Size = UDim2.fromScale(1, 1) }, 0.75).frame
-	text(spectatePanel, "label", "ivory.50", {
+	Shapes.slant(spectate.fade, ST.Plate, L.ChipLean, { Name = "Plate" })
+	Poster.text(spectate.fade, "label", 15, "ivory.50", {
 		Size = UDim2.fromScale(1, 1),
 		TextXAlignment = Enum.TextXAlignment.Center,
 		Text = "SPECTATING",
+		ZIndex = 1,
 	})
 
 	-- the target marker: chevron + name, and a thin bar in the other-fighter ramp ----------------------------

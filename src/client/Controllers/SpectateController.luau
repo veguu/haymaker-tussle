@@ -1,11 +1,13 @@
 --!strict
--- SpectateController - the Spectate button, top left under AFK, and its two views. The rules are in
--- Core/Spectate; this draws them and moves the camera.
+-- SpectateController - the spectate panel and its two views. The rules are in Core/Spectate; this draws them
+-- and moves the camera. The panel is opened from the menu window's More page and stands at the bottom centre,
+-- in the fight-poster look (2026-11-18): two rough-cut tabs, MY VIEW and FIGHTER POV (the one that is on is
+-- yellow and says ON), and under them previous, who you are watching on a slanted ink plate, and next.
 --
 -- MY VIEW: the normal game. Your camera is on your own avatar and you walk where you like.
--- FIGHTER POV: the camera sits just behind a fighter still in the round and faces the way they face
--- (another player's own camera isn't sent to you, so their facing is the truth available). Your avatar
--- stays where it is in the lobby with its controls off, until you come back.
+-- FIGHTER POV: the camera follows a fighter still in the round, and you turn and zoom it freely, as you do
+-- your own (the owner, 2026-11-18; it used to sit fixed behind them). Your avatar stays where it is in the
+-- lobby with its controls off, until you come back.
 --
 -- Who can be watched: every body tagged HT_Fighter by RoundService. If the one you're watching goes,
 -- you're moved to the next and the list opens so you can choose; with nobody left, or when the round
@@ -21,14 +23,18 @@ local RunService = game:GetService("RunService")
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Spectate = require(ReplicatedStorage.Shared.Core.Spectate)
-local Typography = require(ReplicatedStorage.Shared.Typography)
-local HudMotion = require(script.Parent.Parent.Ui.HudMotion)
+local Tokens = require(ReplicatedStorage.Shared.Tokens)
+local Drift = require(script.Parent.Parent.Ui.Drift)
 local HudTheme = require(script.Parent.Parent.Ui.HudTheme)
+local Poster = require(script.Parent.Parent.Ui.Poster)
+local PosterKit = require(script.Parent.Parent.Ui.PosterKit)
+local Shapes = require(script.Parent.Parent.Ui.Shapes)
 
 local lobbyCfg: any = GameConfig.Lobby
 local camCfg: any = lobbyCfg.Spectate
-local C = HudTheme.Colour
+local colour = Tokens.colour
 local S = HudTheme.Spectate
+local DRIFT = "spectate"
 local FIGHTER_TAG = "HT_Fighter"
 local IN_ROUND = "HT_InRound"
 local SPECTATING = "HT_Spectating"
@@ -40,34 +46,6 @@ local STATE_FOLDER = "HT_RoundState"
 local SpectateController = Knit.CreateController({
 	Name = "SpectateController",
 })
-
-local function label(parent: Instance, name: string, role: string, colour: Color3): TextLabel
-	local text = Instance.new("TextLabel")
-	text.Name = name
-	text.BackgroundTransparency = 1
-	text.Text = "<unbound>"
-	text.TextColor3 = colour
-	Typography.apply(text, role)
-	text.Parent = parent
-	return text
-end
-
-local function button(parent: Instance, name: string, text: string): TextButton
-	local made = Instance.new("TextButton")
-	made.Name = name
-	made.AutoButtonColor = false
-	made.BorderSizePixel = 0
-	made.Selectable = true
-	made.BackgroundColor3 = C.PanelRaised
-	made.TextColor3 = C.Text
-	made.Text = text
-	Typography.apply(made, "Button")
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, S.Corner)
-	corner.Parent = made
-	made.Parent = parent
-	return made
-end
 
 function SpectateController:KnitStart()
 	if not GameConfig.Round.Enabled or not lobbyCfg.Enabled then
@@ -86,67 +64,77 @@ function SpectateController:KnitStart()
 	local root = Instance.new("Frame")
 	root.Name = "Root"
 	root.BackgroundTransparency = 1
-	root.Size = UDim2.fromOffset(S.Width + S.Gap + S.PanelWidth, S.Height + (S.Row + S.Gap) * 2)
+	root.AnchorPoint = Vector2.new(0.5, 1)
+	root.Size = UDim2.fromOffset(S.PanelWidth, S.Tab * 2 + S.Gap)
 	root.Parent = gui
 	local scale = Instance.new("UIScale")
 	scale.Parent = root
 
-	local main = Instance.new("TextButton")
-	main.Name = "SpectateButton"
-	main.Size = UDim2.fromOffset(S.Width, S.Height)
-	main.AutoButtonColor = false
-	main.BorderSizePixel = 0
-	main.Text = ""
-	main.Selectable = true
-	main.BackgroundColor3 = C.Panel
-	main.Parent = root
-	local mainCorner = Instance.new("UICorner")
-	mainCorner.CornerRadius = UDim.new(0, S.Corner)
-	mainCorner.Parent = main
-	local press = Instance.new("UIScale")
-	press.Parent = main
-	local title = label(main, "Title", "Button", C.Text)
-	title.Size = UDim2.new(1, 0, 0.6, 0)
-	title.Position = UDim2.fromScale(0, 0.05)
-	title.Text = "SPECTATE"
-	local sub = label(main, "Sub", "Label", C.Muted)
-	sub.Size = UDim2.new(1, -8, 0.4, 0)
-	sub.Position = UDim2.new(0, 4, 0.58, 0)
-	sub.TextTruncate = Enum.TextTruncate.AtEnd
-
 	-- The panel: the two views on one row, then who you're watching with previous and next.
 	local panel = Instance.new("Frame")
 	panel.Name = "Panel"
-	panel.Position = UDim2.fromOffset(S.Width + S.Gap, 0)
-	panel.Size = UDim2.fromOffset(S.PanelWidth, S.Pad * 2 + S.Row * 2 + S.Gap)
-	panel.BackgroundColor3 = C.Panel
-	panel.BackgroundTransparency = HudTheme.Transparency.Panel
-	panel.BorderSizePixel = 0
+	panel.BackgroundTransparency = 1
+	panel.Size = UDim2.fromScale(1, 1)
 	panel.Visible = false
 	panel.Parent = root
-	local panelCorner = Instance.new("UICorner")
-	panelCorner.CornerRadius = UDim.new(0, S.Corner)
-	panelCorner.Parent = panel
 
-	local half = (S.PanelWidth - S.Pad * 2 - S.Gap) / 2
-	local mineButton = button(panel, "MyView", "MY VIEW")
-	mineButton.Position = UDim2.fromOffset(S.Pad, S.Pad)
-	mineButton.Size = UDim2.fromOffset(half, S.Row)
-	local povButton = button(panel, "FighterPov", "FIGHTER POV")
-	povButton.Position = UDim2.fromOffset(S.Pad + half + S.Gap, S.Pad)
-	povButton.Size = UDim2.fromOffset(half, S.Row)
-
-	local rowY = S.Pad + S.Row + S.Gap
-	local prevButton = button(panel, "Previous", "<")
-	prevButton.Position = UDim2.fromOffset(S.Pad, rowY)
-	prevButton.Size = UDim2.fromOffset(S.Arrow, S.Row)
-	local nextButton = button(panel, "Next", ">")
-	nextButton.Position = UDim2.fromOffset(S.PanelWidth - S.Pad - S.Arrow, rowY)
-	nextButton.Size = UDim2.fromOffset(S.Arrow, S.Row)
-	local who = label(panel, "Who", "Button", C.Text)
-	who.Position = UDim2.fromOffset(S.Pad + S.Arrow + S.Gap, rowY)
-	who.Size = UDim2.fromOffset(S.PanelWidth - (S.Pad + S.Arrow + S.Gap) * 2, S.Row)
-	who.TextWrapped = true
+	-- a rough-cut button with a word on it; it drifts like every pressable control (Ui/Drift)
+	type Piece = { cut: PosterKit.Cut, label: TextLabel }
+	local function piece(
+		shape: string,
+		x: number,
+		y: number,
+		width: number,
+		words: string,
+		onPress: () -> ()
+	): Piece
+		local cut = PosterKit.cut(
+			panel,
+			shape,
+			Vector2.new(width, S.Tab),
+			colour("ivory.50"),
+			Vector2.new(4, 5)
+		)
+		PosterKit.place(cut, x, y)
+		local label = Poster.text(cut.face, "label", 15, "ink.900", {
+			Size = UDim2.fromScale(1, 1),
+			Text = words,
+			TextXAlignment = Enum.TextXAlignment.Center,
+		})
+		PosterKit.pressable(cut, onPress)
+		Drift.add(DRIFT, cut.body, S.Tab, 3)
+		return { cut = cut, label = label }
+	end
+	-- what the buttons do is set further down, once the views exist
+	local onMine: () -> (), onPov: () -> (), onCycle: (number) -> ()
+	local half = (S.PanelWidth - S.Gap) / 2
+	local mineTab = piece("act", 0, 0, half, "MY VIEW", function()
+		onMine()
+	end)
+	local povTab = piece("act", half + S.Gap, 0, half, "FIGHTER POV", function()
+		onPov()
+	end)
+	local rowY = S.Tab + S.Gap
+	local prevArrow = piece("close", 0, rowY, S.Tab, "<", function()
+		onCycle(-1)
+	end)
+	local nextArrow = piece("close", S.PanelWidth - S.Tab, rowY, S.Tab, ">", function()
+		onCycle(1)
+	end)
+	local whoPlate = Instance.new("Frame")
+	whoPlate.Name = "Who"
+	whoPlate.BackgroundTransparency = 1
+	whoPlate.Position = UDim2.fromOffset(S.Tab + S.Gap, rowY)
+	whoPlate.Size = UDim2.fromOffset(S.PanelWidth - (S.Tab + S.Gap) * 2, S.Tab)
+	whoPlate.Parent = panel
+	Shapes.slant(whoPlate, "ink.900", S.Lean, { Name = "Plate" })
+	local who = Poster.text(whoPlate, "label", 15, "ivory.50", {
+		Position = UDim2.fromOffset(S.Lean + 4, 0),
+		Size = UDim2.new(1, -(S.Lean + 4) * 2, 1, 0),
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 1,
+	})
 
 	-- State.
 	local view = "mine"
@@ -156,6 +144,7 @@ function SpectateController:KnitStart()
 	local open = false
 	local controls: any = nil
 	local camPosition: Vector3? = nil
+	local free = false -- the ordinary camera is following the fighter; step() leaves it alone
 	local camLook: Vector3? = nil
 
 	local function nameOf(model: Model): string
@@ -206,29 +195,26 @@ function SpectateController:KnitStart()
 		local list = fighters()
 		local inRound = player:GetAttribute(IN_ROUND) == true
 		local watching = if target then nameOf(target) else nil
-		main.Active = not inRound
-		main.BackgroundTransparency = if inRound
-			then HudTheme.Transparency.Stepped
-			else HudTheme.Transparency.Panel
-		title.TextColor3 = if inRound then C.Dim else C.Text
-		sub.TextColor3 = if inRound then C.Dim else C.Muted
-		sub.Text = if inRound
-			then "locked in round"
-			else Spectate.status(view, phase(), watching, #list)
-		panel.Visible = open and not inRound
+		local shown = open and not inRound
+		panel.Visible = shown
+		Drift.show(DRIFT, shown)
 
+		-- the view that is on: yellow, and it says ON (told by word as well as colour)
 		local pov = view == "pov"
-		mineButton.BackgroundColor3 = if pov then C.PanelRaised else C.Accent
-		mineButton.TextColor3 = if pov then C.Text else C.OnAccent
-		mineButton.Text = if pov then "MY VIEW" else "MY VIEW  ON"
-		povButton.BackgroundColor3 = if pov then C.Accent else C.PanelRaised
-		povButton.TextColor3 = if pov then C.OnAccent else C.Text
-		povButton.Text = if pov then "FIGHTER POV  ON" else "FIGHTER POV"
+		mineTab.cut.fill.ImageColor3 = colour(if pov then "ivory.50" else "coral.500")
+		mineTab.label.Text = if pov then "MY VIEW" else "MY VIEW  ON"
+		povTab.cut.fill.ImageColor3 = colour(if pov then "coral.500" else "ivory.50")
+		povTab.label.Text = if pov then "FIGHTER POV  ON" else "FIGHTER POV"
+		-- the arrows: light violet when there is someone else to turn to, dark and dim when not
 		local canCycle = pov and #list > 1
-		prevButton.Active = canCycle
-		nextButton.Active = canCycle
-		prevButton.TextColor3 = if canCycle then C.Text else C.Dim
-		nextButton.TextColor3 = if canCycle then C.Text else C.Dim
+		for _, arrow in { prevArrow, nextArrow } do
+			if arrow.cut.button then
+				arrow.cut.button.Active = canCycle
+			end
+			arrow.cut.fill.ImageColor3 = colour(if canCycle then "violet.400" else "poster.dark")
+			arrow.label.TextColor3 = colour(if canCycle then "ink.900" else "stone.300")
+			Drift.hold(arrow.cut.body, not canCycle)
+		end
 		if notice then
 			who.Text = notice
 		elseif pov and watching then
@@ -238,7 +224,7 @@ function SpectateController:KnitStart()
 		else
 			who.Text = "No active match"
 		end
-		who.TextColor3 = if pov and not notice then C.Text else C.Muted
+		who.TextColor3 = colour(if pov and not notice then "ivory.50" else "stone.300")
 	end
 
 	local function restore()
@@ -276,7 +262,7 @@ function SpectateController:KnitStart()
 		local camera = workspace.CurrentCamera
 		local body = target
 		local bodyRoot = body and body:FindFirstChild("HumanoidRootPart") :: BasePart?
-		if not camera or not bodyRoot then
+		if free or not camera or not bodyRoot then
 			return
 		end
 		local at = bodyRoot.Position
@@ -296,12 +282,22 @@ function SpectateController:KnitStart()
 		target = model
 		targetIndex = table.find(list, model) or 1
 		notice = why
-		if view ~= "pov" then
-			view = "pov"
-			local camera = workspace.CurrentCamera
-			if camera then
+		-- The camera follows the fighter and is yours to move (the owner, 2026-11-18): it is the game's ordinary
+		-- camera with the fighter as its subject, so you turn and zoom it as you do your own. A body with no
+		-- Humanoid falls back to the fixed view behind it (step()).
+		local camera = workspace.CurrentCamera
+		local humanoid = model:FindFirstChildOfClass("Humanoid")
+		free = humanoid ~= nil
+		if camera then
+			if humanoid then
+				camera.CameraType = Enum.CameraType.Custom
+				camera.CameraSubject = humanoid
+			else
 				camera.CameraType = Enum.CameraType.Scriptable
 			end
+		end
+		if view ~= "pov" then
+			view = "pov"
 			local character = player.Character
 			if character then
 				character:SetAttribute(SPECTATING, true)
@@ -363,15 +359,6 @@ function SpectateController:KnitStart()
 		end
 	end
 
-	main.MouseButton1Down:Connect(function()
-		HudMotion.pressDown(press, S.PressScale)
-	end)
-	main.MouseButton1Up:Connect(function()
-		HudMotion.pressUp(press)
-	end)
-	main.MouseLeave:Connect(function()
-		HudMotion.pressUp(press)
-	end)
 	local function toggle()
 		if player:GetAttribute(IN_ROUND) == true then
 			return
@@ -380,25 +367,17 @@ function SpectateController:KnitStart()
 		notice = nil
 		show()
 	end
-	main.Activated:Connect(toggle)
-	-- The menu window's More page opens this now (MenuController, 2026-11-17), so the old button is hidden;
-	-- the panel it opened stands at the bottom centre (see layout()).
+	-- The menu window's More page opens this (MenuController).
 	self._toggle = toggle
-	main.Visible = false
-	mineButton.Activated:Connect(function()
+	onMine = function()
 		toMine(nil)
-	end)
-	povButton.Activated:Connect(function()
+	end
+	onPov = function()
 		if view ~= "pov" then
 			toPov()
 		end
-	end)
-	prevButton.Activated:Connect(function()
-		cycle(-1)
-	end)
-	nextButton.Activated:Connect(function()
-		cycle(1)
-	end)
+	end
+	onCycle = cycle
 
 	CollectionService:GetInstanceAddedSignal(FIGHTER_TAG):Connect(show)
 	CollectionService:GetInstanceRemovedSignal(FIGHTER_TAG):Connect(function(instance)
@@ -448,16 +427,9 @@ function SpectateController:KnitStart()
 		local size = if camera then camera.ViewportSize else HudTheme.Scale.Reference
 		local by = HudTheme.scaleFor(size)
 		scale.Scale = by
-		-- The panel stands at the bottom centre, over the place of the HUD's "spectating" chip (16 from the
-		-- bottom, 40 tall). It used to open at the top left, where the menu strips are now (owner, 2026-11-17:
-		-- nothing lies over anything). The panel is the root's right part; the old button on its left is hidden.
-		local panelTall = S.Pad * 2 + S.Row * 2 + S.Gap
-		root.Position = UDim2.new(
-			0.5,
-			-(S.Width + S.Gap + S.PanelWidth / 2) * by,
-			1,
-			-(16 + 40 * by + 14 + panelTall * by)
-		)
+		-- The panel stands at the bottom centre, just over the HUD's SPECTATING chip (which stands 24 from the
+		-- bottom): nothing lies over anything (the owner, 2026-11-17).
+		root.Position = UDim2.new(0.5, 0, 1, -(24 + (S.Chip.Y + 12) * by))
 	end
 	-- and it gives way to the open menu window
 	Knit.GetController("MenuController").Changed:Connect(function(entry: string?)

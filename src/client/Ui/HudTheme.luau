@@ -273,6 +273,10 @@ HudTheme.Spectate = {
 	PressScale = 0.96,
 	PressSeconds = 0.05,
 	ReleaseSeconds = 0.16,
+	-- the fight-poster panel (2026-11-18): its buttons' height, the who-plate's lean, and the HUD's SPECTATING chip
+	Tab = 40,
+	Lean = 6,
+	Chip = Vector2.new(170, 32),
 }
 
 -- The owner's Bots button (Studio or the place's owner only) sits under the Spectate button.
