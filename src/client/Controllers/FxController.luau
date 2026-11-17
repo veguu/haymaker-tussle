@@ -39,9 +39,8 @@ local BLACK = Color3.new(0, 0, 0)
 local DARK_SHARE = 0.72
 local MARK_SOLID = 0.08
 local PITCH_VARY = 0.08
--- An M1 landing is ONE role, m1_hit, with its layers (Config/SoundCandidates: the user picks it with the
--- F7 sound picker, 2026-11-16, kits-4i). No low boom under it any more: that was the "bassy drum".
-local KIT_HIT_LOUDER = 1.25
+-- An M1 landing is ONE role, m1_hit, and a launching hit m1_finish, each with its layers (Config/SoundCandidates:
+-- the user picks them with the sound picker, P in Studio). Round 3 (kits-5e): a sub thump, a crack and a smack.
 local PARK_POSITION = CFrame.new(0, -1000, 0)
 
 local FxController = Knit.CreateController({
@@ -246,10 +245,9 @@ function FxController:HitBurst(target: Model, attacker: Model?, strength: number
 		PunchHitFx.play(center, away, if strong then 1 else scale, nil, strong)
 	end
 
-	-- The punch (m1_hit, see KIT_HIT_LOUDER; its rumble bed holds through the string). On a strong hit (the
-	-- launch) a little louder, and the launch's whoosh. No boom on it any more (kits-5b): a low boom on the hit is
-	-- what read as a drum.
-	Sfx.playLayered("m1_hit", root, PITCH_VARY, if strong then { volume = KIT_HIT_LOUDER } else nil)
+	-- The punch (m1_hit); a strong hit (the launch) is the finisher (m1_finish, with its long tail) and the
+	-- launch's whoosh.
+	Sfx.playLayered(if strong then "m1_finish" else "m1_hit", root, PITCH_VARY)
 	if strong then
 		Sfx.play("launch", root, PITCH_VARY)
 		-- Smoke left along the flight path, so a big launch is readable across the arena (Fx/AirFx).
@@ -1065,9 +1063,8 @@ function FxController:KitHit(target: Model, attacker: Model?, side: string, stre
 		self:HitBurst(target, attacker, strength)
 		return
 	end
-	-- The same punch as an M1, louder, and the launch's boom.
-	Sfx.playLayered("m1_hit", root, PITCH_VARY, { volume = KIT_HIT_LOUDER })
-	Sfx.play("boom_low", root, 0, { pitch = 1.1, volume = 0.8, cut = 0.5 })
+	-- The same finisher as a string's launching hit (m1_finish), and the launch's whoosh.
+	Sfx.playLayered("m1_finish", root, PITCH_VARY)
 	Sfx.play("launch", root, PITCH_VARY)
 	-- Smoke left along the flight path, so the throw is readable across the arena.
 	AirFx.trail(root, cfg.TrailPuffs * cfg.TrailPuffSeconds)

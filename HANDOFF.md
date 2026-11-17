@@ -1832,3 +1832,40 @@ Build stamp `kits-5c+lobby-4+ui-4`. NOT committed. After the user reconnected Ro
   apart from the known 203785492.
 - NOT TESTED: the 0.32 s cadence (the tools can't click faster than ~0.5 s), a player as the target (two
   clients), how it sounds (no ears), Studio's upload of the flinch/run clips (they play in Studio only).
+- Committed as 8fc3af6 (not pushed).
+
+## kits-5d (2026-11-16): the sound picker opens with P or a SOUNDS button (F7 never worked)
+The user: "i cant see the f7 sound option thing". Measured: the picker was built and F7 bound, but a pressed F7
+never reached the game (Studio keeps that key). Now P (unbound by the game and by Studio in play) and a small
+"SOUNDS (P)" button at the top left (80, 12; beside the in-round menu button), Studio only. Verified in Studio:
+P opens it, the button closes it, the panel shows m1_hit A-D and ult_ready A-E.
+
+## kits-5e (2026-11-16): punch sound round 3 (sub thump + crack + smack), a finisher row, a shine for the ready sound
+Build stamp `kits-5e+lobby-4+ui-4`. NOT committed. The user disliked every round-2 option and sent new references
+with descriptions: punch (Gojo/Jogo - its download failed, 403; OPM Garou x2, Saitama x2, JJS melee hit set "THE
+closest", JoJo ORA barrage) and ultimate (glow SFX set, anime "kiiiin" shine, light spell). Their summary: every
+hit "mostly a huge, deep sub-bass thump (the loudest part), with a sharp crack on top ... and a crunchy meaty layer
+in the middle", short (0.2-0.5 s); finishers keep a 1.5-4 s rumble tail; ultimates a bright tonal shine, then a hit
+like Serious Punch.
+- MEASURED (JJS hit, ffmpeg band RMS): all bands jump on the hit, the sub loudest (~6 dB over mids) from ~40 ms,
+  sweeping down, gone ~0.35 s; mids/highs gone after ~0.12 s. (Corrects the "no thump on the hit" conclusion of
+  kits-5b, drawn from one clip; Field Notes "Sound Design Pitfalls" section 8.)
+- NEW ROLES: punch_thump (PSE "Boom Impact Deep Distant Thumping Hits", 11 takes: instant attack, pitch sweeping
+  ~300 -> ~70 Hz, long tail) and punch_smack (the Beefy Hit takes). punch_sub (the round-1 boom) and the rumble
+  beds are gone; Sfx.bed stays (unused; for a future barrage). m1_hit A thump (1.6, cut 0.25) + smack (1.0, mid
+  +6 dB) + crack (1.0); B thump + smack; C thump + crack; D A at 0.88 speed. NEW ROW m1_finish (hit 4 and launching
+  kit hits; replaces "m1_hit louder + boom_low"): A thump left ~2 s + smack + crack; B APM "BOOM-Synthetic Boom 03"
+  (cut 2.5) + thump + smack + crack; C PSE "Wind Whoosh Sonic Boom Low End Impact" (from 0.28 s, its impact on the
+  hit) + thump + crack. Levels set by measuring the whole mix against the JJS hit in one AudioAnalyzer.
+- ult_ready: A APM "Beautiful Shimmer", B APM "Effect Cue 6", C PSE Magic Burst 3 (the last pick), D a community
+  "GlowUp" (choose only if accepted). Ui/UltimateMeter (the teammate's file; only our sound line) now plays it 2.6 s
+  with nothing under it.
+- VERIFIED in Studio: picker rows m1_hit / m1_finish / ult_ready; a 4-hit string on Practice Dummy 1 played
+  m1_hit (thump + smack with EQ + crack, a new take each hit) x3 and m1_finish + launch on hit 4. Gates pass
+  (496; Tokens x2 the teammate's). NOT HEARD by me.
+
+## kits-5f (2026-11-16): the user's picks baked in
+The user picked m1_hit A, m1_finish A, ult_ready C. All three are now SoundBank entries (m1_hit / m1_finish share
+THUMP_TAKES with punch_thump; ult_ready = PSE Magic Burst 3). SoundCandidates is empty, and the sound picker (and
+its SOUNDS button) doesn't build while nothing is left to choose; add a role there to bring it back. Verified in
+Studio: the entries load as picked, no picker, console clean. Gates pass (496; Tokens x2 the teammate's).

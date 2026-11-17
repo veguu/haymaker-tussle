@@ -156,9 +156,8 @@ function UltimateMeter.start()
 		local ready = player:GetAttribute("HT_UltReady") == true
 		-- Full: its sound, once, as it fills. A short sting, not a cue that plays on (the user, 2026-11-15).
 		if ready and not wasReady then
-			-- Short and powerful (the user, 2026-11-16): the sting cut at 1 s, a sub thump under it.
-			Sfx.play("ult_ready", nil, nil, { cut = 1 })
-			Sfx.play("punch_sub", nil, nil, { volume = 1.1, pitch = 0.8, cut = 0.4 })
+			-- A bright, tonal shine (the user, 2026-11-16, kits-5e): left to glow 2.6 s, nothing under it.
+			Sfx.play("ult_ready", nil, nil, { cut = 2.6 })
 		end
 		wasReady = ready
 		local share = math.clamp(value / cfg.Max, 0, 1)

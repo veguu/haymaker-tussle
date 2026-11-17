@@ -41,6 +41,22 @@ export type Entry = {
 	layers: { Layer }?,
 }
 
+-- The sub thump's takes (ProSoundEffects "Boom Impact, Deep Distant Thumping Hit"), shared by punch_thump, m1_hit and
+-- m1_finish: see punch_thump below.
+local THUMP_TAKES: { Take } = {
+	{ id = 9125402735, length = 2.9, start = 0.01, volume = 0.9 },
+	{ id = 9125401226, length = 2.9, start = 0.01, volume = 1.12 },
+	{ id = 9125401225, length = 2.9, start = 0.01, volume = 1.0 },
+	{ id = 9125402967, length = 2.9, start = 0.06, volume = 1.0 },
+	{ id = 9125401391, length = 2.9, start = 0.01, volume = 1.08 },
+	{ id = 9125401393, length = 2.9, start = 0.01, volume = 0.97 },
+	{ id = 9125403415, length = 2.9, start = 0.04, volume = 1.0 },
+	{ id = 9125403433, length = 3.0, start = 0.06, volume = 1.0 },
+	{ id = 9125401975, length = 2.9, start = 0.01, volume = 1.04 },
+	{ id = 9125402512, length = 3.0, start = 0.02, volume = 0.82 },
+	{ id = 9125404320, length = 3.0, start = 0.05, volume = 1.0 },
+}
+
 local SoundBank: { [string]: Entry } = {
 	-- Body bumps. Very quiet (peak 6 against a punch's 668): only a soft touch.
 	["bump"] = {
@@ -162,44 +178,78 @@ local SoundBank: { [string]: Entry } = {
 		name = "Boxing Hits, With Gloves, Hit Punching Bag Hard (SFX)",
 		creator = "ProSoundEffects",
 	},
-	-- A low BOOM, cut at about 0.3 s. NO LONGER UNDER ANY PUNCH (2026-11-16, kits-4i): under the punches it
-	-- was the "bassy drum" the user heard (measured: the loudest layer of every M1, its lows held for the
-	-- whole 0.5 s). Kept only under the ultimate-ready sting (Ui/UltimateMeter). Each take starts on one boom
-	-- of a multi-boom file; volumes even out the peaks (133, 148, 331).
-	["punch_sub"] = {
-		takes = {
-			{ id = 9114362625, length = 2.89, start = 0.08, volume = 1.5 },
-			{ id = 9114362918, length = 2.47, start = 0.06, volume = 1.35 },
-			{ id = 1837830213, length = 3.29, start = 0.01, volume = 0.6 },
-		},
+	-- THE PUNCH'S LAYERS, round 3 (kits-5e, 2026-11-16). The user's references (JJS hit sounds the closest; also
+	-- OPM, JoJo, Gojo): "every hit is mostly a huge, deep sub-bass thump (the loudest part), with a sharp crack on
+	-- top that reaches the very highest frequencies, and a crunchy meaty layer in the middle". Measured in the
+	-- JJS hits: all bands jump together on the hit, the sub becomes the loudest (~6 dB over the mids) from ~40 ms
+	-- and decays by ~0.35 s, its pitch sweeping DOWN; mids and highs are gone after ~0.12 s.
+	--
+	-- The sub: ProSoundEffects "Boom Impact, Deep Distant Thumping Hit" (Stings), 11 takes. Measured in Studio:
+	-- instant attack with its own mid transient (50 ms), the loudest low frequency falling from ~300 to ~70 Hz in
+	-- 0.1-0.15 s (the reference's sub drop), and a long low tail (cut short for an M1, left for a finisher).
+	-- `start` is each onset less 0.01 s; volumes even out RMS peaks (0.25-0.34).
+	["punch_thump"] = {
+		takes = THUMP_TAKES,
 		looped = false,
-		name = "Explosions, Dull, Thuddy (SFX) x2 + BOOM-Deep Boom 06",
-		creator = "ProSoundEffects / APMOfficial",
-	},
-	-- THE RUMBLE BEDS under an M1 string (kits-5b, 2026-11-16), played by Sfx.bed: one steady rumble that swells
-	-- in on the first hit and holds while the hits keep coming, like the user's punch references (their weight
-	-- is a steady, loud, noisy rumble under ~140 Hz held ~0.6 s; never a thump on the hit). Each take starts in
-	-- the middle of a long file, so there's no attack. Measured in Studio (AudioAnalyzer, 1 s from the start
-	-- below): Low Rumble 2 is 80 % under 140 Hz, RMS 0.12, steady (wobble 0.31); Avalanche Deep Crumbling 4 is
-	-- rougher, debris in the mids (53 % under 140 Hz), RMS 0.14. Volumes bring both to about RMS 0.3.
-	["punch_rumble_low"] = {
-		takes = {
-			{ id = 9112824733, length = 46.0, start = 4, volume = 2.4 },
-			{ id = 9112824733, length = 46.0, start = 12, volume = 2.4 },
-			{ id = 9112824733, length = 46.0, start = 20, volume = 2.4 },
-		},
-		looped = false,
-		name = "Low Rumble 2 (SFX)",
+		name = "Boom Impact Deep Distant Thumping Hits (SFX)",
 		creator = "ProSoundEffects",
 	},
-	["punch_rumble_rough"] = {
+	-- The meaty middle: ProSoundEffects "Punch Kit, Whappy Chin Sock, Beefy Hit" 1-8 (Fight - Hits). Most of its
+	-- energy is 1.2-4.7 kHz, gone in 0.2-0.3 s (measured 2026-11-16).
+	["punch_smack"] = {
 		takes = {
-			{ id = 9113218938, length = 16.0, start = 3, volume = 2.0 },
-			{ id = 9113218938, length = 16.0, start = 7, volume = 2.0 },
-			{ id = 9113218938, length = 16.0, start = 11, volume = 2.0 },
+			{ id = 9117969584, length = 0.49, start = 0.015, volume = 0.62 },
+			{ id = 9117969687, length = 0.62, start = 0.01, volume = 0.63 },
+			{ id = 9117969717, length = 0.9, start = 0.02, volume = 0.5 },
+			{ id = 9117969878, length = 0.58, start = 0.005, volume = 0.57 },
+			{ id = 9117969892, length = 0.66, start = 0.02, volume = 0.51 },
+			{ id = 9117969990, length = 0.57, start = 0.005, volume = 0.46 },
+			{ id = 9117970193, length = 0.92, start = 0.005, volume = 0.44 },
+			{ id = 9117970227, length = 0.49, start = 0.01, volume = 0.52 },
 		},
 		looped = false,
-		name = "Avalanche Deep Crumbling 4 (SFX)",
+		name = "Punch Kit Beefy Hit (SFX)",
+		creator = "ProSoundEffects",
+	},
+	-- THE PICKS (the user, 2026-11-16, kits-5f, from the sound picker): m1_hit A, m1_finish A, ult_ready C.
+	-- An M1 landing: the sub thump (the loudest; faded from 0.25 s, so ~0.4 s in all) with the meaty smack (its
+	-- mids +6 dB) and the crack. Levels set by measuring the whole mix against a JJS hit in one AudioAnalyzer.
+	["m1_hit"] = {
+		takes = THUMP_TAKES,
+		looped = false,
+		name = "Boom Impact Deep Distant Thumping Hits (SFX) + Beefy Hit + Punch Crack",
+		creator = "ProSoundEffects",
+		play = { volume = 1.6, cut = 0.25 },
+		layers = {
+			{
+				role = "punch_smack",
+				options = { volume = 1.0, eq = { low = 0, mid = 6, high = 0 } },
+			},
+			{ role = "punch_crack", options = { volume = 1.0 } },
+		},
+	},
+	-- The launching hit (hit 4 of a string, and kit hits that launch; FxController adds the launch whoosh): the
+	-- same layers with the thump's tail left ~2 s, like the references' big finishers.
+	["m1_finish"] = {
+		takes = THUMP_TAKES,
+		looped = false,
+		name = "Boom Impact Deep Distant Thumping Hits (SFX), full tail + Beefy Hit + Punch Crack",
+		creator = "ProSoundEffects",
+		play = { volume = 2.0, cut = 2.0 },
+		layers = {
+			{
+				role = "punch_smack",
+				options = { volume = 1.0, eq = { low = 0, mid = 6, high = 0 } },
+			},
+			{ role = "punch_crack", options = { volume = 1.0 } },
+		},
+	},
+	-- The ultimate meter filling (Ui/UltimateMeter plays it up to 2.6 s, nothing under it): a big beefy impact
+	-- with a glowing tonal tail. Its hit is 0.07 s in.
+	["ult_ready"] = {
+		takes = { { id = 9116385056, length = 1.83, start = 0.07, volume = 1.1 } },
+		looped = false,
+		name = "Magic Burst 3 (SFX)",
 		creator = "ProSoundEffects",
 	},
 	-- The light air of a swing, under `swing_heavy`.

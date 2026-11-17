@@ -1,6 +1,6 @@
 --!strict
 -- SoundPicker - Studio only: audition the sound candidates (Config/SoundCandidates) and pick one per role,
--- live (2026-11-15). F7 in a Studio play test shows or hides it. Clicking a letter plays that option and
+-- live (2026-11-15). P (or the SOUNDS button, top left) in a Studio play test shows or hides it. Clicking a letter plays that option and
 -- makes it the one the game uses for this test session (Sfx.setRole), so an ultimate played next sounds
 -- with it. The picks are printed to Output: tell them to Claude, who bakes them into Config/SoundBank.
 
@@ -44,9 +44,10 @@ local function label(parent: Instance, text: string, size: number, x: number, w:
 	return made
 end
 
---- Builds the picker (Studio only) and binds F7.
+--- Builds the picker (Studio only), its SOUNDS button, and binds P.
 function SoundPicker.start()
-	if not RunService:IsStudio() then
+	-- Studio only, and only while something is still to be chosen (SoundCandidates.ORDER).
+	if not RunService:IsStudio() or #SoundCandidates.ORDER == 0 then
 		return
 	end
 	local gui = Instance.new("ScreenGui")
@@ -71,7 +72,7 @@ function SoundPicker.start()
 	title.Position = UDim2.fromOffset(12, 6)
 	title.Size = UDim2.new(1, -24, 0, 30)
 	title.Parent = panel
-	label(title, "SOUND PICKER  (click a letter to hear and pick it; F7 hides)", 15, 0, WIDTH - 24)
+	label(title, "SOUND PICKER  (click a letter to hear and pick it; P hides)", 15, 0, WIDTH - 24)
 
 	for index, role in SoundCandidates.ORDER do
 		local options = SoundCandidates.OPTIONS[role]
@@ -144,12 +145,37 @@ function SoundPicker.start()
 	end
 
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+	-- Opened with P or the small SOUNDS button (2026-11-16: F7 never reached the game, Studio keeps that key).
+	local toggleGui = Instance.new("ScreenGui")
+	toggleGui.Name = "HT_SoundPickerToggle"
+	toggleGui.ResetOnSpawn = false
+	toggleGui.DisplayOrder = 50
+	local toggle = Instance.new("TextButton")
+	toggle.Position = UDim2.fromOffset(80, 12)
+	toggle.Size = UDim2.fromOffset(130, 30)
+	toggle.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+	toggle.BackgroundTransparency = 0.08
+	toggle.TextColor3 = PICKED
+	toggle.Text = "SOUNDS (P)"
+	Typography.apply(toggle, "Stat")
+	toggle.TextSize = 15
+	toggle.Parent = toggleGui
+	local toggleCorner = Instance.new("UICorner")
+	toggleCorner.CornerRadius = UDim.new(0, 6)
+	toggleCorner.Parent = toggle
+	toggleGui.Parent = gui.Parent
+
+	local function flip()
+		gui.Enabled = not gui.Enabled
+	end
+	toggle.Activated:Connect(flip)
 	ContextActionService:BindAction("HaymakerSoundPicker", function(_, state)
 		if state == Enum.UserInputState.Begin then
-			gui.Enabled = not gui.Enabled
+			flip()
 		end
 		return Enum.ContextActionResult.Pass
-	end, false, Enum.KeyCode.F7)
+	end, false, Enum.KeyCode.P)
 end
 
 return SoundPicker
