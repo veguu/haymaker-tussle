@@ -2898,3 +2898,27 @@ synced later the same day (178 scripts match, origin/main had nothing new), plac
   speeds past 140; Reduced Motion; the published game.
 - NEXT (ask the owner which first): the feed, the spectate panel and chip in the new look, the class-name band;
   then tests on a phone, a gamepad, Reduced Motion.
+
+## ui-9b (2026-11-18): the feed in the fight-poster look: SYNCED, SEEN RUNNING (NOT COMMITTED)
+ui-5a to ui-9a were committed and pushed as 85ef556 (the owner: "everything up to this point works"). The owner
+picked the feed as the next piece. Stamp on disk `kits-7c+lobby-4+ui-9b`; the PLACE is still ui-9a (v436): Studio
+was in a Play session I did not start. 533 tests, gates green. NOT in the mockup (it has no feed): designed here.
+- `HudController.pushFeed`: a row is a small slanted ink plate (`Shapes.slant`, the top strip's lean) with the words
+  upright in the poster label face at 15; a line about you has yellow under the ink, showing as a 5-unit right edge
+  (`L.FeedEdge`). The verb is a word in its own colour: KNOCKED OUT yellow, FELL and LEFT quiet. A row comes in
+  from the right on the spring (`Timing.FeedIn` 0.45 s) and leaves to the right past the feed's own edge
+  (`FeedOut` 0.2 s); both go through `Poster.run`, so Reduced Motion shows and removes it at once. Place, row
+  count, 2 s life and the give-way to the open menu are unchanged.
+- SYNCED the same day (178 scripts match, origin/main had nothing new; the Rojo server had to be started again),
+  place saved (see the UI Map for the version).
+- FOUND AND FIXED: with `AutomaticSize` the plate came out about 40 units wider than its words. The row is now
+  sized from the label's `TextBounds`, which is in SCREEN pixels: it is divided by the feed group's UIScale
+  first (without that the words overflowed the plate). Words are centred on the plate.
+- SEEN in my own play test with bots (1118 x 536): rows read "Bot 2  KNOCKED OUT  Bot 18", plates 162 to 174 px
+  for 135 to 148 px of words; my own line had the yellow edge and my name in yellow; rows stack 23 px apart from
+  the feed's top, under the Coins out of a round. Look judged from one capture of two enlarged copies.
+  Console: only the known lines (plus Studio's own "Assistant plugin version changed" notice).
+- NOT TESTED: FELL and LEFT lines (only knockouts happened); a long name (cut at 16 letters, as before); the slide
+  in and out by eye; Reduced Motion; phones; the published game.
+- NEXT: the spectate panel and chip in the new look, then the class-name band; then phone, gamepad and Reduced
+  Motion tests.

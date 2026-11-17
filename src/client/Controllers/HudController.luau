@@ -11,7 +11,8 @@
 --      seconds left) and can't use (dark with stripes, a slash, a flag that says why).
 --   A  top centre: one slanted strip (next round in N, get ready, 18 / 25 standing, final two, round over), the
 --      count in yellow, your class colour under it.
---   F  top right: the ring-out feed, newest on top, four rows; yours marked with a yellow edge.
+--   F  top right: the ring-out feed, newest on top, four rows, each a small slanted ink plate that comes in
+--      from the right; yours marked with a yellow edge.
 --   the target: a chevron and the name over your lock-on target (an open one over the nearest opponent ahead
 --      when nothing is locked), with a thin bar shaded by THEIR stagger.
 --
@@ -54,7 +55,7 @@ local UiSound = require(script.Parent.Parent.Ui.UiSound)
 
 local S, T = HudTheme.Size, HudTheme.Time
 local ST, TT, SS, SPD = HudTheme.Stagger, HudTheme.Tile, HudTheme.Strip, HudTheme.Speed
-local make, text, panel, colour = Components.make, Components.text, Components.panel, Tokens.colour
+local make, text, colour = Components.make, Components.text, Tokens.colour
 local moveCfg = GameConfig.Movement
 local kickCfg = GameConfig.Kick
 local staggerCfg = GameConfig.Stagger
@@ -122,6 +123,7 @@ local L = {
 	FeedRow = 28,
 	FeedGap = SP[1], -- 4
 	FeedRows = 4,
+	FeedEdge = 5, -- the yellow edge of a line about you
 	ClosingFor = 2.5, -- seconds the ARENA CLOSING chip shows each time a shrink begins
 }
 
@@ -922,7 +924,7 @@ function HudController:KnitStart()
 	-- F: the ring-out feed --------------------------------------------------------------------------------
 	local feed = group(gui, "Feed", Vector2.new(L.FeedWidth, L.FeedRows * (L.FeedRow + L.FeedGap)))
 	feed.holder.AnchorPoint = Vector2.new(1, 0)
-	type FeedRow = { frame: Frame, label: TextLabel, ledge: Frame, born: number }
+	type FeedRow = { frame: Frame, label: TextLabel, born: number }
 	local feedRows: { FeedRow } = {}
 
 	-- Spectating: a small strip at the bottom centre while you are out ---------------------------------------
@@ -1219,42 +1221,61 @@ function HudController:KnitStart()
 				else n
 			return `<font color="{tone}">{short}</font>`
 		end
-		local verb = `<font color="{Tokens.hex["stone.300"]}">`
+		-- the verb is a word in its own colour: yellow for a knockout, quiet for a fall or a leave
+		local verb = `<font color="{Tokens.hex["gold.400"]}">`
+		local quiet = `<font color="{Tokens.hex["stone.300"]}">`
 		local line = if cause == "left"
-			then `{name(victim)}  {verb}left</font>`
+			then `{name(victim)}  {quiet}LEFT</font>`
 			elseif
 				attacker
 				and attacker ~= ""
 				and cause == "knocked"
-			then `{name(attacker)}  {verb}knocked out</font>  {name(victim)}`
-			else `{name(victim)}  {verb}fell</font>`
-		local frame = panel(feed.fade, 1, "s", {
+			then `{name(attacker)}  {verb}KNOCKED OUT</font>  {name(victim)}`
+			else `{name(victim)}  {quiet}FELL</font>`
+		-- A row in the fight-poster look: a slanted ink plate like the top strip's, the words upright on it. A
+		-- line about you has yellow under the ink, showing as its right edge. `frame` is the row's place in the
+		-- list (relayoutFeed moves it); `slide` is what comes in from the right on the spring and leaves that way.
+		local frame = make("Frame", feed.fade, {
+			Name = "Row",
+			BackgroundTransparency = 1,
 			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, SP[3], 0, 0),
-			Size = UDim2.fromOffset(0, L.FeedRow),
-			AutomaticSize = Enum.AutomaticSize.X,
-			BackgroundTransparency = 0.1,
+			Position = UDim2.new(1, 0, 0, 0),
+			Size = UDim2.fromOffset(L.FeedWidth, L.FeedRow),
 		})
-		local label = text(frame, "body.strong", "ivory.50", {
-			Size = UDim2.fromScale(0, 1),
-			AutomaticSize = Enum.AutomaticSize.X,
+		local slide = make("Frame", frame, {
+			Name = "Slide",
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+		})
+		if mine then
+			Shapes.slant(slide, "coral.500", L.ChipLean, { Name = "Edge" })
+		end
+		Shapes.slant(slide, ST.Plate, L.ChipLean, {
+			Name = "Plate",
+			Size = UDim2.new(1, if mine then -L.FeedEdge else 0, 1, 0),
+			ZIndex = 1,
+		})
+		local label = Poster.text(slide, "label", 15, "ivory.50", {
+			Size = UDim2.fromScale(1, 1),
 			RichText = true,
 			Text = line,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			ZIndex = 2,
 		})
-		make("UIPadding", label, {
-			PaddingLeft = UDim.new(0, SP[3]),
-			PaddingRight = UDim.new(0, SP[3] + 3),
-		})
-		-- the edge on the right: pink when the line is about you
-		local ledge = make("Frame", frame, {
-			Name = "Edge",
-			BackgroundColor3 = colour(if mine then "coral.500" else "line.500"),
-			BorderSizePixel = 0,
-			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.fromScale(1, 0),
-			Size = UDim2.new(0, 3, 1, 0),
-		})
-		local row: FeedRow = { frame = frame, label = label, ledge = ledge, born = os.clock() }
+		-- the plate is as wide as its words (measured, not left to AutomaticSize, which made it too wide)
+		-- TextBounds is in screen pixels, so it is taken back to the HUD's own units
+		local pad = SP[3] + L.ChipLean
+		local edge = if mine then L.FeedEdge else 0
+		local width = math.min(
+			L.FeedWidth,
+			math.ceil(label.TextBounds.X / math.max(feed.scale.Scale, 0.01)) + 2 * pad + edge
+		)
+		frame.Size = UDim2.fromOffset(width, L.FeedRow)
+		make("UIPadding", label, { PaddingRight = UDim.new(0, edge) })
+		Poster.run(slide, T.FeedIn, function(t: number)
+			slide.Position = UDim2.fromOffset(L.FeedWidth / 2 * (1 - PosterEase.spring(t)), 0)
+		end)
+		local row: FeedRow = { frame = frame, label = label, born = os.clock() }
 		table.insert(feedRows, 1, row)
 		while #feedRows > L.FeedRows do
 			local old = table.remove(feedRows) :: FeedRow
@@ -1268,9 +1289,10 @@ function HudController:KnitStart()
 			local at = table.find(feedRows, row)
 			if at then
 				table.remove(feedRows, at)
-				HudMotion.play(frame, "fade", { BackgroundTransparency = 1 }, "quick", "exit")
-				HudMotion.play(label, "fade", { TextTransparency = 1 }, "quick", "exit")
-				task.delay(Tokens.motion.duration.quick, function()
+				-- out to the right, past the feed's own edge, which cuts it off
+				Poster.run(slide, T.FeedOut, function(t: number)
+					slide.Position = UDim2.fromOffset((L.FeedWidth + 40) * PosterEase.easeIn(t), 0)
+				end, function()
 					frame:Destroy()
 				end)
 				relayoutFeed()

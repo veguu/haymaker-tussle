@@ -74,6 +74,8 @@ HudTheme.Time = {
 	Emphasis = 0.3, -- final two, arena closing
 	EmphasisScale = 1.12,
 	Feed = 2, -- how long a ring-out line stays
+	FeedIn = 0.45, -- a line coming in from the right, on the spring
+	FeedOut = 0.2, -- and leaving to the right
 }
 
 -- THE FIGHT-POSTER HUD (2026-11-16; the approved mockup is the vault's UI Research/fight-poster-prototype.html).
