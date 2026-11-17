@@ -374,14 +374,19 @@ function SpectateController:KnitStart()
 	main.MouseLeave:Connect(function()
 		HudMotion.pressUp(press)
 	end)
-	main.Activated:Connect(function()
+	local function toggle()
 		if player:GetAttribute(IN_ROUND) == true then
 			return
 		end
 		open = not open
 		notice = nil
 		show()
-	end)
+	end
+	main.Activated:Connect(toggle)
+	-- The lobby navigation's drawer opens this now (NavController, 2026-11-16), so the old button is hidden;
+	-- the panel it opened still appears in the same place.
+	self._toggle = toggle
+	main.Visible = false
 	mineButton.Activated:Connect(function()
 		toMine(nil)
 	end)
@@ -457,6 +462,13 @@ function SpectateController:KnitStart()
 	show()
 	layout()
 	gui.Parent = player:WaitForChild("PlayerGui")
+end
+
+--- Opens or closes the spectate panel (the navigation drawer's Spectate row). Does nothing in a round.
+function SpectateController:Toggle()
+	if self._toggle then
+		self._toggle()
+	end
 end
 
 return SpectateController

@@ -109,6 +109,8 @@ function SoundPicker.start()
 					looped = false,
 					name = option.name,
 					creator = option.creator,
+					play = option.play,
+					layers = option.layers,
 				})
 				local audition = SoundCandidates.AUDITION[role]
 				local playOptions = if audition then audition.options :: any else { cut = 2.5 }
@@ -116,7 +118,14 @@ function SoundPicker.start()
 				local beats = if audition and audition.beats then audition.beats else nil
 				local with = if audition then audition.with else nil
 				for _, at in beats or { 0 } do
-					task.delay(at, Sfx.play, role, nil, if beats then 0.03 else nil, playOptions)
+					task.delay(
+						at,
+						Sfx.playLayered,
+						role,
+						nil,
+						if beats then 0.03 else nil,
+						playOptions
+					)
 					if with then
 						task.delay(at, Sfx.play, with.role, nil, nil, with.options :: any)
 					end

@@ -109,11 +109,8 @@ type Dummy = {
 	lockBy: Model?,
 	lockAhead: number?,
 	lockSeenAt: number?,
-	-- Its own ground punch: planted until `rootedUntil`, stepping forward from `stepAt` for StepSeconds.
-	rootedUntil: number?,
-	stepAt: number?,
-	stepDir: Vector3?,
-	stepSpeed: number?,
+	-- Its own last ground punch: it runs no faster than Punch.MoveSpeed for MoveSeconds after (Combat.stringSpeed).
+	punchedAt: number?,
 }
 
 local DummyService = Knit.CreateService({
@@ -540,30 +537,8 @@ local function think(dummy: Dummy, root: BasePart, now: number): (number, number
 		dummy.judged = BotBrain.judgedPunch(punchCfg, botCfg.MisjudgeStuds, math.random())
 		Knit.GetService("CombatService")
 			:PunchAs(dummy.model, BotBrain.isWildSwing(botCfg, math.random()))
-		-- Planted, then a step forward at the strike, like a player's M1 (MovementController).
-		local body = dummy.model:FindFirstChildOfClass("Humanoid")
-		if body and body.FloorMaterial ~= Enum.Material.Air then
-			local face = Vector3.new(dummy.state.headingX, 0, dummy.state.headingZ)
-			if face.Magnitude > 0.01 then
-				face = face.Unit
-				local params = RaycastParams.new()
-				params.FilterType = Enum.RaycastFilterType.Exclude
-				params.FilterDescendantsInstances = CollectionService:GetTagged(Combatants.TAG)
-				params.RespectCanCollide = true
-				params.IgnoreWater = true
-				local reach = punchCfg.StepDistance
-					+ punchCfg.LockDistance
-					+ 2 * punchCfg.LockBodyRadius
-				local wall = workspace:Raycast(root.Position, face * reach, params)
-				local distance = Combat.punchStep(punchCfg, if wall then wall.Distance else nil)
-				dummy.rootedUntil = now + punchCfg.RootSeconds
-				dummy.stepAt = if distance > 0.05
-					then now + punchCfg.Windup + punchCfg.ActiveSeconds
-					else nil
-				dummy.stepDir = face
-				dummy.stepSpeed = distance / punchCfg.StepSeconds
-			end
-		end
+		-- Running on, held to Punch.MoveSpeed, like a player's M1 (MovementController).
+		dummy.punchedAt = now
 	end
 	return inputX, inputZ
 end
@@ -676,7 +651,6 @@ local function stepDummy(
 			dummy.lockAhead = Combat.lockDistance(punch, gap.Magnitude)
 		end
 		dummy.lockSeenAt = now
-		dummy.stepAt = nil
 		-- The spot CombatService picked for this punch (HT_LockSpot: in front of them, a step on), still
 		-- between punches; without one, in front of their body now.
 		local lockSpot = dummy.model:GetAttribute("HT_LockSpot") :: Vector3?
@@ -772,41 +746,6 @@ local function stepDummy(
 	if fighting and not air and not stunned then
 		inputX, inputZ = think(dummy, root, now)
 	end
-	-- Its own M1: planted (no running) for RootSeconds, with the step forward at the strike.
-	if dummy.rootedUntil and now < dummy.rootedUntil and not air and not stunned then
-		inputX, inputZ = 0, 0
-		dummy.state = Momentum.stopped(dummy.state)
-		local stepAt = dummy.stepAt
-		local dir = dummy.stepDir
-		if stepAt and dir and now >= stepAt and now < stepAt + GameConfig.Punch.StepSeconds then
-			local speed = dummy.stepSpeed or 0
-			humanoid.WalkSpeed = 0
-			humanoid:Move(Vector3.zero, false)
-			dummy.align.CFrame = CFrame.lookAt(Vector3.zero, dir)
-			-- moved exactly, not walked (a walked step came out short), never past the step's end
-			local left = stepAt + GameConfig.Punch.StepSeconds - now
-			-- never into the body in front (Combat.stepRoom): pushed into one, a body gets flung
-			local others: { { x: number, z: number } } = {}
-			for _, other in CollectionService:GetTagged(Combatants.TAG) do
-				local otherRoot = other ~= dummy.model and Combatants.rootOf(other)
-				if otherRoot then
-					local offset = otherRoot.Position - root.Position
-					if offset.Magnitude < 10 then
-						table.insert(others, { x = offset.X, z = offset.Z })
-					end
-				end
-			end
-			local move = math.min(
-				speed * math.min(dt, left),
-				Combat.stepRoom(GameConfig.Punch, dir.X, dir.Z, others)
-			)
-			root.CFrame = root.CFrame + dir * move
-			local rate = if dt > 0 then move / dt else 0
-			local v = root.AssemblyLinearVelocity
-			root.AssemblyLinearVelocity = Vector3.new(dir.X * rate, v.Y, dir.Z * rate)
-			return
-		end
-	end
 	if air ~= "float" then
 		dummy.steerX, dummy.steerZ = 0, 0
 	elseif fighting and botCfg.AirSteers then
@@ -840,6 +779,32 @@ local function stepDummy(
 	end
 	dummy.state =
 		Momentum.step(dummy.state, moveCfg, inputX, inputZ, grounded or air == "float", dt)
+	-- Throwing M1s: running, no faster than Punch.MoveSpeed (Combat.stringSpeed).
+	if grounded and (dummy.state.propelLeft or 0) <= 0 then
+		local capped = Combat.stringSpeed(punchCfg, dummy.state.speed, dummy.punchedAt, now)
+		-- never through the one it's punching (Combat.frontRoom), like a player
+		if dummy.punchedAt and now - dummy.punchedAt <= punchCfg.MoveSeconds and dt > 0 then
+			local others: { { x: number, z: number } } = {}
+			for _, other in CollectionService:GetTagged(Combatants.TAG) do
+				local otherRoot = other ~= dummy.model and Combatants.rootOf(other)
+				if otherRoot then
+					local offset = otherRoot.Position - root.Position
+					if offset.Magnitude < 12 then
+						table.insert(others, { x = offset.X, z = offset.Z })
+					end
+				end
+			end
+			capped = math.min(
+				capped,
+				Combat.frontRoom(punchCfg, dummy.state.headingX, dummy.state.headingZ, others) / dt
+			)
+		end
+		if capped < dummy.state.speed then
+			local slowed = table.clone(dummy.state)
+			slowed.speed = capped
+			dummy.state = slowed
+		end
+	end
 	if air == "hold" then
 		dummy.lastHit = now
 		dummy.state = Momentum.stopped(dummy.state)

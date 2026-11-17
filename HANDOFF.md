@@ -1750,3 +1750,85 @@ Same build stamp (kits-4g). NOT committed. After the user reconnected Rojo:
   obti3wLCshs; cutscenes: Yde2yYu9_lM, QlvfbPbCYCM, C2vCVdNRLms, sfZyOKF50so; movement: TSB Garou zP6MFM_SamU).
   The boom layer (punch_sub) is the likeliest "bassy drum"; consider dropping it and sourcing designed anime-style
   punch hits instead. Committed at their request so they could stop for the night.
+
+## kits-4i (2026-11-16): the boom is out of every punch; M1 hit options in the F7 picker
+Build stamp `kits-4i+lobby-4+ui-4`. NOT committed.
+- THE PLACE WAS AHEAD OF GIT: it held `ui-4` (the teammate's UI work: NavController, Ui/Icons and 13 changed UI
+  scripts). Saved from the place into the folder by checksum before Rojo was started; every Rojo-managed script
+  then matched the place. Two tests fail with it (Tokens.spec: the new palette's contrasts, "ivory.50 on ink.900"
+  and "coral.500 on ink.700"); his updated spec is probably on his PC. Left alone (his code).
+- REFERENCES, as spectrograms: MUDA rush punches are 40-80 ms bursts almost all under ~300 Hz, the lows smeared
+  noise with no steady line; the Itadori design is a short swell, a ~15 ms full-range crack, then long noisy lows.
+- MEASURED in Studio (AudioAnalyzer in the Edit datamodel, Field Notes "Sound Design Pitfalls" section 8): punch_sub
+  was the loudest layer of every M1 (RMS ~0.26 vs crack 0.17, body 0.23 at the volumes played) and its lows held
+  for the full 0.5 s: the "bassy drum". Removed from the M1, the kit hits, the barrage beats and the haymaker.
+  It stays only under the ultimate-ready sting (Ui/UltimateMeter, the teammate's file, not a punch).
+- NEW: role `m1_hit` (Config/SoundCandidates, first row of the F7 picker; plays a 4-hit string). A = ProSoundEffects
+  "Punch Kit Beefy Hit" 1-8 + the heavy-bag body; B = the same deeper (0.9, lows +4, highs -3); C = Beefy alone;
+  D = the last version minus the boom (crack + bag); E = A + a 0.06 s cut of APM Deep Boom 06. Beefy onsets 16-32
+  ms, peaks 27-64 ms, gone by 0.2-0.32 s; volumes even out their RMS peaks. A SoundBank entry can now carry `play`
+  (its own Sfx options) and `layers` (other roles), played by `Sfx.playLayered`.
+- Not changed: boom_low under the launch (hit 4) and the kit hits; ult_barrage still the bag hits.
+- NOT HEARD by me. Gates: build, selene, stylua, fx_smoke pass; tests 495 pass, 2 fail (Tokens, above).
+- THE USER, after trying A-E: "still sounds nothing like the references ... still just sounds like one of those
+  low sounding drums".
+
+## kits-5a (2026-11-16): Final Bell removed entirely; references re-studied for a new ultimate and mobile M1s
+Build stamp `kits-5a+lobby-4+ui-4`. NOT committed. The user: "completely rework the ultimate, just entirely remove
+the current one", then brainstorm a new one from the cutscene references; M1s become mobile (reference: JJK Maki
+vs Naoya, youtube jORpuoAQoyA); punches still "low sounding drums".
+- REMOVED: the Final Bell timeline (Core/Ultimates: TIMELINES is empty, `timeline(kit)` returns nil), all its cues
+  (Fx/UltimateFx is an empty dispatcher), its impact frame (ImpactFrame.BASE), and its sound roles (ult_blink,
+  ult_barrage, ult_windup, ult_impact, ult_frame, ult_haymaker, ult_launch). KEPT as the frame for the new one: the
+  meter and G window (UltimateService opens no window for a kit without a timeline), the playback (pose, shots,
+  cues, flight), Fx/CutsceneScreen (grade, blackout), the ImpactFrame player, ult_ready. Tests: the Final Bell
+  tests are gone; the playback maths runs on a small test timeline. Studio: starts clean on kits-5a.
+- PUNCH SOUND, MEASURED (ffmpeg band envelopes, scratchpad bands.ps1): the Itadori design hit has NO low transient
+  on the hit: its lows swell ~75 ms before, then a steady, very loud noisy rumble under 140 Hz (~-6 dB RMS) holds
+  ~0.6 s; the crack is 25 ms in the mids and highs only. The MUDA rush hits are 20-60 ms noise bursts spread evenly
+  over every band. Every option we had (A-E, swings included) is a short CLEAN low thump on the hit, lows gone in
+  0.05-0.2 s: that is what a kick drum is.
+- Proposals to the user (agree before building): new ultimate concepts, the mobile M1 numbers, the punch rebuild.
+
+## kits-5b (2026-11-16): mobile M1s, short stun, knock-on, dash buffer, punch sound round 2 (rumble bed)
+Build stamp `kits-5b+lobby-4+ui-4`. NOT committed. NOT SEEN IN STUDIO (see the end). The user picked "M1s + punch
+sound first" and took the proposed numbers.
+- RULES (Punch, game.json and GameConfig in the same order): Cooldown 0.42 -> 0.32; StunSeconds 0.5 -> 0.2 (ends
+  0.12 s before the next punch can land: never a true combo); LockCatchUpSpeed 36 -> 45; StepDistance, StepSeconds,
+  RootSeconds REMOVED; new Push 6.5 (each stunning hit knocks the target on), MoveSpeed 20 + MoveSeconds 0.45 (run
+  cap while throwing M1s), DashBufferSeconds 0.3. Endlag.PunchMiss 0.28 -> 0.2 (a whiff's endlag must fit the
+  faster cadence). Windup stays 0.16 (the swing clips strike at 0.16 and can't be sped up).
+- Core/Combat: punchStep/stepRoom gone; hitPush (Push clipped at a wall), stringSpeed (the cap), dashBuffered.
+  CombatService.lockSpotFor: target held at (current distance clamped to LockMin..LockMax) + Push in front of the
+  puncher; the puncher is never moved or pushed by its own M1 (it already kept momentum on M1s).
+  MovementController: no plant, no step; punchPressedAt caps state.speed at MoveSpeed while grounded and not
+  dashing; a dash pressed during an HT_Stunned stun is buffered and fires as the stun ends. DummyService: bots the
+  same (punchedAt cap; plant/step gone). AnimController.HitLanded(..., step): string hits alternate HitFlinch /
+  HitFlinchHeavy. Kit mobility skills (not the Dash) are not buffered through a stun.
+- SOUND round 2: Sfx.bed (a sound held under a run of plays: fades in 0.05 s on the first, held `hold` s past each
+  later one, fades out 0.3 s) and Layer.bed. New roles punch_rumble_low (PSE Low Rumble 2, mid-file takes) and
+  punch_rumble_rough (PSE Avalanche Deep Crumbling 4). m1_hit options now: A Beefy lows cut + deep bed; B Beefy lows
+  cut + rough bed; C crack lows cut + deep bed; D Beefy lows cut, no bed. NO_LOWS = eq low -40. boom_low removed
+  from the M1 launch hit. Picker audition at the new cadence (0, 0.32, 0.64, 0.96).
+- Tests: the stun test inverted (stun < cooldown, gap >= 0.1, buffer >= stun); push/cap/buffer tests. 495 pass,
+  2 fail (Tokens: the teammate's palette). Gates: build, selene, stylua, fx_smoke.
+- STUDIO: the play test found the place on `kits-4g+lobby-4+ui-4`: the teammate's Rojo had synced their folder
+  over the place, wiping kits-4i/5a/5b there (disk is fine). Their only new work was HudController, saved into
+  this folder by checksum. Nothing of kits-5a/5b has run in Studio yet.
+
+## kits-5c (2026-11-16): no running through the target; one rumble per string; VERIFIED in Studio
+Build stamp `kits-5c+lobby-4+ui-4`. NOT committed. After the user reconnected Rojo (stamp checked first).
+- FOUND in the first real play test: fighters don't collide, so a puncher at MoveSpeed caught a target standing
+  between punches and ran straight through it (gap 0.1 studs; the next hits then read as "from behind").
+  FIX: Combat.frontRoom (the old stepRoom, renamed): while throwing M1s (MoveSeconds after a press) your speed is
+  capped so you never get nearer than LockMinDistance to anyone ahead. Players (MovementController) and bots
+  (DummyService). Test added. Also BED_HOLD 0.45 -> 0.6: at a slightly slower rhythm the rumble restarted per hit.
+- VERIFIED (Practice Dummy 1, Beast kit, W held, clicks ~0.5 s apart, the fastest the tools can press): run speed
+  held at 20.0 through the string, back to full after; 4 hits, the 4th launched ~100 studs; each stun ~0.2 s; the
+  dummy knocked 3-8 studs ahead per hit and the puncher stopped 2.4 studs behind it, never through; flinches
+  HitFlinch / HitFlinchHeavy / HitFlinch; m1_hit (option A) with EQ low -40 each hit and ONE punch_rumble_low bed
+  from hit 1 through the string, louder on the launch. Dash (Base kit, Q): pressed in a (local) stun, it fired the
+  frame the stun ended (82 studs/s); pressed 1 s before the end, nothing (correct, buffer 0.3 s). Console clean
+  apart from the known 203785492.
+- NOT TESTED: the 0.32 s cadence (the tools can't click faster than ~0.5 s), a player as the target (two
+  clients), how it sounds (no ears), Studio's upload of the flinch/run clips (they play in Studio only).

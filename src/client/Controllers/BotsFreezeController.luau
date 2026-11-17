@@ -1,5 +1,5 @@
 --!strict
--- BotsFreezeController - the owner's Bots button, top left under Spectate. Only shown when the server has
+-- BotsFreezeController - the owner's Bots button, on the right edge at mid height. Only shown when the server has
 -- marked you as allowed (player attribute HT_CanFreezeBots: in Studio, or the place's owner). Pressing it
 -- asks the server to stop or restart every bot; the server owns the state (workspace attribute
 -- HT_BotsFrozen) and this only shows it: "BOTS ON / fighting" or, on the yellow, "BOTS STOPPED / inspecting".
@@ -42,14 +42,12 @@ function BotsFreezeController:KnitStart()
 		gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
 		gui.DisplayOrder = 5
 
-		local top = HudTheme.Afk.Top
-			+ HudTheme.Afk.Height
-			+ HudTheme.Spectate.Gap
-			+ HudTheme.Spectate.Height
-			+ S.Gap
 		local button = Instance.new("TextButton")
 		button.Name = "BotsButton"
-		button.Position = UDim2.fromOffset(HudTheme.Size.Edge, top)
+		-- Right edge, middle (2026-11-16): the left edge is the lobby navigation's now, and nothing else
+		-- lives here.
+		button.AnchorPoint = Vector2.new(1, 0.5)
+		button.Position = UDim2.new(1, -HudTheme.Size.Edge, 0.42, 0)
 		button.Size = UDim2.fromOffset(S.Width, S.Height)
 		button.AutoButtonColor = true
 		button.BorderSizePixel = 0

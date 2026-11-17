@@ -11,12 +11,14 @@ local TweenService = game:GetService("TweenService")
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Sfx = require(ReplicatedStorage.Shared.Sfx)
 local Typography = require(ReplicatedStorage.Shared.Typography)
-local HudTheme = require(script.Parent.HudTheme)
+local Tokens = require(ReplicatedStorage.Shared.Tokens)
 
 local cfg = GameConfig.Ultimate
 local WIDTH, HEIGHT = 300, 12
-local GOLD = Color3.fromRGB(255, 200, 70)
-local GOLD_HOT = Color3.fromRGB(255, 244, 196)
+-- Voltline (2026-11-16): yellow is "earned", so the ultimate is yellow; a dark well with the panel border.
+local GOLD = Tokens.colour("gold.400")
+local GOLD_HOT = Tokens.colour("gold.200")
+local INK = Tokens.colour("ink.950")
 
 local UltimateMeter = {}
 
@@ -49,15 +51,15 @@ local function build(player: Player): Parts
 	plate.AnchorPoint = Vector2.new(0.5, 1)
 	plate.Position = UDim2.new(0.5, 0, 1, -112)
 	plate.Size = UDim2.fromOffset(WIDTH, HEIGHT)
-	plate.BackgroundColor3 = HudTheme.Colour.Panel
-	plate.BackgroundTransparency = HudTheme.Transparency.Panel
+	plate.BackgroundColor3 = Tokens.colour("ink.600")
+	plate.BackgroundTransparency = 0.08
 	plate.BorderSizePixel = 0
 	plate.Parent = gui
-	corner(plate, 4)
+	corner(plate, Tokens.radius.s)
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = Color3.new(0, 0, 0)
-	stroke.Thickness = 1.5
-	stroke.Transparency = 0.25
+	stroke.Color = Tokens.colour("line.500")
+	stroke.Thickness = 2
+	stroke.Transparency = 0
 	stroke.Parent = plate
 
 	local fill = Instance.new("Frame")
@@ -66,7 +68,21 @@ local function build(player: Player): Parts
 	fill.BackgroundColor3 = GOLD
 	fill.BorderSizePixel = 0
 	fill.Parent = plate
-	corner(fill, 4)
+	corner(fill, Tokens.radius.s)
+
+	local title = Instance.new("TextLabel")
+	title.Name = "Title"
+	title.AnchorPoint = Vector2.new(0, 1)
+	title.Position = UDim2.new(0, 0, 0, -4)
+	title.Size = UDim2.fromOffset(120, 16)
+	title.BackgroundTransparency = 1
+	title.Text = "ULTIMATE"
+	title.TextColor3 = Tokens.colour("ivory.50")
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.TextStrokeColor3 = INK
+	title.TextStrokeTransparency = 0.3
+	Typography.apply(title, "label")
+	title.Parent = plate
 
 	local cap = Instance.new("TextLabel")
 	cap.Name = "Cap"
@@ -74,13 +90,12 @@ local function build(player: Player): Parts
 	cap.Position = UDim2.new(1, 8, 0.5, 0)
 	cap.Size = UDim2.fromOffset(26, 26)
 	cap.BackgroundColor3 = GOLD
-	cap.TextColor3 = Color3.fromRGB(30, 22, 6)
+	cap.TextColor3 = INK
 	cap.Text = "G"
 	cap.Visible = false
-	Typography.apply(cap, "Stat")
-	cap.TextSize = 16
+	Typography.apply(cap, "Key")
 	cap.Parent = plate
-	corner(cap, 5)
+	corner(cap, Tokens.radius.s)
 
 	-- The window's prompt: a big G and ULTIMATE, with a ring closing on it for the window's length.
 	local prompt = Instance.new("Frame")
@@ -96,12 +111,12 @@ local function build(player: Player): Parts
 	key.Position = UDim2.fromScale(0.5, 0.5)
 	key.Size = UDim2.fromOffset(56, 56)
 	key.BackgroundColor3 = GOLD
-	key.TextColor3 = Color3.fromRGB(30, 22, 6)
+	key.TextColor3 = INK
 	key.Text = "G"
 	Typography.apply(key, "Stat")
 	key.TextSize = 34
 	key.Parent = prompt
-	corner(key, 10)
+	corner(key, Tokens.radius.l)
 	local word = Instance.new("TextLabel")
 	word.AnchorPoint = Vector2.new(0.5, 0)
 	word.Position = UDim2.new(0.5, 0, 1, 4)
@@ -153,7 +168,7 @@ function UltimateMeter.start()
 			local pulse = 0.5 + 0.5 * math.sin(os.clock() * 8)
 			made.fill.BackgroundColor3 = GOLD:Lerp(GOLD_HOT, pulse)
 		else
-			made.fill.BackgroundColor3 = GOLD:Lerp(HudTheme.Colour.Muted, 0.35)
+			made.fill.BackgroundColor3 = GOLD
 		end
 	end)
 end

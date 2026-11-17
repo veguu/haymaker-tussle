@@ -1,13 +1,14 @@
 --!strict
--- Components - the Golden Hour building blocks every rebuilt screen is made from (UI Phase 1a, 2026-11-15; vault
--- UI Research/Design System/Shapes and Components). Each reads only Shared/Tokens and Shared/Typography: no
--- literal colours, radii or fonts here or in the screens that use them.
+-- Components - the Voltline building blocks every rebuilt screen is made from (2026-11-16; the look is in the
+-- vault's UI Research/voltline-preview.html). Each reads only Shared/Tokens and Shared/Typography: no literal
+-- colours, radii or fonts here or in the screens that use them.
 --   make     an instance with properties
 --   text     a label in a type role and colour token
---   panel    a soft rounded surface (level 1 HUD / 2 card / 3 dialog) with an optional hairline
---   ledge    THE signature: a 2-unit lit rule on an element's top edge, inset 8, left quarter at full strength
---   meter    a rounded track and fill (+ optional ghost layer and tick marks)
---   keyCap   a small rounded cap holding a key letter or a glyph image
+--   cut      THE shape: a panel with its top-right and bottom-left corners cut, a fill and a 2-unit border
+--   panel    a plain sharp rectangle (level 1 HUD / 2 sheet / 3 dialog) for rows and old screens
+--   ledge    a 2-unit accent rule on an element's top edge
+--   meter    a square track and fill (+ optional ghost layer and tick marks)
+--   keyCap   a small dark cap holding a key letter or a glyph image
 --   corner   a UICorner from a radius token
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -63,8 +64,138 @@ function Components.text(
 	return label
 end
 
---- A surface: level 1 = HUD panel (ink.900, translucent), 2 = card / sheet (ink.800), 3 = dialog (ink.700).
---- `hairline` adds the 1-unit ivory border at 0.9.
+export type Sticker = {
+	holder: Frame,
+	face: GuiObject,
+	lip: Frame,
+	stroke: UIStroke,
+	depth: number,
+}
+export type StickerOptions = {
+	fill: string?, -- colour token of the face (default ink.900)
+	line: string?, -- colour token of the outline (default ink.950)
+	depth: number?, -- how far the lip shows under the face (default 6; 0 for a flat panel)
+	radius: string?, -- radius token (default "l")
+	button: boolean?, -- the face is a TextButton (default false: a Frame)
+}
+
+--- THE Ringside shape: a rounded face with a 3-unit ink outline, sitting on a darker lip. `holder` takes
+--- `props` (size, position, name); put content in `face`. A sticker made with `button` can be given
+--- Components.pressable, which drops the face onto the lip while it is held.
+function Components.sticker(
+	parent: Instance?,
+	props: { [string]: any }?,
+	options: StickerOptions?
+): Sticker
+	local o: StickerOptions = options or {}
+	local depth = o.depth or 6
+	local radius = o.radius or "l"
+	local holder = make("Frame", nil, { BackgroundTransparency = 1, BorderSizePixel = 0 })
+	local lip = make("Frame", holder, {
+		Name = "Lip",
+		BackgroundColor3 = colour("ink.950"),
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(0, depth),
+		Size = UDim2.fromScale(1, 1),
+		Visible = depth > 0,
+	})
+	Components.corner(lip, radius)
+	local face = make(if o.button then "TextButton" else "Frame", holder, {
+		Name = "Face",
+		BackgroundColor3 = colour(o.fill or "ink.900"),
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 2,
+	})
+	if o.button then
+		face.Text = ""
+		face.AutoButtonColor = false
+	end
+	Components.corner(face, radius)
+	local stroke = make("UIStroke", face, {
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		Color = colour(o.line or "ink.950"),
+		Thickness = 3,
+	})
+	for key, value in props or {} do
+		(holder :: any)[key] = value
+	end
+	holder.Parent = parent
+	return { holder = holder, face = face, lip = lip, stroke = stroke, depth = depth }
+end
+
+--- Recolours a sticker's face and outline; either may be nil to leave it.
+function Components.paintSticker(sticker: Sticker, fillTone: string?, lineTone: string?)
+	if fillTone then
+		sticker.face.BackgroundColor3 = colour(fillTone)
+	end
+	if lineTone then
+		sticker.stroke.Color = colour(lineTone)
+	end
+end
+
+export type Cut = { frame: Frame, fill: ImageLabel, line: ImageLabel }
+
+local function slice(image: string, tone: string, scale: number, z: number): ImageLabel
+	local c = Tokens.cut.slice
+	return make("ImageLabel", nil, {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		Image = image,
+		ImageColor3 = colour(tone),
+		ScaleType = Enum.ScaleType.Slice,
+		SliceCenter = Rect.new(c[1], c[2], c[3], c[4]),
+		SliceScale = scale,
+		ZIndex = z,
+	})
+end
+
+--- One cut-corner image on its own ("fill" or "line"), filling its parent: for a shade over a cut tile.
+function Components.cutImage(kind: string, tone: string, size: number?): ImageLabel
+	local image = if kind == "line" then Tokens.cut.line else Tokens.cut.fill
+	return slice(image, tone, Tokens.cut.scale * (size or 1), 0)
+end
+
+--- The cut-corner panel: a clear Frame holding `Fill` (the surface for `level`, behind everything) and `Line`
+--- (the border, in `lineTone`). Two images, no strokes or corners. `size` scales the cut: 1 is a 12-unit cut
+--- with a 2-unit line; small tiles and chips use less. Put the content in `frame`; tint with Components.paintCut.
+function Components.cut(
+	parent: Instance?,
+	level: number,
+	lineTone: string,
+	props: { [string]: any }?,
+	size: number?
+): Cut
+	local surface = Tokens.surface[level]
+	assert(surface and surface.colour, `no surface level {level}`)
+	local scale = Tokens.cut.scale * (size or 1)
+	local frame = make("Frame", nil, { BackgroundTransparency = 1, BorderSizePixel = 0 })
+	local fill = slice(Tokens.cut.fill, surface.colour, scale, 0)
+	fill.Name = "Fill"
+	fill.ImageTransparency = surface.transparency
+	fill.Parent = frame
+	local line = slice(Tokens.cut.line, lineTone, scale, 1)
+	line.Name = "Line"
+	line.Parent = frame
+	for key, value in props or {} do
+		(frame :: any)[key] = value
+	end
+	frame.Parent = parent
+	return { frame = frame, fill = fill, line = line }
+end
+
+--- Recolours a cut panel: either tone may be nil to leave it.
+function Components.paintCut(cut: Cut, fillTone: string?, lineTone: string?)
+	if fillTone then
+		cut.fill.ImageColor3 = colour(fillTone)
+	end
+	if lineTone then
+		cut.line.ImageColor3 = colour(lineTone)
+	end
+end
+
+--- A plain surface: level 1 = HUD panel (ink.900, translucent), 2 = card / sheet (ink.800), 3 = dialog (ink.700).
+--- `hairline` adds a 1-unit border in line.500.
 function Components.panel(
 	parent: Instance,
 	level: number,
@@ -83,9 +214,9 @@ function Components.panel(
 	if hairline then
 		make("UIStroke", frame, {
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-			Color = colour("ivory.50"),
+			Color = colour("line.500"),
 			Thickness = 1,
-			Transparency = 0.9,
+			Transparency = 0,
 		})
 	end
 	for key, value in props or {} do
@@ -95,34 +226,21 @@ function Components.panel(
 	return frame
 end
 
---- The Ledge: a 2-unit rule on the top edge, inset 8 from each side; its left quarter at full strength, the rest
---- at half, like light catching an edge. Returns the holder (tint it with Components.tintLedge).
+--- An accent rule: 2 units on the top edge, edge to edge. Returns the holder (tint it with tintLedge).
 function Components.ledge(parent: Instance, tone: string): Frame
 	local holder = make("Frame", parent, {
 		Name = "Ledge",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(8, 0),
-		Size = UDim2.new(1, -16, 0, 2),
+		Size = UDim2.new(1, 0, 0, 2),
 		ZIndex = 4,
 	})
-	local bright = make("Frame", holder, {
+	make("Frame", holder, {
 		Name = "Bright",
 		BackgroundColor3 = colour(tone),
 		BorderSizePixel = 0,
-		Size = UDim2.fromScale(0.25, 1),
+		Size = UDim2.fromScale(1, 1),
 		ZIndex = 4,
 	})
-	local rest = make("Frame", holder, {
-		Name = "Rest",
-		BackgroundColor3 = colour(tone),
-		BackgroundTransparency = 0.5,
-		BorderSizePixel = 0,
-		Position = UDim2.fromScale(0.25, 0),
-		Size = UDim2.fromScale(0.75, 1),
-		ZIndex = 4,
-	})
-	Components.corner(bright, "full")
-	Components.corner(rest, "full")
 	return holder
 end
 
@@ -136,7 +254,7 @@ end
 
 export type Meter = { track: Frame, fill: Frame, ghost: Frame?, gradient: UIGradient? }
 
---- A bar: rounded track and fill. `translucent` uses the ivory track at 0.85 for HUD panels over the scene;
+--- A bar: square track and fill. `translucent` thins the dark well a little for HUD panels over the scene;
 --- `ghost` adds a second layer under the fill (a value it is heading to); `ticks` are shares (0..1) marked
 --- with 1-unit lines.
 function Components.meter(
@@ -149,13 +267,12 @@ function Components.meter(
 ): Meter
 	local track = make("Frame", parent, {
 		Name = "Track",
-		BackgroundColor3 = if translucent then colour("ivory.50") else colour("ink.600"),
-		BackgroundTransparency = if translucent then 0.85 else 0,
+		BackgroundColor3 = colour("ink.600"),
+		BackgroundTransparency = if translucent then 0.15 else 0,
 		BorderSizePixel = 0,
 		Size = UDim2.fromOffset(width, height),
 		ClipsDescendants = false,
 	})
-	Components.corner(track, "full")
 	local ghostFrame: Frame? = nil
 	if ghost then
 		ghostFrame = make("Frame", track, {
@@ -166,7 +283,6 @@ function Components.meter(
 			Size = UDim2.fromScale(0, 1),
 			Visible = false,
 		})
-		Components.corner(ghostFrame :: Frame, "full")
 	end
 	local fill = make("Frame", track, {
 		Name = "Fill",
@@ -175,28 +291,27 @@ function Components.meter(
 		Size = UDim2.fromScale(0, 1),
 		ZIndex = 2,
 	})
-	Components.corner(fill, "full")
 	for _, share in ticks or {} do
 		make("Frame", track, {
 			Name = "Tick",
-			BackgroundColor3 = colour("ink.900"),
-			BackgroundTransparency = 0.3,
+			BackgroundColor3 = colour("ivory.50"),
+			BackgroundTransparency = 0.2,
 			BorderSizePixel = 0,
-			AnchorPoint = Vector2.new(0.5, 0),
-			Position = UDim2.fromScale(share, 0),
-			Size = UDim2.new(0, 1, 1, 0),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(share, 0.5),
+			Size = UDim2.new(0, 2, 1, 6),
 			ZIndex = 3,
 		})
 	end
 	return { track = track, fill = fill, ghost = ghostFrame }
 end
 
---- A key cap: radius s, ink.700, hairline, the key in `label` (Extended 600) or a glyph image.
+--- A key cap: a dark well with a bright 1-unit border, the key in `label` or a glyph image.
 function Components.keyCap(parent: Instance, size: number): (Frame, TextLabel, ImageLabel)
 	local cap = make("Frame", parent, {
 		Name = "Cap",
-		BackgroundColor3 = colour("ink.700"),
-		BackgroundTransparency = 0.1,
+		BackgroundColor3 = colour("ink.600"),
+		BackgroundTransparency = 0,
 		BorderSizePixel = 0,
 		Size = UDim2.fromOffset(size, size),
 		AutomaticSize = Enum.AutomaticSize.X,
@@ -204,9 +319,9 @@ function Components.keyCap(parent: Instance, size: number): (Frame, TextLabel, I
 	Components.corner(cap, "s")
 	make("UIStroke", cap, {
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-		Color = colour("ivory.50"),
+		Color = colour("line.300"),
 		Thickness = 1,
-		Transparency = 0.85,
+		Transparency = 0,
 	})
 	make("UIPadding", cap, { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) })
 	local label = Components.text(cap, "Key", "ivory.50", {

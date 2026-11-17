@@ -730,7 +730,7 @@ end
 --- pained pose that says how hard and from where, frozen on its first frame through the stop while
 --- they shake, and their whole body is thrown over away from the hit and springs back. All of it is
 --- only what this client shows.
-function AnimController:HitLanded(attacker: Model?, target: Model, strength: number)
+function AnimController:HitLanded(attacker: Model?, target: Model, strength: number, step: number?)
 	local share = clamp01(strength / cfg.HitStopFullStrength)
 	local stop = cfg.HitStopMin + (cfg.HitStopMax - cfg.HitStopMin) * share
 	local attackerFighter = attacker and fighters[attacker]
@@ -767,8 +767,13 @@ function AnimController:HitLanded(attacker: Model?, target: Model, strength: num
 		end
 	end
 
+	-- A string's stunning punches (strength 0, `step` 1-3) alternate the light and the heavy flinch, so every
+	-- hit of a fast combo reads as its own blow (the user, 2026-11-16: "hit animations of the victim reacting
+	-- to each hit").
+	local stringHit = strength <= 0 and step ~= nil and step > 0
 	local name = if fromBehind
 		then "HitFlinchBack"
+		elseif stringHit and (step :: number) % 2 == 0 then "HitFlinchHeavy"
 		elseif share >= cfg.HeavyHitShare then "HitFlinchHeavy"
 		else "HitFlinch"
 	for _, other in { "HitFlinch", "HitFlinchHeavy", "HitFlinchBack" } do

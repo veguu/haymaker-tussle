@@ -1,36 +1,55 @@
 --!strict
--- The "Golden Hour" design tokens (approved 2026-11-15): every colour, space, radius, surface, motion and type
--- number the interface uses. Screens never use a literal; they read these. Source of truth for the values:
--- the vault's UI Research/Design System pages (Color Palette, Spacing and Layout, Shapes and Components,
--- Animation and Motion, Typography). Pure data at the top level (no Roblox globals) so Lune can load it for
--- tests/Tokens.spec.luau; Color3 values are built lazily by Tokens.colour at runtime.
+-- The "Ringside" design tokens (palette A "Ringside Night", picked by the owner 2026-11-16 from six; the look and
+-- the navigation are in the vault's UI Research/ringside-prototype.html). They replace Voltline's Electric blue
+-- (rejected: "the placeholder UI with different colours") and Golden Hour before it. Every colour, space, radius,
+-- surface, motion and type number the interface uses: screens never use a literal; they read these. Pure data
+-- at the top level (no Roblox globals) so Lune can load it for tests/Tokens.spec.luau.
+--
+-- THE TOKEN NAMES ARE JOBS, not paints (kept since Golden Hour so old screens follow every palette change):
+--   ink.*    surfaces: 950 the INK of every outline and lip, 900 panel, 800 sheet, 700 card, 600 well / header /
+--            empty track, 500 raised or picked card
+--   ivory.*  text and neutral marks              stone.*  quiet and disabled text
+--   coral.*  RED-ORANGE = the primary action (buy, do it), YOU, the tab or card you are on
+--   teal.*   GREEN  = READY, equip, owned, on    gold.*   YELLOW = coins, the ultimate, rising stagger, wins
+--   danger   PINK-RED = critical, warnings, close  line.*  500 = outline ink, 300 = the faint inner edge
+--   violet   the gamepad focus ring (light blue)
 
 local Tokens = {}
 
--- Colours as HEX strings. One colour, one job: coral = YOU, teal = READY/RECOVERING, gold = EARNED,
--- ivory/stone = everything neutral. The meter.* scale belongs to the air-kick meter alone.
 Tokens.hex = {
-	-- neutrals (warm inks, hue ~25 deg)
-	["ink.950"] = "#0F0C0A", -- full-screen scrims, fade cover
-	["ink.900"] = "#15110E", -- base surface: HUD panels, menu background
-	["ink.800"] = "#1F1A16", -- raised surface: cards, menu panels
-	["ink.700"] = "#2B241F", -- highest surface: dialogs, hovered cards
-	["ink.600"] = "#3D342D", -- empty tracks, dividers on solid surfaces
-	["stone.500"] = "#7E7366", -- disabled text and icons (non-essential only)
-	["stone.300"] = "#B9AD9C", -- secondary text, labels, captions
-	["ivory.200"] = "#EDE3D2", -- body text in long passages
-	["ivory.50"] = "#FBF5EA", -- primary text, numerals, neutral marks, primary button fill
-	-- accents
-	["coral.700"] = "#C84634",
-	["coral.500"] = "#FF6A55",
-	["coral.300"] = "#FF9C8C",
-	["teal.700"] = "#1E7F71",
-	["teal.400"] = "#36C2AE",
-	["teal.200"] = "#9FE5DA",
-	["gold.600"] = "#C9952A",
-	["gold.400"] = "#F4C24D",
-	["gold.200"] = "#FBE3A6",
-	["danger.600"] = "#E23B2E", -- fills only
+	["ink.950"] = "#05070A",
+	["ink.900"] = "#171C24",
+	["ink.800"] = "#1B212B",
+	["ink.700"] = "#222A36",
+	["ink.600"] = "#0E1116",
+	["ink.500"] = "#2C3645",
+	["stone.500"] = "#7C889B",
+	["stone.300"] = "#9AA6B8",
+	["ivory.200"] = "#DDE3EC",
+	["ivory.50"] = "#F4F6FA",
+	["coral.700"] = "#A82410",
+	["coral.500"] = "#FF4B2B",
+	["coral.300"] = "#FF8A73",
+	["teal.700"] = "#1C8F54",
+	["teal.400"] = "#35E08A",
+	["teal.200"] = "#9DF2C6",
+	["gold.600"] = "#B37F0C",
+	["gold.400"] = "#FFC83D",
+	["gold.200"] = "#FFE49A",
+	["danger.600"] = "#FF3B5C",
+	["line.500"] = "#05070A",
+	["line.300"] = "#3A4656",
+	["violet.400"] = "#7FD4FF",
+	-- one colour per class (from the kits-4 design: Base gold, Tempest cyan, Inferno orange, Frost ice blue,
+	-- Beast red, Dragon violet, Bruiser brown-gold, Trickster pink). Marks and card art only, never state.
+	["class.Base"] = "#F2C94C",
+	["class.Tempest"] = "#3FE0E0",
+	["class.Inferno"] = "#FF6A2B",
+	["class.Frost"] = "#6FB8FF",
+	["class.Beast"] = "#E0344B",
+	["class.Dragon"] = "#9B5CFF",
+	["class.Bruiser"] = "#C98A3C",
+	["class.Trickster"] = "#FF5FB8",
 	-- the timing meter's own scale
 	["meter.red"] = "#E5484D",
 	["meter.orange"] = "#F0883A",
@@ -44,12 +63,28 @@ Tokens.nonEssentialText = { ["stone.500"] = true }
 -- Spacing on a 4-unit grid, in design units at the 1280x720 reference (before the HUD scale).
 Tokens.space = { 4, 8, 12, 16, 24, 32, 48, 64 }
 
-Tokens.radius = { s = 6, m = 10, l = 14, full = 999 }
+-- Restrained rounding. The look is the STICKER: a rounded tile with a 3-unit ink outline that sits on a darker
+-- lip and drops onto it when pressed (Components.sticker). Tokens.cut is the older image-built panel the HUD
+-- still uses until its restyle.
+Tokens.radius = { s = 6, m = 9, l = 12, full = 999 }
+
+-- The cut-corner shape: 9-slice images (white, tinted in use) with the top-right and bottom-left corners cut.
+-- Sources in assets/ui (cut_fill, cut_line, cut_flag .png: 96 px, a 24 px cut, a 4 px line), uploaded
+-- 2026-11-16. `scale` 0.5 gives a 12-unit cut and a 2-unit line.
+Tokens.cut = {
+	-- rounded since Ringside (assets/ui/round_fill, round_line, round_badge .png; the cut-corner cut_*.png of
+	-- Voltline are kept on disk): a 12-unit radius and a 3-unit ink line at `scale` 0.5
+	fill = "rbxassetid://76833744141686",
+	line = "rbxassetid://97311833623704",
+	flag = "rbxassetid://110797461255609", -- the ready badge: a dot in an ink ring, tinted green
+	slice = { 32, 32, 64, 64 },
+	scale = 0.5,
+}
 
 -- Surface levels: 0 = on the scene, 1 = HUD panel, 2 = menu sheet/card, 3 = dialog/toast.
 Tokens.surface = {
 	[0] = { colour = nil, transparency = 1 },
-	[1] = { colour = "ink.900", transparency = 0.12 }, -- the HUD maximum: more and coral loses contrast on paving
+	[1] = { colour = "ink.900", transparency = 0.04 }, -- 0.12 is the most: past it text loses contrast on a bright arena
 	[2] = { colour = "ink.800", transparency = 0 },
 	[3] = { colour = "ink.700", transparency = 0 },
 }
@@ -85,6 +120,7 @@ Tokens.motion = {
 Tokens.textFloor = 15
 
 export type TypeRole = {
+	italic: boolean?,
 	face: string,
 	weight: string,
 	size: number,
@@ -92,46 +128,53 @@ export type TypeRole = {
 	case: string,
 }
 
--- Type scale per role. face: "display" = Builder Extended, "text" = Builder Sans, "mono" = Builder Mono.
+-- Type scale per role. One family, Titillium Web, upright: "display" in Black for headings and numerals and
+-- Bold for short caps labels, "text" for everything people read. "mono" = Builder Mono (ticking figures).
 -- weight names are Enum.FontWeight names, resolved by Typography.
 Tokens.type = {
 	["display.xl"] = {
 		face = "display",
-		weight = "ExtraBold",
+		weight = "Heavy",
 		size = 120,
 		lineHeight = 1.0,
 		case = "upper",
 	},
 	["display.l"] = {
 		face = "display",
-		weight = "ExtraBold",
+		weight = "Heavy",
 		size = 64,
 		lineHeight = 1.0,
 		case = "upper",
 	},
 	["numeral.l"] = {
 		face = "display",
-		weight = "ExtraBold",
+		weight = "Heavy",
 		size = 44,
 		lineHeight = 1.0,
 		case = "figures",
 	},
 	["numeral.m"] = {
 		face = "display",
-		weight = "SemiBold",
+		weight = "Heavy",
 		size = 28,
 		lineHeight = 1.0,
 		case = "figures",
 	},
 	headline = {
 		face = "display",
-		weight = "ExtraBold",
+		weight = "Heavy",
 		size = 28,
 		lineHeight = 1.05,
 		case = "upper",
 	},
-	title = { face = "display", weight = "SemiBold", size = 20, lineHeight = 1.1, case = "upper" },
-	label = { face = "display", weight = "SemiBold", size = 15, lineHeight = 1.0, case = "upper" },
+	title = {
+		face = "display",
+		weight = "Heavy",
+		size = 20,
+		lineHeight = 1.1,
+		case = "upper",
+	},
+	label = { face = "display", weight = "Bold", size = 15, lineHeight = 1.0, case = "upper" },
 	["body.l"] = {
 		face = "text",
 		weight = "Medium",
@@ -139,7 +182,7 @@ Tokens.type = {
 		lineHeight = 1.25,
 		case = "sentence",
 	},
-	body = { face = "text", weight = "Regular", size = 17, lineHeight = 1.25, case = "sentence" },
+	body = { face = "text", weight = "Regular", size = 17, lineHeight = 1.2, case = "sentence" },
 	["body.strong"] = {
 		face = "text",
 		weight = "Bold",
@@ -147,8 +190,20 @@ Tokens.type = {
 		lineHeight = 1.2,
 		case = "sentence",
 	},
-	caption = { face = "text", weight = "Medium", size = 15, lineHeight = 1.2, case = "sentence" },
-	button = { face = "display", weight = "SemiBold", size = 17, lineHeight = 1.0, case = "upper" },
+	caption = {
+		face = "text",
+		weight = "SemiBold",
+		size = 15,
+		lineHeight = 1.15,
+		case = "sentence",
+	},
+	button = {
+		face = "display",
+		weight = "Heavy",
+		size = 17,
+		lineHeight = 1.0,
+		case = "upper",
+	},
 	["mono.timer"] = {
 		face = "mono",
 		weight = "Bold",
@@ -167,8 +222,8 @@ Tokens.type = {
 
 -- Font families for the faces above.
 Tokens.family = {
-	display = "rbxasset://fonts/families/BuilderExtended.json",
-	text = "rbxasset://fonts/families/BuilderSans.json",
+	display = "rbxasset://fonts/families/TitilliumWeb.json",
+	text = "rbxasset://fonts/families/TitilliumWeb.json",
 	mono = "rbxasset://fonts/families/BuilderMono.json",
 }
 

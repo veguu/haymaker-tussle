@@ -1,10 +1,8 @@
 --!strict
 -- Typography - the type for every piece of game-owned text, client and server (world labels are made on the
--- server). UI Phase 0c (2026-11-15): the Golden Hour faces from one Roblox-native family, measured loadable in
--- Studio 2026-11-14 (vault UI Research/Design System/Typography):
---   text    = Builder Sans      (everything people read; FAMILY)
---   display = Builder Extended  (headings, big numerals, short caps labels)
---   mono    = Builder Mono      (ticking figures)
+-- server). Ringside (2026-11-16), measured loadable in Studio:
+--   text and display = Titillium Web (200, 300, 400, 600, 700 and Black 900; upright everywhere)
+--   mono             = Builder Mono (ticking figures)
 -- Roles come from Tokens.type through Core/TypeRoles. The old role names (Headline, Stat, Button, ...) still
 -- work as aliases at their old sizes, so every screen keeps its layout until it is rebuilt.
 -- Same API as before: face, apply, adopt and the HT_TextRole attribute. NEW: FAMILIES, resolve, textScale, and
@@ -30,6 +28,7 @@ export type Role = {
 	size: number,
 	lineHeight: number?,
 	scalable: boolean?,
+	italic: boolean?,
 }
 
 local function build(name: string): Role
@@ -40,6 +39,7 @@ local function build(name: string): Role
 		size = r.size,
 		lineHeight = r.lineHeight,
 		scalable = r.scalable,
+		italic = r.italic,
 	}
 end
 
@@ -58,7 +58,11 @@ function Typography.face(role: Role | Enum.FontWeight): Font
 		return Font.new(Typography.FAMILY, role :: Enum.FontWeight, Enum.FontStyle.Normal)
 	end
 	local r = role :: Role
-	return Font.new(r.family or Typography.FAMILY, r.weight, Enum.FontStyle.Normal)
+	return Font.new(
+		r.family or Typography.FAMILY,
+		r.weight,
+		if r.italic then Enum.FontStyle.Italic else Enum.FontStyle.Normal
+	)
 end
 
 -- The player's text-size multiplier (1 on the server and wherever the setting can't be read).

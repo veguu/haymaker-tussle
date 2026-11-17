@@ -88,6 +88,9 @@ function UltimateController:KnitStart()
 			end
 			UltimateMeter.hidePrompt()
 			local line = Ultimates.timeline(kit)
+			if not line then
+				return
+			end
 			local me = player.Character
 			local role = if me == attacker then "attacker" elseif me == target then "target" else nil
 			local camera = workspace.CurrentCamera

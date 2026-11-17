@@ -2,7 +2,7 @@
 -- Text roles, resolved (UI Phase 0c, 2026-11-15). Pure, no Roblox globals, so tests/TypeRoles.spec.luau can
 -- check it in Lune; Shared/Typography turns the answers into Font objects.
 --
--- Source of truth: Tokens.type (the Golden Hour scale, vault UI Research/Design System/Typography), passed in
+-- Source of truth: Tokens.type (the Voltline scale since 2026-11-16, vault UI Research/Design System/Typography), passed in
 -- by the caller because Core modules require nothing. The old role names every screen still uses (Headline, Stat, Button, ...) are ALIASES: they take the new role's face and
 -- weight but KEEP THEIR OLD SIZE, so no existing box overflows while screens are rebuilt one by one (Phase 1+).
 -- Aliases go in Phase 7.
@@ -28,10 +28,10 @@ for name, n in TypeRoles.WEIGHT do
 end
 
 -- The weights each face really has, measured in Studio 2026-11-14 (TextService:GetFamilyInfoAsync,
--- research_notes/roblox_fonts_measured.md). Nothing at 900 in any of them.
+-- research_notes/roblox_fonts_measured.md). Only Montserrat goes to 900.
 TypeRoles.AVAILABLE = {
-	text = { 100, 300, 400, 500, 600, 700, 800 }, -- Builder Sans
-	display = { 300, 400, 600, 700, 800 }, -- Builder Extended
+	text = { 200, 300, 400, 600, 700, 900 }, -- Titillium Web (measured 2026-11-16: no 500, no 800)
+	display = { 200, 300, 400, 600, 700, 900 }, -- Titillium Web again: Black is its 900
 	mono = { 300, 400, 700 }, -- Builder Mono
 }
 
@@ -61,6 +61,7 @@ export type Resolved = {
 	weight: string, -- an Enum.FontWeight name the face really has
 	size: number,
 	lineHeight: number,
+	italic: boolean, -- slanted (display headings and numerals)
 	scalable: boolean, -- follows PreferredTextSize (not numerals or display calls)
 }
 
@@ -79,7 +80,13 @@ function TypeRoles.snap(face: string, weight: string): string
 	return NAME_OF[best]
 end
 
-type TokenRole = { face: string, weight: string, size: number, lineHeight: number }
+type TokenRole = {
+	face: string,
+	weight: string,
+	size: number,
+	lineHeight: number,
+	italic: boolean?,
+}
 type TokenSet = { type: { [string]: TokenRole }, textFloor: number }
 
 --- A role name (new or old) resolved to face, weight, size and line height, from the given Tokens.
@@ -96,6 +103,7 @@ function TypeRoles.resolve(Tokens: TokenSet, name: string): Resolved
 		weight = TypeRoles.snap(role.face, role.weight),
 		size = math.max(if alias then alias.size else role.size, Tokens.textFloor),
 		lineHeight = math.max(role.lineHeight, 1),
+		italic = role.italic == true,
 		scalable = prefix ~= "numeral" and prefix ~= "display",
 	}
 end

@@ -1,5 +1,5 @@
 --!strict
--- PerfController - the owner's performance readout, top left under the Bots button, for testing on real
+-- PerfController - the owner's performance readout, on the right edge under the Bots button, for testing on real
 -- devices (phones especially). Only shown to whoever may use the Bots button (HT_CanFreezeBots: Studio, or the
 -- place's owner), so players never see it. Tap it to hide or show the detail line.
 --
@@ -53,16 +53,11 @@ function PerfController:KnitStart()
 		gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
 		gui.DisplayOrder = 5
 
-		local top = HudTheme.Afk.Top
-			+ HudTheme.Afk.Height
-			+ HudTheme.Spectate.Gap
-			+ HudTheme.Spectate.Height
-			+ HudTheme.BotsFreeze.Gap
-			+ HudTheme.BotsFreeze.Height
-			+ HudTheme.BotsFreeze.Gap
 		local panel = Instance.new("TextButton")
 		panel.Name = "PerfPanel"
-		panel.Position = UDim2.fromOffset(HudTheme.Size.Edge, top)
+		-- Right edge, under the Bots button (2026-11-16): the left edge is the lobby navigation's now.
+		panel.AnchorPoint = Vector2.new(1, 0.5)
+		panel.Position = UDim2.new(1, -HudTheme.Size.Edge, 0.42, HudTheme.BotsFreeze.Height + 6)
 		panel.Size = UDim2.fromOffset(HudTheme.BotsFreeze.Width, 44)
 		panel.AutomaticSize = Enum.AutomaticSize.X
 		panel.BackgroundColor3 = C.Panel

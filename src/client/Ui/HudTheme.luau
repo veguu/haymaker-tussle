@@ -8,12 +8,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Tokens = require(ReplicatedStorage.Shared.Tokens)
+local Icons = require(script.Parent.Icons)
 
 local HudTheme = {}
 
--- Re-pointed to the Golden Hour tokens (UI Phase 0d, 2026-11-15; Shared/Tokens, vault UI Research/Design
--- System/Color Palette). One colour, one job: coral = YOU, teal = ready/recovering, gold = earned, ink/ivory/
--- stone = neutral. The names stay so every screen picks the palette up with no code change; screens move to
+-- Pointed at Shared/Tokens (Voltline since 2026-11-16: the token names are jobs, see the note there). One
+-- colour, one job: coral = YOU (pink), teal = ready/recovering (cyan), gold = earned (yellow), ink/ivory/
+-- stone = neutral (blue surfaces, white text). The names stay so every screen picks the palette up with no code change; screens move to
 -- Tokens directly as they are rebuilt (Phase 1+), then this table goes.
 local T = Tokens.colour
 HudTheme.Colour = {
@@ -112,13 +113,12 @@ HudTheme.Time = {
 	Steps = 0.15, -- stepping back for a prompt
 }
 
--- The icons: drawn by Project/design/ui/draw_icons.py (PNGs in Project/assets/icons) and uploaded
--- through Studio as Images on 2026-11-08 (punch and propel redrawn for hud-9). Redraw and re-upload to change them.
+-- The HUD's four action icons, by action id, from the one icon list (Ui/Icons; all placeholders there).
 HudTheme.Icons = {
-	punch = "rbxassetid://93989680466321",
-	propel = "rbxassetid://108732937698089",
-	kick = "rbxassetid://113416372768113",
-	uppercut = "rbxassetid://93989680466321", -- the punch's fist, until it has its own drawing
+	punch = Icons.id("classes"), -- the glove
+	propel = Icons.id("dash"), -- Q, the class's move
+	kick = Icons.id("jump"),
+	uppercut = Icons.id("punch"), -- R, the class's attack
 	mouse = "rbxassetid://118394725313773",
 }
 
@@ -162,11 +162,11 @@ HudTheme.Guide = {
 		},
 		{
 			key = "R",
-			action = "Hold to charge your skill, let go to throw it. Let go in the white for a PERFECT.",
+			action = "Your class's attack. Hold it for up to 3 seconds, let go to throw it.",
 		},
 		{
 			key = "Q",
-			action = "Your kit's move. Can't be used while stunned.",
+			action = "Your class's move. Can't be used while stunned.",
 		},
 		{
 			key = "Space",
@@ -183,9 +183,9 @@ HudTheme.Guide = {
 		},
 		{
 			key = "L2",
-			action = "Hold to charge your skill, let go to throw it. Let go in the white for a PERFECT.",
+			action = "Your class's attack. Hold it for up to 3 seconds, let go to throw it.",
 		},
-		{ key = "B", action = "Your kit's move. Can't be used while stunned." },
+		{ key = "B", action = "Your class's move. Can't be used while stunned." },
 		{
 			key = "Y",
 			action = "Jump. R2 in the air to glide a punch.",
@@ -198,8 +198,8 @@ HudTheme.Guide = {
 			key = "Punch",
 			action = "Punch: a 4-hit string. The fourth knocks them away.",
 		},
-		{ key = "Propel", action = "Your kit's move." },
-		{ key = "Upper", action = "Hold to charge your skill, let go to throw it." },
+		{ key = "Propel", action = "Your class's move." },
+		{ key = "Upper", action = "Your class's attack. Hold, then let go to throw it." },
 		{
 			key = "Kick",
 			action = "Jump. Punch in the air to glide a punch at them.",
@@ -248,15 +248,17 @@ HudTheme.Menu = {
 	ButtonWidth = 132,
 	ButtonHeight = 52,
 	Corner = 8,
-	MaxWidth = 780,
-	MaxHeight = 500,
+	MaxWidth = 1040,
+	MaxHeight = 600,
 	ScreenShare = Vector2.new(0.92, 0.86), -- of the screen, before MaxWidth/MaxHeight
-	Header = 48,
+	Header = 56,
 	Rail = 150, -- the tab column
 	Tab = 44, -- tab and button height: the touch-target minimum
 	Gap = 8,
 	Pad = 14,
 	CardButton = 136,
+	Detail = Vector2.new(230, 320), -- the selected class's panel: least and most width (32 % of the sheet)
+	Cell = Vector2.new(140, 156), -- a class card: least width, height
 	Coin = T("gold.400"), -- earned
 	Good = T("teal.400"), -- confirmed
 	Backdrop = 0.45,

@@ -21,11 +21,24 @@ export type Take = {
 	volume: number,
 }
 
+-- A layer played with a role by Sfx.playLayered: another role and how to play it.
+export type Layer = {
+	role: string,
+	options: { [string]: any }?,
+	-- A BED instead of a one-shot (Sfx.bed): it fades in on the first play, is held this many seconds past
+	-- every later one, then fades out. One rumble under a whole combo instead of a thump per hit.
+	bed: number?,
+}
+
 export type Entry = {
 	takes: { Take },
 	looped: boolean,
 	name: string,
 	creator: string,
+	-- How this role always plays (Sfx.Options: pitch, eq, ...), under whatever the caller passes.
+	play: { [string]: any }?,
+	-- Other roles played with it by Sfx.playLayered, so one pick can be a whole layered sound.
+	layers: { Layer }?,
 }
 
 local SoundBank: { [string]: Entry } = {
@@ -149,11 +162,10 @@ local SoundBank: { [string]: Entry } = {
 		name = "Boxing Hits, With Gloves, Hit Punching Bag Hard (SFX)",
 		creator = "ProSoundEffects",
 	},
-	-- The low BOOM under every punch, cut at about 0.3 s. Not a drum: a bass drum here "sounds like a drum"
-	-- (the user, 2026-11-16). The reference they gave (an anime punch sound-design video) has, per hit, a
-	-- noise-like boom under ~170 Hz sweeping down for 0.2-0.4 s, a full-range crack on top and a body between.
-	-- Each take starts on one boom of a multi-boom file (measured in a play test 2026-11-16); volumes even out
-	-- the peaks (133, 148, 331).
+	-- A low BOOM, cut at about 0.3 s. NO LONGER UNDER ANY PUNCH (2026-11-16, kits-4i): under the punches it
+	-- was the "bassy drum" the user heard (measured: the loudest layer of every M1, its lows held for the
+	-- whole 0.5 s). Kept only under the ultimate-ready sting (Ui/UltimateMeter). Each take starts on one boom
+	-- of a multi-boom file; volumes even out the peaks (133, 148, 331).
 	["punch_sub"] = {
 		takes = {
 			{ id = 9114362625, length = 2.89, start = 0.08, volume = 1.5 },
@@ -163,6 +175,32 @@ local SoundBank: { [string]: Entry } = {
 		looped = false,
 		name = "Explosions, Dull, Thuddy (SFX) x2 + BOOM-Deep Boom 06",
 		creator = "ProSoundEffects / APMOfficial",
+	},
+	-- THE RUMBLE BEDS under an M1 string (kits-5b, 2026-11-16), played by Sfx.bed: one steady rumble that swells
+	-- in on the first hit and holds while the hits keep coming, like the user's punch references (their weight
+	-- is a steady, loud, noisy rumble under ~140 Hz held ~0.6 s; never a thump on the hit). Each take starts in
+	-- the middle of a long file, so there's no attack. Measured in Studio (AudioAnalyzer, 1 s from the start
+	-- below): Low Rumble 2 is 80 % under 140 Hz, RMS 0.12, steady (wobble 0.31); Avalanche Deep Crumbling 4 is
+	-- rougher, debris in the mids (53 % under 140 Hz), RMS 0.14. Volumes bring both to about RMS 0.3.
+	["punch_rumble_low"] = {
+		takes = {
+			{ id = 9112824733, length = 46.0, start = 4, volume = 2.4 },
+			{ id = 9112824733, length = 46.0, start = 12, volume = 2.4 },
+			{ id = 9112824733, length = 46.0, start = 20, volume = 2.4 },
+		},
+		looped = false,
+		name = "Low Rumble 2 (SFX)",
+		creator = "ProSoundEffects",
+	},
+	["punch_rumble_rough"] = {
+		takes = {
+			{ id = 9113218938, length = 16.0, start = 3, volume = 2.0 },
+			{ id = 9113218938, length = 16.0, start = 7, volume = 2.0 },
+			{ id = 9113218938, length = 16.0, start = 11, volume = 2.0 },
+		},
+		looped = false,
+		name = "Avalanche Deep Crumbling 4 (SFX)",
+		creator = "ProSoundEffects",
 	},
 	-- The light air of a swing, under `swing_heavy`.
 	["punch_swing"] = {
@@ -198,6 +236,8 @@ for role, options in SoundCandidates.OPTIONS do
 			looped = false,
 			name = first.name,
 			creator = first.creator,
+			play = first.play,
+			layers = first.layers,
 		}
 	end
 end

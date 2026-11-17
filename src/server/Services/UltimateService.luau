@@ -89,6 +89,10 @@ function UltimateService:OpenWindow(attacker: Model, target: Model)
 	if busy(attacker) or busy(target) or not Combatants.isAlive(target) then
 		return
 	end
+	-- no window for a kit that has no ultimate yet
+	if not Ultimates.timeline(Knit.GetService("AbilityService"):KitOf(player)) then
+		return
+	end
 	windows[player] = { target = target, untilAt = os.clock() + cfg.WindowSeconds }
 	self._window:FireClient(player, target, cfg.WindowSeconds)
 end
@@ -118,6 +122,9 @@ local function start(self: any, player: Player, attacker: Model, target: Model)
 	end
 	local kitId = Knit.GetService("AbilityService"):KitOf(player)
 	local line = Ultimates.timeline(kitId)
+	if not line then
+		return
+	end
 	-- Facing outward from the arena's middle when the target is in the round; otherwise away from the
 	-- attacker.
 	local arena = if CollectionService:HasTag(target, FIGHTER_TAG) and ActiveArena.hasArena()

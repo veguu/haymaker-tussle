@@ -1,16 +1,18 @@
 --!strict
--- HudController - the combat HUD, rebuilt in the Golden Hour design (UI Phase 1, 2026-11-15; vault UI Research/
--- UI Specifications/Combat HUD and Round Presentation). The frame hugs the edges and leaves the centre to the
--- fight:
---   Y  bottom-left (top-left on phones): YOUR panel with the coral Ledge. A big stagger figure (not a health
---      bar: it fills UP toward danger), STAGGER label, the knockback it means ("3.4x knockback"), CRITICAL
---      (70+) or RECOVERING, the speed bar, and the stagger bar with marks at 40 and 70.
---   K  bottom-right: the four actions as tiles, Q mobility, R attack, Jump/Kick, Punch (circle = attack, rounded
---      square = movement), key caps under them, a shade that drains as the cooldown runs, a teal ring at ready.
+-- HudController - the combat HUD in the Voltline look (2026-11-16; drawn in the vault's UI Research/
+-- voltline-preview.html, "Electric blue"). Blue cut-corner panels on the screen's edges; the centre is the fight's:
+--   Y  bottom-left (top-left on phones): YOUR stagger. A big slanted figure that climbs toward danger (not a
+--      health bar), STAGGER, the knockback it means ("2.1x knockback"), RISING / CRITICAL / RECOVERING in words,
+--      the speed bar, and the stagger bar with marks at 40 and 70. White, then yellow, then red-orange.
+--   K  bottom-right: the class skills, ALWAYS shown in a fight: Q (mobility) and R (attack) as the two big
+--      tiles, each with its icon, name, key cap, a shade that drains off the icon as the cooldown runs and the
+--      seconds left on top. Jump and Punch are the two small tiles beside them. Four states, each a different
+--      shape: ready (cyan border, corner flag, filled key), cooling down (shade and seconds), held (white
+--      border, pressed fill) and can't use (dim, a slash through it).
 --   A  top centre: one status strip (next round in N, get ready, 18 / 25 standing, final two, round over).
---   F  top right: the ring-out feed, newest on top, four rows; yours marked with the coral Ledge.
---   the target: a coral chevron and the name over your lock-on target (an open ivory one over the nearest
---      opponent ahead when nothing is locked), with a thin bar shaded by THEIR stagger (never coral: coral is you).
+--   F  top right: the ring-out feed, newest on top, four rows; yours marked with a pink edge.
+--   the target: a pink chevron and the name over your lock-on target (an open white one over the nearest
+--      opponent ahead when nothing is locked), with a thin bar shaded by THEIR stagger.
 --
 -- It only draws. Every number comes from where the game keeps it: MovementController.Hud (speed, propel and kick
 -- timing), CombatController (punch timing and results), AbilityController (kit skills), EndlagController, the
@@ -29,6 +31,7 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TextService = game:GetService("TextService")
 local UserInputService = game:GetService("UserInputService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
@@ -50,25 +53,26 @@ local STAGGER_MAX = staggerCfg.Max
 local COMBATANT_TAG = "HT_Combatant"
 local ROUND_FOLDER = "HT_RoundState"
 local HELP_ACTION = "HaymakerHelp"
-local GUIDE_ROWS = 6
+local GUIDE_ROWS = 7
 local SP = Tokens.space -- 4, 8, 12, 16, 24, 32, 48, 64
 
 -- Layout in design units at 1280 x 720, before the HUD scale (spec Combat HUD 5.2-5.4, Round Presentation 5.1-5.2).
 local L = {
 	Edge = SP[5], -- 24 from the safe edges
-	Y = Vector2.new(280, 88),
+	Y = Vector2.new(324, 88),
 	YPhone = Vector2.new(200, 88),
-	FigureWidth = 84, -- three digits reserved, so the label column never jumps between 9 and 100
-	Bar = Vector2.new(256, 10),
+	FigureWidth = 96, -- three digits reserved, so the label column never jumps between 9 and 100
+	Bar = Vector2.new(300, 10),
 	BarPhone = 176,
-	SpeedWidth = 84,
+	SpeedWidth = 64,
 	SpeedOver = 24,
 	SpeedHeight = 6,
-	Tile = 48,
-	TileColumn = 56,
-	TileGap = SP[3], -- 12
-	Cap = 22,
-	K = Vector2.new(260, 96), -- tiles, caps, and room above for the names
+	TileBig = 76, -- Q and R: the class skills
+	TileSmall = 56, -- Jump and Punch
+	TileGap = SP[2], -- 8
+	TileTop = 22, -- room above the tiles for a result word (HIT / MISS / NOW)
+	Cap = 20,
+	K = Vector2.new(56 + 8 + 56 + 12 + 76 + 8 + 76, 22 + 76),
 	Strip = Vector2.new(360, 44),
 	StripTop = SP[2], -- 8
 	Chip = 28,
@@ -76,9 +80,8 @@ local L = {
 	FeedRow = 28,
 	FeedGap = SP[1], -- 4
 	FeedRows = 4,
-	NamesFor = 3, -- seconds the tile names show at a fight's start and after a kit change
 	ClosingFor = 2.5, -- seconds the ARENA CLOSING chip shows each time a shrink begins
-	ReadyRing = 0.25,
+	ReadyPop = 0.18, -- the one pop a tile gives when its skill comes back
 }
 
 local HudController = Knit.CreateController({
@@ -128,220 +131,221 @@ local function group(parent: Instance, name: string, size: Vector2): Group
 	return { holder = holder, fade = fade, scale = scale, wanted = false }
 end
 
--- One action tile (spec 5.3): a 48-unit container, the icon, a cooldown shade, the seconds, a teal ready ring,
--- a slash for unavailable, the key cap under it and the skill's name above it.
+-- One action tile: a cut-corner box holding the icon, the skill's name (big tiles), the key cap, a cooldown
+-- shade with the seconds left, the ready flag and a slash for unavailable. A result word shows above it.
 type Tile = {
 	id: string,
+	big: boolean,
 	column: Frame,
 	scale: UIScale,
-	box: Frame,
-	boxCorner: UICorner,
+	box: Components.Cut,
 	icon: ImageLabel,
 	shadeClip: Frame,
-	shade: Frame,
-	shadeCorner: UICorner,
 	seconds: TextLabel,
-	ring: Frame,
-	ringStroke: UIStroke,
-	ringScale: UIScale,
+	flag: ImageLabel,
 	slash: Frame,
 	cap: Frame,
+	capStroke: UIStroke,
 	capText: TextLabel,
 	capGlyph: ImageLabel,
-	capScale: UIScale,
+	capTone: string,
 	name: TextLabel,
 	word: TextLabel,
 	state: string,
-	round: boolean,
 	wordUntil: number,
 	secondsText: string,
 }
 
-local function makeTile(parent: Instance, id: string, index: number, round: boolean): Tile
-	local x = (index - 1) * (L.TileColumn + L.TileGap)
+local function makeTile(parent: Instance, id: string, x: number, big: boolean): Tile
+	local size = if big then L.TileBig else L.TileSmall
+	local cutSize = if big then 1 else 0.75
 	local column = make("Frame", parent, {
 		Name = id,
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(x, 0),
-		Size = UDim2.new(0, L.TileColumn, 1, 0),
+		Size = UDim2.fromOffset(size, L.K.Y),
 	})
 	local scale = make("UIScale", column, {})
-	-- the skill's name, above the tile, only at a fight's start, after a kit change and in the lobby
-	local name = text(column, "caption", "ivory.200", {
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 0, 22),
-		Size = UDim2.fromOffset(L.TileColumn + L.TileGap, 18),
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		TextTransparency = 1,
-	})
-	-- a short result word (HIT / MISS / NOW) in the same place, briefly
+	-- a short result word (HIT / MISS / NOW) above the tile, briefly
 	local word = text(column, "label", "ivory.50", {
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 0, 22),
-		Size = UDim2.fromOffset(L.TileColumn + L.TileGap, 18),
+		Position = UDim2.new(0.5, 0, 1, -(size + 2)),
+		Size = UDim2.fromOffset(size + 16, 18),
 		TextXAlignment = Enum.TextXAlignment.Center,
 		Visible = false,
 	})
-	local boxTop = 24
-	local box = panel(column, 1, if round then "full" else "m", {
+	make("UIStroke", word, {
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
+		Color = colour("ink.950"),
+		Thickness = 1.5,
+		Transparency = 0.3,
+	})
+	local box = Components.cut(column, 2, "line.500", {
 		Name = "Box",
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, boxTop),
-		Size = UDim2.fromOffset(L.Tile, L.Tile),
-	}, true)
-	-- level 1 is the HUD's translucent ink: a touch more body for a 48-unit tile over a bright floor
-	box.BackgroundTransparency = 0.25
-	local boxCorner = box:FindFirstChildOfClass("UICorner") :: UICorner
-	local icon = make("ImageLabel", box, {
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.fromOffset(size, size),
+	}, cutSize)
+	Components.paintCut(box, "ink.700", nil)
+	local icon = make("ImageLabel", box.frame, {
 		Name = "Icon",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(26, 26),
+		Position = UDim2.fromScale(0.5, if big then 0.54 else 0.46),
+		Size = if big then UDim2.fromOffset(36, 36) else UDim2.fromOffset(26, 26),
 		Image = HudTheme.Icons[id] or "",
 		ScaleType = Enum.ScaleType.Fit,
 		ZIndex = 2,
 	})
-	-- the cooldown shade: a copy of the container's shape, revealed from the bottom by a clip whose height is
-	-- the share of the cooldown still to run
-	local shadeClip = make("Frame", box, {
+	-- the skill's name, inside the top of a big tile, always there
+	local name = text(box.frame, "caption", "ivory.200", {
+		Name = "SkillName",
+		Position = UDim2.fromOffset(7, 6),
+		Size = UDim2.new(1, -9, 0, 14),
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Visible = big,
+		ZIndex = 5,
+	})
+	name.TextSize = 12 -- nine capitals ("FROSTBITE") have to fit beside the cut corner
+	-- the cooldown shade: the tile's own shape in dark ink, shown from the top down by a clip whose height is
+	-- the share of the cooldown still to run, with a white line on its lower edge. The icon stays visible under it.
+	local shadeClip = make("Frame", box.frame, {
 		Name = "ShadeClip",
 		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromScale(0, 1),
 		Size = UDim2.fromScale(1, 0),
 		ClipsDescendants = true,
 		ZIndex = 3,
 	})
-	local shade = make("Frame", shadeClip, {
-		Name = "Shade",
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromScale(0, 1),
-		Size = UDim2.fromOffset(L.Tile, L.Tile),
-		BackgroundColor3 = colour("ink.950"),
-		BackgroundTransparency = 0.35,
+	local shade = Components.cutImage("fill", "ink.950", cutSize)
+	shade.Name = "Shade"
+	shade.Size = UDim2.fromOffset(size, size)
+	shade.ImageTransparency = 0.45
+	shade.Parent = shadeClip
+	make("Frame", shadeClip, {
+		Name = "Edge",
+		BackgroundColor3 = colour("ivory.50"),
 		BorderSizePixel = 0,
-		ZIndex = 3,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 2, 1, 0),
+		Size = UDim2.new(1, -4, 0, 2),
 	})
-	local shadeCorner = Components.corner(shade, if round then "full" else "m")
-	local seconds = text(box, "mono.small", "ivory.50", {
+	local seconds = text(box.frame, "numeral.m", "ivory.50", {
+		Name = "Seconds",
+		Position = UDim2.fromOffset(0, if big then 6 else -2),
 		Size = UDim2.fromScale(1, 1),
 		TextXAlignment = Enum.TextXAlignment.Center,
 		ZIndex = 5,
 	})
+	if not big then
+		seconds.TextSize = 20
+	end
 	make("UIStroke", seconds, {
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
 		Color = colour("ink.950"),
-		Thickness = 1.5,
-		Transparency = 0.4,
+		Thickness = 2,
+		Transparency = 0.1,
 	})
-	local ring = make("Frame", box, {
+	local flag = make("ImageLabel", box.frame, {
 		Name = "Ready",
 		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromScale(1, 1),
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.fromOffset(24 * cutSize, 24 * cutSize),
+		Image = Tokens.cut.flag,
+		ImageColor3 = colour("teal.400"),
+		Visible = false,
 		ZIndex = 4,
 	})
-	local ringCorner = Components.corner(ring, if round then "full" else "m")
-	ringCorner.Name = "RingCorner"
-	local ringStroke = make("UIStroke", ring, {
-		Color = colour("teal.400"),
-		Thickness = 2,
-		Transparency = 1,
-	})
-	local ringScale = make("UIScale", ring, {})
-	local slash = make("Frame", box, {
+	local slash = make("Frame", box.frame, {
 		Name = "Slash",
-		BackgroundColor3 = colour("stone.500"),
+		BackgroundColor3 = colour("stone.300"),
 		BorderSizePixel = 0,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(34, 2),
+		Size = UDim2.fromOffset(size * 0.95, 3),
 		Rotation = -45,
 		Visible = false,
 		ZIndex = 6,
 	})
-	local cap, capText, capGlyph = Components.keyCap(column, L.Cap)
-	cap.AnchorPoint = Vector2.new(0.5, 0)
-	cap.Position = UDim2.new(0.5, 0, 0, boxTop + L.Tile + SP[1])
-	local capScale = make("UIScale", cap, {})
+	local cap, capText, capGlyph = Components.keyCap(box.frame, L.Cap)
+	cap.AnchorPoint = Vector2.new(0, 1)
+	cap.Position = UDim2.new(0, 5, 1, -5)
+	cap.ZIndex = 6
+	if not big then
+		-- a small tile's cap has to hold "SPACE": tighter padding and smaller letters
+		local pad = cap:FindFirstChildOfClass("UIPadding") :: UIPadding
+		pad.PaddingLeft, pad.PaddingRight = UDim.new(0, 3), UDim.new(0, 3)
+		cap.Position = UDim2.new(0, 4, 1, -4)
+		capText.TextSize = 12
+	end
 	return {
 		id = id,
+		big = big,
 		column = column,
 		scale = scale,
 		box = box,
-		boxCorner = boxCorner,
 		icon = icon,
 		shadeClip = shadeClip,
-		shade = shade,
-		shadeCorner = shadeCorner,
 		seconds = seconds,
-		ring = ring,
-		ringStroke = ringStroke,
-		ringScale = ringScale,
+		flag = flag,
 		slash = slash,
 		cap = cap,
+		capStroke = cap:FindFirstChildOfClass("UIStroke") :: UIStroke,
 		capText = capText,
 		capGlyph = capGlyph,
-		capScale = capScale,
+		capTone = "ink.600",
 		name = name,
 		word = word,
 		state = "",
-		round = round,
 		wordUntil = 0,
 		secondsText = "",
 	}
 end
 
--- A tile's shape: circle for attacks, rounded square for movement (the Jump tile turns round for the air kick).
-local function shapeTile(tile: Tile, round: boolean)
-	if tile.round == round then
-		return
-	end
-	tile.round = round
-	local r = if round then UDim.new(0.5, 0) else UDim.new(0, Tokens.radius.m)
-	tile.boxCorner.CornerRadius = r
-	tile.shadeCorner.CornerRadius = r
-	local ringCorner = tile.ring:FindFirstChild("RingCorner") :: UICorner?
-	if ringCorner then
-		ringCorner.CornerRadius = r
-	end
-end
-
--- A tile's look for a state, with shape as well as colour:
---   ready: icon at full strength; coming back from a cooldown, a teal ring expands once and fades;
---   recovering: icon dimmed, the shade drains as the cooldown runs, seconds while more than 1.5 s are left;
---   unavailable: the whole tile at 40 % with a slash through it.
-local function paintTile(tile: Tile, state: string)
-	if tile.state == state then
+-- A tile's look for a state, told apart by shape as well as colour:
+--   ready: cyan border, the corner flag, the key cap filled; coming back from a cooldown the tile pops once;
+--   recovering: plain border, icon dimmed under the draining shade, the seconds left on top;
+--   held (the attack skill while its key is down): white border, lighter fill, the key cap white;
+--   unavailable: dim, with a slash through it.
+local function paintTile(tile: Tile, state: string, held: boolean)
+	local key = if held then "held" else state
+	if tile.state == key then
 		return
 	end
 	local was = tile.state
-	tile.state = state
-	local ready = state == "ready"
-	local dim = state == "unavailable"
-	tile.icon.ImageColor3 = if ready then Color3.new(1, 1, 1) else colour("stone.300")
-	tile.icon.ImageTransparency = if dim then 0.6 elseif ready then 0 else 0.25
-	tile.box.BackgroundTransparency = if dim then 0.6 else 0.25
+	tile.state = key
+	local ready = state == "ready" and not held
+	local dim = state == "unavailable" and not held
+	Components.paintCut(
+		tile.box,
+		if dim then "ink.900" elseif held then "ink.500" else "ink.700",
+		if held
+			then "ivory.50"
+			elseif ready then "teal.400"
+			elseif dim then "stone.500"
+			else "line.500"
+	)
+	tile.icon.ImageTransparency = if dim then 0.7 elseif ready or held then 0 else 0.3
+	tile.flag.Visible = ready
 	tile.slash.Visible = dim
-	tile.capText.TextTransparency = if dim then 0.6 else 0
+	local capTone = if held then "ivory.50" elseif ready then "teal.400" else "ink.600"
+	tile.capTone = capTone
+	tile.cap.BackgroundColor3 = colour(capTone)
+	tile.capStroke.Color = if held or ready
+		then colour(capTone)
+		elseif dim then colour("stone.500")
+		else colour("line.300")
+	tile.capText.TextColor3 = if held or ready
+		then colour("ink.950")
+		elseif dim then colour("stone.500")
+		else colour("ivory.50")
 	tile.capGlyph.ImageTransparency = if dim then 0.6 else 0
-	if not (state == "recovering") then
+	tile.name.TextColor3 = if dim then colour("stone.500") else colour("ivory.200")
+	if key ~= "recovering" then
 		tile.shadeClip.Size = UDim2.fromScale(1, 0)
 	end
 	if ready and was == "recovering" and not HudMotion.reduced() then
-		tile.ringScale.Scale = 1
-		tile.ringStroke.Transparency = 0
-		HudMotion.to(tile.ringScale, "ring", { Scale = 1.25 }, L.ReadyRing, Enum.EasingStyle.Quint)
-		HudMotion.to(
-			tile.ringStroke,
-			"ring",
-			{ Transparency = 1 },
-			L.ReadyRing,
-			Enum.EasingStyle.Quad
-		)
+		HudMotion.pop(tile.scale, 1.08, L.ReadyPop)
 	end
 end
 
@@ -396,16 +400,15 @@ function HudController:KnitStart()
 	-- A: the status strip, top centre ------------------------------------------------------------------
 	local strip = group(gui, "Strip", Vector2.new(L.Strip.X, L.Strip.Y + SP[2] + L.Chip))
 	strip.holder.AnchorPoint = Vector2.new(0.5, 0)
-	local stripPanel = panel(strip.fade, 1, "m", {
+	-- its border turns yellow for the final two and the last one; the contents are a row inside it
+	local stripCut = Components.cut(strip.fade, 1, "line.500", {
 		Name = "Panel",
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.fromScale(0.5, 0),
 		Size = UDim2.fromOffset(0, L.Strip.Y),
 		AutomaticSize = Enum.AutomaticSize.X,
 	})
-	-- the gold Ledge (final two, last one) sits on the panel's top edge; the contents are a row inside it
-	local stripLedge = Components.ledge(stripPanel, "gold.400")
-	stripLedge.Visible = false
+	local stripPanel = stripCut.frame
 	local stripRow = make("Frame", stripPanel, {
 		Name = "Row",
 		BackgroundTransparency = 1,
@@ -413,8 +416,8 @@ function HudController:KnitStart()
 		AutomaticSize = Enum.AutomaticSize.X,
 	})
 	make("UIPadding", stripRow, {
-		PaddingLeft = UDim.new(0, SP[4]),
-		PaddingRight = UDim.new(0, SP[4]),
+		PaddingLeft = UDim.new(0, SP[5]),
+		PaddingRight = UDim.new(0, SP[5]),
 	})
 	make("UIListLayout", stripRow, {
 		FillDirection = Enum.FillDirection.Horizontal,
@@ -436,26 +439,23 @@ function HudController:KnitStart()
 	local stripTitle = stripText(3, "label", "stone.300") -- STANDING / FINAL TWO / NEXT ROUND ...
 	local titleScale = make("UIScale", stripTitle, {})
 	local stripRound = stripText(4, "label", "stone.300") -- ROUND 4
+	-- the warning chip: red-orange with dark lettering, and the "!" so it isn't colour alone
 	local closing = panel(strip.fade, 1, "s", {
 		Name = "Closing",
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, L.Strip.Y + SP[2]),
 		Size = UDim2.fromOffset(0, L.Chip),
 		AutomaticSize = Enum.AutomaticSize.X,
+		BackgroundColor3 = colour("danger.600"),
+		BackgroundTransparency = 0,
 		Visible = false,
-	})
-	make("UIStroke", closing, {
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-		Color = colour("ivory.50"),
-		Thickness = 1,
-		Transparency = 0.2,
 	})
 	make("UIPadding", closing, {
 		PaddingLeft = UDim.new(0, SP[3]),
 		PaddingRight = UDim.new(0, SP[3]),
 	})
 	local closingScale = make("UIScale", closing, {})
-	text(closing, "label", "ivory.50", {
+	text(closing, "label", "ink.950", {
 		Size = UDim2.fromScale(0, 1),
 		AutomaticSize = Enum.AutomaticSize.X,
 		Text = "!  ARENA CLOSING",
@@ -463,8 +463,10 @@ function HudController:KnitStart()
 
 	-- Y: you --------------------------------------------------------------------------------------------
 	local you = group(gui, "You", L.Y)
-	local youPanel = panel(you.fade, 1, "m", { Name = "Panel", Size = UDim2.fromScale(1, 1) })
-	Components.ledge(youPanel, "coral.500")
+	local youPanel = Components.cut(you.fade, 1, "line.500", {
+		Name = "Panel",
+		Size = UDim2.fromScale(1, 1),
+	}).frame
 	local youPulse = make("UIScale", you.fade, {})
 	local figure = text(youPanel, "numeral.l", "ivory.50", {
 		Name = "Figure",
@@ -487,15 +489,15 @@ function HudController:KnitStart()
 	})
 	local status = text(youPanel, "label", "teal.400", {
 		Name = "Status",
-		Position = UDim2.fromOffset(170, 44),
-		Size = UDim2.fromOffset(100, 16),
+		Position = UDim2.fromOffset(L.Y.X - SP[3] - 110, 44),
+		Size = UDim2.fromOffset(110, 16),
 		TextXAlignment = Enum.TextXAlignment.Right,
 	})
 	local speedLabel = text(youPanel, "label", "stone.300", {
 		Name = "SpeedLabel",
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -SP[3], 0, 10),
-		Size = UDim2.fromOffset(L.SpeedWidth + 2 + L.SpeedOver, 14),
+		Position = UDim2.new(1, -SP[3], 0, 9),
+		Size = UDim2.fromOffset(L.SpeedWidth + 2 + L.SpeedOver, 18),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Text = "SPEED",
 	})
@@ -519,7 +521,7 @@ function HudController:KnitStart()
 	local bar = Components.meter(youPanel, L.Bar.X, L.Bar.Y, true, true, { 0.4, 0.7 })
 	bar.track.Position = UDim2.fromOffset(SP[3], L.Y.Y - SP[3] - L.Bar.Y)
 	local barGradient = make("UIGradient", bar.fill, {
-		Color = ColorSequence.new(colour("coral.500"), colour("danger.600")),
+		Color = ColorSequence.new(colour("gold.400"), colour("danger.600")),
 		Enabled = false,
 	})
 	local drainTick = make("Frame", bar.track, {
@@ -541,26 +543,25 @@ function HudController:KnitStart()
 	for _, action in HudTheme.Actions do
 		actionById[action.id] = action
 	end
-	local ORDER = { "propel", "uppercut", "kick", "punch" } -- Q, R, Jump/Kick, Punch (primary outermost)
+	-- Jump and Punch small on the left, then the class skills big: Q, and R outermost.
+	local ORDER = { "kick", "punch", "propel", "uppercut" }
+	local BIG = { propel = true, uppercut = true }
 	local tiles: { [string]: Tile } = {}
-	for index, id in ORDER do
-		tiles[id] = makeTile(kit.fade, id, index, id == "uppercut" or id == "punch")
+	do
+		local x = 0
+		for index, id in ORDER do
+			local big = BIG[id] == true
+			tiles[id] = makeTile(kit.fade, id, x, big)
+			x += (if big then L.TileBig else L.TileSmall) + (if index == 2 then SP[3] else L.TileGap)
+		end
 	end
-	local namesUntil = 0
-	local function tileNames(): { [string]: string }
-		return {
-			propel = ability:GetSkill("mobility").name,
-			uppercut = ability:GetSkill("attack").name,
-			kick = if hud.kickTarget or hud.kicking then "Air Kick" else "Jump",
-			punch = "Punch",
-		}
+	-- The class skills' names sit in their tiles for good; they change only with the class.
+	local function refreshNames()
+		tiles.propel.name.Text = string.upper(ability:GetSkill("mobility").name)
+		tiles.uppercut.name.Text = string.upper(ability:GetSkill("attack").name)
 	end
-	local function showNames(seconds: number)
-		namesUntil = math.max(namesUntil, os.clock() + seconds)
-	end
-	ability.KitChanged:Connect(function()
-		showNames(L.NamesFor)
-	end)
+	refreshNames()
+	ability.KitChanged:Connect(refreshNames)
 
 	-- the controls guide: a ghost chip ("Controls" + key cap) and the sheet it opens -------------------------
 	local help = make("Frame", gui, {
@@ -598,33 +599,41 @@ function HudController:KnitStart()
 	})
 	local helpCap, helpCapText, helpCapGlyph = Components.keyCap(helpChip, L.Cap)
 	helpCap.LayoutOrder = 2
-	local guide = panel(help, 2, "l", {
+	local guide = Components.cut(help, 2, "line.300", {
 		Name = "Guide",
 		AnchorPoint = Vector2.new(1, 1),
 		Position = UDim2.new(1, 0, 0, -SP[2]),
 		Size = UDim2.fromOffset(S.GuideWidth + 40, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Visible = false,
-	}, true)
-	Components.ledge(guide, "ivory.50")
-	make("UIPadding", guide, {
+	}).frame
+	-- the rows live in a body of their own, so the list layout never touches the panel's two images
+	local guideBody = make("Frame", guide, {
+		Name = "Body",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		ZIndex = 2,
+	})
+	make("UIPadding", guideBody, {
 		PaddingTop = UDim.new(0, SP[4]),
 		PaddingBottom = UDim.new(0, SP[4]),
 		PaddingLeft = UDim.new(0, SP[4]),
 		PaddingRight = UDim.new(0, SP[4]),
 	})
-	make("UIListLayout", guide, {
+	make("UIListLayout", guideBody, {
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		Padding = UDim.new(0, SP[3]),
 	})
-	text(guide, "title", "ivory.50", {
+	text(guideBody, "title", "ivory.50", {
 		LayoutOrder = 0,
 		Size = UDim2.new(1, 0, 0, 24),
 		Text = "CONTROLS",
 	})
+	local GUIDE_INFO = S.GuideWidth + 40 - 2 * SP[4] - (64 + SP[3])
 	local guideRows: { { frame: Frame, key: TextLabel, info: TextLabel } } = {}
 	for order = 1, GUIDE_ROWS do
-		local row = make("Frame", guide, {
+		local row = make("Frame", guideBody, {
 			BackgroundTransparency = 1,
 			LayoutOrder = order,
 			Size = UDim2.new(1, 0, 0, S.GuideRow),
@@ -637,8 +646,9 @@ function HudController:KnitStart()
 		key.AutomaticSize = Enum.AutomaticSize.None
 		local info = text(row, "body", "ivory.200", {
 			Position = UDim2.fromOffset(64 + SP[3], 0),
-			Size = UDim2.new(1, -(64 + SP[3]), 0, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
+			-- its height is measured when the text is set (refreshDevice): left to AutomaticSize, a wrapped label
+			-- built while the guide is hidden stays one line tall and cuts its text off (seen 2026-11-16)
+			Size = UDim2.fromOffset(GUIDE_INFO, 20),
 			TextWrapped = true,
 			TextYAlignment = Enum.TextYAlignment.Top,
 		})
@@ -654,7 +664,8 @@ function HudController:KnitStart()
 	-- Spectating: a small strip at the bottom centre while you are out ---------------------------------------
 	local spectate = group(gui, "Spectate", Vector2.new(200, 40))
 	spectate.holder.AnchorPoint = Vector2.new(0.5, 1)
-	local spectatePanel = panel(spectate.fade, 1, "m", { Size = UDim2.fromScale(1, 1) })
+	local spectatePanel =
+		Components.cut(spectate.fade, 1, "line.500", { Size = UDim2.fromScale(1, 1) }, 0.75).frame
 	text(spectatePanel, "label", "ivory.50", {
 		Size = UDim2.fromScale(1, 1),
 		TextXAlignment = Enum.TextXAlignment.Center,
@@ -726,7 +737,9 @@ function HudController:KnitStart()
 		for _, part in speedParts do
 			(part :: GuiObject).Visible = not phone
 		end
-		status.Position = if phone then UDim2.fromOffset(labelX, 48) else UDim2.fromOffset(170, 44)
+		status.Position = if phone
+			then UDim2.fromOffset(labelX, 48)
+			else UDim2.fromOffset(L.Y.X - SP[3] - 110, 44)
 		status.TextXAlignment = if phone
 			then Enum.TextXAlignment.Left
 			else Enum.TextXAlignment.Right
@@ -814,6 +827,7 @@ function HudController:KnitStart()
 
 	-- Which groups show: you and your kit while you're alive and in it; nothing of yours once you're out or
 	-- the round is over. Touch has its own buttons, so no tiles there.
+	local wasFighting = false
 	local function refreshGroups()
 		local alive = character ~= nil and character.Parent ~= nil
 		local round = readRound()
@@ -823,10 +837,13 @@ function HudController:KnitStart()
 		setGroup(you, fighting)
 		setGroup(kit, fighting and device ~= "touch")
 		setGroup(spectate, out and not over)
-		help.Visible = fighting
-		if not fighting then
+		-- The chip is for fighters. The guide itself can also be opened from the lobby's Moves button while
+		-- you're out, so it closes once, at the moment you stop fighting, not on every refresh after that.
+		helpChip.Visible = fighting
+		if wasFighting and not fighting then
 			guide.Visible = false
 		end
+		wasFighting = fighting
 	end
 
 	local function refreshStrip(fromEvent: boolean)
@@ -855,7 +872,8 @@ function HudController:KnitStart()
 			else colour("ivory.50")
 		stripRound.Visible = roundText ~= "" and not fightingNow
 		stripRound.Text = roundText
-		stripLedge.Visible = info.finalTwo or (fightingNow and (round.alive or 0) <= 1)
+		local last = info.finalTwo or (fightingNow and (round.alive or 0) <= 1)
+		Components.paintCut(stripCut, nil, if last then "gold.400" else "line.500")
 		local emphasis = fromEvent and HudLogic.emphasize(promptActive, HudMotion.reduced())
 		local before = lastStrip
 		-- Final two: one short emphasis when three became two in a fight, never when it started at two.
@@ -878,9 +896,6 @@ function HudController:KnitStart()
 			and emphasis
 		then
 			HudMotion.pop(countScale, 1.12, Tokens.motion.duration.base)
-		end
-		if fightingNow and lastPhase ~= "Fighting" then
-			showNames(L.NamesFor) -- the kit's skill names, for the first seconds of a fight
 		end
 		lastStrip, lastPhase = info, round.phase
 	end
@@ -948,7 +963,7 @@ function HudController:KnitStart()
 			Position = UDim2.new(1, SP[3], 0, 0),
 			Size = UDim2.fromOffset(0, L.FeedRow),
 			AutomaticSize = Enum.AutomaticSize.X,
-			BackgroundTransparency = 0.3,
+			BackgroundTransparency = 0.1,
 		})
 		local label = text(frame, "body.strong", "ivory.50", {
 			Size = UDim2.fromScale(0, 1),
@@ -958,10 +973,17 @@ function HudController:KnitStart()
 		})
 		make("UIPadding", label, {
 			PaddingLeft = UDim.new(0, SP[3]),
-			PaddingRight = UDim.new(0, SP[3]),
+			PaddingRight = UDim.new(0, SP[3] + 3),
 		})
-		local ledge = Components.ledge(frame, "coral.500")
-		ledge.Visible = mine
+		-- the edge on the right: pink when the line is about you
+		local ledge = make("Frame", frame, {
+			Name = "Edge",
+			BackgroundColor3 = colour(if mine then "coral.500" else "line.500"),
+			BorderSizePixel = 0,
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.fromScale(1, 0),
+			Size = UDim2.new(0, 3, 1, 0),
+		})
 		local row: FeedRow = { frame = frame, label = label, ledge = ledge, born = os.clock() }
 		table.insert(feedRows, 1, row)
 		while #feedRows > L.FeedRows do
@@ -1079,6 +1101,23 @@ function HudController:KnitStart()
 			if item then
 				row.key.Text = item.key
 				row.info.Text = item.action
+				task.spawn(function()
+					local params = Instance.new("GetTextBoundsParams")
+					params.Text = item.action
+					params.Font = row.info.FontFace
+					params.Size = row.info.TextSize
+					params.Width = GUIDE_INFO
+					local ok, bounds = pcall(function()
+						return TextService:GetTextBoundsAsync(params)
+					end)
+					if row.info.Text == item.action then
+						-- the measure knows nothing of the role's line height, so it is added here
+						local height = if ok
+							then math.ceil(bounds.Y * row.info.LineHeight) + 2
+							else row.info.TextSize * 4
+						row.info.Size = UDim2.fromOffset(GUIDE_INFO, height)
+					end
+				end)
 			end
 		end
 		layout()
@@ -1094,12 +1133,9 @@ function HudController:KnitStart()
 
 	local function toggleGuide()
 		guide.Visible = not guide.Visible
-		if guide.Visible then
-			guide.BackgroundTransparency = 1
-			HudMotion.play(guide, "fade", { BackgroundTransparency = 0 }, "quick", "enter")
-		end
 	end
 	helpChip.Activated:Connect(toggleGuide)
+	self._toggleGuide = toggleGuide
 	ContextActionService:BindActionAtPriority(HELP_ACTION, function(_, inputState)
 		if inputState == Enum.UserInputState.Begin then
 			toggleGuide()
@@ -1129,15 +1165,16 @@ function HudController:KnitStart()
 				HudMotion.play(figure, "swap", { TextTransparency = 0 }, "micro", "enter")
 			end
 		end
-		-- the band: fill ivory, then coral.300, then coral.500 -> danger.600; the figure turns coral at 70
+		-- the band: white, then yellow from 40, then yellow -> red-orange from 70; the figure takes the same colour
 		local newBand = HudLogic.staggerBand(value, STAGGER_MAX)
 		bar.fill.BackgroundColor3 = if newBand == "critical"
 			then Color3.new(1, 1, 1)
-			elseif newBand == "rising" then colour("coral.300")
+			elseif newBand == "rising" then colour("gold.400")
 			else colour("ivory.50")
 		barGradient.Enabled = newBand == "critical"
 		figure.TextColor3 = if newBand == "critical"
-			then colour("coral.500")
+			then colour("danger.600")
+			elseif newBand == "rising" then colour("gold.400")
 			else colour("ivory.50")
 		if newBand == "critical" and band ~= "critical" and animate then
 			if HudLogic.emphasize(promptActive, HudMotion.reduced()) then
@@ -1165,13 +1202,16 @@ function HudController:KnitStart()
 		ghost.BackgroundColor3 = bar.fill.BackgroundColor3
 		ghost.Size = UDim2.fromScale(math.clamp(recoverFrom / STAGGER_MAX, 0, 1), 1)
 		drainTick.Visible = recovering
-		-- the status word: CRITICAL wins over RECOVERING (never both)
+		-- the status word, so the band is never colour alone: CRITICAL wins over RECOVERING, that over RISING
 		if newBand == "critical" then
 			status.Text = "CRITICAL"
-			status.TextColor3 = colour("coral.300")
+			status.TextColor3 = colour("danger.600")
 		elseif recovering then
 			status.Text = "RECOVERING"
 			status.TextColor3 = colour("teal.400")
+		elseif newBand == "rising" then
+			status.Text = "RISING"
+			status.TextColor3 = colour("gold.400")
 		else
 			status.Text = ""
 		end
@@ -1236,7 +1276,7 @@ function HudController:KnitStart()
 		HudMotion.play(
 			tile.cap,
 			"blocked",
-			{ BackgroundColor3 = colour("ink.700") },
+			{ BackgroundColor3 = colour(tile.capTone) },
 			"release",
 			"enter"
 		)
@@ -1314,7 +1354,6 @@ function HudController:KnitStart()
 
 	-- THE LOOP: one connection, no tweens started here except on state changes ---------------------------
 	local lastCountdown = ""
-	local namesShown = false
 	RunService.RenderStepped:Connect(function(dt: number)
 		local now = os.clock()
 		local model = character
@@ -1396,21 +1435,22 @@ function HudController:KnitStart()
 						usable = hasUpper and canUpper and not blocked,
 					},
 			}
-			shapeTile(tiles.kick, kicking)
-			local names = now < namesUntil or readRound().phase ~= "Fighting"
-			local nameList = if names ~= namesShown or names then tileNames() else nil
+			local holding = model:GetAttribute("HT_Charging") ~= nil -- R is down (CombatController)
 			for _, id in ORDER do
 				local timing = (timings :: any)[id]
 				local state = HudLogic.actionState(now, timing.readyAt, timing.usable)
 				local tile = tiles[id]
-				paintTile(tile, state)
+				paintTile(tile, state, id == "uppercut" and holding)
 				local left = HudLogic.cooldownLeft(now, timing.readyAt, timing.total)
 				if state == "recovering" then
 					tile.shadeClip.Size = UDim2.fromScale(1, left)
 				end
-				local secs = if state == "recovering" and timing.readyAt - now > 1.5
-					then string.format("%d", math.ceil(timing.readyAt - now))
-					else ""
+				-- the seconds left: tenths under ten seconds, whole seconds above
+				local wait = timing.readyAt - now
+				local secs = if state ~= "recovering" or wait <= 0
+					then ""
+					elseif wait < 10 then string.format("%.1f", wait)
+					else string.format("%d", math.ceil(wait))
 				if secs ~= tile.secondsText then
 					tile.secondsText = secs
 					tile.seconds.Text = secs
@@ -1419,12 +1459,7 @@ function HudController:KnitStart()
 				if id == "kick" and cueUp then
 					word(tile, "NOW", "gold.400")
 				end
-				local wordUp = now < tile.wordUntil
-				tile.word.Visible = wordUp
-				if nameList then
-					tile.name.Text = nameList[id]
-				end
-				tile.name.TextTransparency = if names and not wordUp then 0 else 1
+				tile.word.Visible = now < tile.wordUntil
 				if device == "touch" then
 					local cover, seconds = touchOverlay(actionById[id].touchAction)
 					if cover then
@@ -1435,7 +1470,6 @@ function HudController:KnitStart()
 					end
 				end
 			end
-			namesShown = names
 
 			-- The target: your lock-on target (coral chevron + name), else the nearest opponent ahead (an open
 			-- ivory chevron, no name).
@@ -1538,6 +1572,13 @@ function HudController:KnitStart()
 		onCharacter(player.Character)
 	end
 	refreshStrip(false)
+end
+
+--- Shows or hides the controls guide (the navigation's Moves button and the fight menu call this).
+function HudController:ToggleGuide()
+	if self._toggleGuide then
+		self._toggleGuide()
+	end
 end
 
 return HudController

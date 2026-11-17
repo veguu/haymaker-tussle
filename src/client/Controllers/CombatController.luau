@@ -431,7 +431,7 @@ function CombatController:KnitStart()
 							fx:UppercutHit(target)
 						end
 						flash(target)
-						anim:HitLanded(attacker, target, strength)
+						anim:HitLanded(attacker, target, strength, step)
 						-- A kit's attack skill lands with its own hit, in its kit's look.
 						local swing = anim:LastSwing(attacker)
 						if swing and (Abilities.KitSwings :: any)[swing] then

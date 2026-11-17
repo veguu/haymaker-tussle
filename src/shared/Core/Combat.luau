@@ -190,11 +190,32 @@ function Combat.lockFollow(
 	return px + mx, pz + mz
 end
 
---- How much further a punch's step may carry the puncher along (`dirX, dirZ`, a unit) before someone in
---- front would be nearer than LockMinDistance. `others` are flat offsets from the puncher to everyone else.
---- Measured 2026-11-16: a step moved by position straight into a target the server hadn't moved yet made
---- Roblox push the overlapping bodies apart hard enough to fling the puncher. math.huge with nobody ahead.
-function Combat.stepRoom(
+--- How far a stunning punch knocks its target on (the user, 2026-11-16: "each hit should knockback the enemy by a
+--- small amount but it wont push the player who hit them ... like dribbling a soccer ball"): Push, cut short so the
+--- target still fits before a wall `wallDistance` studs ahead of the puncher (nil: none in reach).
+function Combat.hitPush(cfg: any, wallDistance: number?): number
+	if wallDistance == nil or wallDistance ~= wallDistance then
+		return cfg.Push
+	end
+	local room = wallDistance - cfg.LockDistance - 2 * cfg.LockBodyRadius
+	return math.clamp(room, 0, cfg.Push)
+end
+
+--- Running speed while throwing M1s (the user, 2026-11-16: "you are mobile while doing them ... run while
+--- punching", but nobody drags anyone across the map): never above MoveSpeed for MoveSeconds after a press.
+--- `pressedAt` is the last ground punch's press (nil: none). Returns the speed to keep.
+function Combat.stringSpeed(cfg: any, speed: number, pressedAt: number?, now: number): number
+	if pressedAt == nil or now - pressedAt > cfg.MoveSeconds or speed ~= speed then
+		return speed
+	end
+	return math.min(speed, cfg.MoveSpeed)
+end
+
+--- How much further the puncher may run along (`dirX, dirZ`, a unit) while throwing M1s before someone in
+--- front would be nearer than LockMinDistance (measured in a play test 2026-11-16: fighters don't collide, so a
+--- puncher running at MoveSpeed caught a target standing between punches and ran straight through it). `others`
+--- are flat offsets from the puncher to everyone else. math.huge with nobody ahead.
+function Combat.frontRoom(
 	cfg: any,
 	dirX: number,
 	dirZ: number,
@@ -211,16 +232,10 @@ function Combat.stepRoom(
 	return math.max(room, 0)
 end
 
---- How far a ground punch steps the puncher forward (the user, 2026-11-15: you stop moving while you M1,
---- and "each punch should knock both you and your target forward in the direction youre facing"):
---- StepDistance, cut short so a target held in front still fits before a wall `wallDistance` studs ahead
---- (nil: none in reach).
-function Combat.punchStep(cfg: any, wallDistance: number?): number
-	if wallDistance == nil or wallDistance ~= wallDistance then
-		return cfg.StepDistance
-	end
-	local room = wallDistance - cfg.LockDistance - 2 * cfg.LockBodyRadius
-	return math.clamp(room, 0, cfg.StepDistance)
+--- A dash pressed while a punch's stun held you goes off the moment it ends (the user, 2026-11-16: "after
+--- getting hit a player can dash away and escape the combo"), if it was pressed within DashBufferSeconds.
+function Combat.dashBuffered(cfg: any, pressedAt: number?, now: number): boolean
+	return pressedAt ~= nil and now - pressedAt <= cfg.DashBufferSeconds
 end
 
 --- The lock spot clipped at the first wall (the user, 2026-11-15: never pushed through walls; the target

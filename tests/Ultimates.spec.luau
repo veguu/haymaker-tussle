@@ -12,21 +12,45 @@ local function near(a: number, b: number, tolerance: number): boolean
 	return math.abs(a - b) <= tolerance
 end
 
+-- A small stand-in timeline for the playback maths (the kits' ultimates are being redesigned).
+local TEST: Ultimates.Timeline = {
+	name = "Test",
+	cinematic = 1,
+	attackerFree = 1.2,
+	keys = {
+		{ t = 0, target = Vector3.new(0, 0, 0) },
+		{ t = 0.5, attacker = Vector3.new(0, 3, 3), target = Vector3.new(0, 3, 0), ease = "out" },
+		{ t = 1, attacker = Vector3.new(0, 3, 1), target = Vector3.new(0, 3, -1) },
+	},
+	shots = {
+		{ t = 0, cam = Vector3.new(7, 2, 1), look = Vector3.new(0, 3, 1), fov = 90, cut = true },
+		{
+			t = 0.4,
+			cam = Vector3.new(6, 2, 1),
+			look = Vector3.new(0, 3, 1),
+			fov = 50,
+			ease = "out",
+		},
+		{
+			t = 0.6,
+			cam = Vector3.new(-5, 3, -6),
+			look = Vector3.new(0, 3, 1),
+			fov = 80,
+			cut = true,
+		},
+	},
+	flightFov = 90,
+	cues = { { t = 0, name = "start" }, { t = 0.6, name = "hit" }, { t = 1, name = "launch" } },
+}
+
 return {
-	["every kit has a timeline, Base's own until each kit gets one"] = function()
+	["no kit has an ultimate until its new one is built (Final Bell removed)"] = function()
 		for _, kitId in
 			{ "Base", "Tempest", "Inferno", "Frost", "Beast", "Dragon", "Bruiser", "Trickster" }
 		do
-			local line = Ultimates.timeline(kitId)
-			assert(line.cinematic > 0 and line.attackerFree >= line.cinematic, kitId)
-			assert(#line.keys >= 2, kitId)
-			local last = -1
-			for _, key in line.keys do
-				assert(key.t > last, `{kitId} keys in order`)
-				last = key.t
-			end
+			assert(Ultimates.timeline(kitId) == nil, kitId)
 		end
-		assert(Ultimates.timeline(nil).name == "Final Bell")
+		assert(Ultimates.timeline(nil) == nil)
 	end,
 
 	["the anchor faces outward from the arena's middle"] = function()
@@ -41,73 +65,29 @@ return {
 	end,
 
 	["poses start where the attacker was and end on the last key"] = function()
-		local line = Ultimates.timeline("Base")
 		local start = Vector3.new(9, 0, 9)
-		local a = Ultimates.pose(line, 0, start)
+		local a = Ultimates.pose(TEST, 0, start)
 		assert(a == start, "the attacker starts where they were")
-		local a2, t2 = Ultimates.pose(line, line.cinematic + 5, start)
-		local lastKey = line.keys[#line.keys]
+		local a2, t2 = Ultimates.pose(TEST, TEST.cinematic + 5, start)
+		local lastKey = TEST.keys[#TEST.keys]
 		assert(a2 == lastKey.attacker and t2 == lastKey.target, "after the end, the last key")
 		assert(
-			#Ultimates.cuesBetween(line, -1, line.cinematic) == #line.cues,
+			#Ultimates.cuesBetween(TEST, -1, TEST.cinematic) == #TEST.cues,
 			"every cue fires once"
 		)
-		assert(#Ultimates.cuesBetween(line, 0.5, 0.5) == 0, "an empty span fires nothing")
+		assert(#Ultimates.cuesBetween(TEST, 0.5, 0.5) == 0, "an empty span fires nothing")
 	end,
 
 	["camera shots cut where marked and ease otherwise"] = function()
-		local line = Ultimates.timeline("Base")
-		assert(#line.shots >= 6, "a real shot list, not one orbit")
-		local cuts = 0
-		for index, shot in line.shots do
+		for _, shot in TEST.shots do
 			if shot.cut then
-				cuts += 1
-			end
-			if index > 1 then
-				assert(shot.t >= line.shots[index - 1].t, "shots in order")
-			end
-			assert(shot.fov > 20 and shot.fov < 120, "a sane field of view")
-		end
-		assert(cuts >= 5, "hard cuts, not just a slow move")
-		-- On a cut shot's own moment, the camera is exactly that shot.
-		for _, shot in line.shots do
-			if shot.cut then
-				local cam, look, fov = Ultimates.shot(line, shot.t)
+				local cam, look, fov = Ultimates.shot(TEST, shot.t)
 				assert(cam == shot.cam and look == shot.look and fov == shot.fov, `cut at {shot.t}`)
 			end
 		end
-		-- Half way into an eased move, the field of view is between the two shots'.
-		local first, second = line.shots[1], line.shots[2]
-		assert(not second.cut, "the blink's snap zoom eases")
-		local _, _, mid = Ultimates.shot(line, (first.t + second.t) / 2)
+		local first, second = TEST.shots[1], TEST.shots[2]
+		local _, _, mid = Ultimates.shot(TEST, (first.t + second.t) / 2)
 		assert(mid < first.fov and mid > second.fov, "a snap zoom in progress")
-		assert(line.flightFov > 0, "the chase widens to a set field of view")
-	end,
-
-	["final bell: close-up, then the dark beat, then the hit, all inside the cinematic"] = function()
-		local line = Ultimates.timeline("Base")
-		local at: { [string]: number } = {}
-		for _, cue in line.cues do
-			at[cue.name] = cue.t
-		end
-		assert(at.windup and at.dark and at.impact and at.launch, "every beat is cued")
-		assert(
-			at.windup < at.dark and at.dark < at.impact and at.impact < at.launch,
-			"beats in order"
-		)
-		assert(at.launch == line.cinematic, "the flight starts on the launch")
-		-- the close-up is a cut shot between the windup and the dark beat, and tighter than any barrage shot
-		local closeUp = nil
-		for _, shot in line.shots do
-			if shot.cut and shot.t > at.windup and shot.t < at.dark then
-				closeUp = shot
-			end
-		end
-		assert(closeUp and closeUp.fov <= 36, "an extreme close-up before the dark beat")
-		-- on the hit, a cut to the wide shot
-		local _, _, fov = Ultimates.shot(line, at.impact)
-		assert(fov >= 80, "a wide cut as the haymaker lands")
-		assert(line.grade and #line.grade.tint == 3, "graded")
 	end,
 
 	["the flight always ends out of the round, from anywhere on the arena"] = function()

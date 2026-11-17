@@ -13,9 +13,10 @@
 -- at effectively the same moment and reach each other go to ClashService instead of one
 -- cancelling the other. See Core/Clash.
 --
--- THE M1 STRING (2026-11-15). Punches go in a string of Punch.ComboHits (4). The first three STUN
--- (StatusService, Punch.StunSeconds) and DRAG: the target is given the puncher's own running velocity, so a
--- string thrown on the run carries them along without locking them to you; the puncher keeps running.
+-- THE M1 STRING (2026-11-15; mobile since 2026-11-16, kits-5b). Punches go in a string of Punch.ComboHits (4).
+-- The first three STUN briefly (StatusService, Punch.StunSeconds: shorter than the gap to the next punch, so a
+-- string is never a true combo and a dash pressed in the stun escapes) and KNOCK the target on by Punch.Push,
+-- held in front of the puncher while the stun lasts (lockSpotFor). The puncher runs on, capped at MoveSpeed.
 -- Only the last knocks back (Combat.punchStrength: a fixed strength times stagger; speed adds nothing).
 -- A miss, or Punch.ComboResetSeconds without a hit, starts the string over. Every swing goes out
 -- on the press: there is no holding a punch.
@@ -307,12 +308,12 @@ end
 -- How far in front each held target is, per puncher, fixed when the hold began (Combat.lockDistance).
 local holdAhead: { [Model]: { by: Model, ahead: number } } = setmetatable({}, { __mode = "k" }) :: any
 
--- Where a stunning punch holds its target (2026-11-16; the user: the old lock "drag[ged] the person to you and
--- teleport[ed] them", and each punch should knock both of you forward). Picked HERE, once per punch, from the
--- puncher's own spot and facing: as far in front as the target already was (kept between LockMinDistance and
--- LockMaxDistance) plus the step the punch takes them (Combat.punchStep), clipped at a wall. The target's body
--- glides to it (Combat.lockFollow), so it moves with the puncher's step instead of chasing a body every other
--- screen sees late. Nil when either body is missing.
+-- Where a stunning punch holds its target (2026-11-16, kits-5b; the user: M1s are mobile, "the target should be
+-- locked in front of the player", and "each hit should knockback the enemy by a small amount but it wont push the
+-- player who hit them ... like dribbling a soccer ball"). Picked HERE, once per punch, from the puncher's own spot
+-- and facing: as far in front as the target already was (kept between LockMinDistance and LockMaxDistance) plus
+-- the knock (Combat.hitPush, Punch.Push), clipped at a wall. The target's body glides there during the short stun
+-- (Combat.lockFollow); the puncher is never moved. Nil when either body is missing.
 local function lockSpotFor(attacker: Model, target: Model): Vector3?
 	local from = Combatants.rootOf(attacker)
 	local body = Combatants.rootOf(target)
@@ -335,11 +336,11 @@ local function lockSpotFor(attacker: Model, target: Model): Vector3?
 	params.FilterDescendantsInstances = CollectionService:GetTagged(Combatants.TAG)
 	params.RespectCanCollide = true
 	params.IgnoreWater = true
-	local reach = punchCfg.StepDistance + punchCfg.LockDistance + 2 * punchCfg.LockBodyRadius
+	local reach = punchCfg.Push + punchCfg.LockDistance + 2 * punchCfg.LockBodyRadius
 	local wall = workspace:Raycast(from.Position, look * reach, params)
-	local step = Combat.punchStep(punchCfg, if wall then wall.Distance else nil)
+	local push = Combat.hitPush(punchCfg, if wall then wall.Distance else nil)
 	local x, z =
-		Combat.lockSpot(punchCfg, from.Position.X, from.Position.Z, look.X, look.Z, ahead + step)
+		Combat.lockSpot(punchCfg, from.Position.X, from.Position.Z, look.X, look.Z, ahead + push)
 	local toward = Vector3.new(x - from.Position.X, 0, z - from.Position.Z)
 	if toward.Magnitude > 0.01 then
 		local hit = workspace:Raycast(
@@ -480,8 +481,8 @@ local function finishPunch(self: any, punch: Punch)
 	-- The puncher pays either way: a miss slows them, a hit stops them and pushes them back. A
 	-- repel has already thrown them, which this would otherwise wipe out.
 	-- A heavy move that doesn't root (the uppercut) costs nothing either: its thrower keeps their momentum.
-	-- Nor does any M1 (2026-11-15): an M1 plants the puncher and steps them FORWARD (MovementController),
-	-- so a push back or a slowdown here would only fight that step.
+	-- Nor does any M1 (2026-11-16): the puncher keeps running (capped at Punch.MoveSpeed by their own
+	-- movement) and is never pushed by their own hit.
 	local heavy = HEAVY[punch.side]
 	local keepsMomentum = (heavy ~= nil and heavy.cfg.Roots == false)
 		or (heavy == nil and punch.step > 0)

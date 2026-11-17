@@ -252,9 +252,11 @@ function MovementController:_bind(
 	local lockBy: Model? = nil
 	local lockAhead = 0
 	local lockSeenAt = -math.huge
-	-- A ground punch's step forward (Punch.StepDistance), from CombatController via PunchThrown: it starts
-	-- at the strike and runs StepSeconds.
-	local punchStep: { at: number, dirX: number, dirZ: number, speed: number, left: number }? = nil
+	-- The last ground punch's press: for Punch.MoveSeconds after it you run no faster than Punch.MoveSpeed
+	-- (Combat.stringSpeed). M1s don't stop you or step you any more (2026-11-16, kits-5b).
+	local punchPressedAt: number? = nil
+	-- A dash pressed while a punch's stun held you: it goes off as the stun ends (Combat.dashBuffered).
+	local dashPressedInStun: number? = nil
 	local kick: DiveKick.State? = nil
 	local kickTarget: Model? = nil
 	local kickRequested = false
@@ -565,7 +567,6 @@ function MovementController:_bind(
 			return
 		end
 		endKick()
-		punchStep = nil
 		-- A hit's own lift and fall take over from any recovery lift still running.
 		liftUntil, liftSet = 0, false
 		state = Momentum.applyKnock(state, cfg, velocity.X, velocity.Z, speedKeep)
@@ -603,7 +604,7 @@ function MovementController:_bind(
 		steerX, steerZ, pushX, pushZ, lift = 0, 0, 0, 0, 0
 		punchRequested, propelRequested, kickRequested = false, false, false
 		skillMove = nil
-		punchStep = nil
+		punchPressedAt, dashPressedInStun = nil, nil
 		lastPush = nil
 		lifts, liftUntil, liftSet = AirRecovery.newLifts(), 0, false
 		state = if face and face.Magnitude > 0.01
@@ -687,12 +688,10 @@ function MovementController:_bind(
 				root.CFrame = CFrame.lookAt(root.Position, root.Position + facing)
 			end
 		end
-		-- On the ground an M1 plants you (the user, 2026-11-15: "make the m1 combos slow you down so you cant
-		-- run while m1ing ... you stop moving but each punch should knock both you and your target forward"):
-		-- running stops dead, the keys do nothing for Punch.RootSeconds, and at the strike you step forward
-		-- (Combat.punchStep, shorter near a wall). A target locked in front follows the step (lockFollow).
-		rootedUntil = math.max(rootedUntil, os.clock() + punchCfg.RootSeconds)
-		state = Momentum.stopped(state)
+		-- On the ground an M1 keeps you running (the user, 2026-11-16: "you are mobile while doing them ... run
+		-- while punching"), held to Punch.MoveSpeed for Punch.MoveSeconds (Combat.stringSpeed), so you keep up
+		-- with the target your punches knock on, but can't drag anyone across the map.
+		punchPressedAt = os.clock()
 		-- The way the body really faces (after any turn to the locked-on target above), which is where the
 		-- swing goes; the heading follows it so nothing turns the body back mid-string.
 		local bodyLook = root.CFrame.LookVector
@@ -704,21 +703,6 @@ function MovementController:_bind(
 			turned.headingX, turned.headingZ = faceX, faceZ
 			state = turned
 		end
-		local reach = punchCfg.StepDistance + punchCfg.LockDistance + 2 * punchCfg.LockBodyRadius
-		local wall =
-			workspace:Raycast(root.Position, Vector3.new(faceX, 0, faceZ) * reach, solidParams())
-		local distance = Combat.punchStep(punchCfg, if wall then wall.Distance else nil)
-		punchStep = if distance > 0.05
-			then {
-				-- at the end of the swing's hit window, when the server has placed the target's spot, so
-				-- both start moving together (starting at the windup ran into them for a moment)
-				at = os.clock() + punchCfg.Windup + punchCfg.ActiveSeconds,
-				dirX = faceX,
-				dirZ = faceZ,
-				speed = distance / punchCfg.StepSeconds,
-				left = punchCfg.StepSeconds,
-			}
-			else nil
 	end
 	-- The server refused that punch, so it never happened: its push goes back too.
 	self._punchRefused = function()
@@ -1025,9 +1009,18 @@ function MovementController:_bind(
 			-- Watching a fighter's view: your own body stays where it is (SpectateController).
 			or character:GetAttribute("HT_Spectating") ~= nil
 		if stunned then
+			-- A dash pressed in a punch's stun waits for it to end (Combat.dashBuffered), so a string can be
+			-- escaped the moment it lets go (the user, 2026-11-16).
+			if propelRequested and character:GetAttribute("HT_Stunned") ~= nil then
+				dashPressedInStun = now
+			end
 			kickRequested, propelRequested, punchRequested = false, false, false
 			inputX, inputZ = 0, 0
 			drive, side = "side", 0
+		elseif dashPressedInStun then
+			propelRequested = propelRequested
+				or Combat.dashBuffered(punchCfg, dashPressedInStun, now)
+			dashPressedInStun = nil
 		end
 		-- Frozen in ice (the Frost kit's Frostbite; StatusService): held where they are. Nothing they
 		-- were doing carries on: no travel, no push, no steering. They still fall.
@@ -1112,7 +1105,6 @@ function MovementController:_bind(
 				pushX, pushZ, steerX, steerZ = 0, 0, 0, 0
 				skillMove = nil
 				glide = nil
-				punchStep = nil
 				humanoid.WalkSpeed = 0
 				humanoid:Move(Vector3.zero, false)
 				local facing = Vector3.new(from.X - spot.X, 0, from.Z - spot.Z)
@@ -1127,46 +1119,6 @@ function MovementController:_bind(
 				local carried = if dt > 0 then stepped / dt else Vector3.zero
 				root.AssemblyLinearVelocity =
 					Vector3.new(carried.X, root.AssemblyLinearVelocity.Y, carried.Z)
-				return
-			end
-		end
-		-- A ground punch's step forward, at the strike: a short, set glide along the way you face, then
-		-- you stand planted again (rootedUntil) until the string ends.
-		if punchStep and now >= punchStep.at then
-			local step = punchStep
-			local this = math.min(dt, step.left)
-			step.left -= dt
-			if step.left <= 0 then
-				punchStep = nil
-			end
-			if this > 0 then
-				local dir = Vector3.new(step.dirX, 0, step.dirZ)
-				state = Momentum.stopped(state)
-				pushX, pushZ, steerX, steerZ = 0, 0, 0, 0
-				humanoid.WalkSpeed = 0
-				humanoid:Move(Vector3.zero, false)
-				align.CFrame = CFrame.lookAt(Vector3.zero, dir)
-				-- Moved exactly, not walked: the Humanoid's own walking cut a walked step to about two
-				-- thirds (measured 2026-11-16), while the target's spot (CombatService) counts on all of it.
-				-- Never into the body in front (Combat.stepRoom): pushed into one, it flung us.
-				local others: { { x: number, z: number } } = {}
-				for _, other in CollectionService:GetTagged("HT_Combatant") do
-					local otherRoot = other ~= character
-						and other:FindFirstChild("HumanoidRootPart")
-					if otherRoot and otherRoot:IsA("BasePart") then
-						local offset = otherRoot.Position - root.Position
-						if offset.Magnitude < 10 then
-							table.insert(others, { x = offset.X, z = offset.Z })
-						end
-					end
-				end
-				local move =
-					math.min(step.speed * this, Combat.stepRoom(punchCfg, dir.X, dir.Z, others))
-				root.CFrame = root.CFrame + dir * move
-				-- the velocity it really moved at (none once the step is over), so other screens glide too
-				local rate = if punchStep and this > 0 then move / this else 0
-				local v = root.AssemblyLinearVelocity
-				root.AssemblyLinearVelocity = Vector3.new(dir.X * rate, v.Y, dir.Z * rate)
 				return
 			end
 		end
@@ -1673,6 +1625,32 @@ function MovementController:_bind(
 			)
 			if rooted then
 				state = Momentum.rootSlow(state, cfg, dt)
+			end
+			-- Throwing M1s: running, but no faster than Punch.MoveSpeed (a dash still goes at its own speed).
+			if grounded and (state.propelLeft or 0) <= 0 then
+				local capped = Combat.stringSpeed(punchCfg, state.speed, punchPressedAt, now)
+				-- and never through the one you're punching: no nearer than LockMinDistance to anyone ahead
+				-- (Combat.frontRoom), so you chase them like a dribbled ball instead of running past
+				if punchPressedAt and now - punchPressedAt <= punchCfg.MoveSeconds and dt > 0 then
+					local faceX, faceZ = Momentum.facing(state)
+					local others: { { x: number, z: number } } = {}
+					for _, other in CollectionService:GetTagged("HT_Combatant") do
+						local otherRoot = other ~= character
+							and other:FindFirstChild("HumanoidRootPart")
+						if otherRoot and otherRoot:IsA("BasePart") then
+							local offset = otherRoot.Position - root.Position
+							if offset.Magnitude < 12 then
+								table.insert(others, { x = offset.X, z = offset.Z })
+							end
+						end
+					end
+					capped = math.min(capped, Combat.frontRoom(punchCfg, faceX, faceZ, others) / dt)
+				end
+				if capped < state.speed then
+					local slowed = table.clone(state)
+					slowed.speed = capped
+					state = slowed
+				end
 			end
 			if airRun and airRun.keep then
 				state, airRun.keep = Momentum.airKeep(state, airRun.keep, inputX, inputZ)

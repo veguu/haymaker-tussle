@@ -16,51 +16,56 @@ export type Option = {
 	name: string,
 	creator: string,
 	takes: { { id: number, length: number, start: number, volume: number } },
+	-- how the role always plays with this pick (Sfx.Options), and other roles layered with it
+	play: { [string]: any }?,
+	layers: { { role: string, options: { [string]: any }?, bed: number? } }?,
 }
 
-local function one(id: number, length: number, volume: number?)
-	return { { id = id, length = length, start = 0, volume = volume or 1 } }
-end
+-- ProSoundEffects "Punch Kit, Whappy Chin Sock, Beefy Hit" 1-8 (category Fight - Hits): designed fight
+-- punches. Measured in Studio 2026-11-16 (AudioAnalyzer, quarter speed for timing): each starts 16-32 ms in,
+-- peaks 27-64 ms in, is gone by 0.2-0.32 s, its lows gone within 0.1-0.2 s (no ringing boom). Most of their
+-- energy is above 1.2 kHz, so alone they lean crisp: the options pair them with the heavy-bag body.
+-- Volumes even out their RMS peaks (0.48 to 0.68) at about the loudness of the old crack + body + boom.
+local BEEFY = {
+	{ id = 9117969584, length = 0.49, start = 0.015, volume = 0.62 },
+	{ id = 9117969687, length = 0.62, start = 0.01, volume = 0.63 },
+	{ id = 9117969717, length = 0.9, start = 0.02, volume = 0.5 },
+	{ id = 9117969878, length = 0.58, start = 0.005, volume = 0.57 },
+	{ id = 9117969892, length = 0.66, start = 0.02, volume = 0.51 },
+	{ id = 9117969990, length = 0.57, start = 0.005, volume = 0.46 },
+	{ id = 9117970193, length = 0.92, start = 0.005, volume = 0.44 },
+	{ id = 9117970227, length = 0.49, start = 0.01, volume = 0.52 },
+}
+-- A hit with no low end at all (EqualizerSoundEffect: everything under ~400 Hz down 40 dB): the references put
+-- no thump on the hit. The weight comes from the rumble bed instead.
+local NO_LOWS = { low = -40, mid = 0, high = 0 }
+-- How long a rumble bed holds past each hit before it fades: about the reference's ~0.6 s, so a string pressed a
+-- little slower than the cooldown (measured: ~0.45-0.55 s between hits) still keeps ONE rumble going.
+local BED_HOLD = 0.6
 
 -- What each role is for, in the order the picker shows them.
 SoundCandidates.ORDER = {
+	"m1_hit",
 	"ult_ready",
-	"ult_blink",
-	"ult_barrage",
-	"ult_windup",
-	"ult_impact",
-	"ult_frame",
-	"ult_haymaker",
-	"ult_launch",
 }
 
 SoundCandidates.ABOUT = {
+	m1_hit = "an M1 landing (plays a 4-hit string)",
 	ult_ready = "meter full / the G window opens",
-	ult_blink = "blinking in behind them",
-	ult_barrage = "the barrage's beat (7 hits, deep)",
-	ult_windup = "the quiet beat, gathering power",
-	ult_impact = "the haymaker landing (the boom)",
-	ult_frame = "the impact frame's sting, on top",
-	ult_haymaker = "the haymaker's amped-up punch",
-	ult_launch = "them flying off the map",
 }
 
 -- How the picker plays each role, so it sounds the way the game plays it (UltimateFx, Ui/UltimateMeter):
 -- `options` as Sfx.play takes them, `beats` (seconds) to play it as a rhythm, and `with` another role
 -- layered under it the way the game does. Roles not listed play 2.5 s of the file as it is.
 SoundCandidates.AUDITION = {
+	-- the four punches of a string, at the speed you can press them
+	m1_hit = {
+		options = {},
+		beats = { 0, 0.32, 0.64, 0.96 },
+	},
 	ult_ready = {
 		options = { cut = 1 },
 		with = { role = "punch_sub", options = { volume = 1.1, pitch = 0.8, cut = 0.4 } },
-	},
-	ult_barrage = {
-		options = { pitch = 0.9, volume = 1.8, cut = 0.3, eq = { low = 5, mid = 0, high = -4 } },
-		beats = { 0.07, 0.3, 0.5, 0.67, 0.81, 0.92, 1.01 },
-		with = { role = "punch_sub", options = { volume = 1.1, pitch = 1, cut = 0.28 } },
-	},
-	ult_haymaker = {
-		options = { pitch = 0.82, volume = 2.6, cut = 0.7, eq = { low = 7, mid = 2, high = 0 } },
-		with = { role = "punch_sub", options = { volume = 1.6, pitch = 0.8, cut = 0.5 } },
 	},
 } :: {
 	[string]: {
@@ -71,7 +76,51 @@ SoundCandidates.AUDITION = {
 }
 
 SoundCandidates.OPTIONS = {
-	-- Meter full: SHORT but POWERFUL (the user, 2026-11-16: "i want it to be short but powerful kind of
+	-- An M1 landing, the whole punch. Round 2 (kits-5b, 2026-11-16). The user, of round 1 (every option a short
+	-- low thump on the hit): "still sounds nothing like the references ... still just sounds like one of those
+	-- low sounding drums". Measured in the references: NO low transient on the hit; the hit is a 25 ms crack in
+	-- the mids and highs only, and the weight is a steady noisy rumble under ~140 Hz held ~0.6 s (Itadori), or
+	-- noise bursts spread over every band (MUDA). So here every hit has its lows CUT (no thump at all), and the
+	-- weight is one RUMBLE BED (Sfx.bed) that swells in on the first hit and holds through the string.
+	-- All licensed (ProSoundEffects).
+	m1_hit = {
+		{
+			label = "A",
+			name = "Beefy Hit, lows cut + deep rumble bed",
+			creator = "ProSoundEffects",
+			takes = BEEFY,
+			play = { eq = NO_LOWS },
+			layers = { { role = "punch_rumble_low", bed = BED_HOLD } },
+		},
+		{
+			label = "B",
+			name = "Beefy Hit, lows cut + rough crumbling rumble bed",
+			creator = "ProSoundEffects",
+			takes = BEEFY,
+			play = { eq = NO_LOWS },
+			layers = { { role = "punch_rumble_rough", bed = BED_HOLD } },
+		},
+		{
+			label = "C",
+			name = "Punch crack, lows cut + deep rumble bed",
+			creator = "ProSoundEffects",
+			takes = {
+				{ id = 9117972033, length = 1.57, start = 0.209, volume = 2.0 },
+				{ id = 9117971755, length = 1.62, start = 0.211, volume = 2.56 },
+				{ id = 9117972070, length = 1.78, start = 0.212, volume = 2.68 },
+				{ id = 9117971499, length = 1.77, start = 0.225, volume = 3.77 },
+			},
+			play = { eq = NO_LOWS, volume = 1.2 },
+			layers = { { role = "punch_rumble_low", bed = BED_HOLD } },
+		},
+		{
+			label = "D",
+			name = "Beefy Hit, lows cut, NO bed (the smack alone, to compare)",
+			creator = "ProSoundEffects",
+			takes = BEEFY,
+			play = { eq = NO_LOWS },
+		},
+	}, -- Meter full: SHORT but POWERFUL (the user, 2026-11-16: "i want it to be short but powerful kind of
 	-- notificaition sound", after hype stings, charge-ups and a sword whip were all wrong). A-C are
 	-- ProSoundEffects "Magic Burst" stings: one big beefy impact with a glowing tonal tail, played 1 s from the
 	-- hit, with a low boom under it (Ui/UltimateMeter). D is the APM brass hype sting cut as short; E a
@@ -107,216 +156,6 @@ SoundCandidates.OPTIONS = {
 			name = "Energy Charge Up (original synth)",
 			creator = "DailySoundsFX (community)",
 			takes = { { id = 75223250925800, length = 1.04, start = 0, volume = 0.5 } },
-		},
-	},
-	ult_blink = {
-		{
-			label = "A",
-			name = "Atomic Whoosh Fluttering Pass Bys Fast 4",
-			creator = "ProSoundEffects",
-			takes = one(9113202345, 2.97),
-		},
-		{
-			label = "B",
-			name = "Atomic Whoosh Fluttering Pass Bys Fast 7",
-			creator = "ProSoundEffects",
-			takes = one(9113203658, 2.76),
-		},
-		{
-			label = "C",
-			name = "Spirit Pass Bys Fast Overlapping Whooshes 7",
-			creator = "ProSoundEffects",
-			takes = one(9119468107, 2.39),
-		},
-		{
-			label = "D",
-			name = "Fast Pass By Airy Whooshes Windy 10",
-			creator = "ProSoundEffects",
-			takes = one(9114374050, 1.62),
-		},
-	},
-	-- The barrage's beat (UltimateFx plays it a little slower and warmer: pitch 0.9, lows up a bit, highs
-	-- trimmed, so it stays a punch). The user, 2026-11-15: "more varied ... lower pitched and flat and bassy";
-	-- then, of slowed body slams (ProSoundEffects "Body Impact", car-door hits at 0.78 with the highs cut):
-	-- "dont sound like punches at all... sounds like a burp". So only real punch recordings here. Then
-	-- (2026-11-16): "weak sounding ... like taps ... i want them to sound like actual heavy blows". A is now
-	-- the heavy-bag glove hits (the same as SoundBank punch_body), each beat with a low boom under it
-	-- (UltimateFx); B is both crack-and-thud sets in one bag.
-	ult_barrage = {
-		{
-			label = "A",
-			name = "Boxing Hits, Hit Punching Bag Hard (5 takes)",
-			creator = "ProSoundEffects",
-			takes = {
-				{ id = 9113570289, length = 0.48, start = 0.02, volume = 0.75 },
-				{ id = 9113565281, length = 0.67, start = 0.07, volume = 2.0 },
-				{ id = 9113565276, length = 0.5, start = 0.07, volume = 1.55 },
-				{ id = 9113570179, length = 0.71, start = 0, volume = 0.85 },
-				{ id = 9113569029, length = 0.58, start = 0.02, volume = 1.3 },
-			},
-		},
-		{
-			label = "B",
-			name = "Punch Some Crack And Thud, both sets (10 takes)",
-			creator = "ProSoundEffects",
-			takes = {
-				{ id = 9117971499, length = 1.8, start = 0.22, volume = 1.6 },
-				{ id = 9117972146, length = 1.6, start = 0.22, volume = 1.6 },
-				{ id = 9117971636, length = 1.7, start = 0.22, volume = 1.6 },
-				{ id = 9117972361, length = 1.6, start = 0.22, volume = 1.6 },
-				{ id = 9117971770, length = 1.6, start = 0.22, volume = 1.6 },
-				{ id = 9117972382, length = 1.6, start = 0.22, volume = 1.6 },
-				{ id = 9117971755, length = 1.6, start = 0.21, volume = 1.6 },
-				{ id = 9117972603, length = 1.6, start = 0.22, volume = 1.6 },
-				{ id = 9117971909, length = 1.6, start = 0.22, volume = 1.6 },
-				{ id = 9117972033, length = 1.6, start = 0.21, volume = 1.6 },
-			},
-		},
-		{
-			label = "C",
-			name = "Punch Some Crack And Thud 1-7",
-			creator = "ProSoundEffects",
-			takes = {
-				{ id = 9117971499, length = 1.8, start = 0.22, volume = 1.6 },
-				{ id = 9117971636, length = 1.7, start = 0.22, volume = 1.6 },
-				{ id = 9117971770, length = 1.6, start = 0.22, volume = 1.6 },
-				{ id = 9117971755, length = 1.6, start = 0.21, volume = 1.6 },
-				{ id = 9117971909, length = 1.6, start = 0.22, volume = 1.6 },
-				{ id = 9117972033, length = 1.6, start = 0.21, volume = 1.6 },
-			},
-		},
-		{
-			label = "D",
-			name = "Punch Some Crack And Thud (second set) 1-4",
-			creator = "ProSoundEffects",
-			takes = {
-				{ id = 9117972146, length = 1.6, start = 0.22, volume = 1.6 },
-				{ id = 9117972361, length = 1.6, start = 0.22, volume = 1.6 },
-				{ id = 9117972382, length = 1.6, start = 0.22, volume = 1.6 },
-				{ id = 9117972603, length = 1.6, start = 0.22, volume = 1.6 },
-			},
-		},
-	},
-	ult_windup = {
-		{
-			label = "A",
-			name = "REVERSE NOISE HARD END 17",
-			creator = "APMOfficial",
-			takes = one(9043343896, 2.12, 0.8),
-		},
-		{
-			label = "B",
-			name = "REVERSE HARD STOP-Noise Build 01",
-			creator = "APMOfficial",
-			takes = one(1837834257, 3.4, 0.8),
-		},
-		{
-			label = "C",
-			name = "LONG RISER-Deep Machine Riser 04",
-			creator = "APMOfficial",
-			takes = one(1837834672, 26.87, 0.8),
-		},
-		{
-			label = "D",
-			name = "Ignited Rage Build 1",
-			creator = "APMOfficial",
-			takes = one(1835335007, 9.58, 0.8),
-		},
-	},
-	ult_impact = {
-		{
-			label = "A",
-			name = "Time Warp Big Explosion Blast Boom Tonal Tail 1",
-			creator = "ProSoundEffects",
-			takes = one(9126102254, 5.72),
-		},
-		{
-			label = "B",
-			name = "Time Warp Big Explosion Blast Boom Tonal Tail 6",
-			creator = "ProSoundEffects",
-			takes = one(9126102402, 5.72),
-		},
-		{
-			label = "C",
-			name = "Time Warp Big Explosion Blast Boom Tonal Tail 9",
-			creator = "ProSoundEffects",
-			takes = one(9126102564, 5.81),
-		},
-		{
-			label = "D",
-			name = "BOOM-Deep Boom 06",
-			creator = "APMOfficial",
-			takes = one(1837830213, 3.29),
-		},
-	},
-	ult_frame = {
-		{
-			label = "A",
-			name = "Orchestra Slammed",
-			creator = "APMOfficial",
-			takes = one(1843035156, 9.22, 0.8),
-		},
-		{
-			label = "B",
-			name = "End Hit",
-			creator = "APMOfficial",
-			takes = one(1836741215, 6.68, 0.8),
-		},
-		{
-			label = "C",
-			name = "Fatal Impact",
-			creator = "APMOfficial",
-			takes = one(1839696994, 5.18, 0.8),
-		},
-		{
-			label = "D",
-			name = "Bing Bang Boom",
-			creator = "APMOfficial",
-			takes = one(1843054069, 7.87, 0.8),
-		},
-	},
-	-- The haymaker's own punch, replacing the bell (the user, 2026-11-15: "remove the bell sound its a bit too
-	-- silly, just give like a louder cooler punch sound thats ... amped up"). UltimateFx plays it loud and a
-	-- little deep with the lows pushed, layered over punch_hit and the ult_impact boom.
-	ult_haymaker = {
-		{
-			label = "A",
-			name = "Punch Some Crack And Thud 1-3",
-			creator = "ProSoundEffects",
-			takes = {
-				{ id = 9117971499, length = 1.8, start = 0.22, volume = 1.6 },
-				{ id = 9117971636, length = 1.7, start = 0.22, volume = 1.6 },
-				{ id = 9117971770, length = 1.6, start = 0.22, volume = 1.6 },
-			},
-		},
-		{
-			label = "B",
-			name = "Punch Some Crack And Thud (second set) 1-2",
-			creator = "ProSoundEffects",
-			takes = {
-				{ id = 9117972146, length = 1.6, start = 0.22, volume = 1.6 },
-				{ id = 9117972361, length = 1.6, start = 0.22, volume = 1.6 },
-			},
-		},
-	},
-	ult_launch = {
-		{
-			label = "A",
-			name = "Cloth Whooshes Fast Whooshes Rumbling Pass Bys 9",
-			creator = "ProSoundEffects",
-			takes = one(9125442175, 2.42),
-		},
-		{
-			label = "B",
-			name = "Fast Pass By Airy Whooshes Windy 8",
-			creator = "ProSoundEffects",
-			takes = one(9114374049, 2.23),
-		},
-		{
-			label = "C",
-			name = "Spirit Pass Bys Fast Overlapping Whooshes 4",
-			creator = "ProSoundEffects",
-			takes = one(9119467121, 1.31),
 		},
 	},
 } :: { [string]: { Option } }
