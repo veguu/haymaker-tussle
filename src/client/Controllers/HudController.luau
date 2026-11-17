@@ -1,24 +1,26 @@
 --!strict
--- HudController - the combat HUD in the Voltline look (2026-11-16; drawn in the vault's UI Research/
--- voltline-preview.html, "Electric blue"). Blue cut-corner panels on the screen's edges; the centre is the fight's:
---   Y  bottom-left (top-left on phones): YOUR stagger. A big slanted figure that climbs toward danger (not a
---      health bar), STAGGER, the knockback it means ("2.1x knockback"), RISING / CRITICAL / RECOVERING in words,
---      the speed bar, and the stagger bar with marks at 40 and 70. White, then yellow, then red-orange.
---   K  bottom-right: the class skills, ALWAYS shown in a fight: Q (mobility) and R (attack) as the two big
---      tiles, each with its icon, name, key cap, a shade that drains off the icon as the cooldown runs and the
---      seconds left on top. Jump and Punch are the two small tiles beside them. Four states, each a different
---      shape: ready (cyan border, corner flag, filled key), cooling down (shade and seconds), held (white
---      border, pressed fill) and can't use (dim, a slash through it).
---   A  top centre: one status strip (next round in N, get ready, 18 / 25 standing, final two, round over).
---   F  top right: the ring-out feed, newest on top, four rows; yours marked with a pink edge.
---   the target: a pink chevron and the name over your lock-on target (an open white one over the nearest
---      opponent ahead when nothing is locked), with a thin bar shaded by THEIR stagger.
+-- HudController - the combat HUD in the fight-poster look (2026-11-16; the approved mockup is the vault's UI
+-- Research/fight-poster-prototype.html). Slanted ink plates on the screen's edges; the centre is the fight's:
+--   Y  bottom-left (top-left on phones): YOUR stagger. A slanted ink plate with your class colour on its left
+--      edge, a big slanted number that climbs toward danger (not a health bar), STAGGER, the knockback it means
+--      ("2.1x knockback"), one word (RISING / RECOVERING / STEADY) and a 12-segment bar. The number and the bar
+--      go white, then yellow, then pink together.
+--   K  bottom-right: the skills, ALWAYS shown in a fight: Jump and Punch small in light violet, then Q (mobility)
+--      and R (attack) in your class colour, each with its icon, key cap and name. Three states, each a different
+--      shape and word: ready (bright, a READY flag with a tick), cooling (dark, a fill rising from the bottom, the
+--      seconds left) and can't use (dark with stripes, a slash, a flag that says why).
+--   A  top centre: one slanted strip (next round in N, get ready, 18 / 25 standing, final two, round over), the
+--      count in yellow, your class colour under it.
+--   F  top right: the ring-out feed, newest on top, four rows; yours marked with a yellow edge.
+--   the target: a chevron and the name over your lock-on target (an open one over the nearest opponent ahead
+--      when nothing is locked), with a thin bar shaded by THEIR stagger.
 --
--- It only draws. Every number comes from where the game keeps it: MovementController.Hud (speed, propel and kick
+-- It only draws. Every number comes from where the game keeps it: MovementController.Hud (propel and kick
 -- timing), CombatController (punch timing and results), AbilityController (kit skills), EndlagController, the
--- character's HT_Stagger, and the round's HT_RoundState folder. Rules in Core/HudLogic; colours, radii, type and
--- motion from Shared/Tokens through Ui/Components, Shared/Typography and Ui/HudMotion. No combat input is bound
--- here; on touch the real ContextActionService buttons stay the only buttons, with the cooldown drawn on them.
+-- character's HT_Stagger, and the round's HT_RoundState folder. Rules in Core/HudLogic; colours, steps and
+-- timings in Ui/HudTheme; the slanted and rough-cut shapes are tinted images from Ui/Shapes. No combat input is
+-- bound here; on touch the real ContextActionService buttons stay the only buttons, with the cooldown drawn on
+-- them. Per frame it only moves a cooling tile's fill and seconds; everything else changes on events.
 --
 -- ROUND CONTRACT (filled by the round service; HudPreviewService is a Studio stand-in): a Folder
 -- ReplicatedStorage.HT_RoundState with attributes Phase ("Intermission" | "Starting" | "Fighting" | "RoundOver"),
@@ -38,13 +40,18 @@ local Knit = require(ReplicatedStorage.Packages.Knit)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local HudLogic = require(ReplicatedStorage.Shared.Core.HudLogic)
+local PosterEase = require(ReplicatedStorage.Shared.Core.PosterEase)
 local Tokens = require(ReplicatedStorage.Shared.Tokens)
 local Typography = require(ReplicatedStorage.Shared.Typography)
 local Components = require(script.Parent.Parent.Ui.Components)
 local HudMotion = require(script.Parent.Parent.Ui.HudMotion)
+local Callouts = require(script.Parent.Parent.Ui.Callouts)
 local HudTheme = require(script.Parent.Parent.Ui.HudTheme)
+local Poster = require(script.Parent.Parent.Ui.Poster)
+local Shapes = require(script.Parent.Parent.Ui.Shapes)
 
 local S, T = HudTheme.Size, HudTheme.Time
+local ST, TT, SS = HudTheme.Stagger, HudTheme.Tile, HudTheme.Strip
 local make, text, panel, colour = Components.make, Components.text, Components.panel, Tokens.colour
 local moveCfg = GameConfig.Movement
 local kickCfg = GameConfig.Kick
@@ -56,32 +63,96 @@ local HELP_ACTION = "HaymakerHelp"
 local GUIDE_ROWS = 7
 local SP = Tokens.space -- 4, 8, 12, 16, 24, 32, 48, 64
 
--- Layout in design units at 1280 x 720, before the HUD scale (spec Combat HUD 5.2-5.4, Round Presentation 5.1-5.2).
+-- Layout. Every number here is the MOCKUP'S OWN PIXEL at 1280 x 720, read off the mockup itself with
+-- design/ui/mock_capture.py (--dump with "rects"), so the HUD stands where the approved design does.
+type YouSpec = {
+	box: Vector2, -- the plate as it stands on screen: slanted, so wider than its contents
+	lean: number, -- how far the plate's top sits right of its bottom (8 degrees)
+	edge: number, -- the class-colour edge on the left
+	label: Vector2, -- top-left of the STAGGER line
+	figure: Vector2, -- where the number's first digit starts, and its baseline
+	figureFont: number,
+	figureBox: Vector2, -- the number's box: least width, height. The bump turns about its centre
+	figureTop: number,
+	knockGap: number, -- from the end of the number's box to the knockback column
+	lines: { number }, -- tops of the multiplier line and the two word lines
+	segX: number,
+	segBase: number, -- the segments stand on this line
+	segWidth: number,
+	segPitch: number,
+}
+
+local SEG_SKEW = math.tan(math.rad(20)) -- a segment leans 20 degrees
+local SEG_OFF, SEG_ON = 14, 20 -- an unlit and a lit segment's height
+
 local L = {
 	Edge = SP[5], -- 24 from the safe edges
-	Y = Vector2.new(324, 88),
-	YPhone = Vector2.new(200, 88),
-	FigureWidth = 96, -- three digits reserved, so the label column never jumps between 9 and 100
-	Bar = Vector2.new(300, 10),
-	BarPhone = 176,
-	SpeedWidth = 64,
-	SpeedOver = 24,
-	SpeedHeight = 6,
-	TileBig = 76, -- Q and R: the class skills
-	TileSmall = 56, -- Jump and Punch
-	TileGap = SP[2], -- 8
-	TileTop = 22, -- room above the tiles for a result word (HIT / MISS / NOW)
-	Cap = 20,
-	K = Vector2.new(56 + 8 + 56 + 12 + 76 + 8 + 76, 22 + 76),
-	Strip = Vector2.new(360, 44),
-	StripTop = SP[2], -- 8
+	-- YOUR STAGGER: the mockup's plate, whole, at YScale. The owner, 2026-11-16: smaller than the mockup. At
+	-- 0.66 it is 264 x 110 units (20.6 % x 15.3 % of 1280 x 720; the mockup's is 31 % x 23 %) and its small
+	-- labels land exactly on the 15-unit text floor, so this is as small as it goes without breaking that.
+	YScale = 0.66,
+	Y = {
+		box = Vector2.new(399.5, 167),
+		lean = 23.5,
+		edge = 10,
+		label = Vector2.new(46.4, 13),
+		figure = Vector2.new(40.3, 122.6),
+		figureFont = 96,
+		figureBox = Vector2.new(150, 86.4),
+		figureTop = 36,
+		knockGap = 5,
+		lines = { 44, 83, 106 },
+		segX = 30.9,
+		segBase = 153,
+		segWidth = 23.83,
+		segPitch = 27.83,
+	} :: YouSpec,
+	-- Phones: the mockup's touch plate (narrower, a 64 px number), under the top-left buttons.
+	YPhone = {
+		box = Vector2.new(310.3, 159),
+		lean = 22.3,
+		edge = 10,
+		label = Vector2.new(41.9, 9),
+		figure = Vector2.new(37.8, 89.7),
+		figureFont = 64,
+		figureBox = Vector2.new(100, 57.6),
+		figureTop = 32,
+		knockGap = 3,
+		lines = { 40, 79, 102 },
+		segX = 26.4,
+		segBase = 149,
+		segWidth = 17.17,
+		segPitch = 21.17,
+	} :: YouSpec,
+	YPhoneTop = 84,
+	YMargin = 16, -- room round the plate inside its group, so its shake and the number's punch are not clipped
+	LineHeight = 23, -- a 15 px label's line in the mockup
+	MultiplierHeight = 39, -- the 26 px "2.1x" line
+	-- THE SKILL TILES: the mockup's sizes and places (right 26, bottom 24, 14 apart).
+	TileBig = 104, -- Q and R: the class skills
+	TileSmall = 84, -- Jump and Punch
+	TileGap = 14,
+	TileRight = 26,
+	TileBottom = 24,
+	TilePad = 34, -- room round the row inside its group, for the shadow, the pop and the result word
+	TileLine = 4, -- the ink outline
+	Cap = 28,
+	K = Vector2.new(34 + 84 + 14 + 84 + 14 + 104 + 14 + 104 + 34, 34 + 104 + 34),
+	-- THE STRIP: 72 tall with its 5-unit class-colour line, 18 from the top, leaning 10 degrees.
+	Strip = Vector2.new(460, 72),
+	StripEdge = 5,
+	StripLean = 12.7,
+	StripTop = 18,
+	StripPad = 22,
+	StripGap = 12,
+	StripDrop = 10, -- the words sit this far under the number's centre (they share its baseline)
 	Chip = 28,
+	ChipLean = 6,
 	FeedWidth = 300,
 	FeedRow = 28,
 	FeedGap = SP[1], -- 4
 	FeedRows = 4,
 	ClosingFor = 2.5, -- seconds the ARENA CLOSING chip shows each time a shrink begins
-	ReadyPop = 0.18, -- the one pop a tile gives when its skill comes back
 }
 
 local HudController = Knit.CreateController({
@@ -131,26 +202,36 @@ local function group(parent: Instance, name: string, size: Vector2): Group
 	return { holder = holder, fade = fade, scale = scale, wanted = false }
 end
 
--- One action tile: a cut-corner box holding the icon, the skill's name (big tiles), the key cap, a cooldown
--- shade with the seconds left, the ready flag and a slash for unavailable. A result word shows above it.
+-- One skill tile: the rough-cut shape with an ink outline and a hard shadow, holding the icon, the key cap, the
+-- name, the rising cooldown fill with the seconds left, the stripes and slash for "can't use", and (Q and R) the
+-- flag that names the state. A result word shows above it.
 type Tile = {
 	id: string,
 	big: boolean,
 	column: Frame,
+	box: Frame,
+	rest: UDim2,
 	scale: UIScale,
-	box: Components.Cut,
+	line: ImageLabel,
+	fill: ImageLabel,
+	stripes: ImageLabel,
+	riseClip: Frame,
+	rise: ImageLabel,
+	riseFull: number,
+	riseShown: number,
 	icon: ImageLabel,
-	shadeClip: Frame,
+	iconSize: number,
 	seconds: TextLabel,
-	flag: ImageLabel,
 	slash: Frame,
+	flag: Frame?,
+	flagWord: TextLabel?,
+	tick: Frame?,
 	cap: Frame,
-	capStroke: UIStroke,
 	capText: TextLabel,
 	capGlyph: ImageLabel,
-	capTone: string,
 	name: TextLabel,
 	word: TextLabel,
+	bright: Color3,
 	state: string,
 	wordUntil: number,
 	secondsText: string,
@@ -158,19 +239,19 @@ type Tile = {
 
 local function makeTile(parent: Instance, id: string, x: number, big: boolean): Tile
 	local size = if big then L.TileBig else L.TileSmall
-	local cutSize = if big then 1 else 0.75
+	local inner = size - 2 * L.TileLine
+	local iconSize = if big then 46 else 34
 	local column = make("Frame", parent, {
 		Name = id,
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(x, 0),
-		Size = UDim2.fromOffset(size, L.K.Y),
+		Size = UDim2.fromOffset(size, L.TilePad + L.TileBig),
 	})
-	local scale = make("UIScale", column, {})
 	-- a short result word (HIT / MISS / NOW) above the tile, briefly
-	local word = text(column, "label", "ivory.50", {
+	local word = Poster.text(column, "label", 15, "ivory.50", {
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, -(size + 2)),
-		Size = UDim2.fromOffset(size + 16, 18),
+		Size = UDim2.fromOffset(size + 16, 23),
 		TextXAlignment = Enum.TextXAlignment.Center,
 		Visible = false,
 	})
@@ -180,172 +261,260 @@ local function makeTile(parent: Instance, id: string, x: number, big: boolean): 
 		Thickness = 1.5,
 		Transparency = 0.3,
 	})
-	local box = Components.cut(column, 2, "line.500", {
+	-- the tile itself, scaled and turned about its own centre (used, pop) and knocked sideways when refused
+	local rest = UDim2.new(0.5, 0, 1, -size / 2)
+	local box = make("Frame", column, {
 		Name = "Box",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = rest,
+		Size = UDim2.fromOffset(size, size),
+	})
+	local scale = make("UIScale", box, {})
+	local shadow = TT.Shadow
+	Shapes.image(box, "tile", shadow.tone, {
+		Name = "Shadow",
+		Position = UDim2.fromOffset(shadow.x, shadow.y),
+		ImageTransparency = shadow.transparency,
+	})
+	local line = Shapes.image(box, "tile", TT.Line, { Name = "Line", ZIndex = 1 })
+	-- the face: the same shape inside the outline, with the stripes and the rising fill over it
+	local face = make("Frame", box, {
+		Name = "Face",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(L.TileLine, L.TileLine),
+		Size = UDim2.fromOffset(inner, inner),
+		ZIndex = 2,
+	})
+	local fill = Shapes.image(face, "tile", TT.Dark, { Name = "Fill" })
+	local stripes = Shapes.image(face, "stripes", TT.Stripe, {
+		Name = "Stripes",
+		Visible = false,
+		ZIndex = 1,
+	})
+	-- the cooldown: the tile's own shape in a darker class colour, shown from the bottom up by a clip whose
+	-- height is the share of the cooldown already run
+	local riseClip = make("Frame", face, {
+		Name = "RiseClip",
+		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.fromScale(0, 1),
-		Size = UDim2.fromOffset(size, size),
-	}, cutSize)
-	Components.paintCut(box, "ink.700", nil)
-	local icon = make("ImageLabel", box.frame, {
+		Size = UDim2.new(1, 0, 0, 0),
+		ClipsDescendants = true,
+		Visible = false,
+		ZIndex = 1,
+	})
+	local rise = Shapes.image(riseClip, "tile", TT.Dark, {
+		Name = "Rise",
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.fromOffset(inner, inner),
+	})
+	local icon = make("ImageLabel", box, {
 		Name = "Icon",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, if big then 0.54 else 0.46),
-		Size = if big then UDim2.fromOffset(36, 36) else UDim2.fromOffset(26, 26),
+		Position = UDim2.fromScale(0.5, 0.44),
+		Size = UDim2.fromOffset(iconSize, iconSize),
 		Image = HudTheme.Icons[id] or "",
 		ScaleType = Enum.ScaleType.Fit,
-		ZIndex = 2,
-	})
-	-- the skill's name, inside the top of a big tile, always there
-	local name = text(box.frame, "caption", "ivory.200", {
-		Name = "SkillName",
-		Position = UDim2.fromOffset(7, 6),
-		Size = UDim2.new(1, -9, 0, 14),
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		Visible = big,
-		ZIndex = 5,
-	})
-	name.TextSize = 12 -- nine capitals ("FROSTBITE") have to fit beside the cut corner
-	-- the cooldown shade: the tile's own shape in dark ink, shown from the top down by a clip whose height is
-	-- the share of the cooldown still to run, with a white line on its lower edge. The icon stays visible under it.
-	local shadeClip = make("Frame", box.frame, {
-		Name = "ShadeClip",
-		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 0),
-		ClipsDescendants = true,
 		ZIndex = 3,
 	})
-	local shade = Components.cutImage("fill", "ink.950", cutSize)
-	shade.Name = "Shade"
-	shade.Size = UDim2.fromOffset(size, size)
-	shade.ImageTransparency = 0.45
-	shade.Parent = shadeClip
-	make("Frame", shadeClip, {
-		Name = "Edge",
-		BackgroundColor3 = colour("ivory.50"),
-		BorderSizePixel = 0,
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.new(0, 2, 1, 0),
-		Size = UDim2.new(1, -4, 0, 2),
-	})
-	local seconds = text(box.frame, "numeral.m", "ivory.50", {
-		Name = "Seconds",
-		Position = UDim2.fromOffset(0, if big then 6 else -2),
-		Size = UDim2.fromScale(1, 1),
-		TextXAlignment = Enum.TextXAlignment.Center,
-		ZIndex = 5,
-	})
-	if not big then
-		seconds.TextSize = 20
-	end
-	make("UIStroke", seconds, {
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
-		Color = colour("ink.950"),
-		Thickness = 2,
-		Transparency = 0.1,
-	})
-	local flag = make("ImageLabel", box.frame, {
-		Name = "Ready",
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.fromScale(1, 0),
-		Size = UDim2.fromOffset(24 * cutSize, 24 * cutSize),
-		Image = Tokens.cut.flag,
-		ImageColor3 = colour("teal.400"),
-		Visible = false,
-		ZIndex = 4,
-	})
-	local slash = make("Frame", box.frame, {
+	local slash = make("Frame", box, {
 		Name = "Slash",
-		BackgroundColor3 = colour("stone.300"),
+		BackgroundColor3 = colour(TT.Blocked),
 		BorderSizePixel = 0,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(size * 0.95, 3),
-		Rotation = -45,
+		Size = UDim2.new(0.84, 0, 0, 6),
+		Rotation = -38,
 		Visible = false,
-		ZIndex = 6,
+		ZIndex = 4,
 	})
-	local cap, capText, capGlyph = Components.keyCap(box.frame, L.Cap)
-	cap.AnchorPoint = Vector2.new(0, 1)
-	cap.Position = UDim2.new(0, 5, 1, -5)
-	cap.ZIndex = 6
-	if not big then
-		-- a small tile's cap has to hold "SPACE": tighter padding and smaller letters
-		local pad = cap:FindFirstChildOfClass("UIPadding") :: UIPadding
-		pad.PaddingLeft, pad.PaddingRight = UDim.new(0, 3), UDim.new(0, 3)
-		cap.Position = UDim2.new(0, 4, 1, -4)
-		capText.TextSize = 12
+	-- the seconds left: 34 px, right 8 and bottom 26 in the mockup (a small tile takes the same, in proportion)
+	local seconds = Poster.text(box, "display", if big then 34 else 27, TT.OnDark, {
+		Name = "Seconds",
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = if big then UDim2.new(1, -8, 1, -51.5) else UDim2.new(1, -6, 1, -41.5),
+		Size = UDim2.fromOffset(70, 51),
+		TextXAlignment = Enum.TextXAlignment.Right,
+		Visible = false,
+		ZIndex = 5,
+	})
+	local name = Poster.text(box, "label", 15, TT.OnDark, {
+		Name = "SkillName",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -8),
+		Size = UDim2.new(1, 0, 0, L.LineHeight),
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		ZIndex = 5,
+	})
+	-- the key cap: cream with ink lettering, top left, at least 30 wide; a gamepad's glyph takes its place
+	local cap = make("Frame", box, {
+		Name = "Cap",
+		BackgroundColor3 = colour("ivory.50"),
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(8, 8),
+		Size = UDim2.fromOffset(30, L.Cap),
+		AutomaticSize = Enum.AutomaticSize.X,
+		ZIndex = 5,
+	})
+	make("UIPadding", cap, { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) })
+	make("UIListLayout", cap, {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+	})
+	local capText = Poster.text(cap, "display", 16, TT.OnBright, {
+		Size = UDim2.fromScale(0, 1),
+		AutomaticSize = Enum.AutomaticSize.X,
+		TextXAlignment = Enum.TextXAlignment.Center,
+	})
+	local capGlyph = make("ImageLabel", cap, {
+		Name = "Glyph",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(L.Cap, L.Cap),
+		ScaleType = Enum.ScaleType.Fit,
+		Visible = false,
+	})
+	-- the flag, top right (Q and R): READY with a tick, or why the skill can't be used. In the mockup it lies
+	-- over the key cap and hides the key; the key must always show, so here it reaches 8 units past the tile's
+	-- right edge instead.
+	local flag: Frame? = nil
+	local flagWord: TextLabel? = nil
+	local tick: Frame? = nil
+	if big then
+		local made = make("Frame", box, {
+			Name = "Flag",
+			BackgroundColor3 = colour(TT.Ready),
+			BorderSizePixel = 0,
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, 6, 0, 10),
+			Size = UDim2.fromOffset(0, L.LineHeight),
+			AutomaticSize = Enum.AutomaticSize.X,
+			Visible = false,
+			ZIndex = 6,
+		})
+		make("UIStroke", made, {
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Color = colour(TT.Line),
+			LineJoinMode = Enum.LineJoinMode.Miter,
+			Thickness = 2,
+		})
+		make("UIPadding", made, { PaddingLeft = UDim.new(0, 5), PaddingRight = UDim.new(0, 5) })
+		make("UIListLayout", made, {
+			FillDirection = Enum.FillDirection.Horizontal,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 4),
+		})
+		-- the tick: two strokes, so it never depends on a font having the glyph
+		local mark = make("Frame", made, {
+			Name = "Tick",
+			BackgroundTransparency = 1,
+			LayoutOrder = 1,
+			Size = UDim2.fromOffset(12, 11),
+		})
+		for _, arm in { { 2.7, 7.2, 5.5, 45 }, { 7.9, 5.4, 10, -50 } } do
+			make("Frame", mark, {
+				BackgroundColor3 = colour(TT.OnBright),
+				BorderSizePixel = 0,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromOffset(arm[1], arm[2]),
+				Size = UDim2.fromOffset(arm[3], 2),
+				Rotation = arm[4],
+			})
+		end
+		flagWord = Poster.text(made, "label", 15, TT.OnBright, {
+			LayoutOrder = 2,
+			Size = UDim2.fromScale(0, 1),
+			AutomaticSize = Enum.AutomaticSize.X,
+		})
+		flag, tick = made, mark
 	end
 	return {
 		id = id,
 		big = big,
 		column = column,
-		scale = scale,
 		box = box,
+		rest = rest,
+		scale = scale,
+		line = line,
+		fill = fill,
+		stripes = stripes,
+		riseClip = riseClip,
+		rise = rise,
+		riseFull = inner,
+		riseShown = -1,
 		icon = icon,
-		shadeClip = shadeClip,
+		iconSize = iconSize,
 		seconds = seconds,
-		flag = flag,
 		slash = slash,
+		flag = flag,
+		flagWord = flagWord,
+		tick = tick,
 		cap = cap,
-		capStroke = cap:FindFirstChildOfClass("UIStroke") :: UIStroke,
 		capText = capText,
 		capGlyph = capGlyph,
-		capTone = "ink.600",
 		name = name,
 		word = word,
+		bright = colour(TT.Quiet),
 		state = "",
 		wordUntil = 0,
 		secondsText = "",
 	}
 end
 
--- A tile's look for a state, told apart by shape as well as colour:
---   ready: cyan border, the corner flag, the key cap filled; coming back from a cooldown the tile pops once;
---   recovering: plain border, icon dimmed under the draining shade, the seconds left on top;
---   held (the attack skill while its key is down): white border, lighter fill, the key cap white;
---   unavailable: dim, with a slash through it.
-local function paintTile(tile: Tile, state: string, held: boolean)
-	local key = if held then "held" else state
+-- A tile's look for a state, told apart by shape and word as well as colour:
+--   ready: the bright tile, and on Q and R the READY flag with its tick; coming off a cooldown a class skill
+--     pops once (the mockup's `spop`: 1.6 times and turned 10 degrees, settling on its spring over 0.7 s);
+--   recovering: dark, the fill rising from the bottom, the icon stepped aside for the seconds left;
+--   held (the attack skill while its key is down): bright with a cream outline, no flag;
+--   unavailable: dark with stripes and a slash, and on Q and R a flag that says STUNNED or CAN'T USE.
+local function paintTile(tile: Tile, state: string, held: boolean, stunned: boolean)
+	local key = if held
+		then "held"
+		elseif state == "unavailable" and stunned then "stunned"
+		else state
 	if tile.state == key then
 		return
 	end
 	local was = tile.state
 	tile.state = key
-	local ready = state == "ready" and not held
-	local dim = state == "unavailable" and not held
-	Components.paintCut(
-		tile.box,
-		if dim then "ink.900" elseif held then "ink.500" else "ink.700",
-		if held
-			then "ivory.50"
-			elseif ready then "teal.400"
-			elseif dim then "stone.500"
-			else "line.500"
-	)
-	tile.icon.ImageTransparency = if dim then 0.7 elseif ready or held then 0 else 0.3
-	tile.flag.Visible = ready
-	tile.slash.Visible = dim
-	local capTone = if held then "ivory.50" elseif ready then "teal.400" else "ink.600"
-	tile.capTone = capTone
-	tile.cap.BackgroundColor3 = colour(capTone)
-	tile.capStroke.Color = if held or ready
-		then colour(capTone)
-		elseif dim then colour("stone.500")
-		else colour("line.300")
-	tile.capText.TextColor3 = if held or ready
-		then colour("ink.950")
-		elseif dim then colour("stone.500")
-		else colour("ivory.50")
-	tile.capGlyph.ImageTransparency = if dim then 0.6 else 0
-	tile.name.TextColor3 = if dim then colour("stone.500") else colour("ivory.200")
-	if key ~= "recovering" then
-		tile.shadeClip.Size = UDim2.fromScale(1, 0)
+	local bright = held or state == "ready"
+	local cooling = not held and state == "recovering"
+	local blocked = not held and state == "unavailable"
+	tile.line.ImageColor3 = colour(if held then TT.LineHeld else TT.Line)
+	tile.fill.ImageColor3 = if bright then tile.bright else colour(TT.Dark)
+	tile.stripes.Visible = blocked
+	tile.slash.Visible = blocked
+	tile.riseClip.Visible = cooling
+	tile.riseShown = -1
+	tile.name.TextColor3 = colour(if bright then TT.OnBright else TT.OnDark)
+	tile.seconds.Visible = cooling
+	-- cooling: the icon steps up and left at 36 / 46 of its size, to leave the seconds their corner
+	local iconSize = if cooling then math.floor(tile.iconSize * 36 / 46 + 0.5) else tile.iconSize
+	tile.icon.Size = UDim2.fromOffset(iconSize, iconSize)
+	tile.icon.Position = if cooling then UDim2.fromScale(0.34, 0.36) else UDim2.fromScale(0.5, 0.44)
+	tile.icon.ImageTransparency = if blocked then 0.45 elseif cooling then 0.2 else 0
+	local flag, flagWord, tick = tile.flag, tile.flagWord, tile.tick
+	if flag and flagWord and tick then
+		flag.Visible = state ~= "recovering" and not held
+		flag.BackgroundColor3 = colour(if blocked then TT.Blocked else TT.Ready)
+		tick.Visible = not blocked
+		flagWord.TextColor3 = colour(if blocked then TT.OnBlocked else TT.OnBright)
+		flagWord.Text = if not blocked
+			then TT.WordReady
+			elseif stunned then TT.WordStunned
+			else TT.WordBlocked
 	end
-	if ready and was == "recovering" and not HudMotion.reduced() then
-		HudMotion.pop(tile.scale, 1.08, L.ReadyPop)
+	if key == "ready" and was == "recovering" and tile.big then
+		Poster.run(tile, TT.PopSeconds, function(t: number)
+			local s = PosterEase.spring(t)
+			tile.scale.Scale = TT.PopScale + (1 - TT.PopScale) * s
+			tile.box.Rotation = TT.PopTurn * (1 - s)
+		end)
 	end
 end
 
@@ -397,146 +566,218 @@ function HudController:KnitStart()
 	})
 	gui.Parent = playerGui
 
+	-- Your class colour: the stagger plate's edge, the line under the strip, and the Q and R tiles.
+	local classColour = colour("coral.500")
+
 	-- A: the status strip, top centre ------------------------------------------------------------------
+	-- a slanted ink plate with the class colour showing under it (yellow for the final two and the last one);
+	-- the contents are a row inside it: the number in Oswald, the words beside it on the same baseline
 	local strip = group(gui, "Strip", Vector2.new(L.Strip.X, L.Strip.Y + SP[2] + L.Chip))
 	strip.holder.AnchorPoint = Vector2.new(0.5, 0)
-	-- its border turns yellow for the final two and the last one; the contents are a row inside it
-	local stripCut = Components.cut(strip.fade, 1, "line.500", {
+	local stripPanel = make("Frame", strip.fade, {
 		Name = "Panel",
+		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.fromScale(0.5, 0),
 		Size = UDim2.fromOffset(0, L.Strip.Y),
 		AutomaticSize = Enum.AutomaticSize.X,
 	})
-	local stripPanel = stripCut.frame
+	local stripLast = false
+	local stripPlateHeight = L.Strip.Y - L.StripEdge
+	-- the plate is the top of the same slanted shape, so it starts a little right of the edge's bottom corner
+	local stripSlip = L.StripLean * L.StripEdge / L.Strip.Y
+	local stripEdge = Shapes.slant(stripPanel, "coral.500", L.StripLean, { Name = "Edge" })
+	Shapes.slant(stripPanel, SS.Plate, L.StripLean - stripSlip, {
+		Name = "Plate",
+		Position = UDim2.fromOffset(stripSlip, 0),
+		Size = UDim2.new(1, -stripSlip, 0, stripPlateHeight),
+		ZIndex = 1,
+	})
 	local stripRow = make("Frame", stripPanel, {
 		Name = "Row",
 		BackgroundTransparency = 1,
-		Size = UDim2.fromOffset(0, L.Strip.Y),
+		Size = UDim2.fromOffset(0, stripPlateHeight),
 		AutomaticSize = Enum.AutomaticSize.X,
+		ZIndex = 2,
 	})
 	make("UIPadding", stripRow, {
-		PaddingLeft = UDim.new(0, SP[5]),
-		PaddingRight = UDim.new(0, SP[5]),
+		PaddingLeft = UDim.new(0, L.StripPad + L.StripLean / 2),
+		PaddingRight = UDim.new(0, L.StripPad + L.StripLean / 2),
 	})
 	make("UIListLayout", stripRow, {
 		FillDirection = Enum.FillDirection.Horizontal,
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
 		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, SP[3]),
+		Padding = UDim.new(0, L.StripGap),
 	})
-	local function stripText(order: number, role: string, tone: string): TextLabel
-		return text(stripRow, role, tone, {
-			LayoutOrder = order,
-			Size = UDim2.fromOffset(0, L.Strip.Y),
-			AutomaticSize = Enum.AutomaticSize.X,
-		})
-	end
-	local stripCount = stripText(1, "numeral.m", "ivory.50") -- survivors, or seconds before a round
+	-- The count holds its place in the row with a clear copy of itself; the copy that shows sits on top, so its
+	-- bump (2.4 times, turned, settling on the spring) never pushes the words about.
+	local stripCountSlot = Poster.text(stripRow, "display", 34, SS.Count, {
+		Name = "Count",
+		LayoutOrder = 1,
+		Size = UDim2.fromOffset(0, stripPlateHeight),
+		AutomaticSize = Enum.AutomaticSize.X,
+		TextTransparency = 1,
+	})
+	local stripCount = Poster.text(stripCountSlot, "display", 34, SS.Count, {
+		Name = "Shown",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(1, 1),
+		TextXAlignment = Enum.TextXAlignment.Center,
+	})
 	local countScale = make("UIScale", stripCount, {})
-	local stripTotal = stripText(2, "caption", "stone.300") -- "/ 25"
-	local stripTitle = stripText(3, "label", "stone.300") -- STANDING / FINAL TWO / NEXT ROUND ...
+	-- words: 15 px, a little see-through, dropped onto the number's baseline
+	local function stripWord(order: number): TextLabel
+		local label = Poster.text(stripRow, "label", 15, SS.Word, {
+			LayoutOrder = order,
+			Size = UDim2.fromOffset(0, stripPlateHeight),
+			AutomaticSize = Enum.AutomaticSize.X,
+			TextTransparency = 0.15,
+		})
+		make("UIPadding", label, { PaddingTop = UDim.new(0, 2 * L.StripDrop) })
+		return label
+	end
+	local stripTitle = stripWord(3) -- "/ 25 STANDING", FINAL TWO, NEXT ROUND ...
 	local titleScale = make("UIScale", stripTitle, {})
-	local stripRound = stripText(4, "label", "stone.300") -- ROUND 4
-	-- the warning chip: red-orange with dark lettering, and the "!" so it isn't colour alone
-	local closing = panel(strip.fade, 1, "s", {
+	local stripRound = stripWord(4) -- ROUND 4
+	-- the warning chip: a slanted pink plate with dark lettering, and the "!" so it isn't colour alone
+	local closing = make("Frame", strip.fade, {
 		Name = "Closing",
+		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, L.Strip.Y + SP[2]),
 		Size = UDim2.fromOffset(0, L.Chip),
 		AutomaticSize = Enum.AutomaticSize.X,
-		BackgroundColor3 = colour("danger.600"),
-		BackgroundTransparency = 0,
 		Visible = false,
 	})
-	make("UIPadding", closing, {
-		PaddingLeft = UDim.new(0, SP[3]),
-		PaddingRight = UDim.new(0, SP[3]),
-	})
+	Shapes.slant(closing, SS.Warning, L.ChipLean, { Name = "Plate" })
 	local closingScale = make("UIScale", closing, {})
-	text(closing, "label", "ink.950", {
+	local closingText = Poster.text(closing, "label", 15, SS.OnWarning, {
 		Size = UDim2.fromScale(0, 1),
 		AutomaticSize = Enum.AutomaticSize.X,
 		Text = "!  ARENA CLOSING",
+		ZIndex = 1,
+	})
+	make("UIPadding", closingText, {
+		PaddingLeft = UDim.new(0, SP[3] + L.ChipLean),
+		PaddingRight = UDim.new(0, SP[3] + L.ChipLean),
 	})
 
 	-- Y: you --------------------------------------------------------------------------------------------
-	local you = group(gui, "You", L.Y)
-	local youPanel = Components.cut(you.fade, 1, "line.500", {
-		Name = "Panel",
-		Size = UDim2.fromScale(1, 1),
-	}).frame
-	local youPulse = make("UIScale", you.fade, {})
-	local figure = text(youPanel, "numeral.l", "ivory.50", {
-		Name = "Figure",
-		Position = UDim2.fromOffset(SP[3], 8),
-		Size = UDim2.fromOffset(L.FigureWidth, 48),
-		Text = "<unbound>", -- the sentinel: setStagger writes it at once, so seeing it means a broken wire
+	-- The mockup's plate, built at the mockup's own pixel sizes and shrunk as one piece by L.YScale. Two slanted
+	-- images make it: the class colour underneath, showing as the left edge, and the ink over it.
+	local stagger = 0
+	local you = group(gui, "You", L.Y.box * L.YScale)
+	local plateRest = UDim2.fromOffset(L.YMargin, L.YMargin)
+	local youPlate = make("Frame", you.fade, {
+		Name = "Plate",
+		BackgroundTransparency = 1,
+		Position = plateRest,
 	})
-	local figureMove = make("UIPadding", figure, {})
-	local labelX = SP[3] + L.FigureWidth + SP[2]
-	text(youPanel, "label", "stone.300", {
-		Position = UDim2.fromOffset(labelX, 12),
-		Size = UDim2.fromOffset(110, 16),
+	make("UIScale", youPlate, { Scale = L.YScale })
+	local youEdge = Shapes.slant(youPlate, "coral.500", L.Y.lean, { Name = "Edge" })
+	local youInk = Shapes.slant(youPlate, ST.Plate, L.Y.lean, { Name = "Ink", ZIndex = 1 })
+	-- STAGGER leans with the plate in the mockup (it is the one line not stood back upright), so it is set in
+	-- Titillium's own slanted Bold
+	local staggerLabel = Poster.text(youPlate, "label", 15, ST.Label, {
+		Name = "Label",
 		Text = "STAGGER",
+		TextTransparency = 0.15,
+		ZIndex = 2,
 	})
-	local knock = text(youPanel, "caption", "ivory.200", {
+	staggerLabel.FontFace =
+		Font.new(Tokens.family.text, Enum.FontWeight.Bold, Enum.FontStyle.Italic)
+	-- the number: slanted Oswald digits from the sheet, in a box that scales and turns about its centre
+	local figureBox = make("Frame", youPlate, {
+		Name = "Figure",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		ZIndex = 2,
+	})
+	local figureScale = make("UIScale", figureBox, {})
+	local figure = Poster.number(figureBox, 3, { Name = "Digits", Size = UDim2.fromScale(1, 1) })
+	local knock = Poster.text(youPlate, "display", 26, ST.Text, { Name = "Multiplier", ZIndex = 2 })
+	local knockWord = Poster.text(youPlate, "label", 15, ST.Text, {
 		Name = "Knockback",
-		Position = UDim2.fromOffset(labelX, 30),
-		Size = UDim2.fromOffset(120, 18),
-		RichText = true,
+		Text = "knockback",
+		ZIndex = 2,
 	})
-	local status = text(youPanel, "label", "teal.400", {
-		Name = "Status",
-		Position = UDim2.fromOffset(L.Y.X - SP[3] - 110, 44),
-		Size = UDim2.fromOffset(110, 16),
-		TextXAlignment = Enum.TextXAlignment.Right,
-	})
-	local speedLabel = text(youPanel, "label", "stone.300", {
-		Name = "SpeedLabel",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -SP[3], 0, 9),
-		Size = UDim2.fromOffset(L.SpeedWidth + 2 + L.SpeedOver, 18),
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Text = "SPEED",
-	})
-	local speedBase = Components.meter(youPanel, L.SpeedWidth, L.SpeedHeight, true)
-	speedBase.track.AnchorPoint = Vector2.new(1, 0)
-	speedBase.track.Position = UDim2.new(1, -(SP[3] + L.SpeedOver + 2), 0, 30)
-	local speedOver = Components.meter(youPanel, L.SpeedOver, L.SpeedHeight, true)
-	speedOver.track.AnchorPoint = Vector2.new(1, 0)
-	speedOver.track.Position = UDim2.new(1, -SP[3], 0, 30)
-	speedOver.track.BackgroundTransparency = 0.92
-	-- your top speed under stagger: a 2-unit notch on the speed bar
-	local speedNotch = make("Frame", speedBase.track, {
-		Name = "Cap",
-		BackgroundColor3 = colour("stone.500"),
-		BorderSizePixel = 0,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(1, 0.5),
-		Size = UDim2.new(0, 2, 1, 4),
-		ZIndex = 4,
-	})
-	local bar = Components.meter(youPanel, L.Bar.X, L.Bar.Y, true, true, { 0.4, 0.7 })
-	bar.track.Position = UDim2.fromOffset(SP[3], L.Y.Y - SP[3] - L.Bar.Y)
-	local barGradient = make("UIGradient", bar.fill, {
-		Color = ColorSequence.new(colour("gold.400"), colour("danger.600")),
-		Enabled = false,
-	})
-	local drainTick = make("Frame", bar.track, {
-		Name = "Drain",
-		BackgroundColor3 = colour("teal.400"),
-		BorderSizePixel = 0,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0, 0.5),
-		Size = UDim2.new(0, 2, 1, 4),
-		Visible = false,
-		ZIndex = 5,
-	})
-	local speedParts = { speedLabel, speedBase.track, speedOver.track }
+	local status = Poster.text(youPlate, "label", 15, ST.Text, { Name = "Word", ZIndex = 2 })
+	-- the 12 segments, each its own small slanted image (one drawing lit, one unlit); lit ones are taller and take their third's colour
+	local segs: { ImageLabel } = {}
+	local segTone: { Color3 } = {}
+	local segHeight: { number } = {}
+	for index = 1, ST.Segments do
+		segs[index] = Shapes.image(youPlate, "segOff", ST.SegmentOff, {
+			Name = `Seg{index}`,
+			AnchorPoint = Vector2.new(0, 1),
+			ZIndex = 2,
+		})
+		segHeight[index] = SEG_OFF
+		segTone[index] =
+			colour(ST.Tone[HudLogic.segmentTier(index, ST.Segments, ST.YellowShare, ST.PinkShare)])
+	end
+	local youSpec: YouSpec = L.Y
+	local shownLit = 0
+	-- One segment at a height: a 20-degree lean, standing on the base line, centred on its place in the row.
+	local function placeSegment(index: number, height: number)
+		local spec = youSpec
+		local lean = height * SEG_SKEW
+		local seg = segs[index]
+		segHeight[index] = height
+		seg.Size = UDim2.fromOffset(spec.segWidth + lean, height)
+		seg.Position =
+			UDim2.fromOffset(spec.segX + (index - 1) * spec.segPitch - lean / 2, spec.segBase)
+		-- the lit drawing while it is any taller than an unlit one, so its lean stays true as it grows
+		seg.Image = if height > SEG_OFF + 0.01 then Shapes.ids.segOn else Shapes.ids.segOff
+	end
+	-- Lights the segments for the current stagger. `all` re-places every one (a new layout); otherwise only the
+	-- ones that changed are touched. A changed one grows or shrinks on the mockup's `pop` curve when `animate`.
+	local function paintSegments(animate: boolean, all: boolean)
+		local lit = HudLogic.segmentsLit(stagger, STAGGER_MAX, ST.Segments)
+		for index, seg in segs do
+			local on = index <= lit
+			if all or on ~= (index <= shownLit) then
+				seg.ImageColor3 = if on then segTone[index] else colour(ST.SegmentOff)
+				local goal = if on then SEG_ON else SEG_OFF
+				local from = segHeight[index]
+				if animate and from ~= goal then
+					Poster.run(seg, ST.SegmentSeconds, function(t: number)
+						placeSegment(index, from + (goal - from) * PosterEase.pop(t))
+					end)
+				else
+					Poster.stop(seg)
+					placeSegment(index, goal)
+				end
+			end
+		end
+		shownLit = lit
+	end
+	-- The number, and the knockback column that starts where the number's box ends (the box is at least
+	-- `figureBox` wide, wider for a wide number, as the mockup lays it out).
+	local function paintFigure()
+		local spec = youSpec
+		local width = Poster.setNumber(
+			figure,
+			tostring(math.floor(stagger + 0.5)),
+			spec.figureFont,
+			spec.figure.Y - spec.figureTop
+		)
+		local box = Vector2.new(math.max(spec.figureBox.X, width), spec.figureBox.Y)
+		figureBox.Size = UDim2.fromOffset(box.X, box.Y)
+		figureBox.Position = UDim2.fromOffset(spec.figure.X + box.X / 2, spec.figureTop + box.Y / 2)
+		local x = spec.figure.X + box.X + spec.knockGap
+		knock.Position = UDim2.fromOffset(x, spec.lines[1])
+		knockWord.Position = UDim2.fromOffset(x, spec.lines[2])
+		status.Position = UDim2.fromOffset(x, spec.lines[3])
+		-- what this stagger does to you: the knockback the next hit will use
+		knock.Text = HudLogic.multiplierText(Combat.staggerMultiplier(staggerCfg :: any, stagger))
+			.. "x"
+	end
 
-	-- K: the kit tiles ------------------------------------------------------------------------------------
+	-- K: the skill tiles ----------------------------------------------------------------------------------
 	local kit = group(gui, "Kit", L.K)
 	kit.holder.AnchorPoint = Vector2.new(1, 1)
 	local actionById: { [string]: any } = {}
@@ -548,11 +789,13 @@ function HudController:KnitStart()
 	local BIG = { propel = true, uppercut = true }
 	local tiles: { [string]: Tile } = {}
 	do
-		local x = 0
-		for index, id in ORDER do
+		local x = L.TilePad
+		for _, id in ORDER do
 			local big = BIG[id] == true
-			tiles[id] = makeTile(kit.fade, id, x, big)
-			x += (if big then L.TileBig else L.TileSmall) + (if index == 2 then SP[3] else L.TileGap)
+			local tile = makeTile(kit.fade, id, x, big)
+			tile.name.Text = string.upper(actionById[id].name)
+			tiles[id] = tile
+			x += (if big then L.TileBig else L.TileSmall) + L.TileGap
 		end
 	end
 	-- The class skills' names sit in their tiles for good; they change only with the class.
@@ -560,8 +803,28 @@ function HudController:KnitStart()
 		tiles.propel.name.Text = string.upper(ability:GetSkill("mobility").name)
 		tiles.uppercut.name.Text = string.upper(ability:GetSkill("attack").name)
 	end
+	-- The class colour, wherever it shows. A class with no colour of its own falls back to yellow.
+	local function paintClass()
+		local hex = Tokens.hex[`class.{ability:GetKitId()}`]
+		classColour = if hex then Color3.fromHex(hex) else colour("coral.500")
+		Shapes.paint(youEdge, classColour)
+		Shapes.paint(stripEdge, if stripLast then colour(SS.Last) else classColour)
+		for _, id in ORDER do
+			local tile = tiles[id]
+			if tile.big then
+				tile.bright = classColour
+			end
+			-- the mockup's fill: the tile's colour mixed 45 % toward black
+			tile.rise.ImageColor3 = tile.bright:Lerp(Color3.new(), TT.FillShade)
+			tile.state = "" -- repainted by the loop on the next frame
+		end
+	end
 	refreshNames()
-	ability.KitChanged:Connect(refreshNames)
+	paintClass()
+	ability.KitChanged:Connect(function()
+		refreshNames()
+		paintClass()
+	end)
 
 	-- the controls guide: a ghost chip ("Controls" + key cap) and the sheet it opens -------------------------
 	local help = make("Frame", gui, {
@@ -728,24 +991,40 @@ function HudController:KnitStart()
 		strip.holder.Position = UDim2.new(0.5, 0, 0, L.StripTop)
 		feed.holder.Position = UDim2.new(1, -edge, 0, L.StripTop)
 		spectate.holder.Position = UDim2.new(0.5, 0, 1, -edge)
-		kit.holder.Position = UDim2.new(1, -edge, 1, -edge)
+		-- the tile row keeps spare room round it inside its group; the tiles themselves stop at the mockup's
+		-- 26 from the right and 24 from the bottom
+		local tilePad = L.TilePad * scale
+		kit.holder.Position = UDim2.new(1, tilePad - L.TileRight, 1, tilePad - L.TileBottom)
+
+		-- Your stagger plate, laid out in the mockup's pixels (its own UIScale shrinks it). Phones get the
+		-- mockup's touch plate, top-left under the corner buttons.
 		local phone = device == "touch"
-		-- Phones: your panel goes top-left (the bottom corners belong to the thumbs), narrower, no speed bar.
-		local size = if phone then L.YPhone else L.Y
-		you.holder.Size = UDim2.fromOffset(size.X, size.Y)
-		bar.track.Size = UDim2.fromOffset(if phone then L.BarPhone else L.Bar.X, L.Bar.Y)
-		for _, part in speedParts do
-			(part :: GuiObject).Visible = not phone
-		end
-		status.Position = if phone
-			then UDim2.fromOffset(labelX, 48)
-			else UDim2.fromOffset(L.Y.X - SP[3] - 110, 44)
-		status.TextXAlignment = if phone
-			then Enum.TextXAlignment.Left
-			else Enum.TextXAlignment.Right
+		local spec: YouSpec = if phone then L.YPhone else L.Y
+		youSpec = spec
+		local k = L.YScale
+		local margin = L.YMargin
+		you.holder.Size = UDim2.fromOffset(spec.box.X * k + 2 * margin, spec.box.Y * k + 2 * margin)
+		youPlate.Size = UDim2.fromOffset(spec.box.X, spec.box.Y)
+		youEdge.Size = UDim2.fromOffset(spec.edge + 2 * spec.lean, spec.box.Y)
+		youInk.Position = UDim2.fromOffset(spec.edge, 0)
+		youInk.Size = UDim2.fromOffset(spec.box.X - spec.edge, spec.box.Y)
+		Shapes.setLean(youEdge, spec.lean)
+		Shapes.setLean(youInk, spec.lean)
+		staggerLabel.Position = UDim2.fromOffset(spec.label.X, spec.label.Y)
+		staggerLabel.Size = UDim2.fromOffset(120, L.LineHeight)
+		knock.Size = UDim2.fromOffset(120, L.MultiplierHeight)
+		knockWord.Size = UDim2.fromOffset(140, L.LineHeight)
+		status.Size = UDim2.fromOffset(140, L.LineHeight)
+		paintSegments(false, true)
+		paintFigure()
+
+		-- the plate's bottom-left corner stands 24 from the left and the bottom, as in the mockup; a slanted
+		-- plate's box starts half its lean further left
+		local pad = margin * scale
+		local left = edge - spec.lean * k * scale / 2
 		if phone then
 			you.holder.AnchorPoint = Vector2.new(0, 0)
-			you.holder.Position = UDim2.new(0, edge, 0, L.StripTop)
+			you.holder.Position = UDim2.new(0, left - pad, 0, L.YPhoneTop - pad)
 			help.AnchorPoint = Vector2.new(1, 0)
 			help.Position =
 				UDim2.new(1, -edge, 0, L.StripTop + feed.holder.Size.Y.Offset * scale + SP[2])
@@ -753,9 +1032,10 @@ function HudController:KnitStart()
 			guide.Position = UDim2.new(1, 0, 1, SP[2])
 		else
 			you.holder.AnchorPoint = Vector2.new(0, 1)
-			you.holder.Position = UDim2.new(0, edge, 1, -edge)
+			you.holder.Position = UDim2.new(0, left - pad, 1, pad - edge)
 			help.AnchorPoint = Vector2.new(1, 1)
-			help.Position = UDim2.new(1, -edge, 1, -(edge + (L.K.Y + SP[2]) * scale))
+			help.Position =
+				UDim2.new(1, -L.TileRight, 1, -(L.TileBottom + (L.TileBig + 22 + SP[2]) * scale))
 			guide.AnchorPoint = Vector2.new(1, 1)
 			guide.Position = UDim2.new(1, 0, 0, -SP[2])
 		end
@@ -770,13 +1050,11 @@ function HudController:KnitStart()
 	local closingToken = 0
 	local character: Model? = nil
 	local charConns: { RBXScriptConnection } = {}
-	local stagger = 0
-	local band: HudLogic.StaggerBand = "calm"
+	local shownTier = ""
+	local shownWord = ""
+	local risingUntil: number? = nil
 	local lastRise = -math.huge
 	local recovering = false
-	local recoverFrom = 0
-	local barFrom, barTo, barSince = 0, 0, -math.huge
-	local gaugeShown, overShown = 0, 0
 	local target: Model? = nil
 	local targetLocked = false
 	local nextTargetPick = 0
@@ -859,21 +1137,17 @@ function HudController:KnitStart()
 		local fightingNow = round.phase == "Fighting"
 		local counting = round.phase == "Intermission"
 		-- Fighting: [ 18  / 25  STANDING ]; intermission: [ NEXT ROUND  12  ROUND 4 ]; starting: [ GET READY  ROUND 4 ]
-		stripCount.Visible = info.count ~= nil and (fightingNow or counting)
+		stripCountSlot.Visible = info.count ~= nil and (fightingNow or counting)
+		stripCountSlot.Text = info.count or ""
 		stripCount.Text = info.count or ""
-		Typography.apply(stripCount, if counting then "mono.timer" else "numeral.m")
-		stripCount.LayoutOrder = if counting then 2 else 1
-		stripTotal.Visible = info.total ~= nil
-		stripTotal.Text = if info.total then `/ {info.total}` else ""
-		stripTitle.Text = info.title
+		stripCountSlot.LayoutOrder = if counting then 2 else 1
+		stripTitle.Text = if info.total then `/ {info.total} {info.title}` else info.title
 		stripTitle.LayoutOrder = if counting then 1 else 3
-		stripTitle.TextColor3 = if fightingNow and not info.finalTwo
-			then colour("stone.300")
-			else colour("ivory.50")
 		stripRound.Visible = roundText ~= "" and not fightingNow
 		stripRound.Text = roundText
 		local last = info.finalTwo or (fightingNow and (round.alive or 0) <= 1)
-		Components.paintCut(stripCut, nil, if last then "gold.400" else "line.500")
+		stripLast = last == true
+		Shapes.paint(stripEdge, if stripLast then colour(SS.Last) else classColour)
 		local emphasis = fromEvent and HudLogic.emphasize(promptActive, HudMotion.reduced())
 		local before = lastStrip
 		-- Final two: one short emphasis when three became two in a fight, never when it started at two.
@@ -893,9 +1167,33 @@ function HudController:KnitStart()
 			and before.visible
 			and before.count ~= info.count
 			and fightingNow
-			and emphasis
+			and fromEvent
 		then
-			HudMotion.pop(countScale, 1.12, Tokens.motion.duration.base)
+			-- the mockup's count bump: 2.4 times and turned, settling on the spring
+			local function bumpCount()
+				if HudLogic.emphasize(promptActive, HudMotion.reduced()) then
+					Poster.run(stripCount, SS.BumpSeconds, function(t: number)
+						local spring = PosterEase.spring(t)
+						countScale.Scale = SS.BumpScale + (1 - SS.BumpScale) * spring
+						stripCount.Rotation = SS.BumpTurn * (1 - spring)
+					end)
+				end
+			end
+			-- Down to 5, 4, 3 or 2 standing: the last-players popup, and the count bumps as it flies into the
+			-- strip. Only when the count really fell to it in this fight, never on joining one already there.
+			local alive = tonumber(info.count)
+			local was = tonumber(before.count)
+			if
+				alive
+				and was
+				and alive < was
+				and lastPhase == "Fighting"
+				and Callouts.hasLast(alive)
+			then
+				Callouts.last(alive, device == "touch", bumpCount)
+			else
+				bumpCount()
+			end
 		end
 		lastStrip, lastPhase = info, round.phase
 	end
@@ -1072,8 +1370,6 @@ function HudController:KnitStart()
 		local image = ""
 		if device == "gamepad" and PAD_KEYS[key] then
 			image = UserInputService:GetImageForKeyCode(PAD_KEYS[key])
-		elseif key == "M1" then
-			image = HudTheme.Icons.mouse
 		end
 		glyph.Image = image
 		glyph.Visible = image ~= ""
@@ -1086,6 +1382,7 @@ function HudController:KnitStart()
 			local key = (actionById[id].keys :: any)[device] or ""
 			setCap(tile.capText, tile.capGlyph, key)
 			tile.cap.Visible = device ~= "touch"
+			tile.cap.BackgroundTransparency = if tile.capGlyph.Visible then 1 else 0
 		end
 		if device == "gamepad" then
 			setCap(helpCapText, helpCapGlyph, "SELECT")
@@ -1144,87 +1441,64 @@ function HudController:KnitStart()
 	end, false, Enum.ContextActionPriority.Low.Value, Enum.KeyCode.H, Enum.KeyCode.ButtonSelect)
 
 	-- Your character ---------------------------------------------------------------------------------
+	local function paintWord(now: number)
+		local say = HudLogic.staggerWord(now, lastRise, ST.RisingFor, recovering)
+		if say ~= shownWord then
+			shownWord = say
+			status.Text = say
+		end
+	end
+
+	-- The mockup's hit: the number comes in 1.8 times its size, turned 10 degrees, and settles on the spring
+	-- over 0.6 s; the plate shakes for 0.32 s (three knocks, each eased). Neither plays under Reduced Motion.
+	local SHAKE_X = { { 0, -10 }, { 0.35, 8 }, { 0.7, -4 }, { 1, 0 } }
+	local SHAKE_Y = { { 0, 6 }, { 0.35, -5 }, { 0.7, 2 }, { 1, 0 } }
+	local function bump()
+		Poster.run(figureBox, ST.BumpSeconds, function(t: number)
+			local s = PosterEase.spring(t)
+			figureScale.Scale = ST.BumpScale + (1 - ST.BumpScale) * s
+			figureBox.Rotation = ST.BumpTurn * (1 - s)
+		end)
+		Poster.run(youPlate, ST.ShakeSeconds, function(t: number)
+			local k = L.YScale
+			youPlate.Position = plateRest
+				+ UDim2.fromOffset(
+					PosterEase.keyframes(SHAKE_X, t, PosterEase.ease) * k,
+					PosterEase.keyframes(SHAKE_Y, t, PosterEase.ease) * k
+				)
+		end)
+	end
+
 	local function setStagger(value: number, animate: boolean)
 		local before = stagger
 		stagger = value
 		local now = os.clock()
-		local shown = math.floor(value + 0.5)
-		if figure.Text ~= tostring(shown) then
-			figure.Text = tostring(shown)
-			-- the new figure rises 6 units into place (numbers move on events only)
-			if animate and not HudMotion.reduced() then
-				figureMove.PaddingTop = UDim.new(0, 12)
-				figure.TextTransparency = 0.6
-				HudMotion.play(
-					figureMove,
-					"swap",
-					{ PaddingTop = UDim.new(0, 0) },
-					"micro",
-					"enter"
-				)
-				HudMotion.play(figure, "swap", { TextTransparency = 0 }, "micro", "enter")
-			end
+		paintFigure()
+		-- white, then yellow, then pink, at the same shares of the maximum as the bar's thirds
+		local tier = HudLogic.staggerTier(value, STAGGER_MAX, ST.YellowShare, ST.PinkShare)
+		if tier ~= shownTier then
+			shownTier = tier
+			Poster.tintNumber(figure, colour(ST.Tone[tier]))
 		end
-		-- the band: white, then yellow from 40, then yellow -> red-orange from 70; the figure takes the same colour
-		local newBand = HudLogic.staggerBand(value, STAGGER_MAX)
-		bar.fill.BackgroundColor3 = if newBand == "critical"
-			then Color3.new(1, 1, 1)
-			elseif newBand == "rising" then colour("gold.400")
-			else colour("ivory.50")
-		barGradient.Enabled = newBand == "critical"
-		figure.TextColor3 = if newBand == "critical"
-			then colour("danger.600")
-			elseif newBand == "rising" then colour("gold.400")
-			else colour("ivory.50")
-		if newBand == "critical" and band ~= "critical" and animate then
-			if HudLogic.emphasize(promptActive, HudMotion.reduced()) then
-				HudMotion.pop(youPulse, 1.04, Tokens.motion.duration.base)
-			end
-		end
-		band = newBand
-		-- recovering (a drop after 3 s without a hit) shows the ghost of where it was; hit relief does not
 		if value > before then
 			lastRise = now
+			risingUntil = now + ST.RisingFor
 			recovering = false
-		elseif value < before then
-			if HudLogic.recovering(value, before, now, lastRise, staggerCfg.RecoveryDelay) then
-				if not recovering then
-					recovering = true
-					recoverFrom = before
-				end
+			if animate and HudLogic.emphasize(promptActive, HudMotion.reduced()) then
+				bump()
 			end
+		elseif
+			value < before
+			and HudLogic.recovering(value, before, now, lastRise, staggerCfg.RecoveryDelay)
+		then
+			-- recovering is a drop after the server's delay without a hit; hit relief is not
+			recovering = true
 		end
 		if value <= 0 then
 			recovering = false
 		end
-		local ghost = bar.ghost :: Frame
-		ghost.Visible = recovering
-		ghost.BackgroundColor3 = bar.fill.BackgroundColor3
-		ghost.Size = UDim2.fromScale(math.clamp(recoverFrom / STAGGER_MAX, 0, 1), 1)
-		drainTick.Visible = recovering
-		-- the status word, so the band is never colour alone: CRITICAL wins over RECOVERING, that over RISING
-		if newBand == "critical" then
-			status.Text = "CRITICAL"
-			status.TextColor3 = colour("danger.600")
-		elseif recovering then
-			status.Text = "RECOVERING"
-			status.TextColor3 = colour("teal.400")
-		elseif newBand == "rising" then
-			status.Text = "RISING"
-			status.TextColor3 = colour("gold.400")
-		else
-			status.Text = ""
-		end
-		-- what this stagger does to you: the knockback the next hit will use
-		local mult = HudLogic.multiplierText(Combat.staggerMultiplier(staggerCfg :: any, value))
-		knock.Text = `{mult}<font color="{Tokens.hex["stone.300"]}">x</font> knockback`
-		speedNotch.Position =
-			UDim2.fromScale(Combat.staggerSpeedShare(staggerCfg :: any, value), 0.5)
-		speedNotch.Visible = value > 0
-		-- the bar catches up from wherever it is now, so quick hits move toward the newest value
-		barFrom = HudLogic.catchUp(barFrom, barTo, now - barSince, Tokens.motion.duration.quick)
-		barTo = value / STAGGER_MAX
-		barSince = if animate and not HudMotion.reduced() then now else -math.huge
+		paintWord(now)
+		paintSegments(animate, false)
 	end
 
 	local function onCharacter(model: Model)
@@ -1234,10 +1508,8 @@ function HudController:KnitStart()
 		table.clear(charConns)
 		character = model
 		-- Nothing from a previous life carries over.
-		stagger, barFrom, barTo, barSince = 0, 0, 0, -math.huge
-		gaugeShown, overShown = 0, 0
-		band, recovering, lastRise = "calm", false, -math.huge
-		figure.Text = ""
+		stagger = 0
+		recovering, lastRise, risingUntil = false, -math.huge, nil
 		setStagger((model:GetAttribute("HT_Stagger") or 0) :: number, false)
 		table.insert(
 			charConns,
@@ -1265,21 +1537,21 @@ function HudController:KnitStart()
 	end
 
 	-- Press and result feedback ----------------------------------------------------------------------
+	-- used: the mockup squashes the tile to 1.25 wide by 0.6 tall and springs it back over 0.5 s. Roblox can't
+	-- stretch a tile's contents unevenly, so it shrinks evenly by the same area and springs back the same way.
 	local function press(tile: Tile)
-		HudMotion.pressDown(tile.scale, 0.94)
-		task.delay(Tokens.motion.duration.press, function()
-			HudMotion.pressUp(tile.scale)
+		Poster.run(tile, TT.UsedSeconds, function(t: number)
+			tile.scale.Scale = TT.UsedScale + (1 - TT.UsedScale) * PosterEase.spring(t)
+			tile.box.Rotation = 0
 		end)
 	end
+	-- refused: the mockup's `nope`, 6 units left then right in 0.18 s; the tile's flag already says why
+	local NOPE = { { 0, 0 }, { 0.25, -TT.Nudge }, { 0.75, TT.Nudge }, { 1, 0 } }
 	local function refuse(tile: Tile)
-		tile.cap.BackgroundColor3 = colour("danger.600")
-		HudMotion.play(
-			tile.cap,
-			"blocked",
-			{ BackgroundColor3 = colour(tile.capTone) },
-			"release",
-			"enter"
-		)
+		Poster.run(tile.box, TT.NudgeSeconds, function(t: number)
+			tile.box.Position = tile.rest
+				+ UDim2.fromOffset(PosterEase.keyframes(NOPE, t, PosterEase.ease), 0)
+		end)
 	end
 	local function word(tile: Tile, say: string, tone: string)
 		tile.word.Text = say
@@ -1352,9 +1624,18 @@ function HudController:KnitStart()
 		return cover, (cover :: Frame):FindFirstChild("Seconds") :: TextLabel?
 	end
 
-	-- THE LOOP: one connection, no tweens started here except on state changes ---------------------------
+	-- MEASURING: set the player attribute HT_HudProfile to true and this loop publishes its own cost once a
+	-- second as HT_HudMs (average milliseconds per frame). Off, it costs one test a frame.
+	local profiling = false
+	local profileSum, profileFrames, profileSince = 0, 0, 0
+	player:GetAttributeChangedSignal("HT_HudProfile"):Connect(function()
+		profiling = player:GetAttribute("HT_HudProfile") == true
+		profileSum, profileFrames, profileSince = 0, 0, os.clock()
+	end)
+
+	-- THE LOOP: one connection. Nothing is tweened or written here unless a state or a shown value changed.
 	local lastCountdown = ""
-	RunService.RenderStepped:Connect(function(dt: number)
+	RunService.RenderStepped:Connect(function()
 		local now = os.clock()
 		local model = character
 		-- Priority: a timed kick cue or a clash steps you and your kit back. Checked every frame, because the
@@ -1367,27 +1648,14 @@ function HudController:KnitStart()
 		end
 
 		if model then
-			-- Stagger bar catch-up, and the teal tick at the fill's edge while recovering.
-			local share =
-				HudLogic.catchUp(barFrom, barTo, now - barSince, Tokens.motion.duration.quick)
-			share = math.clamp(share, 0, 1)
-			bar.fill.Size = UDim2.fromScale(share, 1)
-			bar.fill.Visible = share > 0.002
-			if recovering then
-				drainTick.Position = UDim2.fromScale(share, 0.5)
+			-- RISING lasts a moment after a gain, then the word settles.
+			if risingUntil and now >= risingUntil then
+				risingUntil = nil
+				paintWord(now)
 			end
 
-			-- Speed: the bar follows smoothly; past normal running, the short segment fills.
-			local base, over = HudLogic.speedGauge(hud.speed, moveCfg.MaxSpeed, S.GaugeOverSpeed)
-			local follow = math.min(T.GaugeRate * dt, 1)
-			gaugeShown += (base - gaugeShown) * follow
-			overShown += (over - overShown) * follow
-			speedBase.fill.Size = UDim2.fromScale(gaugeShown, 1)
-			speedBase.fill.Visible = gaugeShown > 0.01
-			speedOver.fill.Size = UDim2.fromScale(overShown, 1)
-			speedOver.fill.Visible = overShown > 0.01
-
 			-- Each action from its own real timing.
+			local stunned = model:GetAttribute("HT_Stunned") ~= nil
 			local blocked = model:GetAttribute("HT_Stunned") ~= nil
 				or model:GetAttribute("HT_Air") == "hold"
 				or model:GetAttribute("HT_Clash") ~= nil
@@ -1440,10 +1708,15 @@ function HudController:KnitStart()
 				local timing = (timings :: any)[id]
 				local state = HudLogic.actionState(now, timing.readyAt, timing.usable)
 				local tile = tiles[id]
-				paintTile(tile, state, id == "uppercut" and holding)
+				paintTile(tile, state, id == "uppercut" and holding, stunned)
 				local left = HudLogic.cooldownLeft(now, timing.readyAt, timing.total)
-				if state == "recovering" then
-					tile.shadeClip.Size = UDim2.fromScale(1, left)
+				if tile.state == "recovering" then
+					-- the fill rises a whole unit at a time, so most frames write nothing
+					local shown = math.floor((1 - left) * tile.riseFull + 0.5)
+					if shown ~= tile.riseShown then
+						tile.riseShown = shown
+						tile.riseClip.Size = UDim2.new(1, 0, 0, shown)
+					end
 				end
 				-- the seconds left: tenths under ten seconds, whole seconds above
 				local wait = timing.readyAt - now
@@ -1552,7 +1825,17 @@ function HudController:KnitStart()
 			local info = HudLogic.strip(readRound(), workspace:GetServerTimeNow())
 			if info.count and info.count ~= lastCountdown then
 				lastCountdown = info.count
+				stripCountSlot.Text = info.count
 				stripCount.Text = info.count
+			end
+		end
+
+		if profiling then
+			profileSum += os.clock() - now
+			profileFrames += 1
+			if now - profileSince >= 1 then
+				player:SetAttribute("HT_HudMs", profileSum / profileFrames * 1000)
+				profileSum, profileFrames, profileSince = 0, 0, now
 			end
 		end
 	end)

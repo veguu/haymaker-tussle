@@ -1,6 +1,6 @@
 --!strict
 -- UltimateController - the ultimate on this client (2026-11-15; server UltimateService, choreography
--- Core/Ultimates, looks Fx/UltimateFx and Fx/ImpactFrame, meter Ui/UltimateMeter).
+-- Core/Ultimates, looks Fx/UltimateFx and Fx/ImpactFrame, notice and badge Ui/UltimateNotice).
 --
 -- G (gamepad DPadUp, a touch button) inside the follow-up window asks for it; nothing else does.
 -- When one starts (UltimateStarted), every client plays its cues and the attacker's swings. If this client
@@ -17,7 +17,7 @@ local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Ultimates = require(ReplicatedStorage.Shared.Core.Ultimates)
-local UltimateMeter = require(script.Parent.Parent.Ui.UltimateMeter)
+local UltimateNotice = require(script.Parent.Parent.Ui.UltimateNotice)
 local SoundPicker = require(script.Parent.Parent.Ui.SoundPicker)
 local CutsceneScreen = require(script.Parent.Parent.Fx.CutsceneScreen)
 local UltimateFx = require(script.Parent.Parent.Fx.UltimateFx)
@@ -50,21 +50,21 @@ function UltimateController:KnitStart()
 	local windowRemote = Net.client("UltimateWindow")
 	local startedRemote = Net.client("UltimateStarted")
 	local anim = Knit.GetController("AnimController")
-	UltimateMeter.start()
+	UltimateNotice.start()
 	SoundPicker.start()
 
 	local windowUntil = 0
 	if windowRemote then
 		windowRemote.OnClientEvent:Connect(function(_target: Model, seconds: number)
 			windowUntil = os.clock() + seconds
-			UltimateMeter.prompt(seconds)
+			UltimateNotice.prompt(seconds)
 		end)
 	end
 
 	ContextActionService:BindAction(ACTION, function(_name: string, inputState: Enum.UserInputState)
 		if inputState == Enum.UserInputState.Begin and os.clock() <= windowUntil and request then
 			windowUntil = 0
-			UltimateMeter.hidePrompt()
+			UltimateNotice.hidePrompt()
 			request:FireServer()
 		end
 		return Enum.ContextActionResult.Pass
@@ -87,7 +87,7 @@ function UltimateController:KnitStart()
 			if not attacker or not target then
 				return
 			end
-			UltimateMeter.hidePrompt()
+			UltimateNotice.hidePrompt()
 			local line = Ultimates.timeline(kit)
 			if not line then
 				return

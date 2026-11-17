@@ -47,70 +47,97 @@ HudTheme.Transparency = {
 HudTheme.Scale = { Reference = Vector2.new(1280, 720), Min = 1, Max = 1.35, Bottom = 0.82 }
 
 HudTheme.Size = {
-	Edge = 16, -- inset from the screen's edges (inside the safe area)
-	Notch = 10, -- the angled corner cut
-	AccentBar = 3,
-	-- Top strip: round state and survivors.
-	StripWidth = 260,
-	StripHeight = 52,
-	StripTop = 6,
-	ShrinkWidth = 160,
-	ShrinkHeight = 24,
-	-- Bottom centre: your stagger (the big one) and speed under it.
-	VitalsWidth = 360,
-	VitalsHeight = 72,
-	StaggerBarWidth = 246,
-	StaggerBar = 10,
-	GaugeBase = 62, -- width of the gauge up to normal running speed
-	GaugeOver = 30, -- width of the part past it (up to GaugeOverSpeed)
-	GaugeOverSpeed = 120, -- studs/s at the end of the gauge: past a propel, most launches
-	GaugeHeight = 4,
-	-- Bottom right: the three combat actions, one row each, in fixed columns with 8 px or more between
-	-- them. Mirrored in design/ui/hud_layout.json for the roblox-ui checker (verify_ui.py).
-	ActionsWidth = 268,
-	ActionRow = 34,
-	ActionPad = 8,
-	ActionIconX = 12, -- icon column
-	ActionNameX = 46, -- name column
-	ActionNameWidth = 78,
-	ActionKeyX = 132, -- key cap column
-	ActionKeyWidth = 58,
-	ActionStatusWidth = 58, -- reserved for "15.0s", so nothing moves as the digits change
-	ActionLine = 2, -- the cooldown progress line under a row
-	-- The help chip above the actions, and the full guide it opens.
+	Edge = 16, -- inset from the screen's edges (inside the safe area); the corner buttons use it
+	-- The help chip above the skill tiles, and the full guide it opens.
 	HelpHeight = 26,
 	HelpWidth = 150,
 	GuideWidth = 320,
 	GuideRow = 28,
-	-- Ring-out feed.
-	FeedWidth = 250,
-	FeedHeight = 34,
-	-- Target chip, above their head.
-	ChipWidth = 120,
-	ChipHeight = 32,
+	-- The target marker, above their head.
 	ChipMaxDistance = 70,
 	TargetRange = 22, -- with no lock-on: nearest opponent ahead within this many studs
 }
 
 HudTheme.Time = {
-	Enter = 0.18, -- groups fading in
-	EnterTravel = 8, -- pixels they rise while they do
-	Exit = 0.12,
-	PressDown = 0.04,
-	PressUp = 0.06,
-	PressScale = 0.96,
-	StaggerCatchUp = 0.15,
-	StaggerAccent = 0.22,
-	StaggerAccentGain = 8, -- a gain this big gets the one short accent
-	ReadyFlash = 0.18,
-	ResultWord = 0.4, -- HIT / MISS beside Punch
+	ResultWord = 0.4, -- HIT / MISS above Punch
 	Emphasis = 0.3, -- final two, arena closing
 	EmphasisScale = 1.12,
 	Feed = 2, -- how long a ring-out line stays
-	GaugeRate = 14, -- how quickly the momentum gauge follows, per second
-	DigitHysteresis = 0.8,
-	DigitHz = 10, -- most redraws per second of the speed digits
-	Steps = 0.15, -- stepping back for a prompt
+}
+
+-- THE FIGHT-POSTER HUD (2026-11-16; the approved mockup is the vault's UI Research/fight-poster-prototype.html).
+-- The owner: "I want it to look EXACTLY like it". Places and sizes are in HudController's `L`, in the mockup's own
+-- pixels; the colours (token names), steps and timings are here, copied from the mockup's CSS. Motion runs on the
+-- mockup's own curves (Core/PosterEase), not on TweenService's.
+
+-- Your stagger: a slanted ink plate with your class colour on its left edge, a big slanted number, the
+-- knockback it means, one word, and a 12-segment bar. It is NOT health: no health or damage wording.
+-- The number and the bar go white, then yellow, then pink at the same shares of the maximum. The mockup's
+-- meter ran 0 to 150 with steps at 50 and 100; those are the same thirds of this game's maximum.
+HudTheme.Stagger = {
+	Plate = "ink.900",
+	Segments = 12,
+	YellowShare = 1 / 3,
+	PinkShare = 2 / 3,
+	Tone = { white = "ivory.50", yellow = "gold.400", pink = "danger.600" },
+	SegmentOff = "poster.unlit",
+	Label = "ivory.50",
+	Text = "ivory.50",
+	RisingFor = 0.8, -- seconds the word says RISING after a gain
+	-- a gain (the mockup's `bump` and `shk`): the number comes in at BumpScale, turned BumpTurn degrees, and
+	-- settles on the spring; the plate shakes. Neither plays under Reduced Motion.
+	BumpScale = 1.8,
+	BumpTurn = -10,
+	BumpSeconds = 0.6,
+	ShakeSeconds = 0.32,
+	SegmentSeconds = 0.3, -- a segment growing or shrinking, on the pop curve
+}
+
+-- The skill tiles: a rough-cut tile with an ink outline and a hard shadow. Three states, each a different
+-- SHAPE and WORD as well as a colour:
+--   ready     the tile in your class colour (Jump and Punch in light violet), a READY flag with a tick;
+--   cooling   dark, a fill rising from the bottom, the seconds left;
+--   can't use dark with stripes, a slash across it and a flag that says why.
+HudTheme.Tile = {
+	Line = "ink.900",
+	LineHeld = "ivory.50", -- the attack skill while its key is held (not in the mockup)
+	Dark = "poster.dark",
+	Stripe = "poster.stripe",
+	Quiet = "violet.400", -- Jump and Punch when ready
+	OnBright = "ink.900", -- lettering on a class colour or light violet
+	OnDark = "ivory.50",
+	OnBlocked = "ivory.50", -- the can't-use flag's lettering, as the mockup has it
+	Ready = "teal.400",
+	Blocked = "danger.600",
+	FillShade = 0.45, -- the rising fill is the class colour mixed this far to black
+	Shadow = { tone = "ink.900", transparency = 0.15, x = 5, y = 6 },
+	-- coming off cooldown (`spop`): in at PopScale, turned PopTurn degrees, settling on the spring
+	PopScale = 1.6,
+	PopTurn = 10,
+	PopSeconds = 0.7,
+	-- used (`sq`): the mockup squashes to 1.25 x 0.6; an even shrink of the same area stands in for it
+	UsedScale = 0.87,
+	UsedSeconds = 0.5,
+	-- refused (`nope`)
+	Nudge = 6,
+	NudgeSeconds = 0.18,
+	WordReady = "READY",
+	WordStunned = "STUNNED",
+	WordBlocked = "CAN'T USE",
+}
+
+-- The strip at the top centre: a slanted ink plate with your class colour under it, the count in yellow.
+HudTheme.Strip = {
+	Plate = "ink.900",
+	Count = "gold.400",
+	Word = "ivory.50",
+	Last = "gold.400", -- the edge, for the final two and the last one
+	Warning = "danger.600", -- the ARENA CLOSING chip
+	OnWarning = "ink.950",
+	-- the count changing in a fight (`sb`)
+	BumpScale = 2.4,
+	BumpTurn = -10,
+	BumpSeconds = 0.55,
 }
 
 -- The HUD's four action icons, by action id, from the one icon list (Ui/Icons; all placeholders there).
@@ -119,16 +146,14 @@ HudTheme.Icons = {
 	propel = Icons.id("dash"), -- Q, the class's move
 	kick = Icons.id("jump"),
 	uppercut = Icons.id("punch"), -- R, the class's attack
-	mouse = "rbxassetid://118394725313773",
 }
 
--- The combat actions, in the order they're listed, with their bindings per device and the
--- touch button each mirrors. "M1" draws a mouse.
+-- The combat actions, with their bindings per device and the touch button each mirrors.
 HudTheme.Actions = {
 	{
 		id = "punch",
 		name = "Punch",
-		keys = { mouse = "M1", gamepad = "R2" },
+		keys = { mouse = "Click", gamepad = "R2" },
 		touchAction = "HaymakerPunch",
 	},
 	{
@@ -146,7 +171,7 @@ HudTheme.Actions = {
 	{
 		id = "kick",
 		name = "Jump",
-		keys = { mouse = "SPACE", gamepad = "Y" },
+		keys = { mouse = "Space", gamepad = "Y" },
 		touchAction = "HaymakerKick",
 	},
 }

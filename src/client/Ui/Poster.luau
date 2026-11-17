@@ -1,0 +1,207 @@
+--!strict
+-- Poster - what every fight-poster screen needs to match the approved mockup (the vault's UI Research/
+-- fight-poster-prototype.html) to the pixel: text at the mockup's own sizes, the slanted number, and motion on the
+-- mockup's own curves.
+--
+-- TEXT. A browser's "15px" and Roblox's TextSize 15 are not the same height: Roblox counts the whole line, a
+-- browser the em. Measured 2026-11-16 by setting the same strings in both: Oswald needs 1.463 x the CSS size and
+-- Titillium Web 1.508 x. Poster.text takes the MOCKUP'S pixel size and a scale and does the sum. Roblox has no
+-- letter spacing, so the mockup's tracked labels come out a little tighter here.
+--
+-- NUMBER. Roblox has no slanted Oswald, so the stagger number is drawn from a sheet of digits the browser itself
+-- rendered (Ui/Shapes.digits).
+--
+-- MOTION. Poster.run drives anything from 0 to 1 over a time on one shared frame connection that exists only
+-- while something is moving; the caller shapes it with Core/PosterEase (the mockup's spring and pop). Under
+-- Reduced Motion a run jumps straight to its end.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Tokens = require(ReplicatedStorage.Shared.Tokens)
+local Typography = require(ReplicatedStorage.Shared.Typography)
+local HudMotion = require(script.Parent.HudMotion)
+local Shapes = require(script.Parent.Shapes)
+
+local Poster = {}
+
+export type Face = "display" | "label"
+
+local ROLE: { [string]: string } = { display = "poster.display", label = "poster.label" }
+local FACTOR: { [string]: number } = { display = 1.463, label = 1.508 }
+
+--- Roblox's TextSize for a text the mockup sets at `css` pixels in `face`.
+function Poster.px(css: number, face: Face): number
+	return math.max(1, math.floor(css * FACTOR[face] + 0.5))
+end
+
+--- A label in one of the poster's two faces at the mockup's pixel size. Left-aligned, centred vertically, no
+--- background, like Components.text.
+function Poster.text(
+	parent: Instance?,
+	face: Face,
+	css: number,
+	tone: string,
+	props: { [string]: any }?
+): TextLabel
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.TextColor3 = Tokens.colour(tone)
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.TextYAlignment = Enum.TextYAlignment.Center
+	label.Text = ""
+	Typography.apply(label, ROLE[face])
+	label.TextSize = Poster.px(css, face)
+	for key, value in props or {} do
+		(label :: any)[key] = value
+	end
+	label.Parent = parent
+	return label
+end
+
+--- Changes a poster label's size to another mockup pixel size.
+function Poster.resize(label: TextLabel, face: Face, css: number)
+	label.TextSize = Poster.px(css, face)
+end
+
+-- THE NUMBER -----------------------------------------------------------------------------------------
+
+export type Number = {
+	frame: Frame,
+	digits: { ImageLabel },
+	size: number,
+	width: number,
+	text: string,
+}
+
+--- A slanted number of up to `places` digits, drawn from the digit sheet. `frame` is a clear box whose top-left
+--- is where the mockup's number box starts; set it with Poster.setNumber.
+function Poster.number(parent: Instance?, places: number, props: { [string]: any }?): Number
+	local frame = Instance.new("Frame")
+	frame.BackgroundTransparency = 1
+	frame.BorderSizePixel = 0
+	local digits = {}
+	for index = 1, places do
+		local image = Instance.new("ImageLabel")
+		image.Name = `Digit{index}`
+		image.BackgroundTransparency = 1
+		image.Image = Shapes.ids.digits
+		image.ImageRectSize = Shapes.digits.cell
+		image.Visible = false
+		image.Parent = frame
+		digits[index] = image
+	end
+	for key, value in props or {} do
+		(frame :: any)[key] = value
+	end
+	frame.Parent = parent
+	return { frame = frame, digits = digits, size = 0, width = 0, text = "" }
+end
+
+--- Shows `text` (digits only) at the mockup's `css` font size, with the digits' baseline `baseline` units below
+--- the frame's top. Returns the width the number takes, as the browser would lay it out.
+function Poster.setNumber(number: Number, text: string, css: number, baseline: number): number
+	if number.text == text and number.size == css then
+		return number.width
+	end
+	local sheet = Shapes.digits
+	local scale = css / sheet.font
+	local cell = UDim2.fromOffset(sheet.cell.X * scale, sheet.cell.Y * scale)
+	local pen = 0
+	for index, image in number.digits do
+		local digit = tonumber(string.sub(text, index, index))
+		if digit then
+			image.ImageRectOffset =
+				Vector2.new(digit % 5 * sheet.cell.X, math.floor(digit / 5) * sheet.cell.Y)
+			image.Size = cell
+			image.Position =
+				UDim2.fromOffset(pen - sheet.origin * scale, baseline - sheet.baseline * scale)
+			image.Visible = true
+			pen += sheet.advance[digit + 1] * css / 100 + sheet.tracking * css
+		else
+			image.Visible = false
+		end
+	end
+	number.text, number.size, number.width = text, css, pen
+	return pen
+end
+
+function Poster.tintNumber(number: Number, colour: Color3)
+	for _, image in number.digits do
+		image.ImageColor3 = colour
+	end
+end
+
+-- MOTION ---------------------------------------------------------------------------------------------
+
+type Job = { started: number, seconds: number, step: (number) -> (), done: (() -> ())? }
+
+local jobs: { [any]: Job } = {}
+local count = 0
+local connection: RBXScriptConnection? = nil
+
+local function tick()
+	local now = os.clock()
+	for key, job in jobs do
+		local t = (now - job.started) / job.seconds
+		if t >= 1 then
+			jobs[key] = nil
+			count -= 1
+			job.step(1)
+			if job.done then
+				job.done()
+			end
+		elseif t >= 0 then
+			-- (before its delay is up a run does nothing at all, like a CSS animation that has not started)
+			job.step(t)
+		end
+	end
+	if count <= 0 and connection then
+		connection:Disconnect()
+		connection = nil
+		count = 0
+	end
+end
+
+--- Calls `step(t)` every frame with t running 0 to 1 over `seconds` (starting after `delay`), then `done`. A new run
+--- with the same `key` replaces the old one without finishing it. Under Reduced Motion, or with no time, it
+--- calls step(1) at once.
+function Poster.run(
+	key: any,
+	seconds: number,
+	step: (number) -> (),
+	done: (() -> ())?,
+	delay: number?
+)
+	if jobs[key] then
+		jobs[key] = nil
+		count -= 1
+	end
+	if seconds <= 0 or HudMotion.reduced() then
+		step(1)
+		if done then
+			done()
+		end
+		return
+	end
+	jobs[key] = { started = os.clock() + (delay or 0), seconds = seconds, step = step, done = done }
+	count += 1
+	if not connection then
+		connection = RunService.RenderStepped:Connect(tick)
+	end
+end
+
+--- Stops a run where it is.
+function Poster.stop(key: any)
+	if jobs[key] then
+		jobs[key] = nil
+		count -= 1
+	end
+end
+
+--- Whether a run with this key is going.
+function Poster.running(key: any): boolean
+	return jobs[key] ~= nil
+end
+
+return Poster

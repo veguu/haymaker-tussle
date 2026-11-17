@@ -39,6 +39,9 @@ local BLACK = Color3.new(0, 0, 0)
 local DARK_SHARE = 0.72
 local MARK_SOLID = 0.08
 local PITCH_VARY = 0.08
+-- Our own M1 takes (kits-7a) were picked at their designed pitch: vary them only a little (+-3 %; game punches
+-- use +-3-5 %, wider reads as a different sound). The three takes already differ.
+local M1_PITCH_VARY = 0.03
 -- An M1 landing is ONE role, m1_hit, and a launching hit m1_finish, each with its layers (Config/SoundCandidates:
 -- the user picks them with the sound picker, P in Studio). Round 3 (kits-5e): a sub thump, a crack and a smack.
 local PARK_POSITION = CFrame.new(0, -1000, 0)
@@ -247,7 +250,7 @@ function FxController:HitBurst(target: Model, attacker: Model?, strength: number
 
 	-- The punch (m1_hit); a strong hit (the launch) is the finisher (m1_finish, with its long tail) and the
 	-- launch's whoosh.
-	Sfx.playLayered(if strong then "m1_finish" else "m1_hit", root, PITCH_VARY)
+	Sfx.playLayered(if strong then "m1_finish" else "m1_hit", root, M1_PITCH_VARY)
 	if strong then
 		Sfx.play("launch", root, PITCH_VARY)
 		-- Smoke left along the flight path, so a big launch is readable across the arena (Fx/AirFx).
@@ -1064,7 +1067,7 @@ function FxController:KitHit(target: Model, attacker: Model?, side: string, stre
 		return
 	end
 	-- The same finisher as a string's launching hit (m1_finish), and the launch's whoosh.
-	Sfx.playLayered("m1_finish", root, PITCH_VARY)
+	Sfx.playLayered("m1_finish", root, M1_PITCH_VARY)
 	Sfx.play("launch", root, PITCH_VARY)
 	-- Smoke left along the flight path, so the throw is readable across the arena.
 	AirFx.trail(root, cfg.TrailPuffs * cfg.TrailPuffSeconds)

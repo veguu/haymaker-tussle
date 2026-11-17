@@ -1970,4 +1970,30 @@ gates pass (498, Tokens x2 the teammate's). Field Notes Sound Design Pitfalls se
 Build stamp `kits-6f+lobby-4+ui-4`. NOT committed. The user picked ult_haymaker B, "Star Platinum Punch 1" (reelx1ty,
 community; attack 0.02 s, peak 663 at 0.17 s, start 0.13, volume 1.6). All Haymaker Rush sounds are SoundBank
 entries now (ult_rush Itadori's punch JJK, ult_haymaker Star Platinum Punch 1, ult_bed PSE Hollow Rumble 2);
-SoundCandidates is empty and the picker hides. Gates pass (498, Tokens x2 the teammate's).
+SoundCandidates is empty and the picker hides. Gates pass (498, Tokens x2 the teammate's).## kits-7a (2026-11-17): our own M1 and heavy-hit sounds, from Sonniss GDC 2026 recordings
+Build stamp `kits-7a+lobby-4+ui-6c` (disk and place match). NOT committed.
+- The user wants sounds MADE for the game, not picked. Synthesis failed four rounds ("a slap", "drums", vocoder
+  rebuilds "kinda ok"); an in-depth study (vault `07 Lighting VFX and Audio\Punch Sound Design - References vs
+  Synthesized Attempts, Measured.md`, Field Notes Sound Design Pitfalls 10-12) led to RECORDED layers: the free
+  Sonniss GDC 2026 bundle (350 files, 7.5 GB) is in `C:\Users\spicy\SFX Library\Sonniss GDC 2026` (outside OneDrive).
+- Picks (all in `sfx-lab\final`, PICKS.md says how each was built; build scripts `sfx-lab\build_round6.sh`, `_round7.sh`;
+  tools `sfx-lab\tools\` hitstat/onsets/subpitch/vocode/zipindex): m1_hit = three takes (swing-thud on a recorded body
+  punch), m1_finish = one heavy swing-thud (-8 %), ult_haymaker = "K1" heavy hit (dry snap + thud + fireworks
+  explosion swept 9 kHz -> 700 Hz + mono trailer-boom sub + bass downer + ice debris). K2 (spare_heavy_crunch.wav)
+  kept for something else. Rejected: gore crack ("too wet": no gore/splat sources), thud+boom heavies.
+- Uploaded with Open Cloud to the game's GROUP 2970443 (the game is group-owned): m1_hit 130927601371508,
+  87488745275206, 132785756805885; m1_finish 72542289493940; ult_haymaker 120198385193140. Moderation: approved.
+- Code: SoundBank m1_hit / m1_finish (one file per hit, no layers, start 0), ult_haymaker (volume 1.4);
+  FxController M1_PITCH_VARY 0.03 (was 0.08). Gates pass (498, Tokens x2 the teammate's).
+- VERIFIED in a play test: stamps kits-7a+...+ui-6c on server and client; all five sounds load (0.45 s / 2.6 s) and
+  play (PlaybackLoudness peaks ~375-395 M1, 550 heavy). NOT VERIFIED: the feel in a real M1 string or the ultimate
+  (the user plays it); levels against the other game sounds.
+- THE PLACE WAS AHEAD OF GIT AGAIN, now SAVED: the teammate's ui-5..ui-6c (changed Abilities, HudLogic, TypeRoles,
+  Tokens, Typography, HudController, UltimateController, HudTheme; new VoiceLines, PosterEase, Ui/Callouts, Ui/Poster,
+  Ui/Shapes, Ui/UltimateNotice; Ui/UltimateMeter removed). kits-7a was first patched into the place by targeted edits
+  (ScriptEditorService), then every differing script was dumped with chunked execute_luau results (each just under
+  Studio MCP's 100,000-character cap, so they land in tool-results files, not in context) and written by
+  `lune/save_from_place.luau`. Checksums (`lune/script_hashes.luau` vs the place): 0 differ, 0 missing either way.
+  Rojo Connect is safe again (check the stamp first anyway). Gates: build OK, 497 pass, 3 fail, all the teammate's
+  (HudLogic.spec x2: their HudLogic changed, their spec is probably on their PC; Tokens.spec x1); selene/stylua clean.
+  A local Save-to-File copy (Downloads\game2.rbxl) can't be read by Lune 0.8.9 (new compression).

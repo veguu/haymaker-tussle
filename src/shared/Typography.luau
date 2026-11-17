@@ -17,6 +17,7 @@ Typography.FAMILIES = {
 	text = Tokens.family.text,
 	display = Tokens.family.display,
 	mono = Tokens.family.mono,
+	poster = Tokens.family.poster,
 }
 
 -- The reading family. Role-less text is moved onto it by adopt().

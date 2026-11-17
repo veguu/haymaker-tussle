@@ -33,6 +33,7 @@ TypeRoles.AVAILABLE = {
 	text = { 200, 300, 400, 600, 700, 900 }, -- Titillium Web (measured 2026-11-16: no 500, no 800)
 	display = { 200, 300, 400, 600, 700, 900 }, -- Titillium Web again: Black is its 900
 	mono = { 300, 400, 700 }, -- Builder Mono
+	poster = { 200, 300, 400, 500, 600, 700 }, -- Oswald (measured 2026-11-16: no slanted faces)
 }
 
 -- old role -> new role, and the old size it keeps (Technical Architecture 3.3).
@@ -104,7 +105,7 @@ function TypeRoles.resolve(Tokens: TokenSet, name: string): Resolved
 		size = math.max(if alias then alias.size else role.size, Tokens.textFloor),
 		lineHeight = math.max(role.lineHeight, 1),
 		italic = role.italic == true,
-		scalable = prefix ~= "numeral" and prefix ~= "display",
+		scalable = prefix ~= "numeral" and prefix ~= "display" and prefix ~= "poster",
 	}
 end
 

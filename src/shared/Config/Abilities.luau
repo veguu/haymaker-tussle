@@ -8,7 +8,7 @@
 -- it isn't made yet. To make one real: write its client handler in AbilityController.HANDLERS (and a
 -- server check if it touches anyone), then set `built = true`. Skill ids are unique across all kits.
 --
--- HUD names have room for about 9 characters (HudTheme.Size.ActionNameWidth).
+-- HUD names have room for about 9 characters (the skill tile is 96 units wide).
 
 export type Slot = "mobility" | "attack"
 

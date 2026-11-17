@@ -20,3 +20,10 @@ __pycache__/
 *.env
 .DS_Store
 Thumbs.db
+
+# Sound-design scratch (sfx-lab): test rounds and listening reels stay local; final/, tools/ and build scripts are kept
+sfx-lab/round*/
+sfx-lab/rebuilt/
+sfx-lab/*_reel.wav
+sfx-lab/*_reel_order.txt
+sfx-lab/*.wav

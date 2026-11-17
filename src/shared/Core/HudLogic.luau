@@ -1,8 +1,8 @@
 --!strict
 -- HudLogic - the HUD's rules as plain functions, so they can be tested without Studio: what state an
--- action tile is in, how full a cooldown is, how the speed gauge reads past normal running speed,
--- when a number changes enough to redraw, what the round strip says, and what a ring-out feed line
--- says. HudController only draws what these return.
+-- action tile is in, how full a cooldown is, which colour step and word your stagger shows and how many
+-- segments of its bar are lit, what the round strip says, and what a ring-out feed line says.
+-- HudController only draws what these return.
 
 local HudLogic = {}
 
@@ -23,26 +23,6 @@ function HudLogic.cooldownLeft(now: number, readyAt: number, total: number): num
 		return 0
 	end
 	return math.clamp((readyAt - now) / total, 0, 1)
-end
-
---- The momentum gauge: `base` fills to normal running speed, and `over` is how far past it, up to
---- `overMax`, for a propel or a launch. Both are 0 to 1.
-function HudLogic.speedGauge(speed: number, maxSpeed: number, overMax: number): (number, number)
-	local base = math.clamp(speed / math.max(maxSpeed, 0.001), 0, 1)
-	local over = 0
-	if speed > maxSpeed and overMax > maxSpeed then
-		over = math.clamp((speed - maxSpeed) / (overMax - maxSpeed), 0, 1)
-	end
-	return base, over
-end
-
---- The speed digits only move when the real speed is more than `hysteresis` away from what's shown,
---- so they hold still while running steadily instead of flickering between two numbers.
-function HudLogic.steadyDigits(shown: number, speed: number, hysteresis: number): number
-	if math.abs(speed - shown) > hysteresis or (speed < 0.5 and shown ~= 0) then
-		return math.floor(speed + 0.5)
-	end
-	return shown
 end
 
 --- Whether a stagger change earns the one short accent: only a real gain, of at least `threshold`.
@@ -162,6 +142,69 @@ function HudLogic.recovering(
 	delay: number
 ): boolean
 	return value < previous and now - lastRise >= delay
+end
+
+-- Fight-poster stagger readout (2026-11-16): a number, a 12-segment bar and one word ------------------------
+
+export type StaggerTier = "white" | "yellow" | "pink"
+
+--- The colour step of YOUR stagger number: white, then yellow from `yellowShare` of the max, then pink from
+--- `pinkShare`. The segmented bar uses the same shares, so the number and the bar never disagree.
+function HudLogic.staggerTier(
+	value: number,
+	max: number,
+	yellowShare: number,
+	pinkShare: number
+): StaggerTier
+	local share = value / math.max(max, 1)
+	if share >= pinkShare - 1e-9 then
+		return "pink"
+	elseif share >= yellowShare - 1e-9 then
+		return "yellow"
+	end
+	return "white"
+end
+
+--- How many of `count` segments are lit. Any stagger at all lights one, so the bar is never empty while the
+--- number is above zero.
+function HudLogic.segmentsLit(value: number, max: number, count: number): number
+	if value <= 0 then
+		return 0
+	end
+	local lit = math.floor(value / math.max(max, 1) * count + 0.5)
+	return math.clamp(lit, 1, count)
+end
+
+--- The colour step of segment `index` (1 = first) of `count`, by where the segment starts.
+function HudLogic.segmentTier(
+	index: number,
+	count: number,
+	yellowShare: number,
+	pinkShare: number
+): StaggerTier
+	local start = (index - 1) / math.max(count, 1)
+	if start >= pinkShare - 1e-9 then
+		return "pink"
+	elseif start >= yellowShare - 1e-9 then
+		return "yellow"
+	end
+	return "white"
+end
+
+--- The one word under the number: RISING for `risingFor` seconds after a gain, RECOVERING while it drains,
+--- STEADY otherwise. A fresh gain wins over recovering.
+function HudLogic.staggerWord(
+	now: number,
+	lastRise: number,
+	risingFor: number,
+	recovering: boolean
+): string
+	if now - lastRise < risingFor then
+		return "RISING"
+	elseif recovering then
+		return "RECOVERING"
+	end
+	return "STEADY"
 end
 
 return HudLogic

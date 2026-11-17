@@ -1,55 +1,65 @@
 --!strict
--- The "Ringside" design tokens (palette A "Ringside Night", picked by the owner 2026-11-16 from six; the look and
--- the navigation are in the vault's UI Research/ringside-prototype.html). They replace Voltline's Electric blue
--- (rejected: "the placeholder UI with different colours") and Golden Hour before it. Every colour, space, radius,
--- surface, motion and type number the interface uses: screens never use a literal; they read these. Pure data
--- at the top level (no Roblox globals) so Lune can load it for tests/Tokens.spec.luau.
+-- The "Fight Poster" design tokens (the owner's fourth direction, 2026-11-16: everything reworked from reference
+-- videos; the look is in the vault's UI Research/fight-poster-prototype.html and its colour-system card). They
+-- replace Ringside, Voltline and Golden Hour. Every colour, space, radius, surface, motion and type number the
+-- interface uses: screens never use a literal; they read these. Pure data at the top level (no Roblox globals)
+-- so Lune can load it for tests/Tokens.spec.luau.
 --
+-- ONE COLOUR SYSTEM (the owner: colours must complement each other, never a mix of unrelated hues):
+--   two neutrals: a deep VIOLET ink and a cream paper; three print inks with jobs; one light violet for quiet
+--   things; eight class colours as one warm-to-cool sweep at even brightness.
 -- THE TOKEN NAMES ARE JOBS, not paints (kept since Golden Hour so old screens follow every palette change):
 --   ink.*    surfaces: 950 the INK of every outline and lip, 900 panel, 800 sheet, 700 card, 600 well / header /
 --            empty track, 500 raised or picked card
---   ivory.*  text and neutral marks              stone.*  quiet and disabled text
---   coral.*  RED-ORANGE = the primary action (buy, do it), YOU, the tab or card you are on
---   teal.*   GREEN  = READY, equip, owned, on    gold.*   YELLOW = coins, the ultimate, rising stagger, wins
---   danger   PINK-RED = critical, warnings, close  line.*  500 = outline ink, 300 = the faint inner edge
---   violet   the gamepad focus ring (light blue)
+--   ivory.*  cream text and neutral marks        stone.*  quiet and disabled text (violet greys)
+--   coral.*  YELLOW = the primary action (buy, do it), YOU, the tab or card you are on. Same hue as gold on
+--            purpose: yellow is the opposite of the violet ink, so it is the loudest accent.
+--   teal.*   CYAN   = READY, equip, owned, on    gold.*   YELLOW = coins, the ultimate, rising stagger, wins
+--   danger   MAGENTA = critical, warnings, close line.*  500 = outline ink, 300 = the faint inner edge
+--   violet   LIGHT VIOLET = the gamepad focus ring and quiet controls
 
 local Tokens = {}
 
 Tokens.hex = {
-	["ink.950"] = "#05070A",
-	["ink.900"] = "#171C24",
-	["ink.800"] = "#1B212B",
-	["ink.700"] = "#222A36",
-	["ink.600"] = "#0E1116",
-	["ink.500"] = "#2C3645",
-	["stone.500"] = "#7C889B",
-	["stone.300"] = "#9AA6B8",
-	["ivory.200"] = "#DDE3EC",
-	["ivory.50"] = "#F4F6FA",
-	["coral.700"] = "#A82410",
-	["coral.500"] = "#FF4B2B",
-	["coral.300"] = "#FF8A73",
-	["teal.700"] = "#1C8F54",
-	["teal.400"] = "#35E08A",
-	["teal.200"] = "#9DF2C6",
-	["gold.600"] = "#B37F0C",
-	["gold.400"] = "#FFC83D",
-	["gold.200"] = "#FFE49A",
-	["danger.600"] = "#FF3B5C",
-	["line.500"] = "#05070A",
-	["line.300"] = "#3A4656",
-	["violet.400"] = "#7FD4FF",
-	-- one colour per class (from the kits-4 design: Base gold, Tempest cyan, Inferno orange, Frost ice blue,
-	-- Beast red, Dragon violet, Bruiser brown-gold, Trickster pink). Marks and card art only, never state.
-	["class.Base"] = "#F2C94C",
-	["class.Tempest"] = "#3FE0E0",
-	["class.Inferno"] = "#FF6A2B",
-	["class.Frost"] = "#6FB8FF",
-	["class.Beast"] = "#E0344B",
-	["class.Dragon"] = "#9B5CFF",
-	["class.Bruiser"] = "#C98A3C",
-	["class.Trickster"] = "#FF5FB8",
+	["ink.950"] = "#120C28",
+	["ink.900"] = "#1A1236",
+	["ink.800"] = "#211845",
+	["ink.700"] = "#2A2054",
+	["ink.600"] = "#130D2B",
+	["ink.500"] = "#3A2E6B",
+	["stone.500"] = "#9189BA",
+	["stone.300"] = "#B8B1DA",
+	["ivory.200"] = "#EDE7D6",
+	["ivory.50"] = "#FFFBEF",
+	["coral.700"] = "#B38F00",
+	["coral.500"] = "#FFD426",
+	["coral.300"] = "#FFE680",
+	["teal.700"] = "#0E8FB3",
+	["teal.400"] = "#21D4FD",
+	["teal.200"] = "#A6ECFF",
+	["gold.600"] = "#B38F00",
+	["gold.400"] = "#FFD426",
+	["gold.200"] = "#FFEE99",
+	["danger.600"] = "#FF4D9E",
+	["line.500"] = "#120C28",
+	["line.300"] = "#4A3F7A",
+	["violet.400"] = "#C9BEFF",
+	-- the fight-poster mockup's own darks, used as drawn there: a skill tile that is cooling or can't be used,
+	-- its stripes, and an unlit stagger segment
+	["poster.dark"] = "#2B2924",
+	["poster.stripe"] = "#4A463D",
+	["poster.unlit"] = "#3A372F",
+	-- one colour per class, as ONE sweep from warm to cool at even brightness (Base yellow, Bruiser orange,
+	-- Inferno red-orange, Beast red-pink, Trickster pink, Dragon violet, Frost blue, Tempest teal), so any two
+	-- sit well together. Marks and card art only, never state.
+	["class.Base"] = "#FFD426",
+	["class.Tempest"] = "#2EE0C8",
+	["class.Inferno"] = "#FF6B3D",
+	["class.Frost"] = "#4DB8FF",
+	["class.Beast"] = "#FF4D6D",
+	["class.Dragon"] = "#A97BFF",
+	["class.Bruiser"] = "#FF9F2E",
+	["class.Trickster"] = "#FF5CC8",
 	-- the timing meter's own scale
 	["meter.red"] = "#E5484D",
 	["meter.orange"] = "#F0883A",
@@ -160,6 +170,23 @@ Tokens.type = {
 		lineHeight = 1.0,
 		case = "figures",
 	},
+	-- the fight-poster HUD and menus (2026-11-16): the mockup's two faces at fixed sizes. Oswald Bold for numbers,
+	-- key caps and big words; Titillium Web Bold for labels. The size here is only a default: each use sets the
+	-- mockup's own pixel size through Ui/Poster, which knows how Roblox's text sizes map to a browser's.
+	["poster.display"] = {
+		face = "poster",
+		weight = "Bold",
+		size = 24,
+		lineHeight = 1.0,
+		case = "upper",
+	},
+	["poster.label"] = {
+		face = "text",
+		weight = "Bold",
+		size = 23,
+		lineHeight = 1.0,
+		case = "upper",
+	},
 	headline = {
 		face = "display",
 		weight = "Heavy",
@@ -223,6 +250,7 @@ Tokens.type = {
 -- Font families for the faces above.
 Tokens.family = {
 	display = "rbxasset://fonts/families/TitilliumWeb.json",
+	poster = "rbxasset://fonts/families/Oswald.json", -- the fight-poster look's numbers and big words
 	text = "rbxasset://fonts/families/TitilliumWeb.json",
 	mono = "rbxasset://fonts/families/BuilderMono.json",
 }

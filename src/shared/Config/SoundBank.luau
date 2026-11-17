@@ -214,40 +214,29 @@ local SoundBank: { [string]: Entry } = {
 		name = "Punch Kit Beefy Hit (SFX)",
 		creator = "ProSoundEffects",
 	},
-	-- THE PICKS (the user, 2026-11-16, kits-5f, from the sound picker): m1_hit A, m1_finish A, ult_ready C.
-	-- An M1 landing: the sub thump (the loudest; faded from 0.25 s, so ~0.4 s in all) with the meaty smack (its
-	-- mids +6 dB) and the crack. Levels set by measuring the whole mix against a JJS hit in one AudioAnalyzer.
+	-- OUR OWN M1 SOUNDS (kits-7a, 2026-11-17): built from royalty-free Sonniss GDC 2026 recordings and picked by
+	-- the user ("the first combo is good"). Each take is ONE complete file, its transient at sample 0 (so
+	-- start = 0): a weapon swing-to-thud on a recorded body punch, dry (no gore). How each was built:
+	-- sfx-lab/final/PICKS.md and sfx-lab/build_round6.sh. Uploaded to the game's group.
 	["m1_hit"] = {
-		takes = THUMP_TAKES,
-		looped = false,
-		name = "Boom Impact Deep Distant Thumping Hits (SFX) + Beefy Hit + Punch Crack",
-		creator = "ProSoundEffects",
-		play = { volume = 1.6, cut = 0.25 },
-		layers = {
-			{
-				role = "punch_smack",
-				options = { volume = 1.0, eq = { low = 0, mid = 6, high = 0 } },
-			},
-			{ role = "punch_crack", options = { volume = 1.0 } },
+		takes = {
+			{ id = 130927601371508, length = 0.45, start = 0, volume = 1 },
+			{ id = 87488745275206, length = 0.45, start = 0, volume = 1 },
+			{ id = 132785756805885, length = 0.45, start = 0, volume = 1 },
 		},
+		looped = false,
+		name = "HT M1 Hit 1-3",
+		creator = "Haymaker Tussle (Sonniss GDC 2026 sources)",
 	},
-	-- The launching hit (hit 4 of a string, and kit hits that launch; FxController adds the launch whoosh): the
-	-- same layers with the thump's tail left ~2 s, like the references' big finishers.
+	-- The launching hit (hit 4 of a string, and kit hits that launch; FxController adds the launch whoosh): one
+	-- heavy swing-thud recording pitched down 8 % (the user: "could be a 4th m1 with knockback").
 	["m1_finish"] = {
-		takes = THUMP_TAKES,
+		takes = { { id = 72542289493940, length = 0.45, start = 0, volume = 1 } },
 		looped = false,
-		name = "Boom Impact Deep Distant Thumping Hits (SFX), full tail + Beefy Hit + Punch Crack",
-		creator = "ProSoundEffects",
-		play = { volume = 2.0, cut = 2.0 },
-		layers = {
-			{
-				role = "punch_smack",
-				options = { volume = 1.0, eq = { low = 0, mid = 6, high = 0 } },
-			},
-			{ role = "punch_crack", options = { volume = 1.0 } },
-		},
+		name = "HT M1 Finish",
+		creator = "Haymaker Tussle (Sonniss GDC 2026 sources)",
 	},
-	-- The ultimate meter filling (Ui/UltimateMeter plays it up to 2.6 s, nothing under it): a big beefy impact
+	-- The ultimate meter filling (Ui/UltimateNotice plays it up to 2.6 s, nothing under it): a big beefy impact
 	-- with a glowing tonal tail. Its hit is 0.07 s in.
 	["ult_ready"] = {
 		takes = { { id = 9116385056, length = 1.83, start = 0.07, volume = 1.1 } },
@@ -265,14 +254,15 @@ local SoundBank: { [string]: Entry } = {
 		name = "Itadori's punch JJK",
 		creator = "Terrelluniverse2005 (community)",
 	},
-	-- The haymaker (kits-6f, the user's pick B, after asking for "something louder, like a gunshot, similar to the
-	-- jotaro vs dio reference"): attack 0.02 s, peak 663 at 0.17 s, 193 half a second later; started just before
-	-- the attack, at about twice a punch's peak. Its tail is muffled and sinks at the blast.
+	-- The haymaker = OUR heavy hit (kits-7a, 2026-11-17, the user's pick "K1" over two others): built on the
+	-- measured anime big-hit anatomy from Sonniss GDC 2026 recordings: dry snap + thud, a real explosion as the
+	-- wide roar (top swept 9 kHz -> 700 Hz), a mono trailer-boom sub held ~1 s, a sinking bass downer, ice debris.
+	-- Transient at sample 0. Replaces "Star Platinum Punch 1" (a community upload). sfx-lab/build_round7.sh.
 	["ult_haymaker"] = {
-		takes = { { id = 81245466767623, length = 2.65, start = 0.13, volume = 1.6 } },
+		takes = { { id = 120198385193140, length = 2.6, start = 0, volume = 1.4 } },
 		looped = false,
-		name = "Star Platinum Punch 1",
-		creator = "reelx1ty (community)",
+		name = "HT Heavy Hit",
+		creator = "Haymaker Tussle (Sonniss GDC 2026 sources)",
 	},
 	-- The rumble under the scene (swells in at the charge, builds in the wind-up, cut in the silence).
 	["ult_bed"] = {
