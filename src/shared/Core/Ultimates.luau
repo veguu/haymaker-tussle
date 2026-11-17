@@ -38,7 +38,9 @@ export type Key = {
 -- anchor's space; `fov` in degrees, `roll` a tilt in degrees, `shake` studs of shake while it holds.
 -- `rel = "attacker"` (2026-11-16, Haymaker Rush): cam and look are in the ATTACKER's own frame instead (at
 -- their pose, local -Z toward the target, +X their right), for a close-up on someone whose start is
--- wherever they were standing.
+-- wherever they were standing. `rel = "pair"` (2026-11-17, v2): cam and look are offsets from the MIDPOINT of
+-- the two fighters, in the anchor's axes, so a wide shot tracks the action and keeps both of them in frame
+-- (design/haymaker-rush-v2-brief.md: "you can always see both fighters").
 export type Shot = {
 	t: number,
 	cam: Vector3,
@@ -74,6 +76,10 @@ export type Timeline = {
 	-- The cutscene's own colour grade on the fighters' screens while it plays (Fx/CutsceneScreen): tint RGB
 	-- 0-255, then ColorCorrection saturation, contrast and brightness.
 	grade: { tint: { number }, saturation: number, contrast: number, brightness: number }?,
+	-- Camera KICKS on the hits (v2, the user: "there should be some screen shake ... to make it impactful"): at
+	-- `t` the view narrows by `fov` degrees (a punch-in) and shakes `shake` studs more, both fading to nothing
+	-- over `seconds`, on top of whatever the shot is doing.
+	kicks: { { t: number, fov: number, shake: number, seconds: number } }?,
 }
 
 -- BASE: "Haymaker Rush" (2026-11-16). The user picked it over a black-and-white "Lights Out" (full colour,
@@ -91,16 +97,18 @@ export type Timeline = {
 --     0.26). So: the first blow and a reel, a burst of two, a breath (the cut), a burst of three speeding up.
 --   * ONE JOB PER SHOT, cut in the breaths between hits, never mid-swing; nothing shorter than 0.3 s.
 --
---   0.00 charge     medium close on the attacker, slow push (anticipation)       glint on the fist; rumble in
---   0.80 dash+blow  wide side profile; right hook lands 1.14, they reel (establish) streak, big burst
---   1.50 burst 1    over the right shoulder: left 1.76, right 2.06; breath (blows) burst per fist, a punch each
---   2.32 burst 2    close on their face: left 2.56, right 2.82, left 3.06 (reaction)
---   3.40 uppercut   low from the ground, tilting up; lands 3.64 (the lift)       upward burst, floor burst
---   4.20 leap       wide side, target top right, attacker rising (the chase)      takeoff burst, air trail
---   4.50 wind-up    close on face and cocked fist, held, slow push (the pause)    big glint; rumble builds
+-- v2 shots (2026-11-17, design/haymaker-rush-v2-brief.md; the beat times are unchanged, the user kept them):
+--   0.00 charge     WIDE low from the right, both whole, slow push (lock-in)      glint on the fist; rumble in
+--   0.80 dash       wide side profile tracking them (establish)                    streak
+--   1.14 1st blow   CLOSE-UP 1 (0.3 s), cut on the contact: fist and face         big burst; m1_finish
+--   1.44 barrage    LOW WIDE behind the right shoulder, tracking, drifting right:  burst per fist; an m1_hit
+--                   left 1.76, right 2.06 | breath | left 2.56, right 2.82, left 3.06   take each
+--   3.40 uppercut   low from the front right, tilting up; lands 3.64 (the lift)  upward burst, floor burst
+--   4.20 leap       worm's-eye from the floor, both small against the sky (hang)  takeoff burst, air trail
+--   4.50 wind-up    CLOSE-UP 2: face and cocked fist, target behind, held, push   big glint; rumble builds
 --   5.10 silence    same shot; every sound cut
---   5.25 haymaker   side profile under the drawn impact frame (the hit)           one designed huge hit
---   5.55 blast      wide from the right, holding, then following them (result)    shockwave; the hit muffled
+--   5.25 haymaker   side profile under the drawn impact frame (the hit)           ult_haymaker, our heavy hit
+--   5.55 blast      wide from the right, holding, then following them (result)    shockwave; no new sound
 --
 -- Space: the target starts at the origin facing +Z, the attacker comes in at +Z. y = 0 is root height.
 local DASH = 0.8
@@ -108,7 +116,7 @@ local BLOW = 1.14
 -- two bursts: 0.30 apart, a 0.50 breath, then 0.26 and 0.24 (the references' speeding-up bursts)
 local PUNCHES = { 1.76, 2.06, 2.56, 2.82, 3.06 }
 local SIDES = { "Left", "Right", "Left", "Right", "Left" }
--- how far each blow drives them back: further on the last of each burst
+-- how hard each blow lands (over 0.6: the heavy flinch, on the last of each burst)
 local PUSHES = { 0.5, 0.8, 0.5, 0.5, 0.8 }
 local UPPERCUT = 3.64
 local LEAP = 4.2
@@ -118,94 +126,169 @@ local HAYMAKER = 5.25
 local BLAST = 5.55
 local THROWN = 6.1 -- the flight takes over
 local HOOK_STRIKE = 0.16 -- AnimClips HookLeft/HookRight `strike`
-local GAP = 3.2 -- studs between them while they trade blows
-local PUSH_SECONDS = 0.12 -- each blow drives them back over this long
-local STEP_IN = 0.6 -- the attacker steps in for the uppercut
+-- THE BEATDOWN, v2 (2026-11-17): a JUGGLE, from the user's Garou vs Stinger reference (YouTube pc7b7_unix8,
+-- 7.5-9.4 s; contact sheets in design/references/garou-stinger), the user's pick over a face beatdown. The
+-- old version slid both fighters back in a line with every hook ("the punch barrage is a little awkward") and
+-- its fists stopped 1.4-2.2 studs short (measured). Now the ATTACKER STAYS PLANTED and the TARGET MOVES: the
+-- first hook pops them up, every hook bounces them up and a little back, they sink between hits; the attacker
+-- steps in once in the breath and once for the uppercut, after a still SET (Garou 11.5 s).
+local REACH = 3.0 -- root to root when a hook lands on a lifted target: the fist meets the torso
+local UPPER_REACH = 2.2 -- closer for the uppercut, which rises in front of the body
+local BOUNCE_UP = 0.5 -- each hook lifts them this much over where it caught them
+local BOUNCE_BACK = 0.12 -- and drives them back this far
+local BOUNCE_SECONDS = 0.12 -- the bounce takes this long
+local AIR_GAP = 2.6 -- root to root for the haymaker in the air (was 3.1: the fist stopped 2 studs short)
 
--- The keys: the charge, the dash, then every blow pushing them back and the attacker following.
+-- The keys: the charge, the dash, the pop-up, the juggle, the set, the uppercut, the leap and the haymaker.
 local function rushKeys(): { Key }
 	local keys: { Key } = {
 		{ t = 0, target = Vector3.new(0, 0, 0) },
 		{ t = DASH, target = Vector3.new(0, 0, 0) },
 		{
 			t = BLOW,
-			attacker = Vector3.new(0, 0, GAP),
+			attacker = Vector3.new(0, 0, REACH),
 			target = Vector3.new(0, 0, 0),
 			ease = "out",
 		},
 	}
-	-- the first blow knocks them back and they reel
-	local back = -1.2
+	-- the first hook POPS them up and they hang for a moment; the attacker settles into the stance it keeps
+	local planted = REACH - 0.6
 	table.insert(keys, {
 		t = BLOW + 0.26,
-		attacker = Vector3.new(0, 0, GAP - 1),
-		target = Vector3.new(0, 0, back),
+		attacker = Vector3.new(0, 0, planted),
+		target = Vector3.new(0, 1.7, -0.5),
 		ease = "out",
 	})
+	-- where each hook catches them (height, distance back): falling into each catch, a little lower on the first
+	-- of a burst; the breath (after 2.06) lets them sink low and the attacker steps in once
+	local catches = {
+		{ y = 1.0, z = planted - REACH },
+		{ y = 1.1, z = planted - REACH - BOUNCE_BACK },
+		{ y = 0.7, z = planted - 0.3 - REACH },
+		{ y = 1.2, z = planted - 0.3 - REACH - BOUNCE_BACK },
+		{ y = 1.3, z = planted - 0.3 - REACH - 2 * BOUNCE_BACK },
+	}
+	local stand = planted
 	for index, hit in PUNCHES do
-		local attackerHere = back + GAP
+		local catch = catches[index]
+		-- the breath's one step in, before the second burst
+		if index == 3 then
+			stand = planted - 0.3
+			table.insert(keys, {
+				t = hit - 0.12,
+				attacker = Vector3.new(0, 0, stand),
+				target = Vector3.new(0, catch.y + 0.15, catch.z),
+				ease = "out",
+			})
+		end
+		local side = if SIDES[index] == "Left" then 0.25 else -0.25 -- a left hook snaps them to the right
 		table.insert(keys, {
 			t = hit,
-			attacker = Vector3.new(0, 0, attackerHere),
-			target = Vector3.new(0, 0, back),
+			attacker = Vector3.new(0, 0, stand),
+			target = Vector3.new(0, catch.y, catch.z),
+			ease = "in", -- falling into the catch
 		})
-		back -= PUSHES[index]
-		local nextHit = PUNCHES[index + 1] or (UPPERCUT - 0.1)
-		local share = PUSH_SECONDS / (nextHit - hit)
+		local up = if index == #PUNCHES then BOUNCE_UP * 1.6 else BOUNCE_UP -- the last of the burst sends them highest
 		table.insert(keys, {
-			t = hit + PUSH_SECONDS,
-			attacker = Vector3.new(0, 0, attackerHere - PUSHES[index] * share),
-			target = Vector3.new(0, 0, back),
+			t = hit + BOUNCE_SECONDS,
+			attacker = Vector3.new(0, 0, stand),
+			target = Vector3.new(side, catch.y + up, catch.z - BOUNCE_BACK),
 			ease = "out",
 		})
 	end
-	local standing = back + GAP - STEP_IN
+	-- THE SET: the attacker holds still while they drop; then steps in under them for the uppercut
+	local last = catches[#catches]
+	local caughtZ = last.z - BOUNCE_BACK
+	table.insert(keys, {
+		t = 3.4,
+		attacker = Vector3.new(0, 0, stand),
+		target = Vector3.new(0, 0.9, caughtZ),
+		ease = "in",
+	})
+	local standing = caughtZ + UPPER_REACH
 	table.insert(keys, {
 		t = UPPERCUT,
 		attacker = Vector3.new(0, 0, standing),
-		target = Vector3.new(0, 0, back),
+		target = Vector3.new(0, 0.4, caughtZ),
+		ease = "out",
 	})
 	-- the uppercut lifts them; they hang at the top
 	table.insert(keys, {
 		t = UPPERCUT + 0.46,
 		attacker = Vector3.new(0, 0, standing),
-		target = Vector3.new(0, 8.5, back - 0.8),
+		target = Vector3.new(0, 8.5, caughtZ - 0.8),
 		ease = "out",
 	})
 	table.insert(keys, {
 		t = LEAP,
 		attacker = Vector3.new(0, 0, standing),
-		target = Vector3.new(0, 8.8, back - 0.9),
+		target = Vector3.new(0, 8.8, caughtZ - 0.9),
 		ease = "out",
 	})
-	-- the leap after them
-	local top = back - 1
+	-- the leap after them, close enough this time for the haymaker to land
+	local top = caughtZ - 1
 	table.insert(keys, {
 		t = WINDUP,
-		attacker = Vector3.new(0, 9.3, top + 3.05),
+		attacker = Vector3.new(0, 9.3, top + AIR_GAP - 0.05),
 		target = Vector3.new(0, 9, top),
 		ease = "out",
 	})
 	-- the wind-up and the silence: both nearly still in the air
 	table.insert(keys, {
 		t = HAYMAKER,
-		attacker = Vector3.new(0, 9.3, top + 3.1),
+		attacker = Vector3.new(0, 9.3, top + AIR_GAP),
 		target = Vector3.new(0, 9.05, top - 0.05),
 	})
-	-- held under the impact frame
+	-- the knockback starts ON the contact (the user, kits-7b: "the knockback from the last hit is delayed"; it
+	-- used to hold them 0.3 s under the impact frames): a 50 ms freeze, then they fly; by the time the frames end
+	-- they are well on their way
+	table.insert(keys, {
+		t = HAYMAKER + 0.05,
+		attacker = Vector3.new(0, 9.3, top + AIR_GAP),
+		target = Vector3.new(0, 9.05, top - 0.05),
+	})
 	table.insert(keys, {
 		t = BLAST,
-		attacker = Vector3.new(0, 9.3, top + 2.95),
-		target = Vector3.new(0, 9.05, top - 0.2),
+		attacker = Vector3.new(0, 9.3, top + AIR_GAP - 0.3),
+		target = Vector3.new(0, 8.9, top - 1.7),
+		ease = "out",
 	})
 	-- blasted off to the right
 	table.insert(keys, {
 		t = THROWN,
-		attacker = Vector3.new(0, 9.3, top + 2.9),
+		attacker = Vector3.new(0, 9.3, top + AIR_GAP - 0.2),
 		target = Vector3.new(0, 8.4, top - 3),
 		ease = "out",
 	})
 	return keys
+end
+
+-- The kicks: small on each barrage hook, bigger on the last of each burst, big on the first hook and the
+-- uppercut, biggest on the haymaker and the blast.
+local function rushKicks(): { { t: number, fov: number, shake: number, seconds: number } }
+	local kicks = {
+		{ t = BLOW, fov = 7, shake = 0.55, seconds = 0.25 },
+	}
+	for index, hit in PUNCHES do
+		local last = PUSHES[index] > 0.6
+		table.insert(kicks, {
+			t = hit,
+			fov = if last then 5 else 3,
+			shake = if last then 0.45 else 0.28,
+			seconds = if last then 0.24 else 0.16,
+		})
+	end
+	for _, kick in
+		{
+			{ t = UPPERCUT, fov = 8, shake = 0.7, seconds = 0.3 },
+			{ t = LEAP, fov = 0, shake = 0.3, seconds = 0.22 },
+			{ t = HAYMAKER, fov = 10, shake = 1.1, seconds = 0.4 },
+			{ t = BLAST, fov = 6, shake = 0.9, seconds = 0.5 },
+		}
+	do
+		table.insert(kicks, kick)
+	end
+	return kicks
 end
 
 local function rushCues(): { { t: number, name: string } }
@@ -263,150 +346,166 @@ local HAYMAKER_RUSH: Timeline = {
 	attackerFree = THROWN + 0.05,
 	grade = { tint = { 255, 255, 255 }, saturation = 0.08, contrast = 0.12, brightness = 0 },
 	keys = rushKeys(),
+	-- v2 (2026-11-17, design/haymaker-rush-v2-brief.md, after the user: "the camera work isnt really good as you
+	-- cant see whats going on"). Shaped on Azure Flames: few, long, LOW and WIDE shots that keep both fighters
+	-- whole in frame (`rel = "pair"` tracks their midpoint), and only two short close-ups where nothing is
+	-- missed (the user picked: the first contact and the wind-up). Every camera still on the attacker's right.
+	-- tests/UltimateCamera.spec.luau measures it (both in frame on phone, desktop and tablet).
 	shots = {
-		-- 0.00 the charge: medium close on the attacker from their front right, a slow push in
+		-- 0.00 S1 lock-in and charge: wide, low (about 1.3 studs over the floor), from the right and a little in
+		-- front of the attacker, both whole; a slow push in
 		{
 			t = 0,
-			cam = Vector3.new(3.6, 0.4, -3),
-			look = Vector3.new(0.4, 0.3, 0),
-			fov = 50,
-			rel = "attacker",
+			cam = Vector3.new(12.5, -1.6, -1.5),
+			look = Vector3.new(0, 0.2, 0.4),
+			fov = 70,
+			rel = "pair",
 			cut = true,
 		},
 		{
 			t = DASH,
-			cam = Vector3.new(3.2, 0.4, -2.6),
-			look = Vector3.new(0.4, 0.3, 0),
-			fov = 42,
-			rel = "attacker",
+			cam = Vector3.new(11.5, -1.6, -1.2),
+			look = Vector3.new(0, 0.2, 0.4),
+			fov = 66,
+			rel = "pair",
 			ease = "in",
 		},
-		-- 0.80 the dash and the first blow: wide side profile, the attacker coming in from the left; holds as
-		-- they reel
+		-- 0.80 S2 the dash: wide side profile, tracking them as the gap closes
 		{
 			t = DASH,
-			cam = Vector3.new(13, 0.6, 1.4),
-			look = Vector3.new(0, 0.3, 1.2),
-			fov = 55,
+			cam = Vector3.new(15, -0.8, 0),
+			look = Vector3.new(0, 0.2, 0),
+			fov = 60,
+			rel = "pair",
 			cut = true,
 		},
 		{
-			t = 1.5,
-			cam = Vector3.new(12, 0.6, 0.6),
-			look = Vector3.new(0, 0.3, 0.3),
-			fov = 52,
-			shake = 0.15,
-			ease = "out",
-		},
-		-- 1.50 burst 1 and its breath: over the attacker's right shoulder, following them
-		{
-			t = 1.5,
-			cam = Vector3.new(2.4, 2.2, 6.4),
-			look = Vector3.new(0, 0.5, -1.5),
-			fov = 50,
-			shake = 0.1,
-			cut = true,
-		},
-		{
-			t = 2.32,
-			cam = Vector3.new(2.4, 2.2, 5.4),
-			look = Vector3.new(0, 0.5, -2.5),
-			fov = 48,
-			shake = 0.1,
-		},
-		-- 2.32 burst 2: close on their face from their front right, the fists coming in from the left
-		{
-			t = 2.32,
-			cam = Vector3.new(3, 1.4, -0.6),
-			look = Vector3.new(0, 1.1, -2.7),
-			fov = 44,
-			shake = 0.12,
-			cut = true,
-		},
-		{
-			t = 3.4,
-			cam = Vector3.new(3, 1.4, -2),
-			look = Vector3.new(0, 1.1, -4.3),
-			fov = 40,
-			shake = 0.12,
-		},
-		-- 3.40 the uppercut: low from the ground, tilting up after them
-		{
-			t = 3.4,
-			cam = Vector3.new(5, -2.6, -3),
-			look = Vector3.new(0, 1, -4.4),
-			fov = 62,
-			cut = true,
-		},
-		{
-			t = LEAP,
-			cam = Vector3.new(5, -2.6, -3),
-			look = Vector3.new(0, 8, -5.1),
-			fov = 72,
-			ease = "out",
-		},
-		-- 4.20 the leap: wide from the side, the target hanging top right, the attacker rising from the left
-		{
-			t = LEAP,
-			cam = Vector3.new(14, 5, -2.6),
-			look = Vector3.new(0, 5.5, -4),
+			t = BLOW,
+			cam = Vector3.new(13, -0.8, 0),
+			look = Vector3.new(0, 0.2, 0),
 			fov = 58,
-			cut = true,
-		},
-		{
-			t = WINDUP,
-			cam = Vector3.new(14, 6, -3),
-			look = Vector3.new(0, 8.6, -4.3),
-			fov = 54,
+			rel = "pair",
 			ease = "out",
 		},
-		-- 4.50 the wind-up and the silence: close on the attacker's face and cocked right fist from their front
-		-- right (the target behind the camera), a slow push in
+		-- 1.14 S3 CLOSE-UP 1, cut on the first contact (0.3 s): low from the attacker's front right, the fist and
+		-- the target's face together
 		{
-			t = WINDUP,
-			cam = Vector3.new(3.4, -0.3, -1.6),
-			look = Vector3.new(0.5, 0.5, 0.2),
-			fov = 44,
+			t = BLOW,
+			cam = Vector3.new(3.4, 0.4, -1.4),
+			look = Vector3.new(0, 0.9, -2.2),
+			fov = 52,
 			rel = "attacker",
+			shake = 0.12,
+			cut = true,
+		},
+		-- THE JUGGLE'S CAMERA (the user, kits-7c: "the camera angles are too far behind so you cant really see the
+		-- punches ... dont rotate too much and just keep the side view but make it closer up, not close enough that
+		-- you cant see both bodies in their entirety and the floor beneath"): SIDE VIEWS from the right, about 9.5
+		-- studs out (both whole and the floor under them need ~7.5 studs of height in frame), variety from height
+		-- and a slow push, never more than ~10 deg off the side.
+		-- 1.44 S4 burst 1: static side view at root height (Garou vs Stinger 7.5-9.4 s)
+		{
+			t = BLOW + 0.3,
+			cam = Vector3.new(9.5, 0.2, 1.1),
+			look = Vector3.new(0, 0.3, 0.5),
+			fov = 58,
+			shake = 0.05,
+			cut = true,
+		},
+		-- 2.18 S4b the breath and burst 2: the same side, a little lower and ~9 deg toward the target's front,
+		-- pushing in slowly
+		{
+			t = PUNCHES[2] + BOUNCE_SECONDS,
+			cam = Vector3.new(9, -0.6, -0.9),
+			look = Vector3.new(0, 0.35, 0.4),
+			fov = 58,
+			shake = 0.06,
 			cut = true,
 		},
 		{
-			t = HAYMAKER,
-			cam = Vector3.new(2.8, -0.2, -1.3),
-			look = Vector3.new(0.5, 0.5, 0.2),
-			fov = 34,
-			shake = 0.04,
-			rel = "attacker",
+			t = PUNCHES[5] + BOUNCE_SECONDS,
+			cam = Vector3.new(8.8, -0.6, -0.7),
+			look = Vector3.new(0, 0.2, 0.3),
+			fov = 59,
+			shake = 0.08,
 			ease = "in",
 		},
-		-- 5.25 the haymaker, under the impact frame: side profile, so the two silhouettes read
+		-- 3.18 S5 the set, the uppercut and the launch: low, still from the side, tilting up after the target
+		{
+			t = PUNCHES[5] + BOUNCE_SECONDS,
+			cam = Vector3.new(9, -2, 0.9),
+			look = Vector3.new(0, 0.9, -0.2),
+			fov = 60,
+			cut = true,
+		},
+		{
+			t = LEAP,
+			cam = Vector3.new(9, -2, 0.9),
+			look = Vector3.new(0, 4.4, -1.2),
+			fov = 66,
+			ease = "out",
+		},
+		-- 4.20 S6 the leap and the hang: worm's-eye from near the floor, both small against the sky, a slight tilt
+		{
+			t = LEAP,
+			cam = Vector3.new(5.5, -2.6, 0.6),
+			look = Vector3.new(0, 7.2, -1),
+			fov = 85,
+			roll = 6,
+			cut = true,
+		},
+		-- 4.65 S7 the held wind-up and the silence (the user, kits-7b: the close-up's "bad angle / framing, too short
+		-- / jarring"): no cut, the leap shot GLIDES up into a medium two-shot from below their right, the cocked
+		-- right fist toward us and the target clear beyond; then a slow push in through the silence
+		{
+			t = WINDUP + 0.15,
+			cam = Vector3.new(6, -1.6, 0.8),
+			look = Vector3.new(0, 0.3, 0.2),
+			fov = 55,
+			rel = "pair",
+			ease = "out",
+		},
 		{
 			t = HAYMAKER,
-			cam = Vector3.new(12, 9.6, -3.8),
-			look = Vector3.new(0, 9.2, -3.8),
+			cam = Vector3.new(5, -1.3, 0.6),
+			look = Vector3.new(0, 0.3, 0.2),
+			fov = 46,
+			shake = 0.04,
+			rel = "pair",
+			ease = "in",
+		},
+		-- 5.25 S8 the haymaker, under the impact frame: side profile, so the two silhouettes read
+		{
+			t = HAYMAKER,
+			cam = Vector3.new(12, 0.4, 0),
+			look = Vector3.new(0, 0, 0),
 			fov = 50,
+			rel = "pair",
 			shake = 0.5,
 			cut = true,
 		},
-		-- 5.55 the blast: wide from the right and a little behind the attacker, holding as they're thrown
+		-- 5.55 S9 the blast: wide from the right and a little behind the attacker, holding as they're thrown
 		{
 			t = BLAST,
-			cam = Vector3.new(9, 11, 2.4),
-			look = Vector3.new(0, 9, -5.6),
+			cam = Vector3.new(9, 1.8, 6),
+			look = Vector3.new(0, -0.2, -1.5),
 			fov = 75,
+			rel = "pair",
 			shake = 0.5,
 			cut = true,
 		},
 		{
 			t = THROWN,
-			cam = Vector3.new(9, 11, 2.4),
-			look = Vector3.new(0, 8.6, -8.2),
+			cam = Vector3.new(9, 2.2, 7.4),
+			look = Vector3.new(0, -0.4, -2.8),
 			fov = 72,
+			rel = "pair",
 			shake = 0.25,
 		},
 	},
 	flightFov = 95,
 	cues = rushCues(),
+	kicks = rushKicks(),
 	swings = rushSwings(),
 	blows = rushBlows(),
 }
@@ -495,7 +594,7 @@ end
 --- The camera at `t` seconds in (0 to the timeline's cinematic): position and look-at point in the
 --- anchor's space, field of view, roll and shake. A shot marked `cut` starts on its own frame; any other
 --- eases in from the shot before it. `attackerAt` and `targetAt` (the poses now) place the shots marked
---- `rel = "attacker"`; without them those shots sit at the anchor.
+--- `rel = "attacker"` or `rel = "pair"`; without them those shots sit at the anchor.
 function Ultimates.shot(
 	line: Timeline,
 	t: number,
@@ -508,6 +607,10 @@ function Ultimates.shot(
 	local function place(shot: Shot): (Vector3, Vector3)
 		if shot.rel == "attacker" and frame then
 			return frame:PointToWorldSpace(shot.cam), frame:PointToWorldSpace(shot.look)
+		end
+		if shot.rel == "pair" and attackerAt and targetAt then
+			local middle = attackerAt:Lerp(targetAt, 0.5)
+			return middle + shot.cam, middle + shot.look
 		end
 		return shot.cam, shot.look
 	end
@@ -531,6 +634,21 @@ function Ultimates.shot(
 			(current.shake or 0) + ((nextShot.shake or 0) - (current.shake or 0)) * share
 	end
 	return cam, look, current.fov, current.roll or 0, current.shake or 0
+end
+
+--- The camera kicks at `t`: how many degrees narrower the view is and how many studs more it shakes, each
+--- kick fading out (squared) over its own seconds.
+function Ultimates.kick(line: Timeline, t: number): (number, number)
+	local fov, shake = 0, 0
+	for _, kick in line.kicks or {} do
+		local into = t - kick.t
+		if into >= 0 and into < kick.seconds then
+			local left = 1 - into / kick.seconds
+			fov += kick.fov * left * left
+			shake += kick.shake * left * left
+		end
+	end
+	return fov, shake
 end
 
 --- The cues that fire between `from` (exclusive) and `to` (inclusive), in order.

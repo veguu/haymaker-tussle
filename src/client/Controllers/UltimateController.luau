@@ -108,7 +108,6 @@ function UltimateController:KnitStart()
 			local ending = line.cinematic + cfg.FlightSeconds
 			local lastT = -1
 			local barraging = false
-			local frames = 0
 			local fovBefore = if camera then camera.FieldOfView else 70
 			if role and camera then
 				camera.CameraType = Enum.CameraType.Scriptable
@@ -178,9 +177,12 @@ function UltimateController:KnitStart()
 				-- The cinematic camera on both their screens: the timeline's shots (cuts, moves, field of view,
 				-- tilt, shake), then the chase shot following the flight as it widens.
 				if role and camera then
-					frames += 1
 					local camAt, lookAt, fov, roll, shake =
 						Ultimates.shot(line, math.min(t, line.cinematic), attackerAt, targetAt)
+					-- the hits' camera kicks: a punch-in and a burst of shake, fading out (Ultimates.kick)
+					local kickFov, kickShake = Ultimates.kick(line, t)
+					fov -= kickFov
+					shake += kickShake
 					local from = anchor:PointToWorldSpace(camAt)
 					local toward = anchor:PointToWorldSpace(lookAt)
 					if t >= line.cinematic then
@@ -190,12 +192,15 @@ function UltimateController:KnitStart()
 						fov += (line.flightFov - fov) * (1 - (1 - share) * (1 - share))
 						shake *= 1 - share
 					end
-					-- Shake: a set pattern of nudges that changes every frame, never random.
-					local sx = (if frames % 2 == 0 then 1 else -1) * shake
-					local sy = (if frames % 3 == 0 then 1 elseif frames % 3 == 1 then -0.6 else 0.2)
-						* shake
+					-- Shake (kits-7c, the user: "add some good screen shake"): set waves of a few frequencies on the
+					-- shared clock, never random, so it jolts and rolls instead of buzzing frame to frame (the old
+					-- every-other-frame flip read as a tremble); a small roll twist sells the hit.
+					local w = t * math.pi * 2
+					local sx = (math.sin(w * 17) + 0.5 * math.sin(w * 31 + 1.3)) / 1.5 * shake
+					local sy = (math.sin(w * 23 + 0.7) + 0.5 * math.sin(w * 37 + 2.1)) / 1.5 * shake
+					local twist = math.sin(w * 13 + 0.4) * shake * 2.5
 					camera.CFrame = CFrame.lookAt(from, toward)
-						* CFrame.Angles(0, 0, math.rad(roll))
+						* CFrame.Angles(0, 0, math.rad(roll + twist))
 						* CFrame.new(sx, sy, 0)
 					camera.FieldOfView = fov
 				end

@@ -650,6 +650,146 @@ local function clipSource(name, clip)
 	return table.concat(lines, "\n")
 end
 
+-- ---- THE ULTIMATE'S UPWARD PUNCHES (kits-7d, 2026-11-17). The user, on the hook juggle: "they look like youre
+-- slapping them rather than an actual punch barrage ... the barrage should be facing upwards right?" and "same
+-- with the last punch, should be punching them up and away" (Garou vs Stinger 7.5-9.4 s: the one being juggled is
+-- above the striker). Built from keys: each arm is either in its guard or AIMED (sweep, lift, reach, like the
+-- hooks' beats), blended centre-and-direction between keys, the feet locked like every swing here. They go to
+-- their own module (AnimClips is at Studio's size limit).
+local function armAt(arm, spec)
+	if spec.guard then
+		return GUARD[arm][1], norm(GUARD[arm][2])
+	end
+	local sideSign = if arm == "Right Arm" then 1 else -1
+	local direction = aim(sideSign, spec.sweep, spec.lift)
+	return add(SHOULDER[arm], direction, spec.reach), direction
+end
+
+local EASINGS = {
+	smooth = smooth,
+	snap = easeInHard,
+	out = easeOut,
+	outHard = easeOutHard,
+}
+
+-- keys: { t, ease (into this key), right, left, lean, turn, crouch, look }; feet: where they stay planted.
+local function bakeKeyed(keys, seconds, meta, feet)
+	local right, left = newPlacer("Right Arm"), newPlacer("Left Arm")
+	local legs = { ["Right Leg"] = newPlacer("Right Leg"), ["Left Leg"] = newPlacer("Left Leg") }
+	local timeSet = {}
+	for index = 0, math.round(seconds * FPS) do
+		timeSet[math.round(index / FPS * 1e6) / 1e6] = true
+	end
+	for _, key in keys do
+		timeSet[key.t] = true
+	end
+	local times = {}
+	for t in timeSet do
+		table.insert(times, t)
+	end
+	table.sort(times)
+	local frames = {}
+	for _, t in times do
+		local a, b = keys[1], keys[#keys]
+		for index = 1, #keys - 1 do
+			if t <= keys[index + 1].t then
+				a, b = keys[index], keys[index + 1]
+				break
+			end
+		end
+		local share = if b.t > a.t then math.clamp((t - a.t) / (b.t - a.t), 0, 1) else 1
+		share = EASINGS[b.ease or "smooth"](share)
+		local function blendArm(arm, placer)
+			local ca, da = armAt(arm, a[if arm == "Right Arm" then "right" else "left"])
+			local cb, db = armAt(arm, b[if arm == "Right Arm" then "right" else "left"])
+			return placer.pose(lerp(ca, cb, share), norm(lerp(da, db, share)))
+		end
+		local function mix(key)
+			return (a[key] or 0) + ((b[key] or 0) - (a[key] or 0)) * share
+		end
+		local lean, turn = mix("lean"), mix("turn")
+		local pose = {
+			Torso = { lean, 0, turn, 0, 0, STANCE_HEIGHT },
+			Head = { -lean * 0.6 - mix("look"), 0, -turn * 0.6, 0, 0, 0 },
+			["Right Arm"] = blendArm("Right Arm", right),
+			["Left Arm"] = blendArm("Left Arm", left),
+		}
+		lockFeet(pose, feet, legs)
+		pose.Torso[6] += mix("crouch")
+		table.insert(frames, { t = t, pose = pose })
+	end
+	local clip = { loop = meta.loop, priority = meta.priority, seconds = seconds, frames = frames }
+	clip.strike = meta.strike
+	clip.hold = meta.hold
+	return clip
+end
+
+-- A wider stance for both (the striker plants and drives up): each foot half a stud further out.
+local WIDE_FEET = {
+	["Right Leg"] = add(STANCE_FEET["Right Leg"], { 0.5, 0, 0 }),
+	["Left Leg"] = add(STANCE_FEET["Left Leg"], { -0.5, 0, 0 }),
+}
+
+-- BarrageUp: a 0.25 s loop, a punch every 0.125 s. Each arm fires from its guard up and forward at 50 degrees
+-- (aimed a little inward, at the one above them), snaps back; right lands at 0.0625, left at 0.1875. The body
+-- leans back to look up and twists into each punch.
+local UP_PUNCH = { sweep = -8, lift = 50, reach = 1.3 }
+local GUARDED = { guard = true }
+local BARRAGE_UP_KEYS = {
+	{ t = 0, right = GUARDED, left = GUARDED, lean = -8, turn = -4, crouch = -0.05, look = 10 },
+	{ t = 0.0625, ease = "outHard", right = UP_PUNCH, left = GUARDED, lean = -10, turn = 14, crouch = -0.12, look = 12 },
+	{ t = 0.125, ease = "smooth", right = GUARDED, left = GUARDED, lean = -8, turn = 4, crouch = -0.05, look = 10 },
+	{ t = 0.1875, ease = "outHard", right = GUARDED, left = UP_PUNCH, lean = -10, turn = -14, crouch = -0.12, look = 12 },
+	{ t = 0.25, ease = "smooth", right = GUARDED, left = GUARDED, lean = -8, turn = -4, crouch = -0.05, look = 10 },
+}
+
+-- HaymakerUp: wound up deep (held at 0.25: the right fist low behind the hip, crouched, twisted away, the left
+-- hand out in front), then a rising straight right up and away at 55 degrees (strikes at 0.32, 0.07 s after the
+-- hold, as the timeline lets it go), the body uncoiling and leaning back into it, then settling.
+local HAYMAKER_UP_KEYS = {
+	{ t = 0, right = GUARDED, left = GUARDED, lean = STANCE_DIP, turn = STANCE_TURN },
+	{
+		t = 0.25,
+		ease = "smooth",
+		right = { sweep = 150, lift = -40, reach = 1.0 },
+		left = { sweep = -10, lift = 30, reach = 1.1 },
+		lean = 4,
+		turn = -42,
+		crouch = -0.35,
+		look = 8,
+	},
+	{
+		t = 0.32,
+		ease = "snap",
+		right = { sweep = -8, lift = 55, reach = 1.35 },
+		left = GUARDED,
+		lean = -14,
+		turn = 30,
+		crouch = -0.05,
+		look = 14,
+	},
+	{
+		t = 0.45,
+		ease = "outHard",
+		right = { sweep = -10, lift = 66, reach = 1.3 },
+		left = GUARDED,
+		lean = -18,
+		turn = 38,
+		crouch = 0,
+		look = 16,
+	},
+	{ t = 0.75, ease = "smooth", right = GUARDED, left = GUARDED, lean = STANCE_DIP, turn = STANCE_TURN },
+}
+
+local ULTIMATE_CLIPS = {
+	BarrageUp = simplify(
+		bakeKeyed(BARRAGE_UP_KEYS, 0.25, { loop = true, priority = "Action2", strike = 0.0625 }, WIDE_FEET)
+	),
+	HaymakerUp = simplify(
+		bakeKeyed(HAYMAKER_UP_KEYS, 0.75, { loop = false, priority = "Action2", strike = 0.32, hold = 0.25 }, WIDE_FEET)
+	),
+}
+
 local CLIPS = {
 	HookLeft = simplify(bakeSwing("Left Arm", HOOK, false)),
 	HookRight = simplify(bakeSwing("Right Arm", HOOK, false)),
@@ -676,3 +816,23 @@ end
 assert(#source < 185000, `AnimClips is {#source} characters, over Studio's safe limit`)
 fs.writeFile(PATH, source)
 print("AnimClips characters", #source)
+
+-- The ultimate's clips, in their own module (merged with AnimClips by AnimController).
+local ultimate = {
+	"--!strict",
+	"-- GENERATED FILE - DO NOT EDIT BY HAND. Source: animations/build_strikes.luau (lune run animations/build_strikes).",
+	"-- The ultimate's own clips (kits-7d): the upward barrage loop and the rising haymaker. Same format as",
+	"-- Config/AnimClips, kept apart because AnimClips is at Studio's size limit; AnimController merges the two.",
+	"return {",
+}
+local names = {}
+for name in ULTIMATE_CLIPS do
+	table.insert(names, name)
+end
+table.sort(names)
+for _, name in names do
+	table.insert(ultimate, clipSource(name, ULTIMATE_CLIPS[name]))
+	print(name, "frames", #ULTIMATE_CLIPS[name].frames, "seconds", ULTIMATE_CLIPS[name].seconds)
+end
+table.insert(ultimate, "}")
+fs.writeFile("src/shared/Config/AnimClipsUltimate.luau", table.concat(ultimate, "\n") .. "\n")

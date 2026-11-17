@@ -1997,3 +1997,35 @@ Build stamp `kits-7a+lobby-4+ui-6c` (disk and place match). NOT committed.
   Rojo Connect is safe again (check the stamp first anyway). Gates: build OK, 497 pass, 3 fail, all the teammate's
   (HudLogic.spec x2: their HudLogic changed, their spec is probably on their PC; Tokens.spec x1); selene/stylua clean.
   A local Save-to-File copy (Downloads\game2.rbxl) can't be read by Lune 0.8.9 (new compression).
+## kits-7b / kits-7c (2026-11-17): Haymaker Rush v2, stage 1 (camera, sync, juggle); new upward clips built
+Build stamp `kits-7c+lobby-4+ui-6c`. Spec: `design/haymaker-rush-v2-brief.md` (section 8b lists what changed).
+References studied frame by frame (contact sheets in `design/references/`): Azure Flames, Garou vs Stinger;
+Raging Demon and Orlando Furioso were studied for camera motion (sheets in the scratchpad only).
+- Built and in the place: wide shots ride the fighters' midpoint (`rel = "pair"`); the beatdown is a planted
+  juggle (hooks) in close SIDE views; camera kicks (`Timeline.kicks`, `Ultimates.kick`) with set-wave shake and roll;
+  the wind-up is a medium two-shot reached by a glide; the haymaker's knockback starts on contact; the barrage uses
+  our m1_hit takes, the first blow and uppercut m1_finish, the haymaker our heavy hit unprocessed.
+- Checks: `tests/UltimateCamera.spec.luau` (both fighters in frame at phone/desktop/tablet, floor under their feet
+  in the juggle, kicks included) passes; gates pass (499; HudLogic x2 and Tokens x1 are the teammate's).
+- THE USER'S LATEST VERDICT (after kits-7c), NOT YET BUILT:
+  - camera still "kinda weird": no snap cuts, smooth tweens; one continuous camera like Orlando Furioso 6.7-12.5 s;
+    no zoom on the first hit
+  - the hooks look like slaps; the barrage must be a FAST CONSECUTIVE flurry (~8 hits/s like Garou), punching
+    UPWARD at a target juggled above (user's picks: new animations, one continuous flurry, sounds auditioned in the
+    picker)
+  - the haymaker must punch UP AND AWAY
+  - a barrage needs one complete "rapid punches" sound
+- NEW CLIPS BUILT, NOT WIRED IN: `animations/build_strikes.luau` now also bakes BarrageUp (0.25 s loop, a punch
+  every 0.125 s at 0.0625/0.1875, up 50 deg) and HaymakerUp (hold 0.25, strike 0.32, up 55 deg) into
+  `src/shared/Config/AnimClipsUltimate.luau` (AnimClips is at its 185k limit; AnimController must merge the two).
+  Stills: `design/references/new-poses/`. The user had not yet OKed the poses when they stopped.
+- NEXT (planned, agreed):
+  1. merge AnimClipsUltimate into AnimController's Clips; SetBarrage takes a clip name; a HaymakerUp swing side
+  2. rewrite the timeline as the flurry (draft: FLURRY_FROM 1.5, 12 hits 0.125 apart, the target juggled above at a
+     punch's reach, then the existing uppercut as the finisher), with the haymaker from below sending them up and
+     away
+  3. one continuous eased camera (cut only under the impact frames); remove the first-hit zoom
+  4. ult_barrage in SoundCandidates with 6 Creator Store options, all community uploads that loaded in Studio:
+     117958044865545 (1.02 s), 87361464437966 (1.65 s), 108575892208319 (1.70 s), 95801559782723 (1.83 s),
+     114289646726161 (2.12 s), 102850005066154 (3.51 s, trim)
+  5. camera test, gates, play test (Studio throttles to 12-15 fps when covered: measure only when it's visible)

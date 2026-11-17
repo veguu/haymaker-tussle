@@ -12,12 +12,13 @@
 -- (vault: 07 Lighting VFX and Audio/Anime Impact Sound Anatomy - Measured From 20 References):
 --   charge   no sound (the user removed it); the low rumble swells in under the scene
 --   dash     a whoosh
---   blows    one punch sound per blow (ult_rush), louder on the first blow and the uppercut
+--   blows    one of our M1 takes per barrage blow (m1_hit, the user's pick for v2, 2026-11-17); the first blow
+--            and the uppercut are the heavier knockback take (m1_finish). Every take's transient is at sample 0,
+--            so the sound lands on the cue's frame, which is the fist's contact (the old ult_rush peaked 0.13 s in)
 --   wind-up  the rumble builds
 --   dip      every sound cut to silence for 0.15 s before the haymaker (7 of 8 big hits in the study)
---   haymaker one designed huge hit (ult_haymaker, Serious Punch)
---   blast    no new sound: the hit's tail is muffled (highs gone), grows a second, then sinks in pitch
--- The punch, haymaker and rumble are roles in Config/SoundCandidates until the user picks with the picker.
+--   haymaker one designed huge hit (ult_haymaker, our heavy hit, kits-7a)
+--   blast    no new sound and no processing: the heavy hit's own roar, muffle and sinking boom carry it
 local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -57,9 +58,6 @@ local states: { [Context]: State } = setmetatable({}, { __mode = "k" }) :: any
 local BED_VOLUME = 0.5 -- under the punches, never over them
 local DIP_FADE = 0.05
 local CHOKE = 0.04 -- how fast a punch's ring fades when the next one lands
-local HEAVY_PUNCH = 1.35 -- the first blow and the uppercut, louder than the barrage's
-local MUFFLE = { high = -40, mid = -16, seconds = 0.45 }
-local SINK = { speed = 0.8, seconds = 3 }
 
 -- The impact frame (memory: drawn two-tone frames, never a flash; Azure Flames frames 65-69): black with one
 -- white slash, pure white, an ink sketch of the two of them with speed lines, black with white silhouettes
@@ -242,7 +240,7 @@ end
 -- The first blow, a right hook: big, and the bed comes up to its level.
 local function blow(ctx: Context, state: State)
 	PunchHitFx.play(chest(ctx) + fistSide(ctx, "Right"), outward(ctx), 1.4, nil, true)
-	foreground(ctx, state, "ult_rush", { volume = HEAVY_PUNCH }, true)
+	foreground(ctx, state, "m1_finish")
 	if state.bed then
 		tween(state.bed, 0.1, { Volume = BED_VOLUME })
 	end
@@ -251,7 +249,7 @@ end
 local function punch(side: string): (Context, State) -> ()
 	return function(ctx: Context, state: State)
 		PunchHitFx.play(chest(ctx) + fistSide(ctx, side), outward(ctx), 1, nil, false)
-		foreground(ctx, state, "ult_rush", nil, true)
+		foreground(ctx, state, "m1_hit")
 	end
 end
 
@@ -262,7 +260,7 @@ local function uppercut(ctx: Context, state: State)
 	if floor then
 		StepBurstFx.play(floor, 1.2, true)
 	end
-	foreground(ctx, state, "ult_rush", { volume = HEAVY_PUNCH }, true)
+	foreground(ctx, state, "m1_finish")
 end
 
 local function leap(ctx: Context, state: State)
@@ -312,36 +310,15 @@ local function haymaker(ctx: Context, state: State)
 	sound("ult_haymaker", ctx, state, { volume = 1 })
 end
 
--- The blast: colour back, the shockwave, and no new sound. The haymaker's own tail carries it: everything still
--- sounding loses its highs (the muffle), grows for a second, then sinks in pitch (the study's aftermath).
-local function blast(ctx: Context, state: State)
+-- The blast: colour back, the shockwave, and no new sound. Our heavy hit (ult_haymaker, kits-7a) already carries
+-- the blast: its roar's highs sweep down (the muffle) and a bass downer sinks under it, designed into the one file,
+-- so nothing here re-filters or re-pitches it (v2; before kits-7a this muffled a community upload at run time).
+local function blast(ctx: Context, _state: State)
 	local at = chest(ctx)
 	PunchHitFx.play(at, outward(ctx), 3, nil, true)
 	local floor = FxKit.floorUnder(at, 16, { ctx.attacker, ctx.target })
 	if floor then
 		StepBurstFx.play(floor, 2, true)
-	end
-	for _, playing in state.sounds do
-		if playing.Parent then
-			local tone = playing:FindFirstChildOfClass("EqualizerSoundEffect")
-			if not tone then
-				tone = Instance.new("EqualizerSoundEffect")
-				tone.LowGain, tone.MidGain, tone.HighGain = 0, 0, 0
-				tone.Parent = playing
-			end
-			tween(
-				tone :: Instance,
-				MUFFLE.seconds,
-				{ HighGain = MUFFLE.high, MidGain = MUFFLE.mid }
-			)
-			tween(playing, 1, { Volume = playing.Volume * 1.2 })
-			tween(
-				playing,
-				SINK.seconds,
-				{ PlaybackSpeed = playing.PlaybackSpeed * SINK.speed },
-				Enum.EasingStyle.Sine
-			)
-		end
 	end
 end
 local function launch(ctx: Context, _state: State)

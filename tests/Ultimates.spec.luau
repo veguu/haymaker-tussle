@@ -150,17 +150,29 @@ return {
 
 	["shots in the attacker's frame follow the attacker"] = function()
 		local line = Ultimates.TIMELINES.Base
-		local first = line.shots[1]
-		assert(first.rel == "attacker", "the charge close-up rides on the attacker")
+		-- v2: the close-ups (first contact, wind-up) ride on the attacker; take the first one
+		local first
+		for _, shot in line.shots do
+			if shot.rel == "attacker" and shot.cut then
+				first = shot
+				break
+			end
+		end
+		assert(first, "a close-up rides on the attacker")
 		local at, target = Vector3.new(0, 0, 12), Vector3.new(0, 0, 0)
-		local cam, look = Ultimates.shot(line, 0, at, target)
+		local cam, look = Ultimates.shot(line, first.t, at, target)
 		-- the attacker faces -Z here, so their frame is the anchor's, moved to them
 		assert(near(cam.X, at.X + first.cam.X, 0.001), "x")
 		assert(near(cam.Z, at.Z + first.cam.Z, 0.001), "z")
 		assert(near(look.Z, at.Z + first.look.Z, 0.001), "look")
-		local turned = Ultimates.shot(line, 0, Vector3.new(12, 0, 0), target)
+		local turned = Ultimates.shot(line, first.t, Vector3.new(12, 0, 0), target)
 		-- facing -X now: their right (+X local) is the anchor's -Z
 		assert(near(turned.Z, -first.cam.X, 0.001), "turned with them")
+		-- the wide shots ride on the pair's midpoint
+		local wide = line.shots[1]
+		assert(wide.rel == "pair", "the opening shot frames them both")
+		local wideCam = Ultimates.shot(line, 0, at, target)
+		assert(near(wideCam.Z, 6 + wide.cam.Z, 0.001), "pair midpoint")
 	end,
 
 	["the anchor faces outward from the arena's middle"] = function()
