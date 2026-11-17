@@ -1642,7 +1642,7 @@ Build `kits-4e+lobby-4+ui-1`. NOT committed.
   different take from the last, EQ attached, starting on the onset; ready sting and bell play. Console clean
   apart from `rbxassetid://203785492` "asset type does not match" (not in our source or the server tree; it shows
   at client start, before any ultimate plays). Gates: build, 492 tests, selene, stylua, fx_smoke.
-- The user's reference cutscene (youtube shorts Yde2yYu9_lM) is a guide to what's good, NOT something to copy
+- The user's reference cutscene, "the Raging Demon clip" (youtube shorts Yde2yYu9_lM), is a guide to what's good, NOT something to copy
   (the user, 2026-11-15). No title or K.O. cards.
 - NOT DONE: the user's picks (F7); other kits' ultimates.
 - BARRAGE REVISED (user: "the new punch sounds are super weird and dont sound like punches at all... sounds like
@@ -1747,7 +1747,7 @@ Same build stamp (kits-4g). NOT committed. After the user reconnected Rojo:
   clients), the ultimate with the new layers, a wall in front during a string.
 - THE USER, after trying kits-4h (2026-11-16): the punches "still sound nothing like a punch and a bassy drum";
   next time go back over ALL the references they have sent (punch sound: JoJo MUDA aSHcFlNOElE, Itadori combo
-  obti3wLCshs; cutscenes: Yde2yYu9_lM, QlvfbPbCYCM, C2vCVdNRLms, sfZyOKF50so; movement: TSB Garou zP6MFM_SamU).
+  obti3wLCshs; cutscenes: Raging Demon Yde2yYu9_lM, Orlando Furioso QlvfbPbCYCM, Human Battery C2vCVdNRLms, Azure Flames sfZyOKF50so; movement: TSB Garou zP6MFM_SamU).
   The boom layer (punch_sub) is the likeliest "bassy drum"; consider dropping it and sourcing designed anime-style
   punch hits instead. Committed at their request so they could stop for the night.
 
@@ -1869,3 +1869,105 @@ The user picked m1_hit A, m1_finish A, ult_ready C. All three are now SoundBank 
 THUMP_TAKES with punch_thump; ult_ready = PSE Magic Burst 3). SoundCandidates is empty, and the sound picker (and
 its SOUNDS button) doesn't build while nothing is left to choose; add a role there to bring it back. Verified in
 Studio: the entries load as picked, no picker, console clean. Gates pass (496; Tokens x2 the teammate's).
+
+## kits-6a (2026-11-16): new ultimate "Haymaker Rush"; sound study of all 20 references
+Build stamp `kits-6a+lobby-4+ui-4`. NOT committed. The user turned down "Lights Out" as too black-and-white
+("only for like a temporary moment"), kept its impact frame and camera cuts, and approved Haymaker Rush; then asked
+for an in-depth study of what makes the references' sounds good before any sound was picked.
+- SOUND STUDY (all 20 references the user sent, spectrograms + band tables, 1-frame-per-0.5-s strips): written up
+  as the vault note `07 Lighting VFX and Audio/Anime Impact Sound Anatomy - Measured From 20 References.md`. A big
+  hit = dip to near silence, crack (highs sweeping down), sub 30-100 ms LATER and held/swelling (loudest layer),
+  then everything above ~1 kHz filtered out, a low boom sinking in pitch, sparse debris. Rush hits = short
+  crack-led ticks with their own thump over one low bed. Azure Flames, Orlando and the impact-frame edits are
+  mostly music (timing only). The Raging Demon clip = `Yde2yYu9_lM` (it was in this file by id only).
+- TIMELINE (Core/Ultimates HAYMAKER_RUSH, Base; EVERY kit now falls back to it, so every kit gets the G window):
+  charge 0-0.35 (close on the attacker, a new `rel = "attacker"` shot frame), dash in 0.35-0.5, first blow 0.5,
+  barrage 0.64-1.2 (five blows 0.14 s apart on the clash barrage loop, AnimController.SetBarrage), uppercut 1.4,
+  leap 1.62, dip 1.66, haymaker 1.8 under the impact frame, colour back + blast 2.1, flight from 2.15. New
+  Timeline fields: `swings` (hooks can't strike faster than 0.16 s: they start early), `barrage`, `blows`
+  (target flinches, HitLanded). Grade: only a light contrast push. The hardcoded Final Bell barrage in
+  UltimateController is gone; it plays the timeline's lists.
+- LOOKS (Fx/UltimateFx BASE): fist glint (two set-angle stars + glow), DashFx, PunchHitFx per blow (heavy on blow,
+  uppercut, haymaker, blast), StepBurstFx under the uppercut/leap/blast, AirFx trails. ImpactFrame: new `slash`
+  (one long Leaf stroke, -34 deg); frames black+slash / white / ink sketch with lines / black split / white with
+  black stars (~0.3 s). Each frame seen held in Studio.
+- SOUNDS: no charge-up sound (the user removed it after trying C; the shine and its pitch steps are gone). The bed
+  swells in under the charge; blow and uppercut = m1_finish; rush = ult_rush; dip fades everything in 0.05 s;
+  haymaker = ult_crack (pitch 1.18 -> 0.7 over 0.28 s) then ult_sub 70 ms later; blast = ult_explosion, every
+  sound still playing gets an EQ muffle (high -40, mid -16) and sinks in pitch over 3 s; debris at +0.5/+1.5.
+  Roles in the picker (SoundCandidates, option A in play): ult_rush, ult_bed, ult_crack, ult_sub, ult_explosion,
+  ult_debris. None of the Final Bell ids are reused. Community options (JJS punch ids, thunder) are B-D only.
+- STUDIO: played end to end on Practice Dummy 1 with a planted test helper (fills the meter, opens the window;
+  the client fires UltimateRequest at once, the window is only 1.2 s). Console clean. Shots fixed after
+  captures: charge (was all torso), over-the-shoulder and side (too close; bodies now 3.2 studs apart, they
+  overlapped at 2.8), face close-up (was inside the bodies), worm's-eye (the attacker blacked out half). NOT
+  SEEN after the last fixes: the charge, hang and blast shots; NOT HEARD by me: any of it. The user hears it.
+- Gates: build, selene, stylua, 498 tests (Tokens x2 the teammate's).
+## kits-6b (2026-11-16): Haymaker Rush slowed to 5 s with holds and a wind-up; charge sound removed
+Build stamp `kits-6b+lobby-4+ui-4`. NOT committed. The user, after trying kits-6a: "it all happens to fast ... there
+should be some pauses before the camera shifts and there should be a pause to wind up your punch before the last
+huge hit just like in the references". Earlier the same round: the charge-up shine (C) "not good", then "remove the
+charge sound all together" (ult_shine and its pitch steps are gone; the bed still swells in under the charge).
+- TIMELINE now 5 s (was 2.15): charge 0-0.9; dash 0.9, first blow 1.15 then a reel to 1.55; barrage 1.7-2.54
+  (seven blows 0.14 apart) over three shots (shoulder 1.55, side 2.05, face 2.45 holding to 2.95); uppercut 3.05
+  from the ground; leap 3.35; WIND-UP 3.6-4.22: the haymaker drawn back and HELD (new Swing `hold`, released by
+  `fromHold` 0.07 s before the hit) in a close-up from the attacker's right, glint 1.6x on the fist, the bed
+  swelling to 1.6x; dip 4.22; haymaker 4.4 + impact frame; blast 4.7, held to the flight at 5.
+- Tests: the pace is pinned (cinematic >= 4.5 s, no shot under 0.3 s, every release after a hold). 498 pass
+  (Tokens x2 the teammate's); build, selene, stylua.
+- STUDIO: the wind-up seen (arm cocked, glint on the fist); the dummy hid half of it, so the camera moved to the
+  attacker's right side (NOT re-seen after that move). Console clean.
+- Field Notes: `Studying VFX References ...` section 9 (measure a cutscene's length and shot lengths).
+## kits-6c (2026-11-16): Haymaker Rush rebuilt to an agreed beat plan; one complete sound per event
+Build stamp `kits-6c+lobby-4+ui-4`. NOT committed. The user on kits-6b: "the punches are too fast compared to the
+animations, and the camera angles are too random ... plan the sfx, vfx, camera, and timing with intent". A beat
+plan was agreed ("looks fine"), plus: sfx must not layer on top of each other, barrage punches consecutive, the
+punch "too bassy ... like a drum hit", and "you shouldnt combine a bunch of different sounds to mimick a punch".
+- TIMELINE (Core/Ultimates, comment table at the top of HAYMAKER_RUSH): 5.4 s, nine shots ALL on the attacker's
+  right (+X: attacker screen-left, target screen-right, blows and blast travel left to right); every blow a real
+  swing whose fist lands on it (hooks start 0.16 s early); punches 0.32 s apart (the M1 cadence): first blow 1.14,
+  barrage 1.62 / 1.94 / 2.26 / 2.58 (L R L R), uppercut 2.92, leap 3.5, held wind-up 3.8, silence 4.4, haymaker
+  4.55, blast 4.85, flight 5.4. Each barrage blow pushes the target 0.6 back over 0.12 s (keys built in
+  rushKeys()). The clash-barrage loop is no longer used. Tests pin: cams on +X, blows >= 0.3 s apart, shots >= 0.3 s.
+- SOUND: one complete designed sound per event (memory + Field Notes Sound Design Pitfalls section 9). ult_rush =
+  one punch file (A Itadori's punch JJK, B Itadori Punch sound, C Garou Punch, D-F JJS ids); ult_haymaker = one
+  designed Serious Punch (A TSB, B Re-sfx, C sound design from 2.4 s, D Ash3167 from 2.9 s, E APM Atom Smasher);
+  ult_bed the rumble. All but E and the bed are COMMUNITY uploads of anime/game audio (could be taken down).
+  `start` = each file's measured peak, volumes evened by peak. Removed: ult_crack, ult_sub, ult_explosion,
+  ult_debris, punch_crunch and the crack-sweep code. Foreground is one voice: each punch/whoosh fades the last in
+  0.04 s (UltimateFx.foreground; Sfx.playLayered now takes an `into` list and Layer `delay`). Bed volume 0.5.
+  The blast adds no sound: the haymaker's tail is muffled and sinks.
+- STUDIO: played end to end, console clean; the over-the-shoulder barrage shot seen (attacker left, burst on the
+  dummy right). NOT HEARD by me; the user picks ult_rush / ult_haymaker / ult_bed with P.
+## kits-6d (2026-11-16): sound picks baked; the barrage in bursts like the references; haymaker hit on the frame
+Build stamp `kits-6d+lobby-4+ui-4`. NOT committed. The user picked ult_rush A (Itadori's punch JJK), ult_haymaker C
+(the Serious Punch sound design), ult_bed B (PSE Hollow Rumble 2): all three are SoundBank entries now and
+SoundCandidates is empty (the picker hides). Their notes: the punches "should be more far apart ... dont just make
+them ALL the same amount apart ... sound like an actual barrage ... refer to my references"; the haymaker hit "a
+bit delayed".
+- RHYTHM MEASURED in the references (ffmpeg onsets, scratchpad onsets.ps1): bursts that speed up (0.40 -> 0.30 ->
+  0.25 s) with 0.5-0.9 s breaths (Raging Demon 0.26 0.16 0.16 | 0.72 | 0.26 0.26 0.32 0.32; Itadori 0.54 0.40
+  0.28 | 0.92; Stinger 0.30 0.30 | 0.48 | 0.24 0.26 0.28). New barrage: first blow 1.14, reel, burst L 1.76 R 2.06,
+  breath (the cut), burst L 2.56 R 2.82 L 3.06, breath, uppercut 3.64; everything after moved +0.7 (leap 4.2,
+  wind-up 4.5, silence 5.1, haymaker 5.25, blast 5.55, flight 6.1). Pushback 0.5 per blow, 0.8 on the last of
+  each burst (heavy flinch there). Cues/swings/blows built from the PUNCHES/SIDES/PUSHES lists. Tests: blows >= 0.22 s
+  apart and NOT evenly spaced (longest - shortest gap >= 0.2).
+- HAYMAKER DELAY: the file is three hits (high-band onsets 0.1, 1.4, 2.85 s, measured with an AudioAnalyzer in
+  the Edit datamodel); start 2.42 fell in the second hit's decay, so the third came ~0.45 s late. start = 2.84.
+- STUDIO: full run, console clean, sounds in order (blow, 2, 3, uppercut, haymaker). With Studio in the
+  background (~12 fps) cues fire up to ~0.1 s late and a hitch can fire two at once (cues run on RenderStepped).
+## kits-6e (2026-11-16): the haymaker hit back in the picker, gunshot-like options
+Build stamp `kits-6e+lobby-4+ui-4`. NOT committed. The user: "the last hit doesnt sound", then "change it to
+something louder, like a gunshot, similar to the jotaro vs dio reference". Measured during a real run: the picked
+Serious Punch sound design (from 2.84 s) did play, but swelled 0 -> ~300-530 over 0.3 s with no attack (a roar,
+not a hit). ult_haymaker is in SoundCandidates again (ult_rush and ult_bed stay picked in SoundBank). Options,
+all with a 0.02-0.06 s attack (PlaybackLoudness every frame), volumes set so each peak is ~2x a punch: A "Star
+Platinum Punch" niaz3664 (peak 785, still 622 after 0.5 s: crack then roar, closest to the Jotaro hit), B "Star
+Platinum Punch 1", C "Star Platinum Punch SFX (fixed)", D "SKILL_CANON_SHOT" (all crack), E "Onslaught-Hit-4".
+All community uploads. In a run, A jumps 0 -> ~850 in one sample on the frame and holds ~1000. Console clean;
+gates pass (498, Tokens x2 the teammate's). Field Notes Sound Design Pitfalls section 9: impacts need an attack.
+## kits-6f (2026-11-16): haymaker pick baked
+Build stamp `kits-6f+lobby-4+ui-4`. NOT committed. The user picked ult_haymaker B, "Star Platinum Punch 1" (reelx1ty,
+community; attack 0.02 s, peak 663 at 0.17 s, start 0.13, volume 1.6). All Haymaker Rush sounds are SoundBank
+entries now (ult_rush Itadori's punch JJK, ult_haymaker Star Platinum Punch 1, ult_bed PSE Hollow Rumble 2);
+SoundCandidates is empty and the picker hides. Gates pass (498, Tokens x2 the teammate's).

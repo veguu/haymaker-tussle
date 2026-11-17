@@ -4,12 +4,17 @@
 -- SoundBank starts with option A of every role here. Once the user picks, the chosen take moves into SoundBank
 -- and the role leaves this file.
 --
--- Licensed catalogue first (ProSoundEffects or APMOfficial: free inside Roblox experiences, used by id, nothing
--- uploaded); an option whose creator says "(community)" is only for the user to choose, never option A.
+-- ONE COMPLETE SOUND PER EVENT (kits-6c, the user: "you shouldnt combine a bunch of different sounds to mimick
+-- a punch sound but instead just have an audio that matches what we actually want ... layer sounds but they
+-- should all be distinct ... find the complex sound so it actually sounds like a punch and not like a musical
+-- instrumental"). So no option here is built from layers: each is one already-designed file. Distinct events
+-- may still overlap (the rumble under the scene, then the hit).
 --
--- EMPTY NOW (2026-11-16, kits-5f): the user picked m1_hit A, m1_finish A and ult_ready C, all moved into
--- SoundBank. The picker hides itself while there is nothing to choose. Add a role here (ORDER, ABOUT, OPTIONS,
--- and AUDITION if it plays as a rhythm) to offer choices again.
+-- The punch and haymaker options are the closest the Creator Store has to the user's own references (Itadori,
+-- Garou, the JJS punch ids they sent, Saitama's Serious Punch). They are COMMUNITY uploads, several of anime or
+-- game audio: the user asked for sounds like those references, so they lead here (the old "licensed first"
+-- rule gives way to it), but each could be taken down. Loaded in Studio 2026-11-16; `start` puts each file's
+-- measured peak (PlaybackLoudness, sampled every frame) on the moment it plays; `volume` evens the peaks out.
 
 local SoundCandidates = {}
 
@@ -20,8 +25,12 @@ export type Option = {
 	takes: { { id: number, length: number, start: number, volume: number } },
 	-- how the role always plays with this pick (Sfx.Options), and other roles layered with it
 	play: { [string]: any }?,
-	layers: { { role: string, options: { [string]: any }?, bed: number? } }?,
+	layers: { { role: string, options: { [string]: any }?, bed: number?, delay: number? } }?,
 }
+
+-- EMPTY NOW (2026-11-16, kits-6f): the user picked ult_rush A, ult_bed B and, last, ult_haymaker B (Star Platinum
+-- Punch 1), all SoundBank entries. The picker hides itself while there is nothing to choose. Add a role here
+-- (ORDER, ABOUT, OPTIONS, and AUDITION if it plays as a rhythm) to offer choices again.
 
 -- What each role is for, in the order the picker shows them.
 SoundCandidates.ORDER = {} :: { string }
@@ -40,5 +49,4 @@ SoundCandidates.AUDITION = {} :: {
 }
 
 SoundCandidates.OPTIONS = {} :: { [string]: { Option } }
-
 return SoundCandidates

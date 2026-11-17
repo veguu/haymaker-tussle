@@ -30,6 +30,7 @@ local FLIGHT_RISE = 18
 -- up on the normal view.
 local DIP_IN, DIP_HOLD, DIP_OUT = 0.2, 0.15, 0.35
 local GRADE_IN = 0.12
+local HEAVY_STRENGTH = GameConfig.Animation.HitStopFullStrength
 
 local UltimateController = Knit.CreateController({
 	Name = "UltimateController",
@@ -106,7 +107,7 @@ function UltimateController:KnitStart()
 			local flightFrom = anchor:PointToWorldSpace(lastTarget)
 			local ending = line.cinematic + cfg.FlightSeconds
 			local lastT = -1
-			local swings = 0
+			local barraging = false
 			local frames = 0
 			local fovBefore = if camera then camera.FieldOfView else 70
 			if role and camera then
@@ -121,22 +122,33 @@ function UltimateController:KnitStart()
 			local connection: RBXScriptConnection? = nil
 			connection = RunService.RenderStepped:Connect(function()
 				local t = workspace:GetServerTimeNow() - startedAt
-				-- Cues and the attacker's swings, on every screen.
+				-- Cues, the attacker's swings and the target's flinches, on every screen (the timeline's lists).
 				for _, cue in Ultimates.cuesBetween(line, lastT, t) do
 					UltimateFx.cue(cue, ctx)
-					if cue == "windup" then
-						anim:HoldSwing(attacker, "Uppercut")
-					elseif cue == "impact" then
-						anim:PlaySwing(attacker, "Uppercut", 0.02)
+				end
+				for _, swing in Ultimates.between(line.swings, lastT, t) do
+					if swing.hold then
+						anim:HoldSwing(attacker, swing.side)
+					else
+						anim:PlaySwing(attacker, swing.side, swing.windup)
 					end
 				end
-				-- The barrage's punches: left and right in turn while it lasts.
-				local barrageFrom, barrageTo = 0.34, 1.4
-				if t >= barrageFrom and t < barrageTo then
-					local due = math.floor((t - barrageFrom) / 0.075) + 1
-					while swings < due do
-						swings += 1
-						anim:PlaySwing(attacker, if swings % 2 == 0 then "Left" else "Right", 0.03)
+				for _, blow in Ultimates.between(line.blows, lastT, t) do
+					-- a heavy blow at full strength (the most hit-stop, the heavy flinch); the rest as a
+					-- string's punches, the flinch alternating light and heavy
+					anim:HitLanded(
+						attacker,
+						target,
+						if blow.heavy then HEAVY_STRENGTH else 0,
+						blow.step
+					)
+				end
+				local barrage = line.barrage
+				if barrage then
+					local inside = t >= barrage.from and t < barrage.to
+					if inside ~= barraging then
+						barraging = inside
+						anim:SetBarrage(attacker, inside, 0)
 					end
 				end
 				lastT = t
@@ -168,7 +180,7 @@ function UltimateController:KnitStart()
 				if role and camera then
 					frames += 1
 					local camAt, lookAt, fov, roll, shake =
-						Ultimates.shot(line, math.min(t, line.cinematic))
+						Ultimates.shot(line, math.min(t, line.cinematic), attackerAt, targetAt)
 					local from = anchor:PointToWorldSpace(camAt)
 					local toward = anchor:PointToWorldSpace(lookAt)
 					if t >= line.cinematic then
@@ -195,6 +207,9 @@ function UltimateController:KnitStart()
 				if t >= ending + 0.1 or not attacker.Parent then
 					if connection then
 						connection:Disconnect()
+					end
+					if barraging then
+						anim:SetBarrage(attacker, false)
 					end
 					if removeGrade then
 						removeGrade()

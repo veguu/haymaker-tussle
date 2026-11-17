@@ -196,14 +196,20 @@ function Sfx.play(
 end
 
 --- Play `role` and every layer its entry lists (SoundBank Entry.layers), as one sound. A caller's
---- `volume` scales the layers too. Returns the main Sound.
+--- `volume` scales the layers too; a layer's `delay` starts it that much later. Returns the main Sound, and
+--- `into` (when given) collects every Sound it starts, the delayed ones as they start, so a caller can
+--- stop the whole layered sound at once.
 function Sfx.playLayered(
 	role: string,
 	parent: Instance?,
 	pitchVary: number?,
-	options: Options?
+	options: Options?,
+	into: { Sound }?
 ): Sound?
 	local main = Sfx.play(role, parent, pitchVary, options)
+	if main and into then
+		table.insert(into, main)
+	end
 	local entry = SoundBank[role]
 	local scale = if options and options.volume then options.volume else 1
 	for _, layer in (entry and entry.layers) or {} do
@@ -212,7 +218,17 @@ function Sfx.playLayered(
 		if layer.bed then
 			Sfx.bed(layer.role, parent, layer.bed, layerOptions :: any)
 		else
-			Sfx.play(layer.role, parent, pitchVary, layerOptions :: any)
+			local function start()
+				local played = Sfx.play(layer.role, parent, pitchVary, layerOptions :: any)
+				if played and into then
+					table.insert(into, played)
+				end
+			end
+			if layer.delay and layer.delay > 0 then
+				task.delay(layer.delay, start)
+			else
+				start()
+			end
 		end
 	end
 	return main

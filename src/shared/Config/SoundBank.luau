@@ -28,6 +28,9 @@ export type Layer = {
 	-- A BED instead of a one-shot (Sfx.bed): it fades in on the first play, is held this many seconds past
 	-- every later one, then fades out. One rumble under a whole combo instead of a thump per hit.
 	bed: number?,
+	-- Seconds after the main sound that this layer starts (the references' low end lands 30-100 ms after the
+	-- crack; vault: Anime Impact Sound Anatomy).
+	delay: number?,
 }
 
 export type Entry = {
@@ -250,6 +253,32 @@ local SoundBank: { [string]: Entry } = {
 		takes = { { id = 9116385056, length = 1.83, start = 0.07, volume = 1.1 } },
 		looped = false,
 		name = "Magic Burst 3 (SFX)",
+		creator = "ProSoundEffects",
+	},
+	-- HAYMAKER RUSH, the user's picks (2026-11-16, kits-6d, from the sound picker). One complete sound per
+	-- event (the user: never a punch stacked from layers). Community uploads of anime audio, chosen because they
+	-- match the user's references: they could be taken down.
+	-- Every blow of the ultimate (Fx/UltimateFx; each cuts off the last). Peak measured 0.13 s in.
+	["ult_rush"] = {
+		takes = { { id = 78880770029647, length = 0.97, start = 0.05, volume = 2 } },
+		looped = false,
+		name = "Itadori's punch JJK",
+		creator = "Terrelluniverse2005 (community)",
+	},
+	-- The haymaker (kits-6f, the user's pick B, after asking for "something louder, like a gunshot, similar to the
+	-- jotaro vs dio reference"): attack 0.02 s, peak 663 at 0.17 s, 193 half a second later; started just before
+	-- the attack, at about twice a punch's peak. Its tail is muffled and sinks at the blast.
+	["ult_haymaker"] = {
+		takes = { { id = 81245466767623, length = 2.65, start = 0.13, volume = 1.6 } },
+		looped = false,
+		name = "Star Platinum Punch 1",
+		creator = "reelx1ty (community)",
+	},
+	-- The rumble under the scene (swells in at the charge, builds in the wind-up, cut in the silence).
+	["ult_bed"] = {
+		takes = { { id = 9112795571, length = 76.77, start = 20, volume = 1 } },
+		looped = false,
+		name = "Hollow Rumble 2 (SFX), deep steady drone",
 		creator = "ProSoundEffects",
 	},
 	-- The light air of a swing, under `swing_heavy`.

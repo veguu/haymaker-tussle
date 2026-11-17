@@ -33,6 +33,7 @@ export type Frame = {
 	split: boolean?, -- red and cyan copies of the silhouettes, offset either side
 	zoom: number?, -- the whole picture scaled about the hit (1 = none)
 	shake: number?, -- the whole picture pushed this many pixels, a set way each frame
+	slash: boolean?, -- one bold stroke across the screen through the hit, pointed at both ends
 	hold: number?, -- seconds to hold it (default 1/30)
 }
 
@@ -192,6 +193,13 @@ function ImpactFrame.play(spec: Spec, at: Vector3, models: { Model })
 		table.insert(beams, beam)
 	end
 
+	-- The slash (2026-11-16, Haymaker Rush, from the Azure Flames finisher's first frame): one long stroke,
+	-- pointed at both ends, laid steeply across the screen through the hit.
+	local slash = image(stage, Tex.Leaf, 4)
+	slash.Size = UDim2.fromOffset(reach * 1.5, size.Y * 0.16)
+	slash.Position = UDim2.fromOffset(centre.X, centre.Y)
+	slash.Rotation = -34
+
 	-- The ring: a thick circle outline round the hit.
 	local ring = Instance.new("Frame")
 	ring.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -266,6 +274,8 @@ function ImpactFrame.play(spec: Spec, at: Vector3, models: { Model })
 			beam.Visible = frame.beams == true
 			beam.BackgroundColor3 = frame.ink
 		end
+		slash.Visible = frame.slash == true
+		slash.ImageColor3 = frame.ink
 		ring.Visible = frame.ring ~= nil
 		if frame.ring then
 			ring.Size = UDim2.fromOffset(size.Y * frame.ring, size.Y * frame.ring)

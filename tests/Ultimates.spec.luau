@@ -41,16 +41,126 @@ local TEST: Ultimates.Timeline = {
 	},
 	flightFov = 90,
 	cues = { { t = 0, name = "start" }, { t = 0.6, name = "hit" }, { t = 1, name = "launch" } },
+	swings = {},
+	blows = {},
 }
 
 return {
-	["no kit has an ultimate until its new one is built (Final Bell removed)"] = function()
+	["every kit plays Base's Haymaker Rush until it has its own"] = function()
 		for _, kitId in
 			{ "Base", "Tempest", "Inferno", "Frost", "Beast", "Dragon", "Bruiser", "Trickster" }
 		do
-			assert(Ultimates.timeline(kitId) == nil, kitId)
+			local line = Ultimates.timeline(kitId)
+			assert(line and line.name == "Haymaker Rush", kitId)
 		end
-		assert(Ultimates.timeline(nil) == nil)
+		assert(Ultimates.timeline(nil) == Ultimates.TIMELINES.Base)
+	end,
+
+	["Haymaker Rush is in order and ends in the flight"] = function()
+		local line = Ultimates.TIMELINES.Base
+		local function ordered(list: { any }, what: string)
+			for index = 2, #list do
+				assert(list[index].t >= list[index - 1].t, `{what} out of order at {index}`)
+			end
+			assert(list[#list].t <= line.cinematic + 1e-6, `{what} past the cinematic`)
+		end
+		ordered(line.keys, "keys")
+		ordered(line.shots, "shots")
+		ordered(line.cues, "cues")
+		ordered(line.swings, "swings")
+		ordered(line.blows, "blows")
+		assert(line.keys[#line.keys].t == line.cinematic, "the last key is the flight's start")
+		assert(line.attackerFree >= line.cinematic, "the attacker is held through the cinematic")
+		-- every blow has a swing striking on it, or lands inside the barrage loop
+		local barrage = line.barrage
+		for _, blow in line.blows do
+			local struck = barrage ~= nil and blow.t > barrage.from and blow.t < barrage.to
+			for _, swing in line.swings do
+				if math.abs(swing.t + swing.windup - blow.t) < 0.011 then
+					struck = true
+				end
+			end
+			assert(struck, `no swing strikes at {blow.t}`)
+		end
+		-- the hooks can't strike faster than their clip (0.16 s)
+		-- (a held swing and its release are the exception: from the hold it strikes 0.07 s later)
+		for _, swing in line.swings do
+			assert(
+				swing.side == "Uppercut"
+					or swing.hold
+					or swing.fromHold
+					or swing.windup >= 0.16 - 1e-6,
+				`hook at {swing.t} too fast`
+			)
+		end
+		-- a release always follows its hold
+		local held = false
+		for _, swing in line.swings do
+			if swing.hold then
+				held = true
+			elseif swing.fromHold then
+				assert(held, `release at {swing.t} with nothing held`)
+				held = false
+			end
+		end
+		-- one side of the action (kits-6c, the user: "the camera angles are too random"): every camera on the
+		-- attacker's right, so who is where never flips on screen
+		for _, shot in line.shots do
+			assert(shot.cam.X > 0, `shot at {shot.t} crosses the line`)
+		end
+		-- the barrage like a real one (kits-6d, from the user's references): no two blows closer than a hook can
+		-- strike and start to follow through (0.22 s), and not evenly spaced: bursts and breaths
+		local blowTimes = {}
+		for _, blow in line.blows do
+			table.insert(blowTimes, blow.t)
+		end
+		local shortest, longest = math.huge, 0
+		for index = 2, #blowTimes do
+			local gap = blowTimes[index] - blowTimes[index - 1]
+			assert(gap >= 0.22 - 1e-6, `blows at {blowTimes[index]} too close`)
+			shortest, longest = math.min(shortest, gap), math.max(longest, gap)
+		end
+		assert(longest - shortest >= 0.2, "the barrage has bursts and breaths, not one even beat")
+		-- the pace (kits-6b, the user: "too fast"): at least 4.5 s, and no shot shorter than 0.3 s
+		assert(line.cinematic >= 4.5, "long enough to read")
+		local cuts = {}
+		for _, shot in line.shots do
+			if shot.cut then
+				table.insert(cuts, shot.t)
+			end
+		end
+		table.insert(cuts, line.cinematic)
+		for index = 2, #cuts do
+			assert(
+				cuts[index] - cuts[index - 1] >= 0.3 - 1e-6,
+				`shot at {cuts[index - 1]} too short`
+			)
+		end
+		-- the haymaker lands in the dip's silence, after the hang
+		local dip, haymaker = 0, 0
+		for _, cue in line.cues do
+			if cue.name == "dip" then
+				dip = cue.t
+			elseif cue.name == "haymaker" then
+				haymaker = cue.t
+			end
+		end
+		assert(dip > 0 and haymaker - dip >= 0.1 and haymaker - dip <= 0.3, "a 0.1-0.3 s dip")
+	end,
+
+	["shots in the attacker's frame follow the attacker"] = function()
+		local line = Ultimates.TIMELINES.Base
+		local first = line.shots[1]
+		assert(first.rel == "attacker", "the charge close-up rides on the attacker")
+		local at, target = Vector3.new(0, 0, 12), Vector3.new(0, 0, 0)
+		local cam, look = Ultimates.shot(line, 0, at, target)
+		-- the attacker faces -Z here, so their frame is the anchor's, moved to them
+		assert(near(cam.X, at.X + first.cam.X, 0.001), "x")
+		assert(near(cam.Z, at.Z + first.cam.Z, 0.001), "z")
+		assert(near(look.Z, at.Z + first.look.Z, 0.001), "look")
+		local turned = Ultimates.shot(line, 0, Vector3.new(12, 0, 0), target)
+		-- facing -X now: their right (+X local) is the anchor's -Z
+		assert(near(turned.Z, -first.cam.X, 0.001), "turned with them")
 	end,
 
 	["the anchor faces outward from the arena's middle"] = function()
