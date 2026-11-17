@@ -42,7 +42,7 @@ type Parts = {
 	box: Frame,
 	boxScale: UIScale,
 	fill: ImageLabel,
-	words: TextLabel,
+	words: Poster.Word,
 	cap: Frame,
 	capText: TextLabel,
 	capGlyph: ImageLabel,
@@ -130,12 +130,10 @@ local function build(): Parts
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		Padding = UDim.new(0, 10),
 	})
-	local words = Poster.text(row, "display", 24, "ink.900", {
+	-- the words are images of themselves in the mockup's own font (Ui/Shapes.letters)
+	local words = Poster.word(row, "words", "badge:ULT READY", 24, "ink.900", {
 		Name = "Words",
 		LayoutOrder = 1,
-		Size = UDim2.fromScale(0, 1),
-		AutomaticSize = Enum.AutomaticSize.X,
-		Text = "ULT READY",
 	})
 	local cap = make("Frame", row, {
 		Name = "Cap",
@@ -188,8 +186,7 @@ local function layout(made: Parts)
 	local camera = workspace.CurrentCamera
 	local ref = HudTheme.Scale.Reference
 	local view = if camera then camera.ViewportSize else ref
-	local scale =
-		math.clamp(math.min(view.X / ref.X, view.Y / ref.Y), HudTheme.Scale.Min, HudTheme.Scale.Max)
+	local scale = HudTheme.scaleFor(view)
 	made.holderScale.Scale = scale
 	local kind = device()
 	if kind == "touch" then
@@ -255,7 +252,7 @@ local function hide(made: Parts)
 	Poster.stop(made.drain)
 	made.holder.Visible = false
 	made.drain.Visible = false
-	made.words.Text = "ULT READY"
+	Poster.setWord(made.words, "badge:ULT READY")
 end
 
 --- Builds the badge and follows the player's HT_UltReady: the notice when it is earned, the badge while it lasts.
@@ -319,7 +316,7 @@ function UltimateNotice.prompt(seconds: number)
 	windowOpen = true
 	windowToken += 1
 	local mine = windowToken
-	made.words.Text = if device() == "touch" then "ULT NOW" else "PRESS"
+	Poster.setWord(made.words, if device() == "touch" then "badge:ULT NOW" else "badge:PRESS")
 	made.drain.Visible = true
 	made.drain.Size = UDim2.new(1, -12, 0, 6)
 	if not HudMotion.reduced() then
@@ -343,7 +340,7 @@ function UltimateNotice.hidePrompt()
 	windowOpen = false
 	Poster.stop(made.drain)
 	made.drain.Visible = false
-	made.words.Text = "ULT READY"
+	Poster.setWord(made.words, "badge:ULT READY")
 	if Players.LocalPlayer:GetAttribute("HT_UltReady") ~= true then
 		hide(made)
 	end

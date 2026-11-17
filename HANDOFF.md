@@ -1750,6 +1750,333 @@ Same build stamp (kits-4g). NOT committed. After the user reconnected Rojo:
   obti3wLCshs; cutscenes: Raging Demon Yde2yYu9_lM, Orlando Furioso QlvfbPbCYCM, Human Battery C2vCVdNRLms, Azure Flames sfZyOKF50so; movement: TSB Garou zP6MFM_SamU).
   The boom layer (punch_sub) is the likeliest "bassy drum"; consider dropping it and sourcing designed anime-style
   punch hits instead. Committed at their request so they could stop for the night.
+## ui-0c (2026-11-15): Golden Hour typography (NOT COMMITTED, awaiting the user's try)
+- Shared/Typography now sets every game font in Builder Sans (reading text, FAMILY), Builder Extended (display,
+  numerals, caps labels) or Builder Mono (ticking figures), from Tokens.type. Same API (face, apply, adopt,
+  HT_TextRole); NEW FAMILIES, textScale(). Old role names are aliases that KEEP THEIR OLD SIZES (deviation from
+  Technical Architecture 3.3, which mapped them to the new sizes: no box can overflow until each screen is rebuilt).
+- NEW pure src/shared/Core/TypeRoles.luau (aliases, weight snapping to the weights each face really has, the
+  PreferredTextSize multipliers Medium 1 / Large 1.15 / Larger 1.3 / Largest 1.5 for non-numeral, non-display roles,
+  re-applied live on change) + tests/TypeRoles.spec.luau (8). adopt() snaps Heavy to ExtraBold.
+- MEASURED in Play: 75 HUD/menu text objects, 0 left in Montserrat (Extended 56, Sans 14, Mono 5), none under 15,
+  no new overflow (the same 7 Help-guide lines report TextFits false before and after). World labels: 51, all Builder
+  Sans Bold (dummy stagger figures are Sans until their screen is rebuilt; the design wants Extended for numerals).
+  Frame cost: none per frame (styles once per label; one settings listener). Build vfx-14+lobby-4+ui-0c, Rojo PASS 144.
+- NOT TESTED: PreferredTextSize Large+ (the setting can't be changed from a script; try it in Roblox settings),
+  phones, the Q1 side-by-side with Oswald + Titillium (Studio screen capture is black). NEXT: 0d HudTheme colours.
+
+## ui-0d (2026-11-15): HudTheme colours on the Golden Hour tokens (NOT COMMITTED, awaiting the user's try)
+- src/client/Ui/HudTheme.luau only (spicy co-owns it; only colour lines touched): Colour.* now read Tokens.colour:
+  Panel ink.900, PanelRaised ink.800, Track ink.600, Accent coral.500, AccentHot danger.600, Text ivory.50, Muted
+  stone.300, Dim stone.500, Over teal.400 (no palette job yet; Phase 1), Miss stone.300, Blocked danger.600,
+  OnAccent ink.900; Menu.Coin gold.400, Menu.Good teal.400; Transparency.Panel 0.15 -> 0.12 (Tokens.surface[1]).
+- MEASURED in Play (client PlayerGui): backgrounds ink.900 x26, ink.800 x11, ink.600 x5, coral x8; text ivory.50 x34,
+  stone.300 x13. Left over: colours hard-coded in screens (43 Color3.fromRGB outside HudTheme, e.g. #1B2A35 text,
+  #3CC4FF fills): they move when each screen is rebuilt. Known: AccentHot (danger.600) is also used as stagger TEXT
+  in two places (palette says fills only); Phase 1b. Build vfx-14+lobby-4+ui-0d, Rojo PASS 144. NEXT: 0e motion.
+
+## ui-0e (2026-11-15): motion on tokens (NOT COMMITTED, awaiting the user's try)
+- NEW pure src/shared/Core/Motion.luau (resolve(tokens, duration, easing, kind, reduced): reduced -> move/scale 0,
+  fades <= 0.1 s, colour untouched; stagger 0.03/item capped 0.4) + tests/Motion.spec.luau (6).
+- Ui/HudMotion: NEW play(instance, channel, props, durationToken, easingToken) (kind inferred from props),
+  pressDown/pressUp (t.press 0.06 / t.release 0.16), setReduced (the game's own toggle, for the Settings screen:
+  not wired to any UI yet), onFrame/stopFrame (one shared RenderStepped, disconnected when idle: no callers moved
+  yet). to/press/pop/enter/leave unchanged for existing callers; enter's reduced fade 0.12 -> 0.1.
+- Moved off raw TweenService onto HudMotion: AfkController and SpectateController button presses (0.05 -> 0.06 s
+  down), MenuController open pop (Back/Out 0.16 s -> t.panel 0.32 Quint/Out from 0.94). KickMeterBar still reads
+  ReducedMotionEnabled itself (Phase 2).
+- MEASURED in Play: 10 toggles/s end in the last state (1.000); reduced: scale set at once, ceremony fade 0.10 s;
+  quick exit 0.14 Quad/In; onFrame 25 frames in 0.5 s, 0 after stop. All 11 ScreenGuis built, no script errors.
+  Build vfx-14+lobby-4+ui-0e, Rojo PASS 145. NEXT: 0f InputMode + layout.
+
+## ui-1 (2026-11-15): combat HUD rebuilt in the Golden Hour design (NOT COMMITTED, awaiting the user's look)
+- User: "nothing changed, use the research to COMPLETELY revamp how the UI looks" -> screen-by-screen visible
+  rebuild, combat HUD first. NEW src/client/Ui/Components.luau (make, text, panel levels 1-3, the Ledge, meter with
+  ghost + ticks, keyCap, corner) - tokens only. HudLogic: staggerBand (40/70), multiplierText, recovering (+3 tests).
+- HudController visuals rewritten (all data wiring kept): Y "you" panel bottom-left (top-left on touch, no speed):
+  numeral.l stagger figure (no %), STAGGER, "4.8x knockback" (Combat.staggerMultiplier), CRITICAL coral.300 /
+  RECOVERING teal.400, speed bar + over segment + stagger speed-cap notch, 256x10 bar ticks 40/70 filling ivory ->
+  coral.300 -> coral.500..danger.600 gradient, ghost of the recovery start + teal drain tick, coral Ledge, one
+  1.04 pulse on crossing 70. K kit bottom-right: Q, R, Jump/Kick, Punch tiles (circle attacks, rounded-square
+  movement; Jump turns round in kick mode), cooldown shade draining from the top (vertical, not radial: radial
+  wipe left for later), seconds > 1.5 s in mono, teal ready ring, slash when unavailable, key caps (gamepad glyphs
+  via GetImageForKeyCode, mouse glyph for M1), names above tiles in the lobby / first 3 s of a fight / after a kit
+  change, HIT/MISS/NOW words. A strip: auto-width pill (18 / 25 STANDING; NEXT ROUND 12 ROUND 4; gold Ledge at final
+  two), ARENA CLOSING chip 2.5 s per shrink. F feed: 4 rich-text rows newest on top, yours with the coral Ledge.
+  Target: coral chevron + name + thin bar in the other-fighter ramp (ivory/danger, never coral); open ivory chevron
+  for the nearest-ahead candidate. Controls guide: ghost "CONTROLS" + cap, level-2 sheet. HT_RoundHold now blocks.
+- MEASURED in Play (user's session): all groups built, no script errors; stagger 76 -> figure coral, CRITICAL,
+  4.8x, gradient fill; reset to 0. SPEED label was 14 tall (fixed to 18, synced next Edit-mode push).
+- NOT DONE from the spec: ground stagger arcs, last-hitter chevron, panel nudge toward the hitter, key caps retiring
+  after 3 rounds, radial cooldown wipe, phone/gamepad device tests. Screenshots impossible (Studio capture is
+  edit-view only). NEXT screens: menu/shop/settings (Phase 4), air-kick meter + clash (Phase 2), round ceremony.
+
+## ui-2 (2026-11-16): Golden Hour rejected; the "Voltline" look, Electric blue; combat HUD rebuilt in it (NOT COMMITTED, awaiting the user's look)
+The user saw the Golden Hour HUD in game and rejected it ("nothing changed", "so ass"), passed over the 9-style
+look book, and gave their own brief: structure from two shop/inventory reference images (bold cards, tabs,
+strong borders, sharp shapes), colour from a third (blue/indigo surfaces, purple/pink/cyan accents), the whole
+game UI, and the class skills Q and R ALWAYS visible with icon, key, cooldown and three states. Preview page:
+vault `UI Research/voltline-preview.html` (artifact https://claude.ai/artifact/QnB9MsrcQNE5stMHMLmSeK). They
+hated the first navy palette and picked palette D "Electric blue" of four. Motion: "surprise me later".
+Build `kits-4g+lobby-4+ui-2`. Place saved v373. Golden Hour docs in the vault stay as history.
+- GIT: spicy's e1252a0 and 0e7ce8e were pulled first (e1252a0 already held my ui-0c..ui-1 files, saved from the
+  place). Local overlap resolved by hand; backup of the pre-pull files in `work/pre-pull-backup-20261116/`.
+- TOKENS (`Shared/Tokens`): the NAMES are kept and are now jobs, not paints (ink = blue surfaces, ivory/stone =
+  text, coral = PINK you/selected, teal = CYAN ready, gold = YELLOW earned and rising stagger, danger =
+  red-orange). New: ink.500, line.500, line.300, violet.400, `Tokens.cut` (the cut-corner images). Radii 2/3/4.
+  Because the names stayed, every old screen (AFK, Spectate, menu, ultimate bar) took the new colours at once.
+- TYPE: display face is Montserrat (Black Italic for headings and big numerals, upright Bold for labels),
+  measured in Studio: weights 100-900, each with an italic. Text stays Builder Sans, timers Builder Mono.
+  Roles carry `italic`; `Typography.face` honours it.
+- SHAPE: `Components.cut(parent, level, lineTone, props, size)` = a clear Frame with `Fill` and `Line` 9-slice
+  images (top-right and bottom-left corners cut; 2 images, no strokes). `Components.cutImage`, `paintCut`.
+  Sources `assets/ui/cut_fill.png`, `cut_line.png`, `cut_flag.png`; uploaded through the Studio MCP
+  (`upload_image` needs an http URL: served the folder with `python -m http.server` on 127.0.0.1). Ids in
+  `Tokens.cut`. They are on the account Studio is signed in to: if the game moves to a group, re-check access.
+  A UIListLayout or UIPadding must never sit directly in a cut frame (it would lay out the two images): put
+  the content in a child body, as the controls guide does.
+- HUD (`HudController`, all data wiring kept): tiles are now Jump and Punch small (56) and Q and R big (76),
+  R outermost. Each: icon, name inside the top (big ones, always shown, upper case), key cap inside the
+  bottom-left, a shade that drains from the top with a white lower edge, the seconds left in tenths, a cyan
+  corner flag when ready, a slash when it can't be used. HELD is new: the R tile turns white-bordered while
+  `HT_Charging` is set. Coming back from a cooldown the tile pops once (1.08, 0.18 s). Stagger: white, yellow
+  from 40 (RISING, new word), red-orange from 70 (CRITICAL); RECOVERING cyan. Strip border turns yellow for
+  the final two. Feed rows have a right edge, pink when the line is about you. Controls guide: 7 rows, text
+  measured with GetTextBoundsAsync x LineHeight (AutomaticSize left wrapped rows one line tall and cut them).
+  `HudTheme.Guide` no longer says "charge" or "PERFECT" (R is a plain hold of up to 3 s since kits-4b).
+- ULTIMATE BAR (`Ui/UltimateMeter`, spicy's): colours from tokens, square, an ULTIMATE label. Same place and logic.
+- GATES: 517 tests (Tokens.spec contrasts re-measured, 3 new; TypeRoles.spec italic + 900), selene 0, stylua,
+  rojo build, gen_config --check. Pushed with rojo_push (167 scripts match).
+- SEEN in Studio play (screen capture DOES show the game view now): HUD in a round, Q cooling with shade and
+  "5.1", R ready with flag and filled key, unavailable tiles slashed, stagger 43 RISING in yellow, the guide
+  open and wrapping, console clean of HUD errors.
+- NOT CHECKED: the HELD state by eye, the ready pop, CRITICAL, the final-two strip, the feed rows, the target
+  marker, gamepad glyphs, touch (the real buttons still have the old round look: their restyle is the phone
+  piece), a 1280x720 or larger window (Studio's view was 843x536; the guide runs off the top at that size),
+  frame cost (not measured; the HUD has fewer strokes and corners than before but two images per panel).
+- KNOWN: only 4 icons exist; Q and R show the old dash/fist art for every class. 16 skill icons and 8 class
+  emblems are still to draw. The air-kick prompt and meter code is still there, unused (spicy's call).
+- NEXT: menu (class screen as in the preview), then AFK/Spectate/toasts, clash bar, lock-on marker, tutorial,
+  phone buttons, icons, motion pass.
+
+## ui-3 (2026-11-16): the menu rebuilt in Voltline (NOT COMMITTED, awaiting the user's look)
+Build `kits-4g+lobby-4+ui-3`. Place saved after it. The user was away ("don't ask permission, I will be AFK").
+- `MenuController` rewritten for looks; behaviour kept (M, the Menu button, X, click outside, gamepad B, toast
+  from `ability.Notice`, redraw on InventoryChanged / KitChanged / HT_InRound, `SetOpen`). Instance names kept
+  where they existed (HT_Menu, MenuButton, Toast, Backdrop, Panel, Header.Coins, Header.Close, Header.Tabs.<tab id>).
+- One sheet (max 1040 x 600, was 780 x 500), cut corners, tabs along the top (the old left rail is gone): the
+  tab id "Abilities" is shown as "Classes". Classes and Shop share one layout: the picked class large on the
+  left (`Body.Detail`: art band with EQUIPPED / OWNED / NOT OWNED, name, blurb, Q and R rows with the cooldown
+  read from Abilities / GameConfig, one button `Detail.Side.Action`) and the cards in a 2-4 column grid on the
+  right (`Body.Page.Content.<kit id>`). Classes lists what you own (Equip); Shop lists what has a price (Buy,
+  or "Need N more"). Passes and Settings are the same placeholders in `Body.List`.
+- Each class has a colour token (`class.<id>`, from the kits-4 design). The big letter on a card stands in for
+  an emblem. Buttons sit on a darker lip and drop onto it while pressed; pink = do it, yellow = spend Coins.
+- GATES: 517 tests, selene 0, stylua, rojo build. Pushed (167 scripts match).
+- SEEN in Studio play at 843 x 536: Classes (Inferno equipped and picked), Shop (Tempest picked), Settings.
+  Console clean.
+- NOT CHECKED: the Buy button and "Need N more" (the test account owns every class), equipping from the menu,
+  the toast, Passes, gamepad focus order through the cards, touch, a phone-sized screen, a full-size window.
+- NEXT: AFK / Spectate / Bots buttons (they have the colours but not the shape), clash bar, lock-on marker,
+  tutorial, phone buttons, the 24 icons, then the motion pass.
+
+## ui-4 (2026-11-16): Voltline rejected too; "Ringside": new navigation, shared window, palette A (NOT COMMITTED, awaiting the user's look)
+The user rejected Voltline ("still looks like the placeholder UI with better graphics and different colors") and
+asked for a change of STRUCTURE, designed before building. Figma was tried and dropped: their Starter plan allows
+about six connector calls a month and they can't pay for more (a draft file with six palettes as variables
+exists, key JD0KFHmxNLHJqXgkWUYHJ2; `UI Research/figma/palette-boards.js` can be pasted into Figma's console).
+Design moved to web pages: `UI Research/palette-comparison.html` (six palettes; they picked A, Ringside Night) and
+`UI Research/ringside-prototype.html`, a clickable prototype they approved ("approve, you can build it, however
+keep in mind all icons are placeholders and will be replaceable"). Later note: the big Emotes button gives its
+place to something that exists; I put the moves guide there and Emotes in the drawer.
+Build `kits-4g+lobby-4+ui-4`. Place saved after it.
+- TOKENS (`Shared/Tokens`): palette A on the same job names (ink = near-black surfaces and the INK of outlines,
+  coral = red-orange primary action / you / picked, teal = GREEN ready / equip / owned, gold = coins, danger =
+  pink-red, line.500 = outline ink, line.300 = faint edge, violet = focus). Radii 6 / 9 / 12. One family,
+  Titillium Web (measured: 200, 300, 400, 600, 700, 900; no 500 or 800), upright everywhere; mono unchanged.
+- ICONS (`Ui/Icons`): ONE list, name -> asset id, 25 placeholders (sources `assets/icons/ringside/*.png`, exported
+  from the prototype's SVGs through a browser canvas, uploaded with the Studio MCP). To replace one: upload,
+  change its id there. `HudTheme.Icons` reads from it. A missing name draws nothing.
+- SHAPE: `Components.sticker(parent, props, {fill, line, depth, radius, button})` = rounded face, 3-unit ink
+  outline, a darker lip under it. `Tokens.cut` now points at ROUNDED 9-slice images (`assets/ui/round_*.png`),
+  so the HUD's panels and tiles turned into rounded ink-outlined ones with no HUD code change; the ready flag is
+  a green badge.
+- NAV (`Controllers/NavController`, new; gui HT_Nav, DisplayOrder 19): lobby = four square buttons on the left
+  (Shop 1, Classes 2, Ranked 3 SOON, Moves 4) and MORE, which opens a drawer (Cosmetics, Profile SOON, Leaders
+  SOON, Emotes SOON, Settings, Codes SOON, an AFK switch, Spectate). In a round (`HT_InRound`) it all hides and
+  one gear button at the top left offers Settings and the controls guide. It only launches: `MenuController:
+  Open(tab)` / `:OpenSettings()`, `HudController:ToggleGuide()` (new), `SpectateController:Toggle()` (new; its own
+  button is hidden), the AfkToggle remote (the old HT_Afk gui is disabled). SOON tiles only say so. Phones get a
+  two-by-two block upper left. For whoever has HT_CanFreezeBots the column steps 150 units right, clear of the
+  Bots and perf tools.
+- SHARED WINDOW (`MenuController`, rewritten): no MENU button. One window, three pages in a UIPageLayout: Shop
+  (classes for Coins; Buy then Confirm, red-orange with a coin), Classes (every class; green Equip; unowned ones
+  dim with "See it in the Shop"), Cosmetics (an honest empty page). Tabs, < > arrows, touch swipe, L1 / R1. A
+  shortcut jumps with no slide (`pager.Animated = false`). Only the current page is redrawn. Settings is a
+  separate small panel. Under a 700 x 400 screen the window scales down as a whole.
+- GATES: 517 tests (contrasts re-measured; TypeRoles for Titillium), selene 0, stylua, rojo build, gen_config.
+- SEEN in Studio play at 843 x 536: lobby column with the drawer open; the window on Classes; the fight view with
+  the gear button, rounded HUD tiles, new skill icons and ready badges. Console clean.
+- NOT CHECKED: Shop page, Buy / Confirm, Equip, Cosmetics page, Settings panel, the fight menu's two rows, AFK
+  switch and Spectate from the drawer, keys 1-4 after the label fix, page swipe, L1 / R1, gamepad focus, phones,
+  whether the emote and AFK icons load (they were blank in one capture), a full-size window, frame cost.
+- NOT BUILT: the prototype's slanted stagger number and segmented bar, round phone thumb buttons, emote wheel,
+  Profile / Leaderboards / Ranked / Codes screens, Passes and Robux shelves, the motion pass, final icons.
+  Old code still present: KickPrompt / KickMeter (unused), AfkController's hidden button, cut_*.png.
+- ui-4b (2026-11-16): the user said the left column "feels like it's not connected" (it sat 150 units in from
+  the edge for the owner, clear of the Bots and perf tools). Now the column is hard against the left edge for
+  everyone, and BotsFreezeController's button and PerfController's readout sit on the RIGHT edge at mid height
+  (anchor 1, 0.5; y 0.42). Seen in Studio play: column at x 22, owner tools on the right. Synced, 517 tests.
+- ui-4c (2026-11-16): the user said the left column looks connected now. Play test of ui-4 at 1190 x 536, mouse
+  and keys (their own session stopped first, with their say-so). WORKS: Shop page; Buy then Confirm (tried by
+  hiding Dragon on the client only: Buy 1000 -> Confirm 1000 -> the server refused with "You already own that
+  kit.", no Coins spent); Equip and its toast; Cosmetics empty page; Settings panel and its three switches, from
+  the drawer and from the fight gear; the drawer; AFK switch (server HT_AFK true, switched back off); Spectate
+  from the drawer (old look still); keys 1, 2, 3 (SOON toast), 4; R1 / L1 flip pages (sent as key codes, no pad
+  connected); the fight gear's two rows; Q ready / cooling (5.2 s, bar) / struck out during Get ready; the
+  Emotes and AFK icons load.
+  FIXED: Moves (key 4, the tile, H) did nothing while you were out of a round, because the guide sits inside the
+  Help group and that was hidden unless you were fighting. `HudController.refreshGroups` now hides only the chip
+  and closes the guide once, on the moment you stop fighting. 517 tests, gates green, synced, place saved.
+  FOUND, NOT FIXED: (1) the controls guide is taller than a 536-high view and its top is cut off; (2) the
+  owner's Bots and perf boxes draw over the guide; (3) Confirm looks the same as Buy but for the word; (4) the
+  class detail panel shows Q and only a sliver of R above the action button at this height (it scrolls);
+  (5) a cooling skill tile's icon is nearly hidden behind the seconds; (6) Settings' close is a small "x", the
+  window's is the big cross icon; (7) Settings dims the fight HUD, Q and R included.
+  FRAME COST (bots stopped, lobby): closed 12.2 to 13.9 ms, window open 11.7 to 15.2 ms, so no steady cost
+  that shows over the noise; the frame the window opens on is a hitch of 40 to 54 ms (closed worst 20 to 27).
+  NOT CHECKED: phones and touch swipe (no script access to the device emulator), a real gamepad and its focus
+  ring, a full-size window. Note: Escape opens Roblox's own menu and it swallows clicks; that was my test, not a
+  bug. `rojo_push.py` needs `rojo serve default.project.json` running first.
+
+## ui-5 (2026-11-16): full rework from reference videos; "fight-poster" mockup (DESIGN ONLY, awaiting the user's look)
+The user dropped Ringside as a constraint ("we're gonna rework everything including colors") and sent eleven
+references (ten TikTok, one YouTube). All studied frame by frame; notes, 43 frame sheets and a summary are in
+the vault at `../UI Research/Video References/` (start at `Batch 1 Summary - Patterns Across the References.md`;
+the method is in `How Video References Are Studied.md`). Asked which direction the first mockup should take, the
+user chose "Fight-poster style" (reference P10: cut buttons on one side, a diagonal colour field with a repeated
+word on the other).
+- Mockup: `../UI Research/fight-poster-prototype.html`, https://claude.ai/artifact/ScFqVNZYHhvufmBUMdwwa3.
+  Lobby menu (Classes, Shop, Ranked, Moves, More), field re-themes per entry and per picked class, Shop with a
+  distinct Confirm step, fight HUD (slanted stagger number, knockback, 12-segment bar; Q and R with ready /
+  cooling / can't-use told apart by shape and word), phone layout with round thumb buttons, and a 1.7 s
+  ultimate overlay (wedges, band, cut-out letters, flash, break). Fonts Oswald + Titillium Web.
+- Checked in the Browser pane from a local server: lobby, class re-tint, HUD states, phone layout, the overlay's
+  held frame. The pane has reduce-motion ON, so the motion itself was only seen as paused frames.
+- NOTHING is built in Roblox. The ui-4 (Ringside) code is still what is synced, uncommitted, with the ui-4c fix.
+- Vault: Haymaker now has a `.game` marker; search with `python ../../_tools/vault.py --game "Haymaker Tussle"`.
+- Open with the user: dense or sparse, class re-colour everywhere or only in Classes, flat screen or 3D-world
+  menu, per-class art style for ultimates, and no in-fight HUD reference exists in the batch.
+- ui-5b (2026-11-16): the user, on seeing the first pass: "HUD should not cover the entire screen", "remove
+  the ultimate bar for now", and getting your ultimate should "notify you on the screen with some cool
+  animations". Mockup changed (same link, version 3): menus are a poster WINDOW with the arena visible around it
+  and behind the buttons; no ultimate bar; when the ultimate is earned a banner lands near the top (streak,
+  cut-out letters one by one, READY + key, edge pulse, about 1.5 s) and tucks into a small "ULT READY" badge by
+  the skills; using it still plays the 1.7 s band with the class name, now without the corner wedges.
+  Rule from this: nothing in this game's UI covers the whole screen.
+- ui-5c (2026-11-16): the user: colours "more vibrant and playful"; animations "cooler and vibrant and
+  bouncier"; background textures should drift slowly up and to the right. Mockup version 4: brighter palette
+  (ink is now a dark violet #1A1236; entries green / yellow / red-pink / blue / purple; brighter class colours,
+  Bruiser moved to lime as a proposal), spring easing everywhere (window and tiles overshoot and settle, buttons
+  squash on press, staggered pops, stagger number punches and its plate shakes, a skill pops when it comes off
+  cooldown), the ultimate notice drops its letters with a bounce plus a confetti burst, and the window's
+  repeated word and dot layers loop up and to the right (18 s and 7 s).
+  For Roblox: springs = TweenService Back / Elastic or a spring module on UIScale; the drift = a tiled image
+  with its offset tweened; both need a frame-cost measurement and a Reduced Motion path.
+- ui-5d (2026-11-16): the user: "the colors SHOULD compliment each other, don't just mix and match random
+  colors". Version 5 rebuilds the palette as ONE system: violet ink #1A1236 and cream paper #FFFBEF; three print
+  inks with jobs (yellow #FFD426 = coins and the loudest accent, the opposite of the ink; cyan #21D4FD = ready
+  and go; magenta #FF4D9E = danger, close, can't-use); a light violet #C9BEFF for quiet controls; eight class
+  colours as one warm-to-cool sweep at even brightness (Base #FFD426, Bruiser #FF9F2E, Inferno #FF6B3D, Beast
+  #FF4D6D, Trickster #FF5CC8, Dragon #A97BFF, Frost #4DB8FF, Tempest #2EE0C8). The class picker lays tiles out
+  in that order. The mockup page has a "colour system" card with swatches.
+- ui-5e (2026-11-16): stagger meter recoloured at the user's ask (number white / yellow / red; bar green /
+  yellow / red; green and red used nowhere else). The user then said "CURRENTLY i like everything so far" and
+  asked for sound. Mockup version 8 adds:
+  - SFX (browser-synthesised stand-ins): press, window open / close, screen switch, equip, buy, refused, hit,
+    skill use, skill ready, stun, knockout, ultimate earned, ultimate used, last-players call.
+  - "Last N" popups at 5, 4, 3 and 2 standing: a big slanted number slams in near the top over a coloured bar
+    with "FIGHTERS LEFT" ("FINAL TWO" at 2, plus shake and confetti), about 1.7 s, then flies up into the
+    standing counter, which bumps. Not full screen.
+  - VOICE LINES, ONLY TWO KINDS (the user's rule): "Ultimate ready!" and the last-players calls ("Five fighters
+    left!", "Four left!", "Three left!", "Final two!"). The mockup uses the device's computer speech as a
+    placeholder; other sound ducks under it.
+  - For Roblox (vault: "Audio Mixer Settings with SoundGroups", "Sound Fundamentals", "Sound Design Pitfalls"):
+    SoundGroups for SFX / UI / Voice under Master, duck under voice, feedback sounds on the client, one voice
+    per key with pitch variance, preload, assets uploaded under the experience owner. No audio is chosen or
+    uploaded; do not invent asset ids. The game has no "N players left" event wired to UI yet: RoundService
+    publishes Alive on ReplicatedStorage.HT_RoundState, which is enough to drive it on the client.
+- ui-5f (2026-11-16): the user found the placeholder voice robotic and asked to sample the voice at 2:30 to
+  2:32 of https://www.youtube.com/watch?v=PH_c6kTJlS8 for every voice line. That video is "Evolution of FIGHT
+  Sound Effect (1992-2019)" (channel GamelutioN): the clip is a Mortal Kombat announcer's "FIGHT!". NOT DONE,
+  and told to the user: no tool here can capture or clone audio, and the voice is a commercial game's recording
+  by a real actor, so copying or cloning it into the game is not something to do (rights, and Roblox audio
+  moderation). It is recorded as the STYLE TARGET only: deep, gravelly, short and shouted, with a big-room echo.
+  Mockup version 9: the placeholder now picks a male English system voice if present, pitch 0.25, rate 0.88.
+  Real routes offered: the user or a friend records the five lines; a hired voice actor; a text-to-speech
+  service whose licence allows game use with a stock deep voice; or Creator Store announcer audio via the
+  roblox-sfx skill.
+- ui-5g (2026-11-16): the user asked for the earlier stagger colours back. Mockup version 10: number and bar go
+  white, then yellow (#FFD426), then magenta pink (#FF4D9E). The green / yellow / red trial is dropped.
+- ui-5h (2026-11-16): the user supplied the MP3 of the Mortal Kombat "FIGHT" video and asked for the voice at
+  2:30 to 2:32. Cut with Windows' built-in MediaTranscoder (no installs; numpy and scipy are present, there is
+  no MP3 decoder otherwise) and measured. The window holds TWO "FIGHT!" shouts from a montage, about 0.7 s each,
+  with other audio underneath; pitch unreliable. Saved as a style reference only, with a brief for a real
+  recording, in `../UI Research/Audio References/`. Still not done and not to be done: using that clip in the
+  game or cloning its voice. Waiting on the user for how to get real voice lines.
+- ui-5i (2026-11-16): the user chose "Search Creator Store" for the announcer. Searched ten queries with the
+  roblox-sfx skill (set PYTHONIOENCODING=utf-8 or its printing crashes on non-Latin names; ask one page at a time
+  and pause between queries or the toolbox endpoint fails). No set exists: four of the five lines have no match,
+  "ultimate ready" has one clip of unknown origin (id 108588196592790, unverified), and most announcer audio there
+  is lifted from other games. Not probed in Studio: Studio was in a Play session I did not start. Findings are in
+  `../UI Research/Audio References/Announcer Voice Target.md`. The five lines still need one recorded voice.
+- ui-5j (2026-11-16): three asks from the user, all in mockup version 11:
+  (1) IDLE MOTION on interactable controls only, "subtle but noticeable, don't overdo it": every pressable
+  button drifts about 5 px and tilts under 1 degree on a 2.5 to 3.3 s loop, each with its own speed and phase;
+  the stagger readout, counter, coins, disabled buttons and a skill that is cooling or blocked stay still.
+  (2) NO WHITE FLASH: "can become nauseating really quick". Screen changes now use a slanted band a shade
+  lighter than the window sweeping across it (0.5 s); using the ultimate pulses the edge bars in the class
+  colour instead of a white frame.
+  (3) SOFTER SOUNDS: "hurts my ears". All stand-in sounds rebuilt with sine and triangle tones only, lower
+  pitches, slower attacks, a low-pass at 3 kHz and a quieter master; the press tick is barely audible.
+  Also fixed: Try it buttons used from the Lobby threw an error; they now switch to Fight first.
+  For Roblox: drive idle motion from ONE shared clock for visible, pressable controls only, measure its frame
+  cost, and skip it under Reduced Motion.
+- ui-5k (2026-11-16): the user reversed point (2) above: "you can keep the white flash transition". Version 12
+  restores the one-frame white flash on screen changes and on using the ultimate. Idle motion and the softer
+  sounds stay. The colour-wipe element is still in the file, unused.
+- ui-5l (2026-11-16): sounds nudged a little sharper at the user's ask (version 13). Then the user supplied five
+  voice recordings (MP4s in Downloads, one per line; the ultimate line is their own audio, the source of the
+  other four was not stated). Converted with Windows' MediaTranscoder, measured (all very quiet, already about
+  100 Hz deep, dark), and two sets made in `../UI Research/voice/`: `original/` (trimmed and levelled) and
+  `edited/` (clarity boost, slight grit, short room echo). Mockup version 14 plays these files instead of
+  computer speech, with a Voice switch (Edited / Original); published with the ten WAVs as supporting files.
+  All ten confirmed to load; not heard. Before any of these go into Roblox: confirm where the four non-ultimate
+  lines came from, then upload under the experience owner (audio uploads are quota-limited).
+- ui-5m (2026-11-16): the user confirmed all five voice recordings are their own audio, so they are clear to
+  upload to Roblox under the experience owner when the build reaches sound.
+- ui-5n (2026-11-16): the user picked the EDITED voice set, then asked for the background noise out, the dead
+  air cut, and the lines synced to their popups (the voice sat about 0.7 s into each file, so popups were already
+  fading when the words began). `../UI Research/voice/edited/*.wav` rebuilt: 95 Hz high-pass for rumble, a
+  spectral gate learned from the pre-voice hiss (30 dB cut), a gate between words, start and end re-cut on the
+  cleaned audio so soft first sounds (f, th) survive, then the approved edit chain. Lengths now 1.16 to 1.52 s
+  (were 2.08 to 2.85 s). The user heard it on the local preview and said "its fixed i think".
+  NOT DONE: the artifact link still carries the OLD voice files (publish with the `files` list to update them);
+  `voice/original/` still has the old dead air; popups do not yet wait for their line to end; not heard by me,
+  spectral gating can leave a watery sound.
+- ui-5o (2026-11-16): the user asked for "the final product of everything". Mockup version 15 published with the
+  rebuilt voice files. Finished the leftovers from ui-5n: `voice/original/` re-cut at the same points (0.78 to
+  1.14 s); each popup now stays fully on screen until its line ends (last-players popups 1.70 to 2.19 s, the
+  ultimate notice 1.95 s), with the voice starting 0.10 to 0.12 s after the popup. Checked on the local preview:
+  no errors, all ten files load, popup durations as computed. Not heard by me.
+  CURRENT STATE OF THE DESIGN: `../UI Research/fight-poster-prototype.html`,
+  https://claude.ai/artifact/ScFqVNZYHhvufmBUMdwwa3 . Nothing of it is built in Roblox; ui-4 (Ringside) plus the
+  ui-4c Moves fix is still what is synced in Studio, uncommitted.
+- ui-5p (2026-11-16): FINAL on flashes: the user asked for the white flash to be removed again, "or find an
+  alternative so it doesn't give people epilepsy". Version 16: no white flash anywhere. Screen and class changes
+  use one soft slanted band a shade lighter than the window sweeping across it (0.5 s); using the ultimate pulses
+  the thin edge bars once in the class colour; the skill-ready pop no longer brightens sharply. Rule for the
+  build: no full-screen or large-area flashes, nothing that blinks more than three times a second.
 
 ## kits-4i (2026-11-16): the boom is out of every punch; M1 hit options in the F7 picker
 Build stamp `kits-4i+lobby-4+ui-4`. NOT committed.
@@ -1970,6 +2297,225 @@ gates pass (498, Tokens x2 the teammate's). Field Notes Sound Design Pitfalls se
 Build stamp `kits-6f+lobby-4+ui-4`. NOT committed. The user picked ult_haymaker B, "Star Platinum Punch 1" (reelx1ty,
 community; attack 0.02 s, peak 663 at 0.17 s, start 0.13, volume 1.6). All Haymaker Rush sounds are SoundBank
 entries now (ult_rush Itadori's punch JJK, ult_haymaker Star Platinum Punch 1, ult_bed PSE Hollow Rumble 2);
+SoundCandidates is empty and the picker hides. Gates pass (498, Tokens x2 the teammate's).
+
+## ui-5a (2026-11-16): FIRST BUILD PIECE of the fight-poster UI: the colour system and a smaller stagger panel (NOT COMMITTED)
+The user approved the mockup ("i think we're ready to build"), asked for the stagger panel to be smaller in the
+game than in the mockup, and said to REMOVE ALL THE CURRENT UI so the new one replaces it.
+- BEFORE BUILDING: origin/main was 3 commits ahead (kits-4i to kits-6f, which also committed the ui-2..ui-4 files
+  from the place). Every uncommitted UI file here was identical to or older than GitHub's, so they were backed up
+  to `work/pre-pull-backup-20261116b/`, restored, and the pull fast-forwarded. HANDOFF.md was merged with
+  `git merge-file --union` (both sides' sections kept). Local-only and still uncommitted: tests/HudLogic.spec,
+  tests/Tokens.spec, tests/Motion.spec, tests/TypeRoles.spec, README.md, HANDOFF.md.
+- TOKENS (`Shared/Tokens`): the fight-poster colour system on the same job names. ink = deep violet (#120C28
+  outline, #1A1236 panel), ivory = cream, stone = violet greys, coral AND gold = yellow #FFD426 (primary action,
+  you, coins: the opposite of the ink), teal = cyan #21D4FD (ready, equip, owned), danger = magenta #FF4D9E,
+  violet = light violet #C9BEFF (focus, quiet), line.300 #4A3F7A, and the eight class colours as one warm-to-cool
+  sweep. Every existing screen re-coloured with no screen code changed. Contrasts re-measured in
+  tests/Tokens.spec (ivory 17.1, yellow 12.4, cyan 10.1, magenta 5.8, stone 5.5 on the panel).
+- STAGGER PANEL (`HudController`): `L.YShrink = 0.78` on desktop (phones keep their own panel). 252 x 68 px at
+  1280 x 720 = 19.7 % x 9.5 % of the screen (was 25 % x 12 %). It is a uniform scale, so its small labels are
+  now about 11 px; the proper restyle (slanted number, segmented bar) replaces this.
+- Build `kits-6f+lobby-4+ui-5a`, 520 tests, gates green, synced, seen in Studio play at 1190 x 536 (colours and
+  the smaller panel; console clean), place saved.
+- STILL THE OLD LAYOUT, to be replaced piece by piece and each old piece deleted as its replacement lands:
+  the left nav column, the shared window (MenuController), the HUD's tiles and strip, the ULTIMATE BAR (the user
+  wants it gone: a notice instead), spectate, the controls guide. NOT BUILT from the mockup: cut-shape buttons and
+  poster window, repeated-word drifting background, class re-tint, slanted stagger number and segmented bar,
+  ultimate notice and badge, last 5 / 4 / 3 / 2 popups, idle motion, springy motion, the soft sound set, the five
+  voice lines (the user's own recordings, `../UI Research/voice/edited/`; not uploaded to Roblox).
+- Note for sound work: kits-5e to 6f (the other session) picked an ultimate-ready sound and rebuilt sounds in
+  `Shared/Config/SoundBank`; read those sections before adding the voice line so the two do not clash.
+
+## ui-6a (2026-11-16): the fight HUD of the fight-poster mockup: stagger plate, skill tiles, strip (NOT COMMITTED)
+The second build piece. The three HUD pieces a player looks at in a fight are now the mockup's, and the old ones
+are deleted. Build `kits-6f+lobby-4+ui-6a`, 522 tests, gates green, synced, place saved v404, nothing committed.
+- SHAPES: Roblox cannot skew a frame, so three white PNGs are tinted in use. Drawn by
+  `design/ui/draw_poster_shapes.py` into `assets/ui/poster_*.png`, uploaded with the Studio MCP's `upload_image`
+  (it needs an http URL; port 8765 was another session's server, so use a free port). The ids live ONLY in the new
+  `src/client/Ui/Shapes.luau`: `slant` (a parallelogram, 3-sliced with zero-height rows so one image makes a
+  slanted plate of any size; `Shapes.slant(parent, tone, lean)`), `tile` (the rough-cut quad, stretched; the same
+  image inset 4 units is the tile's fill) and `stripes` (the can't-use pattern).
+- STAGGER PLATE (`HudController`, group `You`; sizes in `L.Y` / `L.YPhone`, theme in `HudTheme.Stagger`): ink
+  plate, class-colour left edge, slanted number (new role `numeral.stagger`: Titillium Bold Italic, 72), STAGGER,
+  "2.1x knockback" on one line, one word (RISING for 0.8 s after a gain / RECOVERING / STEADY), 12 segments.
+  252 x 84 units = 19.7 % x 11.7 % at 1280 x 720. `L.YShrink` is gone. Smallest text is 15, the floor.
+  A gain punches the number; a gain of 5 or more shakes the plate once; neither under Reduced Motion.
+- COLOUR STEPS: this game's stagger maximum is 100, not the mockup's 150, so "yellow at 50, pink at 100" would
+  have put pink only at the very top and out of step with the bar. Number and bar both step at THIRDS of the
+  maximum (`HudTheme.Stagger.YellowShare` / `PinkShare`): white under 34, yellow 34 to 66, pink from 67. At a
+  maximum of 150 those are exactly 50 and 100. One line to change if the owner wants the literal numbers.
+- SPEED GAUGE: REMOVED. The approved mockup has none, the owner asked for a smaller panel and for the old UI to
+  go, and keeping it meant either a label under the text floor or a taller panel. `HudLogic.speedGauge` and
+  `steadyDigits` and their tests went with it. Git history has it if the owner wants it back.
+- SKILL TILES (group `Kit`; `HudTheme.Tile`): Jump and Punch 76 units in light violet, Q and R 96 in the class
+  colour (the mockup's are 84 and 104; row = 29.7 % x 13.3 % at 1280 x 720). Ink outline, hard shadow, cream key
+  cap, icon, name. READY = bright tile + a cyan flag with a drawn tick and the word READY (Q and R). COOLING =
+  dark, a darker class-colour fill rising from the bottom, the seconds, the icon stepped aside. CAN'T USE = dark
+  with stripes, a pink slash, and a pink flag saying STUNNED or CAN'T USE (ink lettering: cream on that pink is
+  about 2.9:1). Held R = bright with a cream outline. Coming off cooldown Q and R pop once; a refused key knocks
+  the tile sideways; no colour blinking. Punch's key cap now says CLICK (was a mouse picture).
+- STRIP (group `Strip`; `HudTheme.Strip`): slanted ink plate, class colour under it (yellow for the final two and
+  the last one), count in yellow. The ARENA CLOSING chip is a slanted pink plate.
+- CLASS COLOUR: `Tokens.hex["class.<kit id>"]` from `AbilityController:GetKitId()`, repainted on `KitChanged`.
+- DELETED: the old cut-corner stagger panel, its bar with ghost and drain tick, the speed gauge and notch, the old
+  tiles (shade, corner badge, key cap stroke states), the strip's cut panel; `HudTheme.Size` and `HudTheme.Time`
+  entries nothing reads any more; `HudTheme.Icons.mouse`. `Components.cut` / `Tokens.cut` stay: the controls
+  guide and the spectating chip still use them.
+- NOT TOUCHED (later pieces): the ultimate bar, the lobby nav, the menu window, the feed, the controls chip and
+  guide, the spectating chip, the target marker, the touch buttons' cooldown overlay.
+- MEASURED in my own Studio play test (viewport 932 x 536, Tempest, bots frozen): the HUD's whole per-frame loop
+  0.05 ms a frame idle and 0.06 ms with a skill cooling (set the player attribute `HT_HudProfile` to true and
+  read `HT_HudMs`); whole HT_Hud on against off over five alternating rounds: 11.39 against 11.24 ms a frame,
+  inside the run-to-run noise (about 1 ms). 139 instances in the three pieces. Console: only the known lines
+  (`rbxassetid://203785492` asset type, not ours).
+- SEEN: ready / cooling / can't-use, stagger at 22 (white), 55 (yellow), 88 (pink), strip while fighting and in
+  intermission. Screenshots: the shared notes folder, `ui-6a-shots/`.
+- KNOWN, NOT FIXED:
+  - The HUD never scales below its 1280 x 720 size (`HudTheme.Scale.Min = 1`, there before). In a small Studio
+    window the plate is 252 x 84 PIXELS: 27 % x 15.7 % of a 932 x 536 viewport. Judge size at 1280 x 720 or
+    larger, or lower the floor for desktop (text would then go under 15 px on small windows).
+  - In the LOBBY (intermission, you alive) the stagger plate shows under the old left nav's MORE button, as the
+    old panel did. It belongs to the nav piece: either hide the fight HUD outside a round or move the nav.
+  - The rising cooldown fill is close in tone to the dark tile on cool class colours (Tempest).
+- NOT TESTED: phones (the plate's phone layout, 208 x 76 under the top-left buttons, has never been on screen:
+  Studio's touch input cannot be driven from the MCP), a real gamepad (glyph caps), a larger Roblox text-size
+  setting (the plate grows by its three text lines; the tiles do not), Reduced Motion, every class colour but
+  Tempest, the final-two strip, the ARENA CLOSING chip, the held-R look, how the motion FEELS (seen as stills).
+
+## ui-6b (2026-11-16): the fight HUD made to match the mockup exactly; tools to capture the mockup (NOT COMMITTED)
+The owner, after ui-6a: "I want it to look EXACTLY like it though", and the whole new UI is to replace the old one
+(order: ultimate notice, last-players popups, lobby buttons and poster window, motion and sound). This pass redid
+the three ui-6a pieces to the mockup's own pixels, fonts and curves. Build `kits-6f+lobby-4+ui-6b`, 528 tests,
+gates green, synced, place saved v407, nothing committed.
+- THE METHOD (use it for every later piece):
+  - `design/ui/mock_capture.py` renders the mockup ITSELF with headless Edge at 1280 x 720 in a chosen state
+    (`out.png '{"view":"fight","cls":"Tempest","stag":82,"cdq":3.1}'`), prints any element's on-screen box
+    (`--dump mock.html '{...,"rects":["#stag",".skl"]}'`), and captures any page on a clear background
+    (`--clear --page x.html`). Nothing installed or downloaded. Its timers: one timer does everything, because
+    `clearInterval` also cancels timeouts.
+  - `design/ui/proof_pair.py` stacks a mockup capture and a Studio capture at one image pixel per HUD unit.
+    Studio's `screen_capture` is 1.25 x the viewport on this PC and is saved as a JPG under the session's
+    `tool-results` folder.
+  - TEXT: a browser's 15 px is not Roblox's TextSize 15. Measured with the same strings in both: Oswald needs
+    1.463 x the CSS size, Titillium Web 1.508 x. `Ui/Poster.text(parent, "display" | "label", cssPx, tone)` does
+    the sum. Oswald loads in Roblox (200 to 700, NO slanted faces). Roblox has no letter spacing.
+  - MOTION: `Core/PosterEase` holds the mockup's `--spring` (its CSS `linear()` list, point for point), its
+    `--pop` cubic-bezier, the CSS ease keywords and a keyframes helper (tests in `tests/PosterEase.spec`).
+    `Poster.run(key, seconds, step)` drives anything on one shared frame connection that exists only while
+    something moves; under Reduced Motion it jumps to the end. TweenService's Back and Elastic are not used.
+  - SLANTED SHAPES: a 9-slice loses its lean when Roblox draws it small (it picks a smaller copy of the image
+    and slices that with the full-size numbers; measured in Edit mode). So `Shapes.slant` is a wedge image, a
+    plain body and a pre-turned wedge (`Rotation = 180` on the second wedge left a hairline seam). Recolour with
+    `Shapes.paint`. Stagger segments have their own two stretched images.
+  - THE NUMBER: Roblox has no slanted Oswald, so the stagger number is drawn from a sheet of digits the browser
+    rendered (`design/ui/poster_digits.html` -> `assets/ui/poster_digits.png`, `Shapes.digits` holds the cell
+    size, baseline and each digit's advance; `Poster.number` / `setNumber` lay them out).
+- NEW TYPE: `Tokens.family.poster` (Oswald), roles `poster.display` and `poster.label` (never scaled by the
+  player's text-size setting: the layouts are fixed). Tokens `poster.dark` / `poster.stripe` / `poster.unlit` are
+  the mockup's own darks. `numeral.stagger` (ui-6a) is gone again.
+- STAGGER PLATE: the mockup's plate whole (label on top, number, "3.8x" / knockback / word column, segments),
+  built in the mockup's pixels and shrunk as one piece by `L.YScale = 0.66`: 264 x 110 units = 20.6 % x 15.3 %
+  of 1280 x 720 (the mockup's is 31 % x 23 %). 0.66 is where its 15 px labels land on the 15-unit text floor.
+  This REPLACES ui-6a's compact 252 x 84 arrangement, which was my own layout, not the mockup's.
+- TILES: the mockup's sizes (84 and 104, 14 apart, right 26, bottom 24), Oswald key caps ("Space", "Click", Q,
+  R), 34 px seconds, the mockup's dark #2B2924 and stripes, `spop` / `nope` on the real curves.
+- STRIP: 72 tall, 18 from the top (under Roblox's own top bar), 34 px Oswald count, words on its baseline.
+- DIFFERENCES FROM THE MOCKUP THAT REMAIN, AND WHY:
+  1. The stagger plate is 66 % of the mockup's size (the owner asked for smaller).
+  2. READY / STUNNED flag: in the mockup it lies over the key cap and HIDES the Q or R. The key must always be
+     visible, so the cap is 30 wide instead of 42 and the flag reaches 8 units past the tile's right edge.
+  3. Stagger colour steps at thirds of 100 (34, 67), the mockup's at 50 and 100 of 150: the same shares.
+  4. Icons are the game's placeholder drawings; the mockup has plain glyphs.
+  5. No letter spacing in Roblox: tracked labels (STANDING, knockback, tile names) are a little narrower.
+  6. "Used" squash: the mockup squashes a tile to 1.25 x 0.6; Roblox can't stretch a tile's contents unevenly, so
+     it shrinks evenly (0.87) and springs back on the same curve.
+  7. The ready tick is drawn with two strokes, not the font's glyph.
+  8. The strip shows this game's wording per phase and sits under Roblox's top bar (76 from the screen top).
+  9. Extra in the game, not in the mockup: the held-R look, CAN'T USE for blocks other than a stun, the result
+     word over Punch and Jump, the ARENA CLOSING chip.
+- PROOF: the shared notes folder, `ui-6b-proof/` (ready, cooling, can't use: mockup over game at the same scale).
+- MEASURED (viewport 932 x 536): HUD loop 0.04 ms a frame; console only the known lines.
+- NOT TESTED: phones (the touch plate has never been on screen), a gamepad, Reduced Motion, classes other than
+  Tempest, the motion in real time (stills only), the count bump, final two.
+- STILL OLD: the ultimate bar, the left nav and gear, the menu window, the feed, the controls chip, spectating.
+
+## ui-6c (2026-11-16): ultimate bar removed; ULTIMATE READY notice and badge; last-players popups (NOT COMMITTED)
+Pieces 1 and 2 of the owner's order after the HUD. Build `kits-6f+lobby-4+ui-6c`, 528 tests, gates green, synced,
+place saved v409, nothing committed.
+- GONE: `Ui/UltimateMeter.luau` (the bar, its pulsing fill, the ring prompt). No meter is on screen now.
+- NEW `Ui/Callouts.luau`: the two big announcements, built when they start and destroyed when they end.
+  - `Callouts.ultimate(colour, key, done)`: the mockup's `.ucall`: ULTIMATE in cut-out letters dropping in on the
+    spring one by one (0.18 s + 0.045 s each), a slanted streak, a READY stamp with the key, 18 confetti, the thin
+    edge bars pulsing once; holds, kicks once, then flies down-right toward the skills. Lasts
+    max(1.7, (0.12 + line) / 0.8) s = 1.95 s, as in the mockup.
+  - `Callouts.last(count, small, done)`: at 5, 4, 3, 2 standing: a big slanted number (an image, with its
+    outline and shadow, rendered from the mockup's font: `design/ui/poster_last_digits.html`) slams in over a
+    coloured bar with FIGHTERS LEFT; at 2 it says FINAL TWO, shakes and throws 20 confetti. It holds for its
+    voice line (1.7 to 2.2 s), flies up into the strip, and the strip's count bumps.
+  - Driven from `HudController.refreshStrip`: only when Alive really FELL to that count during a fight, so
+    joining a round already at 4 shows nothing. Everyone sees it, fighters and spectators.
+- NEW `Ui/UltimateNotice.luau` (same three calls UltimateController used: start, prompt, hidePrompt): follows the
+  player's HT_UltReady by signal, not per frame. Earned -> the notice -> a badge above the skills, "ULT READY"
+  and the key, in the class colour (the mockup's `.ultb`: pops in on the spring, then breathes). The G
+  follow-up WINDOW (1.2 s, the game's own rule, not in the mockup) shows on the badge: it says PRESS and an ink
+  line under it runs out. On touch the badge has no key and sits under the strip; the real Ult button stays the
+  control.
+- VOICE (`Shared/Config/VoiceLines.luau`, the ONE place): the five lines with their lengths and EMPTY ids. Nothing
+  is uploaded: audio uploads are limited and public-facing and wait for the owner's word. To turn a line on, put
+  its `rbxassetid://` in `id`. Popups already hold for each line's length. `UltimateLineReplacesSound = true`:
+  once "ultimate-ready" has an id, the spoken line plays INSTEAD of SoundBank `ult_ready` (kits-5f's 2.6 s
+  shine), so the two never overlap; until then that sound plays as before.
+- MEASURED (my play test, viewport 932 x 536): the notice adds about 0.6 ms a frame for its two seconds, the
+  final-two popup about 0.5 ms, the 5 / 4 / 3 popup and the edge bars nothing measurable; nothing runs when none
+  is on screen. A first build cost about 3 ms: it faded each letter through its own CanvasGroup inside a big
+  one. Now things fade by their own properties and a CanvasGroup is used only for the last fifth of a second.
+  (Frame-time noise in Studio is about 1 ms; alternate short samples to see anything smaller.)
+- FOUND: AutomaticSize on a frame whose child is sized by scale AND has a UIScale feeds back on itself (the
+  letter cards grew to 300 units). Letter widths are measured with TextService instead.
+- DIFFERENCES FROM THE MOCKUP, AND WHY: no voice yet (not uploaded); no announcement sounds yet (the sound piece);
+  the last-players bar is wider than a small Studio window, so its slanted ends are off screen there; letters,
+  stamps and numbers fade in by property over the same time rather than as one layer; the mockup's band with the
+  class name when the ultimate is USED is not built (the game has its own ultimate sequence).
+- PROOF: the shared notes folder, `ui-6c-proof/`.
+- NOT TESTED: a real ultimate earned in play (I set HT_UltReady and Alive from the server), the G window on the
+  badge, the voice path, gamepad and touch, Reduced Motion, counts 4 and 3, two announcements at once.
+
+## ui-6d (2026-11-16): the LOBBY in the fight-poster look: WRITTEN, NOT TESTED, NOT SYNCED (stopped at a usage limit)
+STUDIO IS STILL AT ui-6c (place v409). The files below are on disk only. Do NOT Rojo-push until the steps under
+"TO FINISH" are done and a play test has passed: none of this code has run once.
+- ASSETS, uploaded and recorded in `Ui/Shapes.luau` (ids and word-tile widths): the five menu strips' shapes, the
+  MENU and X shapes, the class tile and its stripes, the action button, the shop slab, the dot tile, and thirteen
+  WORD TILES (eight classes, Shop, Ranked, Moves, More, Settings) from `design/ui/make_word_tiles.py` +
+  `design/ui/poster_words.html`. Shapes come from `design/ui/draw_poster_shapes.py` (`MENU_SHAPES`).
+- NEW `Ui/PosterKit.luau`: cut (rough-cut shape with outline and shadow), pressable, pop, cap, tag, row (the
+  slanted ink row), title (outlined word with shadow), lobbyScale (the lobby scales as a whole, 0.6 to 1.35).
+- REWRITTEN `Controllers/MenuController.luau`: the poster window (948 x 612 at 306, 86; leaning paper, cream
+  slash, drifting dots and word in a CanvasGroup, wipe band on page change, toast under the strip). Pages:
+  classes, shop (Buy then Confirm, scrolls), ranked (planned), moves, more (Settings, AFK, Spectate, planned
+  rest), settings. API: Open(entry), Close(), SetOpen, OpenSettings, GetEntry, Toast, signal Changed(entry?).
+  Old page names still accepted. In a round only more / moves / settings open.
+- REWRITTEN `Controllers/NavController.luau`: the five strips (Classes 1, Shop 2, Ranked 3, Moves 4, More), the
+  coins plate, the fight's MENU button; keys 1 to 4, and H / Select for Moves.
+- TO FINISH, in order:
+  1. `HudController`: delete the old CONTROLS chip and guide (lines found with
+     `grep -n "help\|guide\|GUIDE_\|HELP_ACTION\|toggleGuide\|wasFighting\|TextService"`): the build block from
+     "-- the controls guide" to "-- F: the ring-out feed", the help / guide lines in layout(), refreshGroups and
+     refreshDevice, toggleGuide and its BindAction, `HudController:ToggleGuide`, and the two constants. It binds
+     the SAME action name ("HaymakerHelp") as NavController, so one of the two silently wins until it is gone.
+  2. Delete `Controllers/AfkController.luau` (it only draws the old top-left AFK button; NavController no longer
+     hides it; AFK is a row of the More page). Keep `HudTheme.Afk`: SpectateController reads it.
+  3. Bump the build label to ui-6d, run the gates, fetch and pull, push in Edit mode, play test.
+  4. Check in play: the strips and their entrance, each page, buy / confirm / equip, AFK and Spectate rows, the
+     window's drift (measure its frame cost: the CanvasGroup redraws every frame while open), M / X / B, the
+     round fold (MENU button), the toast, a 932 x 536 window. Compare with `design/ui/mock_capture.py`
+     (`'{"entry":"classes","cls":"Tempest"}'`) using `design/ui/proof_pair.py`.
+- KNOWN DIFFERENCES ALREADY DECIDED: the window's contents stand straight while its paper leans 0.6 degrees
+  (Roblox cannot clip or scroll turned things); planned slabs and the Confirm ring have plain lines, not dashes;
+  the dotted corner of the cream slash is not drawn; the shop scrolls (a new player has seven classes to buy).
+- NOT STARTED: piece 4 (idle drift on pressable controls, the soft sound set), the feed, the spectating chip and
+  SpectateController's panel in the new look, the "class name" band when an ultimate is used.
+- A LOCAL IMAGE SERVER may still be running on 127.0.0.1:8791 (serving assets/ui) and `rojo serve` on 34872.
 SoundCandidates is empty and the picker hides. Gates pass (498, Tokens x2 the teammate's).## kits-7a (2026-11-17): our own M1 and heavy-hit sounds, from Sonniss GDC 2026 recordings
 Build stamp `kits-7a+lobby-4+ui-6c` (disk and place match). NOT committed.
 - The user wants sounds MADE for the game, not picked. Synthesis failed four rounds ("a slap", "drums", vocoder
@@ -2029,3 +2575,326 @@ Raging Demon and Orlando Furioso were studied for camera motion (sheets in the s
      117958044865545 (1.02 s), 87361464437966 (1.65 s), 108575892208319 (1.70 s), 95801559782723 (1.83 s),
      114289646726161 (2.12 s), 102850005066154 (3.51 s, trim)
   5. camera test, gates, play test (Studio throttles to 12-15 fps when covered: measure only when it's visible)
+
+## ui-6d FINISHED (2026-11-17): the lobby runs; nothing overlaps; smaller; blur behind the window (NOT COMMITTED)
+Build `kits-7c+lobby-4+ui-6d`, 530 tests, synced, place saved v421, nothing committed. The section above
+(ui-6d, "WRITTEN, NOT TESTED") is now done; this is what changed while finishing it.
+- PULLED FIRST: origin/main had two new commits (kits-7a, kits-7b..7c) that also hold a copy of the UI up to ui-6c
+  "saved from the place". A plain pull was refused (same files changed here, uncommitted). Done by hand, nothing
+  lost: every overlapping file backed up outside the repo (shared notes folder of this session,
+  `pre-pull-backup/`), fast-forward, local work put back. HudController, HudTheme, Shapes keep the local (newer)
+  text; UltimateController and SoundBank are the remote's. `stylua --check` now fails on `lune/save_from_place.luau`
+  and `lune/script_hashes.luau` (the other developer's new tools, not ours, not synced to Studio): LEFT AS THEY ARE.
+- REMOVED: the HUD's CONTROLS chip and guide, `Controllers/AfkController.luau`, `HudTheme.Afk`, the help sizes.
+  H / Select now open the window's Moves page (NavController owns the "HaymakerHelp" action).
+- THE OWNER'S THREE CALLS DURING THE PLAY TEST (they override the mockup where they differ):
+  1. "NO overlapping UI" and "the stagger plate shouldn't appear in the lobby, maybe in the training area".
+     The plate and the skill tiles show only in a FIGHT: a round, the training arena, or the practice end of the
+     lobby (`Core/Lobby.inTraining`, looked at 4 times a second while HT_InLobby). Rule in
+     `HudController` (`inFight`). The window stands in the ROOM THAT IS LEFT (`MenuController.layout`): under the
+     strip, right of the menu strips (lobby), above the tiles and the ULT READY badge (round) or the spectating
+     chip (lobby). The feed starts under the Coins out of a round and is hidden while the window is open. The
+     toast moved to the top-left corner. The spectate panel (still the old look) moved to the bottom centre and
+     is hidden while the window is open.
+  2. "Everything takes TOO much of the screen, scale it well". `PosterKit.Fit`: the window is 0.8 of the mockup's
+     size (0.62 to 1.1), the strips and Coins 0.85 (never under 46 px tall), the MENU button and the window's X
+     kept big enough to press (X is 62, the mockup's 54). `PosterKit.stage()` is the one place: the screen UNDER
+     Roblox's top bar is the mockup's 1280 x 720. The fight HUD may now shrink on a small desktop window
+     (`HudTheme.Scale.MinDesktop = 0.6`, `HudTheme.scaleFor`); on touch it still never goes under 1.
+     In a round the window is 400 tall, not 612 (`ROUND_TALL`): its pages are short, so it can be drawn larger.
+     At 1280 x 720 the window is about 54 % x 62 % of the screen (the mockup's is 74 % x 85 %).
+  3. "It should blur your background a bit, with a tween". A BlurEffect in Lighting (`HT_MenuBlur`, made by the
+     client): size 10, in over 0.25 s, out over 0.18 s (`BLUR` in MenuController). NOT in a round (you are still
+     fighting), not at graphics levels 1 and 2, set at once under Reduced Motion.
+- FIRST-RUN BUGS FIXED: the cream slash drew a wide ink band (a slanted plate can't be thinner than its lean: the
+  line is one turned bar now); the Coins plate grew to 880 wide (AutomaticSize with a child wider than its box:
+  its width is measured now); the title came out at 81 % (Roblox draws no text over 100: `PosterKit.title` sets
+  it at 100 and scales the box); Ranked's slab was a planned outline, not the mockup's cream slab; a long skill
+  blurb was cut off (the row takes a second line); two control names were cut off ("Lock on: ...", "This guide.").
+- CHECKED IN PLAY (viewport 1126 x 536 and 1190 x 536): the five strips, each page, pick + Equip, Buy then
+  Confirm / Cancel (with a class hidden from the client's owned list; Confirm itself NOT pressed), the AFK row
+  both ways, the Spectate row, M, X, keys 1 to 4, H in a round, the fold to MENU in a round, the toast, the ULT
+  READY badge with the window open, being out with the window open. Console: only the known lines.
+- MEASURED (round running behind, noise about 1 ms): the window's drifting CanvasGroup 0.10 ms a frame, the blur
+  0.07 ms, the whole open window about 1 ms. So the CanvasGroup stays.
+- PROOF: shared notes folder of this session, `ui-6d-proof/` (mockup over game for each page).
+- DIFFERENCES FROM THE MOCKUP THAT REMAIN, AND WHY:
+  1. Sizes and places: smaller, and the window stands clear of the strips instead of under the open one (owner).
+  2. No stagger plate or tiles in the lobby is the mockup's too; the practice end showing them is the game's.
+  3. The window's contents stand straight while its paper leans 0.6 degrees (Roblox can't clip turned things).
+  4. Planned slabs and the Confirm ring are plain lines, not dashes; the slash's dotted corner is not drawn.
+  5. The toast is top-left, not over the window's title (owner: nothing overlaps).
+  6. No letter spacing; no tick in "EQUIPPED"; Moves shows the game's own wording and order.
+  7. The game has Settings, AFK and Spectate rows, a scrolling shop, Cancel under Confirm.
+- NOT TESTED: phones (window, strips and blur path never on a touch screen; on a 390-high phone the window will
+  be small), a real gamepad (B to close: the test tool's ButtonB arrives as a keyboard key), Reduced Motion, the
+  low-graphics blur skip, the round-start moment with the window open (seen once by chance, not on purpose),
+  1920 x 1080 (sizes worked out, not seen), the strips' entrance in real time (stills only), a real purchase.
+  The last two numeric tweaks (gap under the window +8, over the spectating chip +4) were pushed after the last
+  play test.
+- STILL OLD LOOK: the spectate panel and the "spectating" chip, the feed.
+- NEXT (owner's order): 2. lettering as images: tell the owner the upload count first (worked out: 4 images:
+  two sheets of the 13 window titles in full colour at 2x, one white-on-clear sheet of the fixed display words,
+  one glyph sheet 0-9 x . / in upright Oswald and Titillium), WAIT for the go-ahead. 3. idle drift and sounds
+  (ask before any audio upload).
+
+## ui-6e (2026-11-17): window centred and larger; small text made sharp (NOT COMMITTED)
+Same build label (`kits-7c+lobby-4+ui-6d`), 530 tests, synced, place saved v423, nothing committed.
+The owner, after ui-6d: the window "doesn't feel centered", "it all feels small", "the fonts look blurry".
+- CENTRED: the window stands in the middle of the SCREEN (`MenuController.layout`), moved right only as far as
+  the menu strips make it. Before, it was centred in the room beside the strips, which read as off centre.
+- LARGER: `PosterKit.Fit.Window` 0.9 (was 0.8), floor 0.7, ceiling 1.2. A row's small line is 17 px (the mockup's
+  15) and rows are 46 / 72 / 98 tall. In a short Studio viewport (536 high) the window is still held to about
+  0.54 by the no-overlap rule: judge size in a bigger viewport.
+- BLURRY TEXT, MEASURED (the same line drawn five ways in a play test, cropped and enlarged):
+  text under a UIScale is as sharp as text set at that size; text TURNED even 0.6 degrees is clearly soft; at
+  about 13 px Titillium's letters space unevenly; the Regular weight reads washed out when small.
+  So: PLANNED tags, the toast, the picked class tile and the hover tip no longer turn (the mockup turns them 1.5
+  to 2 degrees); small lines are SemiBold, not Regular. Still turned: the window title (3 degrees, big; becomes
+  an image in the lettering piece) and the open strip's rocking word.
+- NOT TESTED: a larger viewport, phones, a gamepad. In the last two play tests Studio's 3D view was black in the
+  captures (the window was probably covered); the UI drew normally.
+
+## ui-6f (2026-11-17): the window a bit bigger again, descriptions at 19 px (NOT COMMITTED)
+The owner: "scale the big ui to be a BIT bigger ... still hard to see the small descriptions". Same build label.
+- `PosterKit.Fit.Window` 1 (the mockup's own size where it fits), floor 0.75, ceiling 1.3. A row's small line is
+  19 px (the mockup's 15); rows are 46 / 76 / 106 tall.
+- More height for it: the room kept for the "spectating" chip under the window is only kept while you are out
+  (HT_Eliminated); otherwise 14 px. In a 1190 x 536 viewport the window went from 0.54 to about 0.62 of the mockup.
+- Seen in play: Classes at that viewport, clear of the strip, the strips and the Coins. NOT seen: the other pages
+  after this change, the last row-height tweak (pushed after the play test), larger viewports, phones.
+
+## ui-6f UNDONE (2026-11-17): sizes back to ui-6e (NOT COMMITTED)
+The owner published and played the real game: ui-6e's sizes were fine there (it only looked small in Studio's short
+viewport), and ui-6f was TOO big. So ui-6f is undone: `PosterKit.Fit.Window` 0.9 (0.7 to 1.2), a row's small line
+17 px, rows 46 / 72 / 98, the room under the window always kept for the spectating chip. LESSON: do not judge or
+tune UI size in a 536-high Studio viewport; the published game is the judge.
+
+## ui-7a (2026-11-17): the big lettering as images (NOT COMMITTED)
+The owner: "Can't u do images for the letters too", then "Yes, upload 4". Build `kits-7c+lobby-4+ui-7a`, 530 tests,
+synced, place saved v426, nothing committed.
+- FOUR UPLOADS, ids ONLY in `Ui/Shapes.luau` (`Shapes.letters`): `poster_titles_1..3.png` (the 13 window titles in
+  full colour with their outline and shadow) and `poster_words_1.png` (white on clear, tinted in use: the five
+  menu strip labels, the ULTIMATE letters, READY, FIGHTERS LEFT, FINAL TWO, ULT READY, PRESS, ULT NOW, the eight
+  class names, and upright figures 0-9 x . /). All drawn by the browser in the mockup's own Oswald at TWICE the
+  mockup's size: `design/ui/poster_lettering.html` + `python design/ui/make_lettering.py`, which also writes the
+  GENERATED `src/client/Ui/LetterRects.luau` (where each word is on its sheet; run `stylua` on it after).
+- IMAGE TEXT CANNOT BE TRANSLATED OR RESIZED BY THE ENGINE, and it ignores the player's text-size setting. A new
+  class, a renamed page or a changed word means: add it to the page's list, run the script, upload the sheet
+  again, change the id. A class or title that is not on a sheet falls back to real text by itself.
+- CODE: `Poster.word` / `setWord` / `wordWidth` / `hasWord` (a word; its frame is the word's text box) and
+  `Poster.figures` / `setFigures` / `tintFigures` (a run of figures). Used by: the window title
+  (`PosterKit.title`), the strip labels (NavController), class names on tiles and slabs (MenuController), the
+  ULTIMATE letters, READY stamp and last-players words (Callouts), the badge's words (UltimateNotice), cooldown
+  seconds, the standing count, the knockback multiplier (HudController) and the Coins (NavController).
+  The slanted stagger number and the popup numbers were images already (`Shapes.digits`, `Shapes.last`).
+- LEFT AS REAL TEXT, on purpose: everything in the small Titillium face (STAGGER, knockback, RISING, the READY /
+  STUNNED / CAN'T USE flags, skill names on tiles, MENU, "/ 25 STANDING", sub lines), action button words (they
+  carry prices), row names, descriptions, toasts, the feed, key caps. These are not the display lettering, they
+  change, and at 15 px an image is no sharper than text.
+- THE SYNC TOOL (`rojo_push.py`) refuses a script that contains `]]` or a NUL byte ("Failed to parse command
+  code"): write `local t = a[b]; t[c]` instead of `a[b][c[d]]`.
+- SEEN IN PLAY (viewport 1190 x 536): the lobby with Classes open (title, strip labels, class names, Coins, count),
+  a round (cooldown seconds, 1.0x), the ULTIMATE notice, the ULT READY badge, FINAL TWO. Console clean.
+  Proof: shared notes folder, `ui-7a-proof/`.
+- NOT MEASURED: frame cost of the image figures against text (they change only when the shown value changes).
+  NOT TESTED: PRESS / ULT NOW on the badge, FIGHTERS LEFT (same code as FINAL TWO), the other twelve titles on
+  screen, the Coins changing, phones, a gamepad, the published game.
+- NEXT: piece 3, idle drift on pressable controls and the soft sound set (ASK before any audio upload).
+
+## ui-7a note (2026-11-17): "the strip looks softer than the dev chips" - TESTED, NO CODE CHANGE KEPT
+The owner compared the top strip with the BOTS / fps chips in a small Studio window and asked for the same sharpness.
+- TRIED: moving a HUD group's contents out of its CanvasGroup once it is fully shown. Captured the strip both ways in
+  the same play test and enlarged the crops: NO difference (edge contrast 15.4 against 15.4). A CanvasGroup is not
+  what softens it. The change was removed again; Studio matches ui-7a.
+- WHAT DIFFERS: the dev chips never scale under 1 (`HudTheme.Scale.Min`), while the HUD now shrinks with a small
+  desktop window (`MinDesktop = 0.6`, ui-6d). In an 867-wide window the strip is drawn at about 0.68: its 23 px
+  label becomes 15 to 16 px (and is 85 % opaque, as in the mockup), and the image figures are shrunk about six
+  times from their sheet. At 1280 x 720 or larger the scale is 1 or more and none of that applies.
+- Judge sharpness, like size, in the published game or a full-size viewport, not a small Studio window.
+
+## ui-7b (2026-11-17): announcements small and at the top; their bars across the whole screen (NOT COMMITTED)
+The owner, on the FINAL TWO popup: it "shouldn't take up the entire screen ... if people are fighting and this blocks
+them, it can ruin their experience", and "the pink strip should REACH the entire screen with NO gaps, for everything
+with that pattern". Build label unchanged (`ui-7a`), 530 tests, synced, place saved v429, not committed.
+- `Callouts.stage` (the one place both announcements stand on): they are SMALL now (the ULTIMATE notice 0.6 of the
+  mockup's size, the last-players popup 0.4, phones 0.34) and stand right under the top strip (20 px below it), so
+  the middle of the screen stays clear. The mockup has them at full size across the middle.
+- Their slanted bars (the ULTIMATE streak, the last-players bar) span the WHOLE screen: `span` = the screen's
+  width in the stage's units plus 400 for the lean and the shake. These two are the only uses of that pattern
+  (`band` in Callouts).
+- Seen in play (1190 x 536): FINAL TWO and the ULTIMATE notice, both bars edge to edge. Proof: shared notes
+  folder, `ui-7b-proof/` (taken with the 10 px gap; the 20 px gap was pushed after). In a 536-high window the
+  popup's words still reach the character's head; on a taller screen the character stands much lower.
+- NOT TESTED: counts 5, 4, 3, phones, the announcements with the menu window open (they are drawn under it), the
+  fly-away in real time.
+
+## ui-7c (2026-11-17): full-width bars UNDONE; announcements glide left to right (NOT COMMITTED)
+The owner, after ui-7b: "revert the long strip thing, I don't like it", and new motion for both popups: "appears
+from the left, slowly goes right, then fades away towards the right; use your own ideas". Build label unchanged
+(`ui-7a`), 530 tests, synced, place saved v431, not committed.
+- BARS: back to the mockup's lengths (the ULTIMATE streak 330 past the letters each side, the last-players bar 460
+  past its box). The small size and the place under the top strip from ui-7b STAY.
+- MOTION (`glide` in Callouts, used by both): in fast from off the LEFT edge (0.45 s, a curve that only just passes
+  its place), a slow steady drift to the right while it is read (150 units over its life), then away to the
+  right, speeding up, fading through a CanvasGroup for that last part only. It no longer flies up into the strip
+  (last players) or down toward the skills (ultimate), and no longer shrinks or turns as it goes. The pieces'
+  own pops (letters dropping, the number slamming, stamps, confetti, the FINAL TWO shake) are unchanged. The
+  strip's count still bumps as the last-players popup leaves. Reduced Motion: no glide, it stands in place.
+- MEASURED in play (centre of a 1190-wide screen is 595): last players 565 -> 586 -> 607 over 1.2 s, then 821 at
+  73 % gone, 1007 gone; ultimate 553 -> 614 over 1.5 s, then 688 at 40 % gone, 1011 at 97 %. Console clean.
+- NOT SEEN: the motion in real time (positions were sampled, not watched), counts 5 and 4, phones.
+
+## ui-8a (2026-11-17): idle drift on pressable controls; AFK strip fix (NOT COMMITTED)
+Piece 3, part A. Build `kits-7c+lobby-4+ui-8a`, 531 tests, gates green, synced, place saved v432, nothing committed.
+- NEW `Ui/Drift.luau`: the mockup's `idle()`. ONE clock (one RenderStepped connection, connected only while
+  something drifts) moves every pressable control up and down, each at its own pace (2.5 to 3.34 s a swing) and
+  starting point, on a cosine ease. Off under Reduced Motion (checked when anything changes and once a second).
+  API: `Drift.add(group, layer, height, lift, slot?, turn?, turned?)`, `hold(layer, on)`, `show(group, on)`,
+  `clear(group)`, `count()`. Groups: `nav` (shown in the lobby), `fight` (the MENU button, shown in a round),
+  `window` (the X) and `page` (the window's page), both shown while the window is open. A hidden group stands at
+  home and costs nothing.
+- HOW IT DOES NOT FIGHT OTHER MOTION: `PosterKit.cut` now has two inner layers, `body` (everything drawn) and
+  `shape` (shadow, outline, fill); `PosterKit.row` has `body`. Drift moves `body`; hover, press, pop, the strips'
+  entrance and the open strip's shift stay on the root. The press button is on the root, so the hit area holds still.
+- FOUND: a UDim's OFFSET IS A WHOLE NUMBER (10.3 and 10.6 both land on 10). So the drift moves by the SCALE part of
+  Position (y / height), which is not rounded. Values are written only when they change by 0.2 unit / 0.02 degree.
+- WHAT DRIFTS, AND BY HOW MUCH (the mockup: 5 px and -0.7 to 0.8 degrees for everything):
+  - the five menu strips: 4 units, and the shape and the word image turn half a degree each way. The key cap (small
+    text) only rides up and down: it stays at 0 degrees (checked: AbsoluteRotation 0). 4 and 0.5, not 5 and 0.8,
+    so two neighbours at their far ends cannot touch (14 apart less a 7-unit shadow). The OPEN strip holds still:
+    its word rocks instead (`Drift.hold`).
+  - the fight's MENU button and the window's X: 5 units, no turn (they carry text).
+  - action buttons (Equip, Buy, Confirm, Cancel, See it in the Shop) and unpicked class tiles: 4 units, no turn.
+  - pressable rows (More, Settings): 3 units, no turn.
+  - NOT drifting: the picked class tile (it answers no press), switched-off buttons, plain rows, slabs, Coins, the
+    HUD (plate, skill tiles, strip), the ULT READY badge.
+- PHONE PATH (`Drift.lite`, touch without a keyboard): no turning at all, and the window's page does not drift; only
+  the strips, MENU and the X ride up and down. CHOSEN, NOT MEASURED ON A PHONE.
+- MEASURED in my play test (1190 x 536, frames about 19 ms in Studio): workspace attribute `HT_DriftOff = true`
+  switches all drift off (a measuring switch, read once a second). 14 alternating 1 s samples, 5 strips drifting:
+  median 19.6 ms on, 19.2 off; an earlier run with 12 controls drifting (window open): 20.0 on, 19.0 off. Samples
+  in each set spread from 17 to 20.6 ms, so the cost is NOT separable from Studio's noise: under 1 ms, likely far
+  less (a handful of property writes a second for each control).
+- SEEN (values sampled from a client script, not watched): strips between -2.4 and +1.6 units and -0.46 to +0.52
+  degrees, each out of step; the smallest gap between a strip's shadow and the next strip over 7 s was 2.8 units;
+  MENU -3.0 to +0.4; two rows and the X in the round's More page; the strips stand still while hidden (in a round).
+  Console: only the known lines.
+- AFK STRIP FIX: with too few players ready (everyone AFK) the server holds Intermission with NO CountdownEnd and
+  the strip stood on "NEXT ROUND 0". `HudLogic.strip` now hides the strip for an Intermission without a countdown
+  (spec added in `tests/HudLogic.spec.luau`). NOT seen in play (the test place fills with bots and starts at once).
+- NOT TESTED: phones, a real gamepad, Reduced Motion, the feel in real time, hover and press WHILE drifting (by
+  hand), the Classes and Shop pages' drift by eye, the published game.
+
+## ui-8b (2026-11-17): the soft sound set: RENDERED AND APPROVED, NOT UPLOADED, NOT WIRED
+Piece 3, part B, stopped here on purpose: the owner asked to carry on in a new chat. Nothing in the game changed.
+- THE OWNER'S ANSWER (2026-11-17, asked with the full list): "Upload all 13". Uploads go to the game's GROUP
+  2970443 by Open Cloud, as kits-7a did. Ask again only if the list changes.
+- `design/ui/make_ui_sounds.py` renders them with the mockup's own numbers (`sfx()`: oscillators, swept noise,
+  master gain 0.6, lowpass 4600 Hz) into `assets/sfx/ui/` (44.1 kHz, 16-bit, mono, each at -6 dBFS peak; the
+  script prints each file's length and the mockup's own peak, which is what SoundBank volumes should follow).
+- THE 13 FILES, WHAT THE MOCKUP PLAYS THEM ON, AND THE GAME EVENT:
+  | file | s | mockup `sfx` | game event (where to call it) |
+  |---|---|---|---|
+  | ui_press | 0.09 | pop: pointer down on any button | any pressable control (`PosterKit.pressable` / `pressRow`) |
+  | ui_open | 0.37 | whoosh: window opens | `MenuController` open from closed |
+  | ui_close | 0.14 | close | `MenuController` close |
+  | ui_page | 0.11 | snap: page change, tile pick, with the wipe | `MenuController` `hit()` |
+  | ui_equip | 0.32 | equip | a class equipped (`ability.KitChanged`, own request) |
+  | ui_buy | 0.33 | coin: bought | purchase succeeded (owned list grows), not the first Buy press |
+  | ui_deny | 0.21 | nope | Q or R pressed while cooling or stunned (the tile's `nope` shake) |
+  | skill_ready | 0.33 | ready | Q or R comes off cooldown (the tile's `spop`) |
+  | ring_out | 0.18 | ko | the standing count falls (the strip's count bump), not for 5 to 2 |
+  | last_5, last_4, last_3 | 0.55 | count(n) | `Callouts.last(n)` |
+  | last_2 | 0.82 | count(2) | `Callouts.last(2)` |
+- LEFT OUT, the game already has its own sound there (so nothing doubles): `ultReady` (SoundBank `ult_ready`,
+  the owner's kits-5f pick), `ultFire` (the ultimate's own set: `ult_rush`, `ult_haymaker`, `ult_bed`), `hit`
+  (`m1_hit` / `m1_finish`, kits-7a), `skill` (each kit move has its sounds in FxController), `stun` (combat, not
+  UI). The toast has no sound in the mockup either. Voice lines stay empty (`VoiceLines.luau`).
+- TO DO NEXT, in order: 1. upload the 13 (group 2970443; wait for moderation); 2. add 13 roles to
+  `SoundBank.luau` (one take each, start 0, measured length; volumes low, following the mockup's peaks: the
+  last_* are about 3 x the others there); 3. play them as 2D sounds (not from a character) with the mockup's
+  small pitch variance (4 % each way) on ui_press, ui_page, ring_out; one voice per sound (a repeat cuts the old
+  one); the mockup also dips other sound while a voice line plays (no lines yet); 4. check each loads in Studio
+  (IsLoaded, TimeLength), levels against the fight sounds, console clean; 5. gates, sync, save, HANDOFF.
+- NOT CHECKED: nobody has LISTENED to the WAV files (rendered from the numbers, lengths and peaks checked only).
+
+## ui-8b DONE (2026-11-17): the soft sounds uploaded and wired; a hover sound; Equip is green (NOT COMMITTED)
+Piece 3, part B. Build `kits-7c+lobby-4+ui-8b`, 531 tests, gates green, synced (178 scripts match), place saved
+v435, nothing committed. origin/main had nothing new at each push.
+- UPLOADED to group 2970443 with the Roblox_Studio connector's `open_cloud_invoke` (POST /assets/v1/assets, Audio;
+  the folder `assets/sfx/ui` had to be approved first in Assistant Settings -> MCP Permissions). All loaded in a
+  play test; moderation still said "Reviewing" at upload time (NOT re-checked):
+  ui_press 97006914075932, ui_open 140346518500681, ui_close 140631035788633, ui_page 91442953128650,
+  ui_equip 94748514757177, ui_buy 86516525084890, ui_deny 92136914494187, skill_ready 103068845287243,
+  ring_out 117168801692223, last_5 139031912478680, last_4 134917813764725, last_3 124007641238329,
+  last_2 101304163027883, ui_hover 119602077656645.
+- A 14TH SOUND, `ui_hover` (the owner, mid-task: "if there's not already sound when you hover over the buttons,
+  add one that complements the rest"). There was none, in the game or the mockup. `make_ui_sounds.py` now has it:
+  a sine lifting 540 -> 630 Hz, 0.07 s, level 0.04 (the press falls 420 -> 300, so the two answer each other).
+  The owner's request was taken as the go-ahead to upload that one file (0.10 s, 9 KB).
+- `SoundBank.luau`: 14 new roles, one take each, start 0, the file's length. Volumes = the mockup's own peak x 4.3:
+  ui_hover 0.10, ui_press 0.15, ui_close 0.17, ui_buy 0.20, skill_ready and ring_out 0.22, ui_page, ui_equip and
+  ui_deny 0.25, ui_open 0.28, last_* 0.68 to 0.73. Every file peaks at -6 dBFS, so against an M1 hit (volume 1)
+  the UI sounds sit about 17 to 22 dB down and the last_* about 9 dB down. NOT judged by ear. PlaybackLoudness is
+  no help here (it does not follow Volume: every one read 130 to 270).
+- NEW `client/Ui/UiSound.luau`: `play(role)` flat 2D through Sfx (fails inert), one voice per sound, 4 % pitch
+  variance on ui_press, ui_page, ring_out; `playIfShown(role, gui)` only when that piece is really on screen;
+  `hover()` silent on touch and for 0.3 s after any other UI sound (a press redraws the page under the pointer);
+  ui_deny and skill_ready cannot repeat within 0.25 s.
+- WHERE THEY PLAY: ui_press and ui_hover in `PosterKit.pressable` / `pressRow` (pointer down, pointer enter);
+  ui_open, ui_page (page change and class-tile pick), ui_close in `MenuController`; ui_equip on `KitChanged` and
+  ui_buy when the owned list grows, each only within 5 s of the player's own Equip / Confirm press; ui_deny on
+  `PropelBlocked` / `SkillBlocked`; skill_ready in `HudController.paintTile`; ring_out when the standing count
+  falls without a popup; last_N at the top of `Callouts.last`.
+- FOUND AND FIXED: the Q and R tiles pass through "recovering" after EVERY move (endlag, 0.65 s at most) and pop
+  "ready" each time, so skill_ready pinged about 20 times in 12 s of fighting. It now plays only after 0.8 s or
+  more of recovering (`READY_SOUND_AFTER`, `Tile.coolSince`): 1 in 25 s after the fix. The pop itself is unchanged.
+- EQUIP IS GREEN (the owner, mid-task: "a nice vibrant cool shade of green, so it's easier to notice"): new token
+  `go.400` #1FE38C, used only by the Equip button (`MenuController.action`, kind "go"; it was teal.400).
+- VERIFIED in my own play tests: all 14 load (IsLoaded, TimeLength = the file lengths); heard as Sounds created
+  in SoundService from REAL events: ui_open and ui_close (M key), ui_hover, ui_deny, skill_ready, ring_out,
+  last_5 / last_4 / last_3; the hover stays silent right after a press. Console: only the known lines.
+- NOT TESTED: nobody has LISTENED to any of it (levels are from numbers); ui_press and ui_page from a real click;
+  ui_equip and ui_buy (the test place starts a round at once, so no lobby); last_2; the green Equip button BY EYE;
+  a gamepad press (no pointer-down, so ui_press is silent there); phones; Reduced Motion; the published game.
+- NEXT (ask the owner which first): the feed, the spectate panel and chip in the new look, the class-name band
+  when an ultimate is used; then tests on a phone, a gamepad, Reduced Motion.
+
+## ui-9a (2026-11-17): the speed dial and hover-to-unequip: SYNCED, SEEN RUNNING (NOT COMMITTED)
+The owner, after the mockup: "yes thats really good ... build it into roblox". Stamp on disk `kits-7c+lobby-4+ui-9a`;
+synced later the same day (178 scripts match, origin/main had nothing new), place saved v436. 533 tests.
+- MOCKUP (published, same link): `.spd`, a half dial at the bottom centre in place of the stagger plate; stagger is
+  a small strip in its base ("STAGGER 22 . 2.1x"); Equip green; Equipped turns into a red Unequip under the pointer.
+- GAME, `HudController` group Y rewritten: the dial is built from plain frames (a circle cut flat by a clipping
+  frame, 30 rotated ticks, zone marks, a peak mark; NO new image, no upload), in the mockup's units (`L.Dial`,
+  340 x 232) shrunk by `L.YScale` 0.66 (phones `YPhoneScale` 0.52), bottom centre on every device. Speed = the
+  character's horizontal `AssemblyLinearVelocity`, read every 0.05 s (0.1 s on touch), smoothed; only changed
+  values are written. Dial top = `Movement.PropelChargedSpeed` (140), yellow from `Movement.MaxSpeed` (50), pink
+  from `HudTheme.Speed.Redline` (100). New pure rules `HudLogic.speedTicks` / `speedTier` with specs.
+  The strip goes cream, yellow, pink with stagger (the number's old colour steps); a hit pops the strip and shakes
+  the dial. REMOVED from view: the RISING / RECOVERING / STEADY word, the 12-segment bar, the word "knockback"
+  (`HudLogic.staggerWord`, `segmentsLit` and their specs are still in Core, now unused by the HUD).
+- GAME, `MenuController`: `wornAction`. On the class you wear (not in a round, not the starting class) the button
+  says EQUIPPED in light violet; under the pointer it turns red (new token `stop.400` #FF4444), says UNEQUIP,
+  pops and wobbles; pressing it equips `Abilities.DefaultKit`. Touch: first tap shows it for 3 s, second does it.
+- SEEN in my own play test (1118 x 536 view, a fight with bots): the dial stands bottom centre and reads as the
+  mockup does (one capture, by eye; no side-by-side proof pair made). It is 167 x 113 px there, x 475 to 642; the
+  first skill tile starts at x 781, so nothing touches. The number and ticks follow the character's speed.
+- MEASURED: 14 alternating 1 s samples with the dial shown and hidden: median 13.9 ms shown, 14.3 hidden (spread
+  11 to 18), so its cost is NOT separable from Studio's noise. The HUD loop's own cost with the dial in it
+  (`HT_HudProfile`): 0.065 ms a frame. The ticks were being written throughout (106 colour writes in 14 s).
+- EQUIP: the green button seen in the open Classes window (fill #1FE38C). The server rule for unequip is the
+  ordinary equip of `DefaultKit`, which every profile owns (`AbilityKit.equip`; refused in a round).
+- THE UNEQUIP BUTTON WAS NOT PROVEN BY A PRESS OF MINE: the test place starts a round at once, so I forced the
+  lobby state (server: `HT_InRound` false) and equipped Frost through the remote. Twice the class then went from
+  Frost back to Base while the Classes window was open, but the pointer was not where I had put it (someone was
+  using the mouse), so I cannot say my press did it, and I never read the red UNEQUIP state off the screen.
+  The play session left the class on Base, as it started.
+- Console: only the known lines.
+- NOT TESTED: the red UNEQUIP state and its wobble by eye; a controlled unequip press; the touch path (two taps);
+  the dial on a phone (its place against the real thumb buttons and stick is CHOSEN, not seen) and with a
+  gamepad; the dial against the spectate panel and the air-kick meter; a hit's strip pop and shake by eye;
+  speeds past 140; Reduced Motion; the published game.
+- NEXT (ask the owner which first): the feed, the spectate panel and chip in the new look, the class-name band;
+  then tests on a phone, a gamepad, Reduced Motion.

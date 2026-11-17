@@ -1,0 +1,26 @@
+<!doctype html><meta charset="utf-8">
+<!-- The big numbers of the last-players popups (5, 4, 3, 2), drawn by the browser exactly as the mockup's `.lnum`
+     draws them: Oswald 700 slanted, cream, a 10 px ink outline and a 12 px hard ink shadow, each at its own size
+     (5 and 4 at 230 px, 3 at 255, 2 at 290). Full colour on clear: these are shown as they are, not tinted.
+     Capture:  python design/ui/mock_capture.py --clear --size 1024,400 --page design/ui/poster_last_digits.html
+               assets/ui/poster_last.png
+     Cells are 256 x 400, in the order 5 4 3 2. Each number's own box (its width, 0.95 of its size tall) sits in
+     the middle of its cell, so the cell turns and scales about the number's centre as the mockup's does. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&display=swap">
+<style>
+html,body{margin:0;background:transparent;overflow:hidden}
+.c{position:absolute;top:0;width:256px;height:400px;display:flex;align-items:center;justify-content:center}
+.n{display:inline-block;font:700 230px/.95 Oswald;font-style:italic;color:#FFFBEF;-webkit-text-stroke:10px #1A1236;paint-order:stroke fill;text-shadow:12px 12px 0 #1A1236}
+pre{position:absolute;left:0;top:405px;font:12px monospace}
+</style>
+<body>
+<script>
+const SIZE={5:230,4:230,3:255,2:290};
+[5,4,3,2].forEach((d,i)=>{const c=document.createElement('div'); c.className='c'; c.style.left=(i*256)+'px';
+  const n=document.createElement('span'); n.className='n'; n.style.fontSize=SIZE[d]+'px'; n.textContent=d; n.id='n'+d; c.appendChild(n); document.body.appendChild(c);});
+document.fonts.load('italic 700 230px Oswald').then(()=>document.fonts.ready).then(()=>{
+  const pre=document.createElement('pre');
+  pre.textContent='\nRECT boxes | '+[5,4,3,2].map(d=>{const e=document.getElementById('n'+d); return d+':'+e.offsetWidth+'x'+e.offsetHeight;}).join(' ')+'\n';
+  document.body.appendChild(pre);
+});
+</script>

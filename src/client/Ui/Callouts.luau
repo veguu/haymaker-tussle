@@ -15,7 +15,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
-local TextService = game:GetService("TextService")
 
 local PosterEase = require(ReplicatedStorage.Shared.Core.PosterEase)
 local Tokens = require(ReplicatedStorage.Shared.Tokens)
@@ -24,6 +23,7 @@ local HudMotion = require(script.Parent.HudMotion)
 local HudTheme = require(script.Parent.HudTheme)
 local Poster = require(script.Parent.Poster)
 local Shapes = require(script.Parent.Shapes)
+local UiSound = require(script.Parent.UiSound)
 
 local Callouts = {}
 
@@ -73,11 +73,7 @@ local function hudScale(): number
 	local camera = workspace.CurrentCamera
 	local ref = HudTheme.Scale.Reference
 	local view = if camera then camera.ViewportSize else ref
-	return math.clamp(
-		math.min(view.X / ref.X, view.Y / ref.Y),
-		HudTheme.Scale.Min,
-		HudTheme.Scale.Max
-	)
+	return HudTheme.scaleFor(view)
 end
 
 --- Speaks a line, if it has been uploaded.
@@ -278,35 +274,61 @@ local function stamp(
 	end, nil, wait)
 end
 
+local ARRIVE = 0.45 -- seconds to come in from the left edge
+-- it runs a long way, so it only just passes its place before settling (the spring overshot by 100 px)
+local arriveCurve = PosterEase.bezier(0.22, 1.12, 0.36, 1)
+local DRIFT = 150 -- how far it travels, slowly, while it is being read
+local function glide(elapsed: number, life: number, away: number, span: number): number
+	local arrived = arriveCurve(math.clamp(elapsed / ARRIVE, 0, 1))
+	-- it never stands still: it rushes in, slows to a steady drift to the right through the middle of the
+	-- screen, then picks up speed and is gone off to the right as it fades
+	local drift = DRIFT * (life - 0.45)
+	return -(span / 2 + 200) * (1 - arrived) + drift + span * 0.3 * away * away
+end
+
 -- The stage every announcement stands on: a holder at the top centre scaled with the HUD, and inside it a
 -- plain group that turns and scales about the announcement's centre. `box` is the announcement's own box; its
 -- top-left is at `origin` inside the group.
+-- WHERE AND HOW BIG (owner, 2026-11-17): an announcement must be seen without covering the fight. The mockup
+-- puts it across the middle of the screen at full size; here it is SMALL (`extra`, a share of the mockup's size)
+-- and stands right under the top strip, so the middle of the screen, where people are fighting, stays clear.
+-- HOW IT COMES AND GOES (owner, 2026-11-17: "appears from the left, slowly goes right, then fades right; use
+-- your own ideas"): in fast from the LEFT edge, a slow steady drift to the right while it is read, then away to
+-- the RIGHT, speeding up as it fades (`glide`). `span` is the screen's width in the stage's own units, so
+-- it starts wholly off the screen. (A bar across the whole screen was tried the same day and taken out again.)
 local function stage(
 	name: string,
-	top: number,
 	box: Vector2,
 	extra: number
-): (Frame, Frame, UIScale, Vector2)
+): (Frame, Frame, UIScale, Vector2, number)
 	Callouts.start()
-	local scale = hudScale() * extra
+	local hud = hudScale()
+	local scale = hud * extra
+	local camera = workspace.CurrentCamera
+	local wide = if camera then camera.ViewportSize.X else 1280
+	local span = wide / scale + 400
 	local holder = make("Frame", gui, {
 		Name = name,
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0.5, 0, 0, (top + box.Y / 2) * scale),
+		-- the strip is 18 from the top and 72 tall at the HUD's scale
+		Position = UDim2.new(0.5, 0, 0, (18 + 72) * hud + 20 + box.Y / 2 * scale),
 		Size = UDim2.fromOffset(box.X, box.Y),
 	})
 	make("UIScale", holder, { Scale = scale })
-	local room = Vector2.new(box.X + 1000, box.Y + 440)
+	local room = Vector2.new(math.max(box.X + 1000, span), box.Y + 440)
 	local group = make("Frame", holder, {
 		Name = "Group",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
+		-- it starts off the left edge (see `glide`); with no motion it is simply in its place
+		Position = if HudMotion.reduced()
+			then UDim2.fromScale(0.5, 0.5)
+			else UDim2.new(0.5, -(span / 2 + 200), 0.5, 0),
 		Size = UDim2.fromOffset(room.X, room.Y),
 	})
 	local groupScale = make("UIScale", group, {})
-	return holder, group, groupScale, (room - box) / 2
+	return holder, group, groupScale, (room - box) / 2, span
 end
 
 -- Moves a stage's group into a CanvasGroup, so the whole announcement can fade as one. Only done for its last
@@ -330,31 +352,13 @@ end
 
 -- THE ULTIMATE ---------------------------------------------------------------------------------------
 
--- How wide Roblox sets one of the big 74 px letters. Asked once per letter; it can wait a moment the first time.
-local letterWidths: { [string]: number } = {}
+-- How wide the browser sets one of the big 74 px letters: the letters are images of its own drawing of them
+-- (Ui/Shapes.letters), so the width is the browser's too.
 local function letterWidth(letter: string): number
-	local known = letterWidths[letter]
-	if known then
-		return known
-	end
-	local params = Instance.new("GetTextBoundsParams")
-	params.Text = letter
-	params.Font = Font.new(Tokens.family.poster, Enum.FontWeight.Bold)
-	params.Size = Poster.px(74, "display")
-	params.Width = 1000
-	local ok, bounds = pcall(function()
-		return TextService:GetTextBoundsAsync(params)
-	end)
-	local width = if ok then bounds.X else 74 * 0.5
-	letterWidths[letter] = width
-	return width
+	return Poster.wordWidth("words", "ult:" .. letter, 74)
 end
 
 local WORD = "ULTIMATE"
-local UC_TURN =
-	{ { 0, 0 }, { 0.4, 0 }, { 0.46, -4 }, { 0.53, 3 }, { 0.6, 0 }, { 0.8, 0 }, { 1, 20 } }
-local UC_SIZE =
-	{ { 0, 1 }, { 0.4, 1 }, { 0.46, 1.1 }, { 0.53, 0.97 }, { 0.6, 1 }, { 0.8, 1 }, { 1, 0.15 } }
 local UC_AWAY = { { 0, 0 }, { 0.8, 0 }, { 1, 1 } }
 
 --- "ULTIMATE ... READY": the notice for earning your ultimate, in `tone` (your class colour). `key` is the key
@@ -369,7 +373,7 @@ function Callouts.ultimate(tone: Color3, key: string?, done: (() -> ())?)
 	serial += 1
 	local id = `ultimate{serial}`
 	local box = Vector2.new(540, 82)
-	local holder, group, groupScale, origin = stage("Ultimate", 112, box, 1)
+	local holder, group, _groupScale, origin, span = stage("Ultimate", box, 0.6)
 	local ink, paper, coin = colour("ink.900"), colour("ivory.50"), colour("gold.400")
 
 	-- the streak behind the letters: 330 past them each side, growing from the right in 0.22 s
@@ -424,12 +428,11 @@ function Callouts.ultimate(tone: Color3, key: string?, done: (() -> ())?)
 			Position = UDim2.fromOffset(4, 4),
 			Size = UDim2.new(1, -8, 1, -8),
 		})
-		local glyph = Poster.text(card, "display", 74, "ink.900", {
-			Size = UDim2.fromScale(1, 1),
-			Text = letter,
-			TextXAlignment = Enum.TextXAlignment.Center,
+		local glyph = Poster.word(card, "words", "ult:" .. letter, 74, "ink.900", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
 			ZIndex = 2,
-		})
+		}).image
 		local solid = false
 		Poster.run(`{id}letter{index}`, 0.6, function(t: number)
 			local s = spring(t)
@@ -438,7 +441,7 @@ function Callouts.ultimate(tone: Color3, key: string?, done: (() -> ())?)
 				local clear = 1 - math.clamp(s, 0, 1)
 				card.BackgroundTransparency = clear
 				face.BackgroundTransparency = clear
-				glyph.TextTransparency = clear
+				glyph.ImageTransparency = clear
 				solid = clear <= 0
 			end
 			card.Position = UDim2.new(0.5, 0, 0.5, -170 + (restY + 170) * s)
@@ -465,14 +468,10 @@ function Callouts.ultimate(tone: Color3, key: string?, done: (() -> ())?)
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		Padding = UDim.new(0, 10),
 	})
-	local readyWord = Poster.text(ready, "display", 30, "ivory.50", {
-		LayoutOrder = 1,
-		Size = UDim2.fromScale(0, 1),
-		AutomaticSize = Enum.AutomaticSize.X,
-		Text = "READY",
-	})
+	local readyWord =
+		Poster.word(ready, "words", "stamp:READY", 30, "ivory.50", { LayoutOrder = 1 }).image
 	local readyFades: { { any } } =
-		{ { ready, "BackgroundTransparency" }, { readyWord, "TextTransparency" } }
+		{ { ready, "BackgroundTransparency" }, { readyWord, "ImageTransparency" } }
 	local readyWidth = 160
 	if key then
 		local cap = make("Frame", ready, {
@@ -525,9 +524,7 @@ function Callouts.ultimate(tone: Color3, key: string?, done: (() -> ())?)
 			canvas = toCanvas(group)
 		end
 		local moving: GuiObject = canvas or group
-		moving.Rotation = keyframes(UC_TURN, t, ease)
-		groupScale.Scale = keyframes(UC_SIZE, t, ease)
-		moving.Position = UDim2.new(0.5, box.X * 0.55 * away, 0.5, 300 * away)
+		moving.Position = UDim2.new(0.5, glide(t * seconds, t, away, span), 0.5, 0)
 		if canvas then
 			canvas.GroupTransparency = away
 		end
@@ -585,14 +582,15 @@ function Callouts.last(count: number, small: boolean, done: (() -> ())?)
 		end
 		return
 	end
+	UiSound.play(`last_{count}`)
 	local key = VoiceLines.Last[count]
 	local line = VoiceLines.Lines[key]
 	local seconds = math.max(1.7, (0.1 + line.seconds) / 0.74)
 	serial += 1
 	local id = `last{serial}`
 	local box = Vector2.new(spec.width, spec.box.Y - 34 + 77)
-	local holder, group, groupScale, origin =
-		stage("LastPlayers", 84, box, if small then 170 / 230 else 1)
+	local holder, group, _groupScale, origin, span =
+		stage("LastPlayers", box, if small then 0.34 else 0.4)
 	local ink = colour("ink.900")
 	local tone = colour(spec.tone)
 
@@ -643,15 +641,14 @@ function Callouts.last(count: number, small: boolean, done: (() -> ())?)
 		BorderSizePixel = 0,
 		Size = UDim2.new(1, 0, 1, -7),
 	})
-	local wordsText = Poster.text(plate, "display", 42, "ivory.50", {
-		Size = UDim2.fromScale(1, 1),
-		Text = spec.words,
-		TextXAlignment = Enum.TextXAlignment.Center,
-	})
+	local wordsText = Poster.word(plate, "words", "last:" .. spec.words, 42, "ivory.50", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+	}).image
 	stamp(`{id}words`, words, wordsScale, -4, 0.28, {
 		{ words, "BackgroundTransparency" },
 		{ plate, "BackgroundTransparency" },
-		{ wordsText, "TextTransparency" },
+		{ wordsText, "ImageTransparency" },
 	})
 
 	if count == 2 then
@@ -699,8 +696,7 @@ function Callouts.last(count: number, small: boolean, done: (() -> ())?)
 			canvas = toCanvas(group)
 		end
 		local moving: GuiObject = canvas or group
-		moving.Position = UDim2.new(0.5, shake, 0.5, -170 * away)
-		groupScale.Scale = 1 + (0.15 - 1) * away
+		moving.Position = UDim2.new(0.5, shake + glide(t * seconds, t, away, span), 0.5, 0)
 		if canvas then
 			canvas.GroupTransparency = away
 		end

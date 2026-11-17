@@ -1,10 +1,10 @@
 --!strict
 -- HudController - the combat HUD in the fight-poster look (2026-11-16; the approved mockup is the vault's UI
 -- Research/fight-poster-prototype.html). Slanted ink plates on the screen's edges; the centre is the fight's:
---   Y  bottom-left (top-left on phones): YOUR stagger. A slanted ink plate with your class colour on its left
---      edge, a big slanted number that climbs toward danger (not a health bar), STAGGER, the knockback it means
---      ("2.1x knockback"), one word (RISING / RECOVERING / STEADY) and a 12-segment bar. The number and the bar
---      go white, then yellow, then pink together.
+--   Y  bottom centre: THE SPEED DIAL (the owner, 2026-11-17, in place of the stagger plate). A half dial of ink
+--      with your class colour round its edge: ticks that light with your speed, the speed as a big slanted number,
+--      and in its base a strip with STAGGER, its number and the knockback it means ("2.1x"). Speed and stagger
+--      each go white, then yellow, then pink.
 --   K  bottom-right: the skills, ALWAYS shown in a fight: Jump and Punch small in light violet, then Q (mobility)
 --      and R (attack) in your class colour, each with its icon, key cap and name. Three states, each a different
 --      shape and word: ready (bright, a READY flag with a tick), cooling (dark, a fill rising from the bottom, the
@@ -33,13 +33,13 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TextService = game:GetService("TextService")
 local UserInputService = game:GetService("UserInputService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local HudLogic = require(ReplicatedStorage.Shared.Core.HudLogic)
+local Lobby = require(ReplicatedStorage.Shared.Core.Lobby)
 local PosterEase = require(ReplicatedStorage.Shared.Core.PosterEase)
 local Tokens = require(ReplicatedStorage.Shared.Tokens)
 local Typography = require(ReplicatedStorage.Shared.Typography)
@@ -48,10 +48,12 @@ local HudMotion = require(script.Parent.Parent.Ui.HudMotion)
 local Callouts = require(script.Parent.Parent.Ui.Callouts)
 local HudTheme = require(script.Parent.Parent.Ui.HudTheme)
 local Poster = require(script.Parent.Parent.Ui.Poster)
+local PosterKit = require(script.Parent.Parent.Ui.PosterKit)
 local Shapes = require(script.Parent.Parent.Ui.Shapes)
+local UiSound = require(script.Parent.Parent.Ui.UiSound)
 
 local S, T = HudTheme.Size, HudTheme.Time
-local ST, TT, SS = HudTheme.Stagger, HudTheme.Tile, HudTheme.Strip
+local ST, TT, SS, SPD = HudTheme.Stagger, HudTheme.Tile, HudTheme.Strip, HudTheme.Speed
 local make, text, panel, colour = Components.make, Components.text, Components.panel, Tokens.colour
 local moveCfg = GameConfig.Movement
 local kickCfg = GameConfig.Kick
@@ -59,75 +61,43 @@ local staggerCfg = GameConfig.Stagger
 local STAGGER_MAX = staggerCfg.Max
 local COMBATANT_TAG = "HT_Combatant"
 local ROUND_FOLDER = "HT_RoundState"
-local HELP_ACTION = "HaymakerHelp"
-local GUIDE_ROWS = 7
 local SP = Tokens.space -- 4, 8, 12, 16, 24, 32, 48, 64
 
 -- Layout. Every number here is the MOCKUP'S OWN PIXEL at 1280 x 720, read off the mockup itself with
 -- design/ui/mock_capture.py (--dump with "rects"), so the HUD stands where the approved design does.
-type YouSpec = {
-	box: Vector2, -- the plate as it stands on screen: slanted, so wider than its contents
-	lean: number, -- how far the plate's top sits right of its bottom (8 degrees)
-	edge: number, -- the class-colour edge on the left
-	label: Vector2, -- top-left of the STAGGER line
-	figure: Vector2, -- where the number's first digit starts, and its baseline
-	figureFont: number,
-	figureBox: Vector2, -- the number's box: least width, height. The bump turns about its centre
-	figureTop: number,
-	knockGap: number, -- from the end of the number's box to the knockback column
-	lines: { number }, -- tops of the multiplier line and the two word lines
-	segX: number,
-	segBase: number, -- the segments stand on this line
-	segWidth: number,
-	segPitch: number,
-}
-
-local SEG_SKEW = math.tan(math.rad(20)) -- a segment leans 20 degrees
-local SEG_OFF, SEG_ON = 14, 20 -- an unlit and a lit segment's height
-
 local L = {
 	Edge = SP[5], -- 24 from the safe edges
-	-- YOUR STAGGER: the mockup's plate, whole, at YScale. The owner, 2026-11-16: smaller than the mockup. At
-	-- 0.66 it is 264 x 110 units (20.6 % x 15.3 % of 1280 x 720; the mockup's is 31 % x 23 %) and its small
-	-- labels land exactly on the 15-unit text floor, so this is as small as it goes without breaking that.
+	-- THE SPEED DIAL, in the mockup's own units (its `.spd` box is 340 x 232), shrunk as one piece by YScale:
+	-- 224 x 153 units on screen. Small text is set larger here so it stays near 15 units after the shrink.
 	YScale = 0.66,
-	Y = {
-		box = Vector2.new(399.5, 167),
-		lean = 23.5,
-		edge = 10,
-		label = Vector2.new(46.4, 13),
-		figure = Vector2.new(40.3, 122.6),
-		figureFont = 96,
-		figureBox = Vector2.new(150, 86.4),
-		figureTop = 36,
-		knockGap = 5,
-		lines = { 44, 83, 106 },
-		segX = 30.9,
-		segBase = 153,
-		segWidth = 23.83,
-		segPitch = 27.83,
-	} :: YouSpec,
-	-- Phones: the mockup's touch plate (narrower, a 64 px number), under the top-left buttons.
-	YPhone = {
-		box = Vector2.new(310.3, 159),
-		lean = 22.3,
-		edge = 10,
-		label = Vector2.new(41.9, 9),
-		figure = Vector2.new(37.8, 89.7),
-		figureFont = 64,
-		figureBox = Vector2.new(100, 57.6),
-		figureTop = 32,
-		knockGap = 3,
-		lines = { 40, 79, 102 },
-		segX = 26.4,
-		segBase = 149,
-		segWidth = 17.17,
-		segPitch = 21.17,
-	} :: YouSpec,
-	YPhoneTop = 84,
-	YMargin = 16, -- room round the plate inside its group, so its shake and the number's punch are not clipped
+	YPhoneScale = 0.52, -- phones: the mockup draws it at 0.78 of the desktop one
+	Dial = {
+		box = Vector2.new(340, 232),
+		centre = Vector2.new(170, 176), -- the circle's centre; its edge is `radius` out, the flat cut at `chord`
+		radius = 164,
+		chord = 224,
+		stroke = 5, -- the class-colour edge
+		tickRadius = 134, -- the middle of a tick
+		tick = Vector2.new(8, 24),
+		tip = Vector2.new(12, 26), -- the last lit tick is a little bigger
+		zoneRadius = 152, -- the thin band outside the ticks: yellow above a run, pink from the redline
+		zone = Vector2.new(16, 4),
+		peakRadius = 114, -- the recent-top-speed mark, inside the ticks
+		peak = Vector2.new(5, 9),
+		labelTop = 60,
+		labelHeight = 24,
+		labelFont = 22,
+		figureFont = 92,
+		figureHeight = 83,
+		figureMid = 128,
+		stripBottom = 231,
+		stripHeight = 34,
+		stripFont = 22,
+		stripFigures = 26,
+		bottom = 10, -- the dial's foot stands this far above the screen's bottom edge
+	},
+	YMargin = 16, -- room round the dial inside its group, so its shake and the strip's punch are not clipped
 	LineHeight = 23, -- a 15 px label's line in the mockup
-	MultiplierHeight = 39, -- the 26 px "2.1x" line
 	-- THE SKILL TILES: the mockup's sizes and places (right 26, bottom 24, 14 apart).
 	TileBig = 104, -- Q and R: the class skills
 	TileSmall = 84, -- Jump and Punch
@@ -221,7 +191,7 @@ type Tile = {
 	riseShown: number,
 	icon: ImageLabel,
 	iconSize: number,
-	seconds: TextLabel,
+	seconds: Poster.Figures,
 	slash: Frame,
 	flag: Frame?,
 	flagWord: TextLabel?,
@@ -235,6 +205,7 @@ type Tile = {
 	state: string,
 	wordUntil: number,
 	secondsText: string,
+	coolSince: number,
 }
 
 local function makeTile(parent: Instance, id: string, x: number, big: boolean): Tile
@@ -332,12 +303,11 @@ local function makeTile(parent: Instance, id: string, x: number, big: boolean): 
 		ZIndex = 4,
 	})
 	-- the seconds left: 34 px, right 8 and bottom 26 in the mockup (a small tile takes the same, in proportion)
-	local seconds = Poster.text(box, "display", if big then 34 else 27, TT.OnDark, {
+	-- (figures from the lettering sheet, Ui/Shapes.letters: the browser's own drawing of the mockup's digits)
+	local seconds = Poster.figures(box, 4, if big then 34 else 27, TT.OnDark, {
 		Name = "Seconds",
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = if big then UDim2.new(1, -8, 1, -51.5) else UDim2.new(1, -6, 1, -41.5),
-		Size = UDim2.fromOffset(70, 51),
-		TextXAlignment = Enum.TextXAlignment.Right,
 		Visible = false,
 		ZIndex = 5,
 	})
@@ -463,6 +433,7 @@ local function makeTile(parent: Instance, id: string, x: number, big: boolean): 
 		state = "",
 		wordUntil = 0,
 		secondsText = "",
+		coolSince = 0,
 	}
 end
 
@@ -472,6 +443,7 @@ end
 --   recovering: dark, the fill rising from the bottom, the icon stepped aside for the seconds left;
 --   held (the attack skill while its key is down): bright with a cream outline, no flag;
 --   unavailable: dark with stripes and a slash, and on Q and R a flag that says STUNNED or CAN'T USE.
+local READY_SOUND_AFTER = 0.8
 local function paintTile(tile: Tile, state: string, held: boolean, stunned: boolean)
 	local key = if held
 		then "held"
@@ -482,6 +454,9 @@ local function paintTile(tile: Tile, state: string, held: boolean, stunned: bool
 	end
 	local was = tile.state
 	tile.state = key
+	if key == "recovering" then
+		tile.coolSince = os.clock()
+	end
 	local bright = held or state == "ready"
 	local cooling = not held and state == "recovering"
 	local blocked = not held and state == "unavailable"
@@ -492,7 +467,7 @@ local function paintTile(tile: Tile, state: string, held: boolean, stunned: bool
 	tile.riseClip.Visible = cooling
 	tile.riseShown = -1
 	tile.name.TextColor3 = colour(if bright then TT.OnBright else TT.OnDark)
-	tile.seconds.Visible = cooling
+	tile.seconds.frame.Visible = cooling
 	-- cooling: the icon steps up and left at 36 / 46 of its size, to leave the seconds their corner
 	local iconSize = if cooling then math.floor(tile.iconSize * 36 / 46 + 0.5) else tile.iconSize
 	tile.icon.Size = UDim2.fromOffset(iconSize, iconSize)
@@ -510,6 +485,11 @@ local function paintTile(tile: Tile, state: string, held: boolean, stunned: bool
 			else TT.WordBlocked
 	end
 	if key == "ready" and was == "recovering" and tile.big then
+		-- the sound is for a real cooldown ending; the short lock after every move (endlag, 0.65 s at most)
+		-- also passes through here, and would ping on every punch
+		if os.clock() - tile.coolSince >= READY_SOUND_AFTER then
+			UiSound.playIfShown("skill_ready", tile.box)
+		end
 		Poster.run(tile, TT.PopSeconds, function(t: number)
 			local s = PosterEase.spring(t)
 			tile.scale.Scale = TT.PopScale + (1 - TT.PopScale) * s
@@ -620,13 +600,12 @@ function HudController:KnitStart()
 		AutomaticSize = Enum.AutomaticSize.X,
 		TextTransparency = 1,
 	})
-	local stripCount = Poster.text(stripCountSlot, "display", 34, SS.Count, {
+	local stripFigures = Poster.figures(stripCountSlot, 3, 34, SS.Count, {
 		Name = "Shown",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromScale(1, 1),
-		TextXAlignment = Enum.TextXAlignment.Center,
 	})
+	local stripCount = stripFigures.frame
 	local countScale = make("UIScale", stripCount, {})
 	-- words: 15 px, a little see-through, dropped onto the number's baseline
 	local function stripWord(order: number): TextLabel
@@ -666,116 +645,230 @@ function HudController:KnitStart()
 	})
 
 	-- Y: you --------------------------------------------------------------------------------------------
-	-- The mockup's plate, built at the mockup's own pixel sizes and shrunk as one piece by L.YScale. Two slanted
-	-- images make it: the class colour underneath, showing as the left edge, and the ink over it.
+	-- THE SPEED DIAL (the owner, 2026-11-17: "a speed bar instead of a stagger ... centered at the bottom ... like
+	-- those car games"; the approved mockup's `.spd`). A half dial of ink with your class colour round its edge:
+	-- 30 ticks that light with your speed (white, yellow above a run, pink from the redline), a thin band outside
+	-- them that marks those two zones, the speed as a big slanted number, a small mark that holds your recent top
+	-- speed, and in its base a strip with your stagger and the knockback it means. Built from plain frames (no
+	-- image of its own), in the mockup's units, and shrunk as one piece. Nothing in it moves unless a shown value
+	-- changes.
 	local stagger = 0
-	local you = group(gui, "You", L.Y.box * L.YScale)
+	local D = L.Dial
+	local SPEED_MAX = moveCfg.PropelChargedSpeed -- the dial's top: a fully charged dash
+	local SPEED_HI = moveCfg.MaxSpeed -- above a run
+	local you = group(gui, "You", D.box * L.YScale)
 	local plateRest = UDim2.fromOffset(L.YMargin, L.YMargin)
 	local youPlate = make("Frame", you.fade, {
-		Name = "Plate",
+		Name = "Dial",
 		BackgroundTransparency = 1,
 		Position = plateRest,
+		Size = UDim2.fromOffset(D.box.X, D.box.Y),
 	})
-	make("UIScale", youPlate, { Scale = L.YScale })
-	local youEdge = Shapes.slant(youPlate, "coral.500", L.Y.lean, { Name = "Edge" })
-	local youInk = Shapes.slant(youPlate, ST.Plate, L.Y.lean, { Name = "Ink", ZIndex = 1 })
-	-- STAGGER leans with the plate in the mockup (it is the one line not stood back upright), so it is set in
-	-- Titillium's own slanted Bold
-	local staggerLabel = Poster.text(youPlate, "label", 15, ST.Label, {
-		Name = "Label",
-		Text = "STAGGER",
-		TextTransparency = 0.15,
+	local youScale = make("UIScale", youPlate, { Scale = L.YScale })
+	-- the half disc: a circle cut off flat at `chord` by a clipping frame; its hard shadow is the same again
+	local function disc(name: string, at: Vector2, radius: number, props: { [string]: any }): Frame
+		local clip = make("Frame", youPlate, {
+			Name = name,
+			BackgroundTransparency = 1,
+			ClipsDescendants = true,
+			Position = UDim2.fromOffset(at.X, at.Y),
+			Size = UDim2.fromOffset(D.box.X, D.chord),
+		})
+		props.Position = UDim2.fromOffset(D.centre.X - radius, D.centre.Y - radius)
+		props.Size = UDim2.fromOffset(radius * 2, radius * 2)
+		props.BorderSizePixel = 0
+		local circle = make("Frame", clip, props)
+		make("UICorner", circle, { CornerRadius = UDim.new(0.5, 0) })
+		return circle
+	end
+	local shadow = TT.Shadow
+	disc("Shadow", Vector2.new(shadow.x, shadow.y), D.radius, {
+		BackgroundColor3 = colour(shadow.tone),
+		BackgroundTransparency = shadow.transparency,
+	})
+	local plate = disc("Plate", Vector2.zero, D.radius - D.stroke, {
+		BackgroundColor3 = colour(ST.Plate),
+		ZIndex = 1,
+	})
+	local plateEdge = make("UIStroke", plate, { Thickness = D.stroke, Color = colour("coral.500") })
+	local half = math.sqrt(D.radius ^ 2 - (D.chord - D.centre.Y) ^ 2)
+	local plateFoot = make("Frame", plate.Parent, {
+		Name = "Foot",
+		BackgroundColor3 = colour("coral.500"),
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(D.centre.X - half, D.chord - D.stroke),
+		Size = UDim2.fromOffset(half * 2, D.stroke),
 		ZIndex = 2,
 	})
-	staggerLabel.FontFace =
-		Font.new(Tokens.family.text, Enum.FontWeight.Bold, Enum.FontStyle.Italic)
-	-- the number: slanted Oswald digits from the sheet, in a box that scales and turns about its centre
+	-- a small bar on the dial's circle: `t` 0 to 1 along the sweep, `radius` out from the centre, turned to
+	-- point outward
+	local function onArc(bar: Frame, t: number, radius: number)
+		local degrees = SPD.From - SPD.Sweep * t
+		local angle = math.rad(degrees)
+		bar.Position = UDim2.fromOffset(
+			D.centre.X + radius * math.cos(angle),
+			D.centre.Y - radius * math.sin(angle)
+		)
+		bar.Rotation = 90 - degrees
+	end
+	local function bar(name: string, size: Vector2, tone: Color3): Frame
+		local frame = make("Frame", youPlate, {
+			Name = name,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = tone,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(size.X, size.Y),
+			ZIndex = 2,
+		})
+		make("UICorner", frame, { CornerRadius = UDim.new(0, 2) })
+		return frame
+	end
+	local unlit = colour(ST.SegmentOff)
+	local ticks: { Frame } = {}
+	local tickTone: { Color3 } = {}
+	for index = 1, SPD.Ticks do
+		local t = (index - 1) / (SPD.Ticks - 1)
+		local tier = HudLogic.speedTier(t * SPEED_MAX, SPEED_HI, SPD.Redline)
+		tickTone[index] = colour(ST.Tone[tier])
+		ticks[index] = bar(`Tick{index}`, D.tick, unlit)
+		onArc(ticks[index], t, D.tickRadius)
+		if tier ~= "white" then
+			onArc(bar(`Zone{index}`, D.zone, tickTone[index]), t, D.zoneRadius)
+		end
+	end
+	local peakMark = bar("Peak", D.peak, colour(ST.Text))
+	peakMark.Visible = false
+	Poster.text(youPlate, "label", D.labelFont, ST.Label, {
+		Name = "Label",
+		Position = UDim2.fromOffset(0, D.labelTop),
+		Size = UDim2.fromOffset(D.box.X, D.labelHeight),
+		Text = "SPEED",
+		TextTransparency = 0.15,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 2,
+	})
+	-- the speed: slanted Oswald digits from the sheet, in a box as wide as the number, centred on the dial
 	local figureBox = make("Frame", youPlate, {
 		Name = "Figure",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(D.centre.X, D.figureMid),
 		ZIndex = 2,
 	})
-	local figureScale = make("UIScale", figureBox, {})
 	local figure = Poster.number(figureBox, 3, { Name = "Digits", Size = UDim2.fromScale(1, 1) })
-	local knock = Poster.text(youPlate, "display", 26, ST.Text, { Name = "Multiplier", ZIndex = 2 })
-	local knockWord = Poster.text(youPlate, "label", 15, ST.Text, {
-		Name = "Knockback",
-		Text = "knockback",
-		ZIndex = 2,
+	-- the stagger strip in the dial's base: STAGGER, the number, a dot, the knockback the next hit will use.
+	-- The strip itself goes cream, then yellow, then pink as the number did.
+	local staggerStrip = make("Frame", youPlate, {
+		Name = "Stagger",
+		AnchorPoint = Vector2.new(0.5, 1),
+		AutomaticSize = Enum.AutomaticSize.X,
+		BackgroundColor3 = colour(ST.Tone.white),
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(D.centre.X, D.stripBottom),
+		Size = UDim2.fromOffset(0, D.stripHeight),
+		ZIndex = 3,
 	})
-	local status = Poster.text(youPlate, "label", 15, ST.Text, { Name = "Word", ZIndex = 2 })
-	-- the 12 segments, each its own small slanted image (one drawing lit, one unlit); lit ones are taller and take their third's colour
-	local segs: { ImageLabel } = {}
-	local segTone: { Color3 } = {}
-	local segHeight: { number } = {}
-	for index = 1, ST.Segments do
-		segs[index] = Shapes.image(youPlate, "segOff", ST.SegmentOff, {
-			Name = `Seg{index}`,
-			AnchorPoint = Vector2.new(0, 1),
-			ZIndex = 2,
-		})
-		segHeight[index] = SEG_OFF
-		segTone[index] =
-			colour(ST.Tone[HudLogic.segmentTier(index, ST.Segments, ST.YellowShare, ST.PinkShare)])
+	make("UIStroke", staggerStrip, { Thickness = 3, Color = colour(TT.Line) })
+	make(
+		"UIPadding",
+		staggerStrip,
+		{ PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }
+	)
+	make("UIListLayout", staggerStrip, {
+		FillDirection = Enum.FillDirection.Horizontal,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 7),
+	})
+	local stripScale = make("UIScale", staggerStrip, {})
+	Poster.text(staggerStrip, "label", D.stripFont, TT.OnBright, {
+		Name = "Label",
+		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.fromOffset(0, D.stripHeight),
+		Text = "STAGGER",
+		LayoutOrder = 1,
+		ZIndex = 3,
+	})
+	local staggerFigures = Poster.figures(
+		staggerStrip,
+		3,
+		D.stripFigures,
+		TT.OnBright,
+		{ Name = "Number", LayoutOrder = 2, ZIndex = 3 }
+	)
+	local dot = make("Frame", staggerStrip, {
+		Name = "Dot",
+		BackgroundColor3 = colour(TT.OnBright),
+		BorderSizePixel = 0,
+		Size = UDim2.fromOffset(5, 5),
+		LayoutOrder = 3,
+		ZIndex = 3,
+	})
+	make("UICorner", dot, { CornerRadius = UDim.new(0.5, 0) })
+	local knock = Poster.figures(
+		staggerStrip,
+		5,
+		D.stripFigures,
+		TT.OnBright,
+		{ Name = "Multiplier", LayoutOrder = 4, ZIndex = 3 }
+	)
+
+	local function paintDial(tone: Color3)
+		plateEdge.Color = tone
+		plateFoot.BackgroundColor3 = tone
 	end
-	local youSpec: YouSpec = L.Y
-	local shownLit = 0
-	-- One segment at a height: a 20-degree lean, standing on the base line, centred on its place in the row.
-	local function placeSegment(index: number, height: number)
-		local spec = youSpec
-		local lean = height * SEG_SKEW
-		local seg = segs[index]
-		segHeight[index] = height
-		seg.Size = UDim2.fromOffset(spec.segWidth + lean, height)
-		seg.Position =
-			UDim2.fromOffset(spec.segX + (index - 1) * spec.segPitch - lean / 2, spec.segBase)
-		-- the lit drawing while it is any taller than an unlit one, so its lean stays true as it grows
-		seg.Image = if height > SEG_OFF + 0.01 then Shapes.ids.segOn else Shapes.ids.segOff
+	local shownTier = ""
+	-- The strip: your stagger, what it does to you (the knockback the next hit will use), and its colour step
+	-- at the same shares of the maximum as before.
+	local function paintStagger()
+		Poster.setFigures(staggerFigures, tostring(math.floor(stagger + 0.5)))
+		Poster.setFigures(
+			knock,
+			HudLogic.multiplierText(Combat.staggerMultiplier(staggerCfg :: any, stagger)) .. "x"
+		)
+		local tier = HudLogic.staggerTier(stagger, STAGGER_MAX, ST.YellowShare, ST.PinkShare)
+		if tier ~= shownTier then
+			shownTier = tier
+			staggerStrip.BackgroundColor3 = colour(ST.Tone[tier])
+		end
 	end
-	-- Lights the segments for the current stagger. `all` re-places every one (a new layout); otherwise only the
-	-- ones that changed are touched. A changed one grows or shrinks on the mockup's `pop` curve when `animate`.
-	local function paintSegments(animate: boolean, all: boolean)
-		local lit = HudLogic.segmentsLit(stagger, STAGGER_MAX, ST.Segments)
-		for index, seg in segs do
-			local on = index <= lit
-			if all or on ~= (index <= shownLit) then
-				seg.ImageColor3 = if on then segTone[index] else colour(ST.SegmentOff)
-				local goal = if on then SEG_ON else SEG_OFF
-				local from = segHeight[index]
-				if animate and from ~= goal then
-					Poster.run(seg, ST.SegmentSeconds, function(t: number)
-						placeSegment(index, from + (goal - from) * PosterEase.pop(t))
-					end)
-				else
-					Poster.stop(seg)
-					placeSegment(index, goal)
-				end
+	-- The dial for a speed. Only what changed is written: the number when its whole value changes, the ticks
+	-- between the old and the new reading, the peak mark when it moves half a tick.
+	local shownSpeed, shownLit, shownSpeedTier, shownPeak = -1, 0, "", -1
+	local peak = 0
+	local function paintSpeed(speed: number, dt: number)
+		local whole = math.min(math.floor(speed + 0.5), 999)
+		if whole ~= shownSpeed then
+			shownSpeed = whole
+			local width = Poster.setNumber(figure, tostring(whole), D.figureFont, D.figureHeight)
+			figureBox.Size = UDim2.fromOffset(width, D.figureHeight)
+			local tier = HudLogic.speedTier(whole, SPEED_HI, SPD.Redline)
+			if tier ~= shownSpeedTier then
+				shownSpeedTier = tier
+				Poster.tintNumber(figure, colour(ST.Tone[tier]))
 			end
 		end
-		shownLit = lit
+		local lit = HudLogic.speedTicks(speed, SPEED_MAX, SPD.Ticks)
+		if lit ~= shownLit then
+			for index = math.max(1, math.min(lit, shownLit)), math.max(lit, shownLit) do
+				local tick = ticks[index]
+				tick.BackgroundColor3 = if index <= lit then tickTone[index] else unlit
+				local size = if index == lit then D.tip else D.tick
+				tick.Size = UDim2.fromOffset(size.X, size.Y)
+			end
+			shownLit = lit
+		end
+		if peakMark.Visible then
+			peak = math.max(speed, peak - SPD.PeakFall * dt)
+			local steps = (SPD.Ticks - 1) * 2
+			local at = math.floor(math.clamp(peak / SPEED_MAX, 0, 1) * steps + 0.5)
+			if at ~= shownPeak then
+				shownPeak = at
+				onArc(peakMark, at / steps, D.peakRadius)
+			end
+		end
 	end
-	-- The number, and the knockback column that starts where the number's box ends (the box is at least
-	-- `figureBox` wide, wider for a wide number, as the mockup lays it out).
-	local function paintFigure()
-		local spec = youSpec
-		local width = Poster.setNumber(
-			figure,
-			tostring(math.floor(stagger + 0.5)),
-			spec.figureFont,
-			spec.figure.Y - spec.figureTop
-		)
-		local box = Vector2.new(math.max(spec.figureBox.X, width), spec.figureBox.Y)
-		figureBox.Size = UDim2.fromOffset(box.X, box.Y)
-		figureBox.Position = UDim2.fromOffset(spec.figure.X + box.X / 2, spec.figureTop + box.Y / 2)
-		local x = spec.figure.X + box.X + spec.knockGap
-		knock.Position = UDim2.fromOffset(x, spec.lines[1])
-		knockWord.Position = UDim2.fromOffset(x, spec.lines[2])
-		status.Position = UDim2.fromOffset(x, spec.lines[3])
-		-- what this stagger does to you: the knockback the next hit will use
-		knock.Text = HudLogic.multiplierText(Combat.staggerMultiplier(staggerCfg :: any, stagger))
-			.. "x"
-	end
+	paintSpeed(0, 0)
 
 	-- K: the skill tiles ----------------------------------------------------------------------------------
 	local kit = group(gui, "Kit", L.K)
@@ -807,7 +900,7 @@ function HudController:KnitStart()
 	local function paintClass()
 		local hex = Tokens.hex[`class.{ability:GetKitId()}`]
 		classColour = if hex then Color3.fromHex(hex) else colour("coral.500")
-		Shapes.paint(youEdge, classColour)
+		paintDial(classColour)
 		Shapes.paint(stripEdge, if stripLast then colour(SS.Last) else classColour)
 		for _, id in ORDER do
 			local tile = tiles[id]
@@ -825,98 +918,6 @@ function HudController:KnitStart()
 		refreshNames()
 		paintClass()
 	end)
-
-	-- the controls guide: a ghost chip ("Controls" + key cap) and the sheet it opens -------------------------
-	local help = make("Frame", gui, {
-		Name = "Help",
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(1, 1),
-		Size = UDim2.fromOffset(S.HelpWidth, S.HelpHeight),
-	})
-	local helpScale = make("UIScale", help, {})
-	local helpChip = make("TextButton", help, {
-		Name = "Chip",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		AutoButtonColor = false,
-		Text = "",
-	})
-	make("UIListLayout", helpChip, {
-		FillDirection = Enum.FillDirection.Horizontal,
-		HorizontalAlignment = Enum.HorizontalAlignment.Right,
-		VerticalAlignment = Enum.VerticalAlignment.Center,
-		Padding = UDim.new(0, SP[2]),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	})
-	local helpWord = text(helpChip, "label", "stone.300", {
-		LayoutOrder = 1,
-		Size = UDim2.fromScale(0, 1),
-		AutomaticSize = Enum.AutomaticSize.X,
-		Text = "CONTROLS",
-	})
-	make("UIStroke", helpWord, {
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
-		Color = colour("ink.950"),
-		Thickness = 1.5,
-		Transparency = 0.4,
-	})
-	local helpCap, helpCapText, helpCapGlyph = Components.keyCap(helpChip, L.Cap)
-	helpCap.LayoutOrder = 2
-	local guide = Components.cut(help, 2, "line.300", {
-		Name = "Guide",
-		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, 0, 0, -SP[2]),
-		Size = UDim2.fromOffset(S.GuideWidth + 40, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		Visible = false,
-	}).frame
-	-- the rows live in a body of their own, so the list layout never touches the panel's two images
-	local guideBody = make("Frame", guide, {
-		Name = "Body",
-		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		ZIndex = 2,
-	})
-	make("UIPadding", guideBody, {
-		PaddingTop = UDim.new(0, SP[4]),
-		PaddingBottom = UDim.new(0, SP[4]),
-		PaddingLeft = UDim.new(0, SP[4]),
-		PaddingRight = UDim.new(0, SP[4]),
-	})
-	make("UIListLayout", guideBody, {
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, SP[3]),
-	})
-	text(guideBody, "title", "ivory.50", {
-		LayoutOrder = 0,
-		Size = UDim2.new(1, 0, 0, 24),
-		Text = "CONTROLS",
-	})
-	local GUIDE_INFO = S.GuideWidth + 40 - 2 * SP[4] - (64 + SP[3])
-	local guideRows: { { frame: Frame, key: TextLabel, info: TextLabel } } = {}
-	for order = 1, GUIDE_ROWS do
-		local row = make("Frame", guideBody, {
-			BackgroundTransparency = 1,
-			LayoutOrder = order,
-			Size = UDim2.new(1, 0, 0, S.GuideRow),
-			AutomaticSize = Enum.AutomaticSize.Y,
-		})
-		local cap, key = Components.keyCap(row, L.Cap + 4)
-		cap.Size = UDim2.fromOffset(64, L.Cap + 4)
-		cap.AutomaticSize = Enum.AutomaticSize.None
-		key.Size = UDim2.fromScale(1, 1)
-		key.AutomaticSize = Enum.AutomaticSize.None
-		local info = text(row, "body", "ivory.200", {
-			Position = UDim2.fromOffset(64 + SP[3], 0),
-			-- its height is measured when the text is set (refreshDevice): left to AutomaticSize, a wrapped label
-			-- built while the guide is hidden stays one line tall and cuts its text off (seen 2026-11-16)
-			Size = UDim2.fromOffset(GUIDE_INFO, 20),
-			TextWrapped = true,
-			TextYAlignment = Enum.TextYAlignment.Top,
-		})
-		guideRows[order] = { frame = row, key = key, info = info }
-	end
 
 	-- F: the ring-out feed --------------------------------------------------------------------------------
 	local feed = group(gui, "Feed", Vector2.new(L.FeedWidth, L.FeedRows * (L.FeedRow + L.FeedGap)))
@@ -977,68 +978,33 @@ function HudController:KnitStart()
 	local function layout()
 		local camera = workspace.CurrentCamera
 		local view = if camera then camera.ViewportSize else HudTheme.Scale.Reference
-		local ref = HudTheme.Scale.Reference
-		local scale = math.clamp(
-			math.min(view.X / ref.X, view.Y / ref.Y),
-			HudTheme.Scale.Min,
-			HudTheme.Scale.Max
-		)
+		local scale = HudTheme.scaleFor(view)
 		for _, g in { strip, feed, spectate, you, kit } do
 			g.scale.Scale = scale
 		end
-		helpScale.Scale = scale
 		local edge = L.Edge
 		strip.holder.Position = UDim2.new(0.5, 0, 0, L.StripTop)
-		feed.holder.Position = UDim2.new(1, -edge, 0, L.StripTop)
+		-- out of a round your Coins stand in the top-right corner (NavController), so the feed starts under them
+		local underCoins = if player:GetAttribute("HT_InRound") ~= true
+			then 48 * PosterKit.stage().nav + 10
+			else 0
+		feed.holder.Position = UDim2.new(1, -edge, 0, L.StripTop + underCoins)
 		spectate.holder.Position = UDim2.new(0.5, 0, 1, -edge)
 		-- the tile row keeps spare room round it inside its group; the tiles themselves stop at the mockup's
 		-- 26 from the right and 24 from the bottom
 		local tilePad = L.TilePad * scale
 		kit.holder.Position = UDim2.new(1, tilePad - L.TileRight, 1, tilePad - L.TileBottom)
 
-		-- Your stagger plate, laid out in the mockup's pixels (its own UIScale shrinks it). Phones get the
-		-- mockup's touch plate, top-left under the corner buttons.
-		local phone = device == "touch"
-		local spec: YouSpec = if phone then L.YPhone else L.Y
-		youSpec = spec
-		local k = L.YScale
+		-- The speed dial: bottom centre, drawn in its own units and shrunk as one piece; smaller on phones,
+		-- where it stands between the stick and the thumb buttons.
+		local k = if device == "touch" then L.YPhoneScale else L.YScale
 		local margin = L.YMargin
-		you.holder.Size = UDim2.fromOffset(spec.box.X * k + 2 * margin, spec.box.Y * k + 2 * margin)
-		youPlate.Size = UDim2.fromOffset(spec.box.X, spec.box.Y)
-		youEdge.Size = UDim2.fromOffset(spec.edge + 2 * spec.lean, spec.box.Y)
-		youInk.Position = UDim2.fromOffset(spec.edge, 0)
-		youInk.Size = UDim2.fromOffset(spec.box.X - spec.edge, spec.box.Y)
-		Shapes.setLean(youEdge, spec.lean)
-		Shapes.setLean(youInk, spec.lean)
-		staggerLabel.Position = UDim2.fromOffset(spec.label.X, spec.label.Y)
-		staggerLabel.Size = UDim2.fromOffset(120, L.LineHeight)
-		knock.Size = UDim2.fromOffset(120, L.MultiplierHeight)
-		knockWord.Size = UDim2.fromOffset(140, L.LineHeight)
-		status.Size = UDim2.fromOffset(140, L.LineHeight)
-		paintSegments(false, true)
-		paintFigure()
-
-		-- the plate's bottom-left corner stands 24 from the left and the bottom, as in the mockup; a slanted
-		-- plate's box starts half its lean further left
-		local pad = margin * scale
-		local left = edge - spec.lean * k * scale / 2
-		if phone then
-			you.holder.AnchorPoint = Vector2.new(0, 0)
-			you.holder.Position = UDim2.new(0, left - pad, 0, L.YPhoneTop - pad)
-			help.AnchorPoint = Vector2.new(1, 0)
-			help.Position =
-				UDim2.new(1, -edge, 0, L.StripTop + feed.holder.Size.Y.Offset * scale + SP[2])
-			guide.AnchorPoint = Vector2.new(1, 0)
-			guide.Position = UDim2.new(1, 0, 1, SP[2])
-		else
-			you.holder.AnchorPoint = Vector2.new(0, 1)
-			you.holder.Position = UDim2.new(0, left - pad, 1, pad - edge)
-			help.AnchorPoint = Vector2.new(1, 1)
-			help.Position =
-				UDim2.new(1, -L.TileRight, 1, -(L.TileBottom + (L.TileBig + 22 + SP[2]) * scale))
-			guide.AnchorPoint = Vector2.new(1, 1)
-			guide.Position = UDim2.new(1, 0, 0, -SP[2])
-		end
+		youScale.Scale = k
+		you.holder.Size = UDim2.fromOffset(D.box.X * k + 2 * margin, D.box.Y * k + 2 * margin)
+		you.holder.AnchorPoint = Vector2.new(0.5, 1)
+		you.holder.Position = UDim2.new(0.5, 0, 1, margin * scale - D.bottom)
+		peakMark.Visible = device ~= "touch"
+		paintStagger()
 	end
 
 	-- STATE ------------------------------------------------------------------------------------------
@@ -1050,11 +1016,8 @@ function HudController:KnitStart()
 	local closingToken = 0
 	local character: Model? = nil
 	local charConns: { RBXScriptConnection } = {}
-	local shownTier = ""
-	local shownWord = ""
-	local risingUntil: number? = nil
-	local lastRise = -math.huge
-	local recovering = false
+	local nextDial = 0
+	local dialSpeed = 0
 	local target: Model? = nil
 	local targetLocked = false
 	local nextTargetPick = 0
@@ -1103,25 +1066,30 @@ function HudController:KnitStart()
 		end
 	end
 
-	-- Which groups show: you and your kit while you're alive and in it; nothing of yours once you're out or
+	-- Which groups show: you and your kit while you're alive and in a FIGHT; nothing of yours once you're out or
 	-- the round is over. Touch has its own buttons, so no tiles there.
-	local wasFighting = false
+	-- A fight is a round, the training arena, or the practice end of the lobby (where the dummies stand). In the
+	-- rest of the lobby nobody can hit you, the menu strips stand where the plate would, and the approved mockup
+	-- shows neither plate nor tiles there (owner, 2026-11-17: nothing overlaps; no stagger plate in the lobby,
+	-- "maybe when you step into the training area").
+	local practising = false
+	local function inFight(): boolean
+		if not GameConfig.Round.Enabled then
+			return true
+		end
+		return player:GetAttribute("HT_InRound") == true
+			or player:GetAttribute("HT_InTraining") == true
+			or practising
+	end
 	local function refreshGroups()
 		local alive = character ~= nil and character.Parent ~= nil
 		local round = readRound()
 		local out = player:GetAttribute("HT_Eliminated") == true
 		local over = round.phase == "RoundOver"
-		local fighting = alive and not out and not over
+		local fighting = alive and not out and not over and inFight()
 		setGroup(you, fighting)
 		setGroup(kit, fighting and device ~= "touch")
 		setGroup(spectate, out and not over)
-		-- The chip is for fighters. The guide itself can also be opened from the lobby's Moves button while
-		-- you're out, so it closes once, at the moment you stop fighting, not on every refresh after that.
-		helpChip.Visible = fighting
-		if wasFighting and not fighting then
-			guide.Visible = false
-		end
-		wasFighting = fighting
 	end
 
 	local function refreshStrip(fromEvent: boolean)
@@ -1139,7 +1107,7 @@ function HudController:KnitStart()
 		-- Fighting: [ 18  / 25  STANDING ]; intermission: [ NEXT ROUND  12  ROUND 4 ]; starting: [ GET READY  ROUND 4 ]
 		stripCountSlot.Visible = info.count ~= nil and (fightingNow or counting)
 		stripCountSlot.Text = info.count or ""
-		stripCount.Text = info.count or ""
+		Poster.setFigures(stripFigures, info.count or "")
 		stripCountSlot.LayoutOrder = if counting then 2 else 1
 		stripTitle.Text = if info.total then `/ {info.total} {info.title}` else info.title
 		stripTitle.LayoutOrder = if counting then 1 else 3
@@ -1192,6 +1160,10 @@ function HudController:KnitStart()
 			then
 				Callouts.last(alive, device == "touch", bumpCount)
 			else
+				-- someone is out: the soft knock (5 to 2 have their own sound, in the popup)
+				if alive and was and alive < was then
+					UiSound.play("ring_out")
+				end
 				bumpCount()
 			end
 		end
@@ -1365,7 +1337,7 @@ function HudController:KnitStart()
 		end
 	end)
 
-	-- Devices: key caps and the guide follow the last input used ------------------------------------------
+	-- Devices: key caps follow the last input used ---------------------------------------------------------
 	local function setCap(label: TextLabel, glyph: ImageLabel, key: string)
 		local image = ""
 		if device == "gamepad" and PAD_KEYS[key] then
@@ -1384,39 +1356,6 @@ function HudController:KnitStart()
 			tile.cap.Visible = device ~= "touch"
 			tile.cap.BackgroundTransparency = if tile.capGlyph.Visible then 1 else 0
 		end
-		if device == "gamepad" then
-			setCap(helpCapText, helpCapGlyph, "SELECT")
-			helpCapText.Text = "SELECT"
-		else
-			setCap(helpCapText, helpCapGlyph, "H")
-		end
-		helpCap.Visible = device ~= "touch"
-		local list = (HudTheme.Guide :: any)[device] or {}
-		for order, row in guideRows do
-			local item = list[order]
-			row.frame.Visible = item ~= nil
-			if item then
-				row.key.Text = item.key
-				row.info.Text = item.action
-				task.spawn(function()
-					local params = Instance.new("GetTextBoundsParams")
-					params.Text = item.action
-					params.Font = row.info.FontFace
-					params.Size = row.info.TextSize
-					params.Width = GUIDE_INFO
-					local ok, bounds = pcall(function()
-						return TextService:GetTextBoundsAsync(params)
-					end)
-					if row.info.Text == item.action then
-						-- the measure knows nothing of the role's line height, so it is added here
-						local height = if ok
-							then math.ceil(bounds.Y * row.info.LineHeight) + 2
-							else row.info.TextSize * 4
-						row.info.Size = UDim2.fromOffset(GUIDE_INFO, height)
-					end
-				end)
-			end
-		end
 		layout()
 		refreshGroups()
 	end
@@ -1428,39 +1367,17 @@ function HudController:KnitStart()
 		end
 	end)
 
-	local function toggleGuide()
-		guide.Visible = not guide.Visible
-	end
-	helpChip.Activated:Connect(toggleGuide)
-	self._toggleGuide = toggleGuide
-	ContextActionService:BindActionAtPriority(HELP_ACTION, function(_, inputState)
-		if inputState == Enum.UserInputState.Begin then
-			toggleGuide()
-		end
-		return Enum.ContextActionResult.Pass
-	end, false, Enum.ContextActionPriority.Low.Value, Enum.KeyCode.H, Enum.KeyCode.ButtonSelect)
-
 	-- Your character ---------------------------------------------------------------------------------
-	local function paintWord(now: number)
-		local say = HudLogic.staggerWord(now, lastRise, ST.RisingFor, recovering)
-		if say ~= shownWord then
-			shownWord = say
-			status.Text = say
-		end
-	end
-
-	-- The mockup's hit: the number comes in 1.8 times its size, turned 10 degrees, and settles on the spring
-	-- over 0.6 s; the plate shakes for 0.32 s (three knocks, each eased). Neither plays under Reduced Motion.
+	-- A hit: the stagger strip comes in bigger and settles on the spring; the dial shakes for 0.32 s (three
+	-- knocks, each eased), as the mockup's plate did. Neither plays under Reduced Motion.
 	local SHAKE_X = { { 0, -10 }, { 0.35, 8 }, { 0.7, -4 }, { 1, 0 } }
 	local SHAKE_Y = { { 0, 6 }, { 0.35, -5 }, { 0.7, 2 }, { 1, 0 } }
 	local function bump()
-		Poster.run(figureBox, ST.BumpSeconds, function(t: number)
-			local s = PosterEase.spring(t)
-			figureScale.Scale = ST.BumpScale + (1 - ST.BumpScale) * s
-			figureBox.Rotation = ST.BumpTurn * (1 - s)
+		Poster.run(stripScale, ST.BumpSeconds, function(t: number)
+			stripScale.Scale = SPD.StripBump + (1 - SPD.StripBump) * PosterEase.spring(t)
 		end)
 		Poster.run(youPlate, ST.ShakeSeconds, function(t: number)
-			local k = L.YScale
+			local k = youScale.Scale
 			youPlate.Position = plateRest
 				+ UDim2.fromOffset(
 					PosterEase.keyframes(SHAKE_X, t, PosterEase.ease) * k,
@@ -1472,33 +1389,12 @@ function HudController:KnitStart()
 	local function setStagger(value: number, animate: boolean)
 		local before = stagger
 		stagger = value
-		local now = os.clock()
-		paintFigure()
-		-- white, then yellow, then pink, at the same shares of the maximum as the bar's thirds
-		local tier = HudLogic.staggerTier(value, STAGGER_MAX, ST.YellowShare, ST.PinkShare)
-		if tier ~= shownTier then
-			shownTier = tier
-			Poster.tintNumber(figure, colour(ST.Tone[tier]))
-		end
+		paintStagger()
 		if value > before then
-			lastRise = now
-			risingUntil = now + ST.RisingFor
-			recovering = false
 			if animate and HudLogic.emphasize(promptActive, HudMotion.reduced()) then
 				bump()
 			end
-		elseif
-			value < before
-			and HudLogic.recovering(value, before, now, lastRise, staggerCfg.RecoveryDelay)
-		then
-			-- recovering is a drop after the server's delay without a hit; hit relief is not
-			recovering = true
 		end
-		if value <= 0 then
-			recovering = false
-		end
-		paintWord(now)
-		paintSegments(animate, false)
 	end
 
 	local function onCharacter(model: Model)
@@ -1509,7 +1405,6 @@ function HudController:KnitStart()
 		character = model
 		-- Nothing from a previous life carries over.
 		stagger = 0
-		recovering, lastRise, risingUntil = false, -math.huge, nil
 		setStagger((model:GetAttribute("HT_Stagger") or 0) :: number, false)
 		table.insert(
 			charConns,
@@ -1528,13 +1423,39 @@ function HudController:KnitStart()
 			refreshGroups()
 		end
 	end)
-	for _, name in { "HT_Eliminated", "HT_InTraining" } do
+	for _, name in { "HT_Eliminated", "HT_InTraining", "HT_InRound" } do
 		player:GetAttributeChangedSignal(name):Connect(function()
+			layout() -- the feed stands under the Coins out of a round
 			refreshStrip(false)
 			refreshShrink(false)
 			refreshGroups()
 		end)
 	end
+	-- The practice end of the lobby: looked at four times a second, and only while you stand in the lobby.
+	if GameConfig.Round.Enabled and GameConfig.Lobby.Enabled then
+		task.spawn(function()
+			while true do
+				task.wait(0.25)
+				local now = false
+				if player:GetAttribute("HT_InLobby") == true then
+					local root = character and character:FindFirstChild("HumanoidRootPart")
+					if root and root:IsA("BasePart") then
+						now = Lobby.inTraining(GameConfig.Lobby, root.Position.X, root.Position.Z)
+					end
+				end
+				if now ~= practising then
+					practising = now
+					refreshGroups()
+				end
+			end
+		end)
+	end
+	-- The feed gives way to the open menu window: its rows would lie over the window's corner.
+	local menuOpen = false
+	Knit.GetController("MenuController").Changed:Connect(function(entry: string?)
+		menuOpen = entry ~= nil
+		feed.holder.Visible = not menuOpen
+	end)
 
 	-- Press and result feedback ----------------------------------------------------------------------
 	-- used: the mockup squashes the tile to 1.25 wide by 0.6 tall and springs it back over 0.5 s. Roblox can't
@@ -1575,6 +1496,7 @@ function HudController:KnitStart()
 		press(tiles.propel)
 	end)
 	movement.PropelBlocked:Connect(function()
+		UiSound.playIfShown("ui_deny", tiles.propel.box)
 		refuse(tiles.propel)
 	end)
 	-- Other kits' skills (Blink, Cyclone): the same press and refusal on the Q and R tiles.
@@ -1588,6 +1510,7 @@ function HudController:KnitStart()
 	ability.SkillBlocked:Connect(function(slot: string)
 		local tile = slotTiles[slot]
 		if tile then
+			UiSound.playIfShown("ui_deny", tile.box)
 			refuse(tile)
 		end
 	end)
@@ -1648,10 +1571,15 @@ function HudController:KnitStart()
 		end
 
 		if model then
-			-- RISING lasts a moment after a gain, then the word settles.
-			if risingUntil and now >= risingUntil then
-				risingUntil = nil
-				paintWord(now)
+			-- The speed dial: your ground speed, a few times a second, and only while the dial is on screen.
+			if you.wanted and now >= nextDial then
+				local every = if device == "touch" then SPD.EveryLite else SPD.Every
+				local root = model.PrimaryPart
+				local velocity = if root then root.AssemblyLinearVelocity else Vector3.zero
+				local speed = math.sqrt(velocity.X * velocity.X + velocity.Z * velocity.Z)
+				dialSpeed += (speed - dialSpeed) * SPD.Smooth
+				paintSpeed(dialSpeed, if nextDial > 0 then every else 0)
+				nextDial = now + every
 			end
 
 			-- Each action from its own real timing.
@@ -1726,7 +1654,7 @@ function HudController:KnitStart()
 					else string.format("%d", math.ceil(wait))
 				if secs ~= tile.secondsText then
 					tile.secondsText = secs
-					tile.seconds.Text = secs
+					Poster.setFigures(tile.seconds, secs)
 				end
 				-- above the tile: a result word for a moment, else the skill's name when names show
 				if id == "kick" and cueUp then
@@ -1826,7 +1754,7 @@ function HudController:KnitStart()
 			if info.count and info.count ~= lastCountdown then
 				lastCountdown = info.count
 				stripCountSlot.Text = info.count
-				stripCount.Text = info.count
+				Poster.setFigures(stripFigures, info.count)
 			end
 		end
 
@@ -1855,13 +1783,6 @@ function HudController:KnitStart()
 		onCharacter(player.Character)
 	end
 	refreshStrip(false)
-end
-
---- Shows or hides the controls guide (the navigation's Moves button and the fight menu call this).
-function HudController:ToggleGuide()
-	if self._toggleGuide then
-		self._toggleGuide()
-	end
 end
 
 return HudController

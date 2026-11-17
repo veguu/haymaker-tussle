@@ -86,8 +86,6 @@ function SpectateController:KnitStart()
 	local root = Instance.new("Frame")
 	root.Name = "Root"
 	root.BackgroundTransparency = 1
-	root.Position =
-		UDim2.fromOffset(HudTheme.Size.Edge, HudTheme.Afk.Top + HudTheme.Afk.Height + S.Gap)
 	root.Size = UDim2.fromOffset(S.Width + S.Gap + S.PanelWidth, S.Height + (S.Row + S.Gap) * 2)
 	root.Parent = gui
 	local scale = Instance.new("UIScale")
@@ -383,8 +381,8 @@ function SpectateController:KnitStart()
 		show()
 	end
 	main.Activated:Connect(toggle)
-	-- The lobby navigation's drawer opens this now (NavController, 2026-11-16), so the old button is hidden;
-	-- the panel it opened still appears in the same place.
+	-- The menu window's More page opens this now (MenuController, 2026-11-17), so the old button is hidden;
+	-- the panel it opened stands at the bottom centre (see layout()).
 	self._toggle = toggle
 	main.Visible = false
 	mineButton.Activated:Connect(function()
@@ -448,13 +446,23 @@ function SpectateController:KnitStart()
 	local function layout()
 		local camera = workspace.CurrentCamera
 		local size = if camera then camera.ViewportSize else HudTheme.Scale.Reference
-		local ref = HudTheme.Scale.Reference
-		scale.Scale = math.clamp(
-			math.min(size.X / ref.X, size.Y / ref.Y),
-			HudTheme.Scale.Min,
-			HudTheme.Scale.Max
+		local by = HudTheme.scaleFor(size)
+		scale.Scale = by
+		-- The panel stands at the bottom centre, over the place of the HUD's "spectating" chip (16 from the
+		-- bottom, 40 tall). It used to open at the top left, where the menu strips are now (owner, 2026-11-17:
+		-- nothing lies over anything). The panel is the root's right part; the old button on its left is hidden.
+		local panelTall = S.Pad * 2 + S.Row * 2 + S.Gap
+		root.Position = UDim2.new(
+			0.5,
+			-(S.Width + S.Gap + S.PanelWidth / 2) * by,
+			1,
+			-(16 + 40 * by + 14 + panelTall * by)
 		)
 	end
+	-- and it gives way to the open menu window
+	Knit.GetController("MenuController").Changed:Connect(function(entry: string?)
+		gui.Enabled = entry == nil
+	end)
 	local camera = workspace.CurrentCamera
 	if camera then
 		camera:GetPropertyChangedSignal("ViewportSize"):Connect(layout)
@@ -464,7 +472,7 @@ function SpectateController:KnitStart()
 	gui.Parent = player:WaitForChild("PlayerGui")
 end
 
---- Opens or closes the spectate panel (the navigation drawer's Spectate row). Does nothing in a round.
+--- Opens or closes the spectate panel (the More page's Spectate row). Does nothing in a round.
 function SpectateController:Toggle()
 	if self._toggle then
 		self._toggle()

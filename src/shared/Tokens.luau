@@ -37,6 +37,10 @@ Tokens.hex = {
 	["teal.700"] = "#0E8FB3",
 	["teal.400"] = "#21D4FD",
 	["teal.200"] = "#A6ECFF",
+	-- the Equip button alone (the owner, 2026-11-17: a vibrant, cool green, easier to notice than the cyan)
+	["go.400"] = "#1FE38C",
+	-- its opposite: the Equipped button under the pointer, where it offers to take the class off
+	["stop.400"] = "#FF4444",
 	["gold.600"] = "#B38F00",
 	["gold.400"] = "#FFD426",
 	["gold.200"] = "#FFEE99",

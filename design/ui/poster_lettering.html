@@ -1,0 +1,51 @@
+<!doctype html><meta charset="utf-8">
+<!-- The fight-poster look's big lettering, drawn by the browser in the mockup's own font and at TWICE the mockup's
+     size, packed into 1024 x 1024 sheets. design/ui/make_lettering.py runs it:
+       state {"sheet":"titles"|"words", "page":N}   draws that page of that sheet
+       state {"sheet":..., "measure":true} + dump   prints "RECT name | page x y w h" for every item
+     "titles" is full colour (cream, ink outline, ink shadow: the window's title, `.title`). "words" is white on
+     clear, tinted in the game: the menu strips' labels, the ULTIMATE letters, the stamps, the class names and the
+     upright digits. An item's box is its text box (line-height 1) plus PAD on every side. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&display=swap">
+<style>
+html,body{margin:0;background:transparent;overflow:hidden}
+span{position:absolute;white-space:nowrap;line-height:1;font-family:Oswald;font-weight:700;text-transform:uppercase;color:#fff}
+span.title{color:#FFFBEF;-webkit-text-stroke:10px #1A1236;paint-order:stroke fill;text-shadow:14px 14px 0 #1A1236}
+pre{position:absolute;left:0;top:1030px;font:12px monospace}
+</style>
+<body>
+<script>
+let cap={}; try{cap=JSON.parse(decodeURIComponent(location.hash.slice(1))||'{}')}catch(e){}
+const CLASSES=['Base','Bruiser','Inferno','Beast','Trickster','Dragon','Frost','Tempest'];
+// [name, text, mockup px, letter-spacing em]
+const SHEETS={
+  titles:{pad:28,cls:'title',items:[...CLASSES,'Shop','Ranked','Moves','More','Settings'].map(w=>['title:'+w.toUpperCase(),w,84,.02])},
+  words:{pad:6,cls:'',items:[
+    ...['Classes','Shop','Ranked','Moves'].map(w=>['nav:'+w.toUpperCase(),w,34,.03]),
+    ['nav:MORE','More',22,.03],
+    ...'ULTIMAE'.split('').map(c=>['ult:'+c,c,74,0]),
+    ['stamp:READY','Ready',30,0],
+    ['last:FIGHTERS LEFT','Fighters left',42,.03],['last:FINAL TWO','Final two',42,.03],
+    ['badge:ULT READY','Ult ready',24,0],['badge:PRESS','Press',24,0],['badge:ULT NOW','Ult now',24,0],
+    ...CLASSES.map(w=>['class:'+w.toUpperCase(),w,30,0]),
+    ...'0123456789x./'.split('').map(c=>['num:'+c,c,34,0]),
+  ]},
+};
+const sheet=SHEETS[cap.sheet||'words'];
+document.fonts.load('700 100px Oswald').then(()=>document.fonts.ready).then(()=>{
+  let x=0,y=0,row=0,page=0; const out=[];
+  for(const [name,text,px,ls] of sheet.items){
+    const s=document.createElement('span'); s.className=sheet.cls; s.textContent=text;
+    s.style.fontSize=(px*2)+'px'; s.style.letterSpacing=ls+'em'; if(name.startsWith('num:x'))s.style.textTransform='none';
+    document.body.appendChild(s);
+    const w=Math.ceil(s.offsetWidth)+2*sheet.pad, h=px*2+2*sheet.pad;
+    if(x+w>1024){x=0;y+=row;row=0;}
+    if(y+h>1024){page++;x=0;y=0;row=0;}
+    s.style.left=(x+sheet.pad)+'px'; s.style.top=(y+sheet.pad)+'px';
+    if(page!==(cap.page||0))s.style.display='none';
+    out.push('RECT '+name+' | '+[page,x,y,w,h].join(' '));
+    x+=w; row=Math.max(row,h);
+  }
+  if(cap.measure){const pre=document.createElement('pre'); pre.textContent='\n'+out.join('\n')+'\n'; document.body.appendChild(pre);}
+});
+</script>

@@ -6,6 +6,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local Tokens = require(ReplicatedStorage.Shared.Tokens)
 local Icons = require(script.Parent.Icons)
@@ -44,15 +45,25 @@ HudTheme.Transparency = {
 -- Whole-HUD scale: window size against 1280 x 720, kept within these so text stays readable.
 -- `Bottom` shrinks the two bottom groups (your stagger and speed, and the controls) against the rest
 -- (user, 2026-11-09: smaller). At the 1280 x 720 reference that takes 15-unit text to about 12 px.
-HudTheme.Scale = { Reference = Vector2.new(1280, 720), Min = 1, Max = 1.35, Bottom = 0.82 }
+-- With a mouse or a gamepad the HUD may shrink to `MinDesktop` in a small window, so it keeps the share of the
+-- screen it has at 1280 x 720 (owner, 2026-11-17: everything took too much of a small window). On touch it
+-- never goes under `Min`: a phone's screen is small in pixels but is held close.
+HudTheme.Scale =
+	{ Reference = Vector2.new(1280, 720), Min = 1, MinDesktop = 0.6, Max = 1.35, Bottom = 0.82 }
+
+--- The HUD's scale in a viewport of this size, for the device in hand.
+function HudTheme.scaleFor(view: Vector2): number
+	local rule = HudTheme.Scale
+	local touch = UserInputService:GetLastInputType() == Enum.UserInputType.Touch
+	return math.clamp(
+		math.min(view.X / rule.Reference.X, view.Y / rule.Reference.Y),
+		if touch then rule.Min else rule.MinDesktop,
+		rule.Max
+	)
+end
 
 HudTheme.Size = {
 	Edge = 16, -- inset from the screen's edges (inside the safe area); the corner buttons use it
-	-- The help chip above the skill tiles, and the full guide it opens.
-	HelpHeight = 26,
-	HelpWidth = 150,
-	GuideWidth = 320,
-	GuideRow = 28,
 	-- The target marker, above their head.
 	ChipMaxDistance = 70,
 	TargetRange = 22, -- with no lock-on: nearest opponent ahead within this many studs
@@ -91,6 +102,20 @@ HudTheme.Stagger = {
 	BumpSeconds = 0.6,
 	ShakeSeconds = 0.32,
 	SegmentSeconds = 0.3, -- a segment growing or shrinking, on the pop curve
+}
+
+-- The speed dial (HudController, group Y): a half dial of ticks. Its top speed and where "above a run" starts
+-- come from GameConfig.Movement (PropelChargedSpeed, MaxSpeed); the colours are Stagger.Tone's.
+HudTheme.Speed = {
+	Ticks = 30,
+	From = 197, -- degrees: where the first tick stands, counted anticlockwise from the right
+	Sweep = 214, -- degrees the ticks cover, over the top
+	Redline = 100, -- studs a second: pink from here
+	Every = 0.05, -- seconds between readings of your speed
+	EveryLite = 0.1, -- the same on phones
+	Smooth = 0.5, -- how far the shown speed moves toward the real one at each reading
+	PeakFall = 28, -- studs a second, each second: how fast the top-speed mark falls back
+	StripBump = 1.6, -- a hit: the stagger strip comes in this much bigger and settles on the spring
 }
 
 -- The skill tiles: a rough-cut tile with an ink outline and a hard shadow. Three states, each a different
@@ -176,7 +201,7 @@ HudTheme.Actions = {
 	},
 }
 
--- The full guide behind the help chip. Lock-on is E in Studio, because Alt there opens Studio's
+-- The controls the window's Moves page lists. Lock-on is E in Studio, because Alt there opens Studio's
 -- menu bar.
 local lockKey = if RunService:IsStudio() then "E" else "Alt"
 HudTheme.Guide = {
@@ -198,8 +223,8 @@ HudTheme.Guide = {
 			action = "Jump. Click in the air to glide a punch at where you point.",
 		},
 		{ key = "Ctrl", action = "Shift lock." },
-		{ key = lockKey, action = "Lock on to the nearest opponent." },
-		{ key = "H", action = "Show or hide this guide." },
+		{ key = lockKey, action = "Lock on: the nearest opponent." },
+		{ key = "H", action = "This guide." },
 	},
 	gamepad = {
 		{
@@ -215,8 +240,8 @@ HudTheme.Guide = {
 			key = "Y",
 			action = "Jump. R2 in the air to glide a punch.",
 		},
-		{ key = "L1", action = "Lock on to the nearest opponent." },
-		{ key = "Select", action = "Show or hide this guide." },
+		{ key = "L1", action = "Lock on: the nearest opponent." },
+		{ key = "Select", action = "This guide." },
 	},
 	touch = {
 		{
@@ -229,22 +254,11 @@ HudTheme.Guide = {
 			key = "Kick",
 			action = "Jump. Punch in the air to glide a punch at them.",
 		},
-		{ key = "Lock", action = "Lock on to the nearest opponent." },
+		{ key = "Lock", action = "Lock on: the nearest opponent." },
 	},
 }
 
--- The AFK button, top left: sit out the next rounds. 52 tall, the touch-target minimum.
-HudTheme.Afk = {
-	Width = 132,
-	Height = 52,
-	Top = 8, -- below the safe area's top edge
-	Corner = 6,
-	PressScale = 0.96,
-	PressSeconds = 0.05,
-	ReleaseSeconds = 0.16,
-}
-
--- The Spectate button sits under the AFK button and opens a small panel beside it.
+-- The spectate panel (bottom centre; opened from the window's More page). The old button beside it is hidden.
 HudTheme.Spectate = {
 	Width = 132,
 	Height = 52,

@@ -36,7 +36,53 @@ Shapes.ids = {
 	digits = "rbxassetid://73013783840248",
 	badge = "rbxassetid://101402484359518",
 	last = "rbxassetid://134576604933482",
+	-- the lobby (assets/ui/poster_nav_*.png and friends): each is the mockup's own clip-path polygon, stretched
+	navA = "rbxassetid://136856775817076", -- Classes, Ranked, More
+	navB = "rbxassetid://124539778494442", -- Shop
+	navD = "rbxassetid://97223561262692", -- Moves
+	gear = "rbxassetid://136635326219064", -- the fight's MENU button
+	close = "rbxassetid://117594119784549", -- the window's X
+	class = "rbxassetid://85756694857451", -- a class tile
+	classStripes = "rbxassetid://101597562657732", -- the stripes over a class you don't own
+	act = "rbxassetid://81122324445766", -- an action button (Equip, Buy, Confirm)
+	slab = "rbxassetid://128027657366818", -- a shop slab
+	dots = "rbxassetid://99839905290934", -- one cell of the window's dot pattern, four times its size
 } :: { [string]: string }
+
+-- The window's drifting word: one TILE per word, from design/ui/make_word_tiles.py (the browser draws them in
+-- the mockup's font). A tile is one word-and-gap wide and two rows (168) tall, its second row set 140 to the
+-- left, so repeated it is the mockup's wall of words. A word that isn't listed draws no words.
+Shapes.words = {
+	Base = { id = "rbxassetid://103610338234574", width = 203 },
+	Bruiser = { id = "rbxassetid://113485940305771", width = 323 },
+	Inferno = { id = "rbxassetid://89122730886452", width = 312 },
+	Beast = { id = "rbxassetid://133110655645176", width = 238 },
+	Trickster = { id = "rbxassetid://129372346850451", width = 388 },
+	Dragon = { id = "rbxassetid://85888752360197", width = 309 },
+	Frost = { id = "rbxassetid://124805599592276", width = 240 },
+	Tempest = { id = "rbxassetid://86888317908588", width = 319 },
+	Shop = { id = "rbxassetid://97270319505585", width = 218 },
+	Ranked = { id = "rbxassetid://91327796862187", width = 298 },
+	Moves = { id = "rbxassetid://86763183912944", width = 256 },
+	More = { id = "rbxassetid://89104050580662", width = 222 },
+	Settings = { id = "rbxassetid://102397341024255", width = 337 },
+} :: { [string]: { id: string, width: number } }
+
+-- LETTERING AS IMAGES (owner, 2026-11-17, for an exact match): the big display words, drawn by the browser in the
+-- mockup's own font at twice its size (design/ui/make_lettering.py -> assets/ui/poster_titles_<n>.png and
+-- poster_words_<n>.png). Where each word is on its sheet is in the generated Ui/LetterRects; Poster.word and
+-- Poster.figures draw them. `titles` are full colour (the window's title with its outline and shadow); `words`
+-- are white, tinted where used (menu strip labels, the ULTIMATE letters, the stamps, class names, upright
+-- digits). IMAGE TEXT CANNOT BE TRANSLATED OR RESIZED BY THE ENGINE: a new or changed word means drawing and
+-- uploading the sheet again. Anything long or changing stays real text.
+Shapes.letters = {
+	titles = {
+		"rbxassetid://87365915153934",
+		"rbxassetid://118820953416670",
+		"rbxassetid://139550002196137",
+	},
+	words = { "rbxassetid://140543979882744" },
+} :: { [string]: { string } }
 
 -- The last-players numbers' sheet: cells in the order 5, 4, 3, 2, each number's own box in the middle of its
 -- cell. Full colour (cream, ink outline and shadow), so it is shown untinted.

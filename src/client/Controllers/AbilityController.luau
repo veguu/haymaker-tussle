@@ -401,7 +401,7 @@ function AbilityController:KnitStart()
 			if reason == "ok" then
 				self.Notice:Fire(
 					if action == "buy"
-						then `Bought {name}. Equip it in Abilities.`
+						then `Bought {name}. Equip it in Classes.`
 						else `{name} equipped.`,
 					true
 				)

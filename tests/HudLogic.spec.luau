@@ -16,22 +16,6 @@ return {
 		assert(HudLogic.cooldownLeft(0, 3, 0) == 0)
 	end,
 
-	["the speed gauge fills to running speed, then shows the extra separately"] = function()
-		local base, over = HudLogic.speedGauge(18, 36, 120)
-		assert(base == 0.5 and over == 0)
-		base, over = HudLogic.speedGauge(84, 36, 120)
-		assert(base == 1 and math.abs(over - 48 / 84) < 1e-9)
-		base, over = HudLogic.speedGauge(400, 36, 120)
-		assert(base == 1 and over == 1)
-	end,
-
-	["speed digits hold steady through small wobble, and reach zero"] = function()
-		assert(HudLogic.steadyDigits(36, 35.6, 0.8) == 36)
-		assert(HudLogic.steadyDigits(36, 34.9, 0.8) == 35)
-		assert(HudLogic.steadyDigits(3, 0.2, 0.8) == 0)
-		assert(HudLogic.steadyDigits(36, 84, 0.8) == 84, "a propel shows its real speed")
-	end,
-
 	["stagger accent only for a real gain"] = function()
 		assert(HudLogic.staggerAccent(10, 22, 8))
 		assert(not HudLogic.staggerAccent(10, 14, 8))
@@ -48,6 +32,15 @@ return {
 		assert(s.count == "6")
 		s = HudLogic.strip({ phase = "Starting", countdownEnd = 3 }, 5)
 		assert(s.count == "0", "never negative")
+	end,
+
+	["an intermission with no countdown (too few players ready) hides the strip"] = function()
+		local s = HudLogic.strip({ phase = "Intermission" }, 5)
+		assert(not s.visible, "no NEXT ROUND 0 while nothing is counting")
+		s = HudLogic.strip({ phase = "Intermission", countdownEnd = 4 }, 5)
+		assert(s.visible and s.count == "0", "a countdown that has just run out still shows")
+		s = HudLogic.strip({ phase = "Starting" }, 5)
+		assert(s.visible, "GET READY shows with or without a time")
 	end,
 
 	["feed lines for a knock, a fall with nobody credited, and a disconnect"] = function()
@@ -73,5 +66,82 @@ return {
 		bar = HudLogic.catchUp(bar, 24, 0.05, 0.15)
 		bar = HudLogic.catchUp(bar, 36, 0.15, 0.15)
 		assert(bar == 36)
+	end,
+	["stagger bands: calm under 40, rising 40-69, critical from 70"] = function()
+		assert(HudLogic.staggerBand(0, 100) == "calm")
+		assert(HudLogic.staggerBand(39, 100) == "calm")
+		assert(HudLogic.staggerBand(40, 100) == "rising")
+		assert(HudLogic.staggerBand(69, 100) == "rising")
+		assert(HudLogic.staggerBand(70, 100) == "critical")
+		assert(HudLogic.staggerBand(100, 100) == "critical")
+	end,
+
+	["the knockback caption has one decimal"] = function()
+		assert(HudLogic.multiplierText(1) == "1.0")
+		assert(HudLogic.multiplierText(3.35) == "3.4")
+		assert(HudLogic.multiplierText(6) == "6.0")
+	end,
+
+	["a drop is recovery only after the delay; sooner it's hit relief"] = function()
+		assert(HudLogic.recovering(40, 43, 10, 6, 3))
+		assert(not HudLogic.recovering(40, 43, 10, 8, 3))
+		assert(not HudLogic.recovering(43, 40, 10, 0, 3))
+	end,
+
+	["your stagger number goes white, yellow, pink at the same shares as the bar"] = function()
+		local third, twoThirds = 1 / 3, 2 / 3
+		assert(HudLogic.staggerTier(0, 100, third, twoThirds) == "white")
+		assert(HudLogic.staggerTier(33, 100, third, twoThirds) == "white")
+		assert(HudLogic.staggerTier(34, 100, third, twoThirds) == "yellow")
+		assert(HudLogic.staggerTier(66, 100, third, twoThirds) == "yellow")
+		assert(HudLogic.staggerTier(67, 100, third, twoThirds) == "pink")
+		assert(HudLogic.staggerTier(100, 100, third, twoThirds) == "pink")
+		-- at the mockup's range (0 to 150) the steps land on 50 and 100
+		assert(HudLogic.staggerTier(49, 150, third, twoThirds) == "white")
+		assert(HudLogic.staggerTier(50, 150, third, twoThirds) == "yellow")
+		assert(HudLogic.staggerTier(100, 150, third, twoThirds) == "pink")
+	end,
+
+	["the segmented bar lights from the first hit and fills only at the top"] = function()
+		assert(HudLogic.segmentsLit(0, 100, 12) == 0)
+		assert(HudLogic.segmentsLit(1, 100, 12) == 1, "any stagger lights one")
+		assert(HudLogic.segmentsLit(7.2, 100, 12) == 1)
+		assert(HudLogic.segmentsLit(50, 100, 12) == 6)
+		assert(HudLogic.segmentsLit(100, 100, 12) == 12)
+		assert(HudLogic.segmentsLit(400, 100, 12) == 12, "never past the last")
+	end,
+
+	["the speed dial lights no tick at rest, one for any movement, all past its top"] = function()
+		assert(HudLogic.speedTicks(0, 140, 30) == 0)
+		assert(HudLogic.speedTicks(0.4, 140, 30) == 0, "standing still")
+		assert(HudLogic.speedTicks(1, 140, 30) == 1, "any movement lights one")
+		assert(HudLogic.speedTicks(70, 140, 30) == 15)
+		assert(HudLogic.speedTicks(140, 140, 30) == 30)
+		assert(HudLogic.speedTicks(250, 140, 30) == 30, "never past the last")
+	end,
+
+	["speed is white up to a run, yellow above it, pink from the redline"] = function()
+		assert(HudLogic.speedTier(0, 50, 100) == "white")
+		assert(HudLogic.speedTier(49.9, 50, 100) == "white")
+		assert(HudLogic.speedTier(50, 50, 100) == "yellow")
+		assert(HudLogic.speedTier(99, 50, 100) == "yellow")
+		assert(HudLogic.speedTier(100, 50, 100) == "pink")
+		assert(HudLogic.speedTier(250, 50, 100) == "pink")
+	end,
+
+	["segments are white, yellow and pink in thirds"] = function()
+		local third, twoThirds = 1 / 3, 2 / 3
+		for index = 1, 12 do
+			local want = if index <= 4 then "white" elseif index <= 8 then "yellow" else "pink"
+			assert(HudLogic.segmentTier(index, 12, third, twoThirds) == want, `segment {index}`)
+		end
+	end,
+
+	["the stagger word: rising after a gain, recovering while it drains, else steady"] = function()
+		assert(HudLogic.staggerWord(10.5, 10, 0.8, false) == "RISING")
+		assert(HudLogic.staggerWord(10.5, 10, 0.8, true) == "RISING", "a fresh gain wins")
+		assert(HudLogic.staggerWord(11, 10, 0.8, false) == "STEADY")
+		assert(HudLogic.staggerWord(14, 10, 0.8, true) == "RECOVERING")
+		assert(HudLogic.staggerWord(0, -math.huge, 0.8, false) == "STEADY")
 	end,
 }

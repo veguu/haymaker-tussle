@@ -21,6 +21,7 @@ local RunService = game:GetService("RunService")
 local Tokens = require(ReplicatedStorage.Shared.Tokens)
 local Typography = require(ReplicatedStorage.Shared.Typography)
 local HudMotion = require(script.Parent.HudMotion)
+local LetterRects = require(script.Parent.LetterRects)
 local Shapes = require(script.Parent.Shapes)
 
 local Poster = {}
@@ -128,6 +129,172 @@ end
 
 function Poster.tintNumber(number: Number, colour: Color3)
 	for _, image in number.digits do
+		image.ImageColor3 = colour
+	end
+end
+
+-- WORDS AND FIGURES AS IMAGES --------------------------------------------------------------------------
+-- The big display lettering is drawn from sheets the browser rendered in the mockup's own font (Ui/Shapes.letters,
+-- Ui/LetterRects), so it matches the mockup to the pixel: its letter spacing, its outline, its shadow.
+
+export type Word = {
+	frame: Frame,
+	image: ImageLabel,
+	sheet: string,
+	css: number,
+	width: number,
+	name: string,
+}
+
+local rects: any = LetterRects
+
+--- Whether a word is on a sheet (a class or a page added later may not be: draw it as text then).
+function Poster.hasWord(sheet: string, name: string): boolean
+	return rects[sheet] ~= nil and rects[sheet][name] ~= nil
+end
+
+local function showWord(word: Word, name: string): number
+	local group = rects[word.sheet]
+	local rect = group[name]
+	word.name = name
+	if not rect then
+		word.image.Visible = false
+		word.width = 0
+		return 0
+	end
+	local pad = group.pad
+	-- the word was drawn with its text box (height: its font size, twice over) inside `pad` on every side
+	local unit = word.css / (rect[5] - 2 * pad)
+	word.image.Visible = true
+	local pages = Shapes.letters[word.sheet]
+	word.image.Image = pages[rect[1] :: number]
+	word.image.ImageRectOffset = Vector2.new(rect[2], rect[3])
+	word.image.ImageRectSize = Vector2.new(rect[4], rect[5])
+	word.image.Position = UDim2.fromOffset(-pad * unit, -pad * unit)
+	word.image.Size = UDim2.fromOffset(rect[4] * unit, rect[5] * unit)
+	word.width = (rect[4] - 2 * pad) * unit
+	word.frame.Size = UDim2.fromOffset(word.width, word.css)
+	return word.width
+end
+
+--- How wide the browser lays a word out at the mockup's `css` font size (0 for a word that isn't on the sheet).
+function Poster.wordWidth(sheet: string, name: string, css: number): number
+	local group = rects[sheet]
+	local rect = group and group[name]
+	if not rect then
+		return 0
+	end
+	return (rect[4] - 2 * group.pad) * css / (rect[5] - 2 * group.pad)
+end
+
+--- A word from a lettering sheet at the mockup's `css` font size. `frame` is the word's TEXT BOX (as wide as the
+--- browser lays the word out, `css` tall): place and turn that. `tone` tints a white word; leave it out for the
+--- full-colour titles.
+function Poster.word(
+	parent: Instance?,
+	sheet: string,
+	name: string,
+	css: number,
+	tone: string?,
+	props: { [string]: any }?
+): Word
+	local frame = Instance.new("Frame")
+	frame.Name = "Word"
+	frame.BackgroundTransparency = 1
+	frame.BorderSizePixel = 0
+	local image = Instance.new("ImageLabel")
+	image.Name = "Image"
+	image.BackgroundTransparency = 1
+	if tone then
+		image.ImageColor3 = Tokens.colour(tone)
+	end
+	image.Parent = frame
+	local word: Word =
+		{ frame = frame, image = image, sheet = sheet, css = css, width = 0, name = "" }
+	showWord(word, name)
+	for key, value in props or {} do
+		(frame :: any)[key] = value
+	end
+	frame.Parent = parent
+	return word
+end
+
+--- Changes which word a Word shows. Returns its width.
+function Poster.setWord(word: Word, name: string): number
+	if word.name == name then
+		return word.width
+	end
+	return showWord(word, name)
+end
+
+export type Figures = {
+	frame: Frame,
+	glyphs: { ImageLabel },
+	css: number,
+	width: number,
+	text: string,
+}
+
+--- Upright figures (0 to 9, "x", ".", "/") of up to `places` glyphs at the mockup's `css` size, from the words
+--- sheet. `frame` is the run's text box; set it with Poster.setFigures.
+function Poster.figures(
+	parent: Instance?,
+	places: number,
+	css: number,
+	tone: string,
+	props: { [string]: any }?
+): Figures
+	local frame = Instance.new("Frame")
+	frame.Name = "Figures"
+	frame.BackgroundTransparency = 1
+	frame.BorderSizePixel = 0
+	local glyphs = {}
+	for index = 1, places do
+		local image = Instance.new("ImageLabel")
+		image.Name = `Glyph{index}`
+		image.BackgroundTransparency = 1
+		image.Image = Shapes.letters.words[1]
+		image.ImageColor3 = Tokens.colour(tone)
+		image.Visible = false
+		image.Parent = frame
+		glyphs[index] = image
+	end
+	for key, value in props or {} do
+		(frame :: any)[key] = value
+	end
+	frame.Parent = parent
+	return { frame = frame, glyphs = glyphs, css = css, width = 0, text = "?" }
+end
+
+--- Shows `text`; a character that is not on the sheet takes no room. Returns the width the run takes.
+function Poster.setFigures(figures: Figures, text: string): number
+	if figures.text == text then
+		return figures.width
+	end
+	local group = rects.words
+	local pad = group.pad
+	local pen = 0
+	for index, image in figures.glyphs do
+		local rect = group["num:" .. string.sub(text, index, index)]
+		if rect and index <= #text then
+			local unit = figures.css / (rect[5] - 2 * pad)
+			image.ImageRectOffset = Vector2.new(rect[2], rect[3])
+			image.ImageRectSize = Vector2.new(rect[4], rect[5])
+			image.Position = UDim2.fromOffset(pen - pad * unit, -pad * unit)
+			image.Size = UDim2.fromOffset(rect[4] * unit, rect[5] * unit)
+			image.Visible = true
+			pen += (rect[4] - 2 * pad) * unit
+		else
+			image.Visible = false
+		end
+	end
+	figures.text, figures.width = text, pen
+	figures.frame.Size = UDim2.fromOffset(pen, figures.css)
+	return pen
+end
+
+function Poster.tintFigures(figures: Figures, colour: Color3)
+	for _, image in figures.glyphs do
 		image.ImageColor3 = colour
 	end
 end

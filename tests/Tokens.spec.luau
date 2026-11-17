@@ -1,7 +1,7 @@
 --!strict
 -- Spec files are required BY the runner, so this path is relative to tests/.
--- The Golden Hour tokens keep the rules the design system promises: readable contrast, the 4-unit grid,
--- the 15-unit text floor.
+-- The Ringside tokens (palette A, Ringside Night, 2026-11-16) keep the rules the design system promises: readable
+-- contrast, the 4-unit grid, the 15-unit text floor.
 local Tokens = require("../src/shared/Tokens")
 
 local function channel(v: number): number
@@ -29,8 +29,7 @@ local TEXT = {
 	"ivory.200",
 	"stone.300",
 	"stone.500",
-	"coral.300",
-	"coral.500",
+	"coral.300", -- the red-orange for text; coral.500 is for fills and marks (and text on ink.900 only)
 	"teal.400",
 	"gold.400",
 }
@@ -45,13 +44,13 @@ return {
 
 	["the palette's measured contrasts hold (to 0.1)"] = function()
 		local expect = {
-			{ "ivory.50", "ink.900", 17.3 },
-			{ "coral.300", "ink.900", 9.3 },
-			{ "coral.500", "ink.900", 6.7 },
-			{ "teal.400", "ink.900", 8.5 },
-			{ "gold.400", "ink.900", 11.3 },
-			{ "stone.500", "ink.900", 4.1 },
-			{ "danger.600", "ink.900", 4.4 },
+			{ "ivory.50", "ink.900", 17.1 },
+			{ "coral.300", "ink.900", 14.3 },
+			{ "coral.500", "ink.900", 12.4 },
+			{ "teal.400", "ink.900", 10.1 },
+			{ "gold.400", "ink.900", 12.4 },
+			{ "stone.500", "ink.900", 5.5 },
+			{ "danger.600", "ink.900", 5.8 },
 		}
 		for _, e in expect do
 			local got = contrast(e[1], e[2])
@@ -71,10 +70,27 @@ return {
 	end,
 
 	["accent buttons take ink text at 4.5:1 or better"] = function()
-		for _, fill in { "ivory.50", "gold.400", "teal.400", "coral.500" } do
-			local c = contrast("ink.900", fill)
-			assert(c >= 4.5, `ink.900 on {fill} is {c}:1`)
+		for _, fill in { "ivory.50", "gold.400", "teal.400", "coral.500", "danger.600" } do
+			local c = contrast("ink.950", fill)
+			assert(c >= 4.5, `ink.950 on {fill} is {c}:1`)
 		end
+	end,
+
+	["the words on the HUD panel that carry state read at 4.5:1 or better"] = function()
+		-- stagger's CRITICAL and the pink of your own name are text on ink.900 only
+		for _, tone in { "danger.600", "coral.500" } do
+			local c = contrast(tone, "ink.900")
+			assert(c >= 4.5, `{tone} on ink.900 is {c}:1`)
+		end
+	end,
+
+	["the cut-corner images are named and sliced inside their 96 px"] = function()
+		for _, key in { "fill", "line", "flag" } do
+			assert(string.match(Tokens.cut[key], "^rbxassetid://%d+$"), key)
+		end
+		local c = Tokens.cut.slice
+		assert(c[1] < c[3] and c[2] < c[4] and c[3] <= 96 and c[4] <= 96)
+		assert(Tokens.cut.scale > 0 and Tokens.cut.scale <= 1)
 	end,
 
 	["spacing sits on the 4-unit grid and grows"] = function()

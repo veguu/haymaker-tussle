@@ -292,6 +292,109 @@ local SoundBank: { [string]: Entry } = {
 		name = "BOOM-Mid Boom 07",
 		creator = "APMOfficial",
 	},
+	-- THE FIGHT-POSTER UI'S SOFT SOUNDS (ui-8b, 2026-11-17): the mockup's own `sfx()` recipes rendered by
+	-- design/ui/make_ui_sounds.py and uploaded to the game's group. Played flat (2D) by client Ui/UiSound. Every
+	-- file peaks at -6 dBFS; `volume` follows the mockup's own peak (x 4.3), so the last_* are about 3 x the
+	-- others, as there. `length` is the file's; each starts at sample 0.
+	-- pop: pointer down on any button
+	["ui_press"] = {
+		takes = { { id = 97006914075932, length = 0.09, start = 0, volume = 0.15 } },
+		looped = false,
+		name = "HT ui_press",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
+	-- whoosh: the window opens
+	["ui_open"] = {
+		takes = { { id = 140346518500681, length = 0.37, start = 0, volume = 0.28 } },
+		looped = false,
+		name = "HT ui_open",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
+	-- the window closes
+	["ui_close"] = {
+		takes = { { id = 140631035788633, length = 0.14, start = 0, volume = 0.17 } },
+		looped = false,
+		name = "HT ui_close",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
+	-- snap: page change, tile pick
+	["ui_page"] = {
+		takes = { { id = 91442953128650, length = 0.11, start = 0, volume = 0.25 } },
+		looped = false,
+		name = "HT ui_page",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
+	-- a class equipped
+	["ui_equip"] = {
+		takes = { { id = 94748514757177, length = 0.32, start = 0, volume = 0.25 } },
+		looped = false,
+		name = "HT ui_equip",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
+	-- coin: a class bought
+	["ui_buy"] = {
+		takes = { { id = 86516525084890, length = 0.33, start = 0, volume = 0.2 } },
+		looped = false,
+		name = "HT ui_buy",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
+	-- nope: Q or R refused
+	["ui_deny"] = {
+		takes = { { id = 92136914494187, length = 0.21, start = 0, volume = 0.25 } },
+		looped = false,
+		name = "HT ui_deny",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
+	-- Q or R off cooldown
+	["skill_ready"] = {
+		takes = { { id = 103068845287243, length = 0.33, start = 0, volume = 0.22 } },
+		looped = false,
+		name = "HT skill_ready",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
+	-- ko: the standing count falls
+	["ring_out"] = {
+		takes = { { id = 117168801692223, length = 0.18, start = 0, volume = 0.22 } },
+		looped = false,
+		name = "HT ring_out",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
+	-- the last-players popup, 5
+	["last_5"] = {
+		takes = { { id = 139031912478680, length = 0.55, start = 0, volume = 0.68 } },
+		looped = false,
+		name = "HT last_5",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
+	-- the last-players popup, 4
+	["last_4"] = {
+		takes = { { id = 134917813764725, length = 0.55, start = 0, volume = 0.68 } },
+		looped = false,
+		name = "HT last_4",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
+	-- the last-players popup, 3
+	["last_3"] = {
+		takes = { { id = 124007641238329, length = 0.55, start = 0, volume = 0.73 } },
+		looped = false,
+		name = "HT last_3",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
+	-- the last-players popup, FINAL TWO
+	["last_2"] = {
+		takes = { { id = 101304163027883, length = 0.82, start = 0, volume = 0.69 } },
+		looped = false,
+		name = "HT last_2",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
+	-- The pointer comes onto a button. NOT in the mockup (the owner asked for it, 2026-11-17): a soft sine that
+	-- lifts a little where the press falls, at about half the press's level.
+	["ui_hover"] = {
+		takes = { { id = 119602077656645, length = 0.1, start = 0, volume = 0.1 } },
+		looped = false,
+		name = "HT ui_hover",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
 }
 
 -- The roles still being chosen (Config/SoundCandidates, the ultimates' sounds): option A of each until the

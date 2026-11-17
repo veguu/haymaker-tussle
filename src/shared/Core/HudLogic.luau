@@ -58,6 +58,11 @@ function HudLogic.strip(state: RoundState, now: number): Strip
 		return { visible = false, title = "", finalTwo = false }
 	end
 	if phase == "Intermission" then
+		if state.countdownEnd == nil then
+			-- Too few players are ready (everyone here is AFK, say), so nothing is counting down: the strip
+			-- hides rather than stand on "NEXT ROUND 0" (seen 2026-11-17).
+			return { visible = false, title = "", finalTwo = false }
+		end
 		return {
 			visible = true,
 			title = "NEXT ROUND",
@@ -160,6 +165,26 @@ function HudLogic.staggerTier(
 	if share >= pinkShare - 1e-9 then
 		return "pink"
 	elseif share >= yellowShare - 1e-9 then
+		return "yellow"
+	end
+	return "white"
+end
+
+--- How many of the speed dial's `count` ticks are lit at `speed`, on a dial that tops out at `max`. Standing
+--- still lights none; any real movement lights one; anything past the top lights them all.
+function HudLogic.speedTicks(speed: number, max: number, count: number): number
+	if speed < 0.5 then
+		return 0
+	end
+	local lit = math.floor(speed / math.max(max, 1) * count + 0.5)
+	return math.clamp(lit, 1, count)
+end
+
+--- The colour step of a speed: white, yellow from `hi` (faster than a run), pink from `redline`.
+function HudLogic.speedTier(speed: number, hi: number, redline: number): StaggerTier
+	if speed >= redline - 1e-9 then
+		return "pink"
+	elseif speed >= hi - 1e-9 then
 		return "yellow"
 	end
 	return "white"

@@ -1,0 +1,21 @@
+<!doctype html><meta charset="utf-8">
+<!-- The stagger number's digits, drawn by the browser exactly as the mockup draws them (Oswald 700, slanted by
+     the browser), white on clear, at twice the mockup's 96 px. Roblox has no slanted Oswald, so the HUD shows
+     these as images. Capture:  python design/ui/mock_capture.py --clear --size 900,400 --page
+     design/ui/poster_digits.html assets/ui/poster_digits.png
+     Cells are 180 x 200, five to a row: 0-4, then 5-9. Each digit starts 30 px into its cell. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&display=swap">
+<style>
+html,body{margin:0;background:transparent;overflow:hidden}
+i{position:absolute;font:italic 700 192px/200px Oswald;color:#fff;letter-spacing:0;white-space:pre}
+pre{position:absolute;left:0;top:402px;font:12px monospace;color:#000}
+</style>
+<body>
+<script>
+for(let d=0;d<10;d++){const e=document.createElement('i'); e.textContent=d; e.style.left=(d%5*180+30)+'px'; e.style.top=(Math.floor(d/5)*200)+'px'; document.body.appendChild(e);}
+document.fonts.load('italic 700 192px Oswald').then(()=>document.fonts.ready).then(()=>{
+  const c=document.createElement('canvas').getContext('2d'); c.font='italic 700 100px Oswald';
+  const pre=document.createElement('pre'); pre.textContent='\nRECT advances per 100px | '+[...'0123456789'].map(ch=>c.measureText(ch).width.toFixed(2)).join(' ')+'\n';
+  document.body.appendChild(pre);
+});
+</script>

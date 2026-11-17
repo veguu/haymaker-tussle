@@ -1,0 +1,30 @@
+<!doctype html><meta charset="utf-8">
+<!-- The poster window's drifting backgrounds, drawn by the browser exactly as the mockup draws them, white on
+     clear, as TILES Roblox can repeat and scroll (ScaleType.Tile):
+       a word tile: one word-and-gap wide, two rows (2 x 84) tall, the second row set 140 px to the left, in
+                    Oswald 700 at 78 px, as `.words` / `.wmove` lay it out;
+       the dot tile: one 32 px cell of `.sheet::before`, drawn four times as large.
+     One capture makes one tile:
+       python design/ui/mock_capture.py --clear --size W,168 --page design/ui/poster_words.html out.png '{"word":"TEMPEST"}'
+       python design/ui/mock_capture.py --clear --size 128,128 --page design/ui/poster_words.html dots.png '{"dots":true}'
+     With '{"measure":[...words]}' and --dump it prints each word's tile width instead.
+     design/ui/make_word_tiles.py runs all of it. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&display=swap">
+<style>
+html,body{margin:0;background:transparent;overflow:hidden}
+.row{position:absolute;left:0;height:78px;font:700 78px/1 Oswald;text-transform:uppercase;white-space:nowrap;color:#fff}
+.dot{position:absolute;inset:0;background:radial-gradient(circle,#fff 20%,transparent 22%) 0 0/128px 128px}
+pre{font:12px monospace}
+</style>
+<body>
+<script>
+let cap={}; try{cap=JSON.parse(decodeURIComponent(location.hash.slice(1))||'{}')}catch(e){}
+const unit=w=>{const s=document.createElement('span'); s.style.cssText='font:700 78px/1 Oswald;text-transform:uppercase;white-space:nowrap;position:absolute;visibility:hidden'; s.innerHTML=w+' &nbsp; '; document.body.appendChild(s); const u=s.offsetWidth; s.remove(); return u;};
+document.fonts.load('700 78px Oswald').then(()=>document.fonts.ready).then(()=>{
+  if(cap.measure){const pre=document.createElement('pre'); pre.textContent='\n'+cap.measure.map(w=>'RECT '+w+' | '+unit(w)).join('\n')+'\n'; document.body.appendChild(pre); return;}
+  if(cap.dots){const d=document.createElement('div'); d.className='dot'; document.body.appendChild(d); return;}
+  const u=cap.width||unit(cap.word);
+  [[0,0],[84,-140]].forEach(([top,shift])=>{const r=document.createElement('div'); r.className='row'; r.style.top=top+'px'; r.style.left=(shift-u)+'px';
+    r.innerHTML=('<span style="display:inline-block;width:'+u+'px">'+cap.word+' &nbsp; </span>').repeat(4); document.body.appendChild(r);});
+});
+</script>

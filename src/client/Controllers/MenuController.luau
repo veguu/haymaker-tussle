@@ -1,76 +1,106 @@
 --!strict
--- MenuController - the SHARED WINDOW for Shop, Classes and Cosmetics, and the small Settings panel (Ringside,
--- 2026-11-16; drawn in the vault's UI Research/ringside-prototype.html and approved there). There is no MENU
--- button any more: NavController's shortcuts open this window DIRECTLY on the page they name.
+-- MenuController - THE POSTER WINDOW (2026-11-16), the lobby's one window, built to the approved mockup (the
+-- vault's UI Research/fight-poster-prototype.html: `.sheet`, `draw()`). It replaces the Ringside shared window
+-- and its Settings panel. NavController's buttons open it on the page they name.
 --
--- ONE window, three pages side by side (a UIPageLayout, so it snaps to whole pages):
---   Shop       where you GET things. Today: the classes, for Coins. The button is red-orange, carries a coin and
---              the price, and asks you to press it twice (Buy, then Confirm). Passes and Robux items will be more
---              shelves on this page when they exist; nothing is sold for Robux today.
---   Classes    where you CHOOSE what you fight with: every class as a card, the picked one large with its Q and
---              R skills. The button is green and says Equip. It never costs anything. (Tab id "Abilities".)
---   Cosmetics  nothing yet: the game has no cosmetics or emotes. An honest empty page, kept so the three stay
---              together when they exist.
--- Move between pages with the tabs, the two arrows, a sideways swipe on touch, or L1 / R1 on a gamepad. A
--- shortcut lands on its page with no slide. Changing page never buys or equips anything. Only the page you are
--- on is redrawn when your coins or classes change.
+-- A WINDOW, not a screen: the arena stays visible round it and behind the menu buttons. A cream slash down its
+-- left side, the page's word repeated across it and a field of dots, both drifting slowly up and to the right,
+-- and the whole window takes the colour of what is open (your picked class in Classes).
+--   Classes   every class as a rough-cut tile in one warm-to-cool sweep; the picked one's Q and R, and Equip.
+--   Shop      the classes you don't own, for Coins. Buy asks twice (Buy, then Confirm). Passes and Cosmetics are
+--             shown as PLANNED: they are not in the game, and nothing is sold for Robux.
+--   Ranked    PLANNED. No ranks, seasons or rewards are invented.
+--   Moves     the controls for the device in your hands.
+--   More      Settings, AFK, Spectate, and the planned rest (Cosmetics, Profile, Leaderboards, Emotes, Codes).
+--   Settings  the three switches the old panel had. They still change nothing, and say so.
+-- In a round only More, Moves and Settings open; the match never pauses.
 --
 -- Everything shown comes from AbilityController (the server's attributes); this only asks it to buy or equip.
--- Its notices show as a toast above the bottom of the screen, window open or not. M still opens and closes the
--- window (on the page you last used); so do the X, a click outside, and gamepad B while it is open.
+-- Its notices show as a toast in the top-left corner, window open or not. M opens and closes the window; so do the X
+-- and gamepad B. Sizes are the mockup's pixels at 1280 x 720; the window scales as a whole (Ui/PosterKit).
+-- The window's edge leans 0.6 degrees as in the mockup; its CONTENTS stand straight, because Roblox cannot clip
+-- or scroll anything that is turned. The drifting word needs a CanvasGroup for the same reason.
 
 local ContextActionService = game:GetService("ContextActionService")
-local GuiService = game:GetService("GuiService")
+local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
+local Signal = require(ReplicatedStorage.Packages.Signal)
 local Abilities = require(ReplicatedStorage.Shared.Config.Abilities)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
-local AbilityKit = require(ReplicatedStorage.Shared.Core.AbilityKit)
+local PosterEase = require(ReplicatedStorage.Shared.Core.PosterEase)
+local Net = require(ReplicatedStorage.Shared.Net)
 local Tokens = require(ReplicatedStorage.Shared.Tokens)
-local Typography = require(ReplicatedStorage.Shared.Typography)
-local Components = require(script.Parent.Parent.Ui.Components)
+local Drift = require(script.Parent.Parent.Ui.Drift)
 local HudMotion = require(script.Parent.Parent.Ui.HudMotion)
 local HudTheme = require(script.Parent.Parent.Ui.HudTheme)
-local Icons = require(script.Parent.Parent.Ui.Icons)
+local Poster = require(script.Parent.Parent.Ui.Poster)
+local PosterKit = require(script.Parent.Parent.Ui.PosterKit)
+local Shapes = require(script.Parent.Parent.Ui.Shapes)
+local UiSound = require(script.Parent.Parent.Ui.UiSound)
 
 local book: any = Abilities
-local M = HudTheme.Menu
-local SP = Tokens.space
 local colour = Tokens.colour
-local make, text = Components.make, Components.text
+local make = PosterKit.make
+local spring = PosterEase.spring
 
 local TOGGLE_ACTION = "HaymakerMenu"
 local CLOSE_ACTION = "HaymakerMenuClose"
-local PAGE_ACTION = "HaymakerMenuPage"
 
-type Tab = "Shop" | "Abilities" | "Cosmetics"
-local TABS: { Tab } = { "Shop", "Abilities", "Cosmetics" }
-local TAB_NAMES: { [Tab]: string } =
-	{ Shop = "Shop", Abilities = "Classes", Cosmetics = "Cosmetics" }
-local TAB_ICONS: { [Tab]: string } =
-	{ Shop = "shop", Abilities = "classes", Cosmetics = "cosmetics" }
+-- the mockup's window: 948 x 612 with a 6-unit ink border. (The mockup stands it 306 from the left and 86 from
+-- the top, its edge under the open menu strip; here it stands clear of everything, see layout().)
+local SHEET = Vector2.new(948, 612)
+local BORDER = 6
+local ROUND_TALL = 400 -- the window's height in a round: its title and about three rows; longer pages scroll
+-- the menu strips' right edge in their own units: the widest (Moves, 44 in and 250 wide) sitting out 18 as the
+-- open one and grown by 4 %, then a gap
+local NAV_RIGHT = 26 + 44 + 18 + 250 * 1.02 + 12
+-- the blur behind the open window: its size, and how long it takes to come and go
+local BLUR = { Size = 10, In = 0.25, Out = 0.18 }
+local BODY = Vector2.new(836, 580) -- the contents' box, 84 right and 8 down inside the border
+local TILT = -0.6
 
+-- the mockup lays the classes out as one sweep of colour, warm to cool
+local SWEEP = { "Base", "Bruiser", "Inferno", "Beast", "Trickster", "Dragon", "Frost", "Tempest" }
+local TITLES = {
+	shop = "Shop",
+	ranked = "Ranked",
+	moves = "Moves",
+	more = "More",
+	settings = "Settings",
+}
+local TONES = {
+	shop = "gold.400",
+	ranked = "danger.600",
+	moves = "violet.400",
+	more = "violet.400",
+	settings = "violet.400",
+}
+-- what opens while a round is on
+local IN_ROUND_OK = { more = true, moves = true, settings = true }
+-- the old window's page names, still accepted by Open()
+local OLD_NAMES = { Shop = "shop", Abilities = "classes", Cosmetics = "more" }
 local SETTINGS = {
 	{ id = "shake", name = "Camera shake" },
 	{ id = "flash", name = "Hit flash" },
 	{ id = "music", name = "Music" },
 }
-
-local HEADER = 68
-local DETAIL = Vector2.new(250, 330) -- the picked class's panel: least and most width
-local CELL = Vector2.new(150, 170) -- a class card: least width, height
-local LIP = 5
+local PLANNED = { "Cosmetics", "Profile", "Leaderboards", "Emotes", "Codes" }
 
 local MenuController = Knit.CreateController({
 	Name = "MenuController",
+	-- (entry: string?) when the window opens on a page, changes page or closes
+	Changed = Signal.new(),
 })
 
-local function classTone(kitId: string): string
-	local name = `class.{kitId}`
-	return if Tokens.hex[name] then name else "line.300"
+local function classColour(kitId: string): Color3
+	local hex = Tokens.hex[`class.{kitId}`]
+	return if hex then Color3.fromHex(hex) else colour("coral.500")
 end
 
 -- A skill's cooldown in seconds, from where the game keeps it, or nil when it has none listed.
@@ -88,1108 +118,1154 @@ local function seconds(value: number): string
 	return if value % 1 == 0 then `{value} s` else string.format("%.1f s", value)
 end
 
-local function small(label: TextLabel, size: number): TextLabel
-	label.TextSize = size
-	return label
-end
-
-local function para(
-	parent: Instance,
-	role: string,
-	tone: string,
-	value: string,
-	order: number?
-): TextLabel
-	return text(parent, role, tone, {
-		Size = UDim2.fromScale(1, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		TextWrapped = true,
-		TextYAlignment = Enum.TextYAlignment.Top,
-		Text = value,
-		LayoutOrder = order or 0,
-	})
-end
-
-local function pad(parent: Instance, amount: number)
-	make("UIPadding", parent, {
-		PaddingTop = UDim.new(0, amount),
-		PaddingBottom = UDim.new(0, amount),
-		PaddingLeft = UDim.new(0, amount),
-		PaddingRight = UDim.new(0, amount),
-	})
-end
-
-local function list(parent: Instance, gap: number, horizontal: boolean?)
-	make("UIListLayout", parent, {
-		FillDirection = if horizontal
-			then Enum.FillDirection.Horizontal
-			else Enum.FillDirection.Vertical,
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, gap),
-		VerticalAlignment = if horizontal
-			then Enum.VerticalAlignment.Center
-			else Enum.VerticalAlignment.Top,
-	})
-end
-
-local function outline(parent: Instance, tone: string, thickness: number): UIStroke
-	return make("UIStroke", parent, {
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-		Color = colour(tone),
-		Thickness = thickness,
-	})
-end
-
--- A small tag: EQUIPPED (green), OWNED (quiet), a price (yellow).
-local function chip(
-	parent: Instance,
-	value: string,
-	fill: string,
-	ink: string,
-	coin: boolean?
-): Frame
-	local frame = make("Frame", parent, {
-		Name = "Chip",
-		BackgroundColor3 = colour(fill),
-		BorderSizePixel = 0,
-		Size = UDim2.fromOffset(0, 20),
-		AutomaticSize = Enum.AutomaticSize.X,
-	})
-	Components.corner(frame, "s")
-	outline(frame, "ink.950", 2)
-	make("UIPadding", frame, { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 7) })
-	list(frame, 4, true)
-	if coin then
-		local image = Icons.image(frame, "coin", 13)
-		image.AnchorPoint = Vector2.zero
-		image.LayoutOrder = 1
+local function deviceOf(): string
+	local kind = UserInputService:GetLastInputType()
+	if kind == Enum.UserInputType.Touch then
+		return "touch"
+	elseif string.find(kind.Name, "Gamepad") then
+		return "gamepad"
 	end
-	small(
-		text(frame, "label", ink, {
-			Size = UDim2.new(0, 0, 1, 0),
-			AutomaticSize = Enum.AutomaticSize.X,
-			Text = value,
-			LayoutOrder = 2,
-		}),
-		12
-	)
-	return frame
+	return "mouse"
 end
 
--- The button looks: a fill, its lettering, and the lip it sits on (nil: flat, can't be pressed).
-local BUTTON = {
-	buy = { fill = "coral.500", ink = "ink.950", lip = "coral.700" }, -- spend: red-orange, with a coin
-	equip = { fill = "teal.400", ink = "ink.950", lip = "teal.700" }, -- choose: green, free
-	plain = { fill = "ink.500", ink = "ivory.50", lip = "ink.950" },
-	off = { fill = "ink.600", ink = "stone.500", lip = nil },
-}
-
--- A button on a lip; it drops onto the lip while held. "off" is flat and can't be pressed.
-local function button(
-	parent: Instance,
-	label: string,
-	style: string,
-	onPress: (() -> ())?,
-	coin: boolean?
-): TextButton
-	local look = (BUTTON :: any)[style]
-	local off = look.lip == nil
-	local b = make("TextButton", parent, {
-		Size = UDim2.fromScale(1, 1),
-		AutoButtonColor = false,
-		BorderSizePixel = 0,
-		BackgroundColor3 = colour(look.fill),
-		Text = if coin then "     " .. label else label,
-		TextColor3 = colour(look.ink),
-		Active = not off,
-		Selectable = not off,
-		ZIndex = 2,
-	})
-	Typography.apply(b, "button")
-	Components.corner(b, "m")
-	outline(b, if off then "ink.700" else "ink.950", 3)
-	if coin then
-		-- the coin sits just left of the centred words
-		local image = Icons.image(b, "coin", 18, UDim2.new(0.5, -(#label * 4.6 + 12), 0.5, 0))
-		image.ZIndex = 3
+-- "Punch: a 4-hit string. The fourth knocks them away." -> "Punch", "A 4-hit string. The fourth knocks ..."
+local function splitMove(action: string): (string, string)
+	local name, rest = string.match(action, "^([^:%.]+)[:%.]%s*(.*)$")
+	if not name then
+		return action, ""
 	end
-	if not off then
-		local lip = make("Frame", b, {
-			Name = "Lip",
-			BackgroundColor3 = colour(look.lip),
-			BorderSizePixel = 0,
-			Position = UDim2.new(0, 0, 1, -6),
-			Size = UDim2.new(1, 0, 0, LIP + 6),
-			ZIndex = 1,
-		})
-		Components.corner(lip, "m")
-		outline(lip, "ink.950", 3)
-		local isDown = false
-		local function set(down: boolean)
-			if isDown == down then
-				return
-			end
-			isDown = down
-			if HudMotion.reduced() then
-				return
-			end
-			b.Position = b.Position + UDim2.fromOffset(0, if down then 3 else -3)
-			lip.Size = UDim2.new(1, 0, 0, if down then LIP + 3 else LIP + 6)
-		end
-		b.MouseButton1Down:Connect(function()
-			set(true)
-		end)
-		b.MouseButton1Up:Connect(function()
-			set(false)
-		end)
-		b.MouseLeave:Connect(function()
-			set(false)
-		end)
-		if onPress then
-			b.Activated:Connect(onPress)
-		end
+	rest = rest or ""
+	if rest ~= "" then
+		rest = string.upper(string.sub(rest, 1, 1)) .. string.sub(rest, 2)
 	end
-	return b
-end
-
--- One skill in the detail panel: its icon with the key on it, the name, the cooldown, what it does.
-local function skillRow(
-	parent: Instance,
-	key: string,
-	icon: string,
-	skill: AbilityKit.Skill,
-	order: number
-)
-	local row = make("Frame", parent, {
-		Name = key,
-		Size = UDim2.fromScale(1, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundColor3 = colour("ink.700"),
-		BorderSizePixel = 0,
-		LayoutOrder = order,
-	})
-	Components.corner(row, "m")
-	outline(row, "ink.950", 2)
-	pad(row, SP[2])
-	local art = make("Frame", row, {
-		Name = "Art",
-		BackgroundColor3 = colour("ink.900"),
-		BorderSizePixel = 0,
-		Size = UDim2.fromOffset(42, 42),
-	})
-	Components.corner(art, "s")
-	outline(art, "ink.950", 2)
-	Icons.image(art, icon, 30)
-	local cap = make("Frame", art, {
-		BackgroundColor3 = colour("ivory.50"),
-		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(-6, -6),
-		Size = UDim2.fromOffset(18, 17),
-		ZIndex = 2,
-	})
-	Components.corner(cap, "s")
-	outline(cap, "ink.950", 2)
-	small(
-		text(cap, "label", "ink.950", {
-			Size = UDim2.fromScale(1, 1),
-			Text = key,
-			TextXAlignment = Enum.TextXAlignment.Center,
-			ZIndex = 3,
-		}),
-		12
-	)
-	local wait = cooldownOf(skill.id)
-	small(
-		text(row, "label", "ivory.50", {
-			Position = UDim2.fromOffset(52, 0),
-			Size = UDim2.new(1, -108, 0, 18),
-			Text = string.upper(skill.name),
-			TextTruncate = Enum.TextTruncate.AtEnd,
-		}),
-		15
-	)
-	small(
-		text(row, "label", "ivory.50", {
-			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.fromScale(1, 0),
-			Size = UDim2.fromOffset(56, 18),
-			Text = if not skill.built then "SOON" elseif wait then seconds(wait) else "",
-			TextXAlignment = Enum.TextXAlignment.Right,
-		}),
-		14
-	)
-	local blurb = para(row, "caption", "stone.300", skill.blurb)
-	blurb.Position = UDim2.fromOffset(52, 20)
-	blurb.Size = UDim2.new(1, -52, 0, 0)
-	blurb.TextSize = 13
+	return name, rest
 end
 
 function MenuController:KnitStart()
 	local player = Players.LocalPlayer
 	local ability = Knit.GetController("AbilityController")
+	local spectate = Knit.GetController("SpectateController")
+	local afkToggle = if GameConfig.Round.Enabled and GameConfig.Round.AfkEnabled
+		then Net.client("AfkToggle")
+		else nil
 
 	local gui = make("ScreenGui", nil, {
 		Name = "HT_Menu",
 		ResetOnSpawn = false,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-		ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
+		IgnoreGuiInset = true,
+		ScreenInsets = Enum.ScreenInsets.None,
 		DisplayOrder = 20,
-		IgnoreGuiInset = false,
 	})
 
-	-- THE TOAST ----------------------------------------------------------------------------------------
-	local toast = make("Frame", gui, {
-		Name = "Toast",
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -150),
-		Size = UDim2.fromOffset(0, 42),
-		AutomaticSize = Enum.AutomaticSize.X,
+	-- THE WINDOW -----------------------------------------------------------------------------------------
+	local holder = make("Frame", gui, {
+		Name = "Sheet",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(SHEET.X, SHEET.Y),
+		Visible = false,
+	})
+	local holderScale = make("UIScale", holder, {})
+	-- everything slides in from the right together
+	local slide = make("Frame", holder, {
+		Name = "Slide",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(1, 1),
+	})
+	local slideScale = make("UIScale", slide, {})
+	-- the paper: shadow, ink border and the coloured field, leaning a little
+	local decor = make("Frame", slide, {
+		Name = "Paper",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(1, 1),
+		Rotation = TILT,
+	})
+	make("Frame", decor, {
+		Name = "Shadow",
+		BackgroundColor3 = colour("ink.900"),
+		BackgroundTransparency = 0.15,
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(10, 12),
+		Size = UDim2.fromScale(1, 1),
+	})
+	make("Frame", decor, {
+		Name = "Border",
 		BackgroundColor3 = colour("ink.900"),
 		BorderSizePixel = 0,
-		Visible = false,
-		ZIndex = 50,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 1,
 	})
-	Components.corner(toast, "m")
-	make(
-		"UIPadding",
-		toast,
-		{ PaddingLeft = UDim.new(0, SP[4]), PaddingRight = UDim.new(0, SP[4]) }
-	)
-	local toastStroke = outline(toast, "teal.400", 3)
-	local toastText = text(toast, "body.strong", "ivory.50", {
+	local field = make("Frame", decor, {
+		Name = "Field",
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(BORDER, BORDER),
+		Size = UDim2.new(1, -2 * BORDER, 1, -2 * BORDER),
+		ZIndex = 2,
+	})
+	-- the drifting dots and word: straight, and clipped a little inside the leaning border. A CanvasGroup,
+	-- because the word is turned 14 degrees and a turned thing is only ever clipped by one of these.
+	local backInset = 2 * BORDER
+	local back = make("CanvasGroup", slide, {
+		Name = "Back",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(backInset, backInset),
+		Size = UDim2.new(1, -2 * backInset, 1, -2 * backInset),
+		ZIndex = 2,
+	})
+	local dots = make("ImageLabel", back, {
+		Name = "Dots",
+		BackgroundTransparency = 1,
+		Image = Shapes.ids.dots,
+		ScaleType = Enum.ScaleType.Tile,
+		TileSize = UDim2.fromOffset(32, 32),
+		Position = UDim2.fromOffset(-32, -32),
+		Size = UDim2.new(1, 64, 1, 64),
+	})
+	local wordsTurn = make("Frame", back, {
+		Name = "Words",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromScale(-0.12, -0.34),
+		Size = UDim2.fromScale(1.7, 2),
+		Rotation = -14,
+		ZIndex = 2,
+	})
+	local words = make("ImageLabel", wordsTurn, {
+		Name = "Tile",
+		BackgroundTransparency = 1,
+		ScaleType = Enum.ScaleType.Tile,
+		Visible = false,
+	})
+	local wordWidth = 300
+	-- the band that sweeps across when the page changes: a shade lighter than the field, never white
+	local wipeLean = (SHEET.Y * 1.2) * math.tan(math.rad(18))
+	local wipe = Shapes.slant(back, "ivory.50", wipeLean, {
+		Name = "Wipe",
+		Position = UDim2.fromScale(-0.45, -0.1),
+		Size = UDim2.new(0.34, wipeLean, 1.2, 0),
+		Visible = false,
+		ZIndex = 3,
+	})
+	-- the cream slash down the left: full height, 12 % of the width at the top and 4 % at the bottom, with a
+	-- thin ink line along its edge
+	local inner = SHEET - Vector2.new(2 * BORDER, 2 * BORDER)
+	local slashTop, slashBottom = inner.X * 0.12, inner.X * 0.04
+	-- (it lies over the dots and the word, so it has its own layer above them, leaning with the paper)
+	local front = make("Frame", slide, {
+		Name = "PaperFront",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(1, 1),
+		Rotation = TILT,
+		ZIndex = 3,
+	})
+	local function setTilt(degrees: number)
+		decor.Rotation = degrees
+		front.Rotation = degrees
+	end
+	local slash = make("Frame", front, {
+		Name = "Slash",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(BORDER, BORDER),
+		Size = UDim2.new(0, inner.X, 1, -2 * BORDER),
+	})
+	make("Frame", slash, {
+		BackgroundColor3 = colour("ivory.50"),
+		BorderSizePixel = 0,
+		Size = UDim2.new(0, slashBottom + 0.5, 1, 0),
+	})
+	Shapes.image(slash, "wedgeEnd", "ivory.50", {
+		Name = "Edge",
+		Position = UDim2.fromOffset(slashBottom, 0),
+		Size = UDim2.new(0, slashTop - slashBottom, 1, 0),
+	})
+	-- the thin ink line along its edge: one turned bar. (Not Shapes.slant: a slanted PLATE can't be thinner than
+	-- its own lean, and asked for one it drew a wide ink band; first run, 2026-11-17.)
+	local lineLean = slashTop - slashBottom
+	local lineWide = inner.X * 0.009
+	local slashLine = make("Frame", slash, {
+		Name = "Line",
+		BackgroundColor3 = colour("ink.900"),
+		BorderSizePixel = 0,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		ZIndex = 2,
+	})
+	-- The window's height. It is the mockup's 612 in the lobby and SHORT in a round, where its pages are a few
+	-- rows and the room between the strip and the skill tiles is small: a shorter window can be drawn larger.
+	local sheetTall = SHEET.Y
+	local function setTall(tall: number)
+		sheetTall = tall
+		holder.Size = UDim2.fromOffset(SHEET.X, tall)
+		local innerTall = tall - 2 * BORDER
+		local lineTurn = math.atan(lineLean / innerTall)
+		slashLine.Position =
+			UDim2.fromOffset(slashBottom + lineLean / 2 + lineWide / 2, innerTall / 2)
+		slashLine.Size =
+			UDim2.fromOffset(lineWide * math.cos(lineTurn), innerTall / math.cos(lineTurn))
+		slashLine.Rotation = math.deg(lineTurn)
+	end
+	setTall(SHEET.Y)
+
+	-- the contents: straight, in the mockup's own coordinates
+	local body = make("Frame", slide, {
+		Name = "Body",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(BORDER + 84, BORDER + 8),
+		Size = UDim2.new(0, BODY.X, 1, -(SHEET.Y - BODY.Y)),
+		ZIndex = 5,
+	})
+	-- the title: 84 px Oswald, cream with an ink outline and shadow, turned 3 degrees about its bottom-left
+	local titleBox, setTitle = PosterKit.title(body, 84, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Size = UDim2.fromOffset(802, 84),
+		Rotation = -3,
+		ZIndex = 3,
+	})
+	do
+		-- turning about the bottom-left corner is turning about the centre and then moving the centre
+		local half = Vector2.new(401, -42)
+		local angle = math.rad(-3)
+		local turned = Vector2.new(
+			half.X * math.cos(angle) - half.Y * math.sin(angle),
+			half.X * math.sin(angle) + half.Y * math.cos(angle)
+		)
+		titleBox.Position = UDim2.fromOffset(34 + turned.X, 84 + turned.Y)
+	end
+	local titleScale = make("UIScale", titleBox, {})
+	local titleRest = titleBox.Rotation
+	local sub = Poster.text(body, "label", 16, "ink.900", {
+		Name = "Sub",
+		Position = UDim2.fromOffset(40, 90),
+		Size = UDim2.fromOffset(796, 24),
+		ZIndex = 3,
+	})
+	-- the page: straight below the title, scrolling when it has more than fits (the shop, for a new player)
+	local page = make("ScrollingFrame", body, {
+		Name = "Page",
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(0, 118),
+		Size = UDim2.new(1, 14, 1, -118),
+		CanvasSize = UDim2.new(),
+		ScrollBarThickness = 6,
+		ScrollBarImageColor3 = colour("ink.900"),
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+		ZIndex = 2,
+	})
+	local PAGE_TOP = 118 -- a page's children use the mockup's body coordinates, less this
+
+	-- THE TOAST ------------------------------------------------------------------------------------------
+	-- the mockup's `.toast`: cream, an ink border, 18 px, turned 1.5 degrees, 88 from the top; it pops in
+	local toastGui = make("ScreenGui", nil, {
+		Name = "HT_Toast",
+		ResetOnSpawn = false,
+		ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets,
+		DisplayOrder = 22,
+	})
+	local toast = make("Frame", toastGui, {
+		Name = "Toast",
+		BackgroundColor3 = colour("ink.900"),
+		BorderSizePixel = 0,
+		AnchorPoint = Vector2.new(0, 0.5),
+		Size = UDim2.fromOffset(0, 44),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Rotation = 0, -- straight: small text turned even a degree is drawn soft (measured 2026-11-17)
+		Visible = false,
+	})
+	local toastScale = make("UIScale", toast, {})
+	make("UIPadding", toast, {
+		PaddingLeft = UDim.new(0, 4),
+		PaddingRight = UDim.new(0, 4),
+		PaddingTop = UDim.new(0, 4),
+		PaddingBottom = UDim.new(0, 4),
+	})
+	local toastText = Poster.text(toast, "label", 18, "ink.900", {
+		BackgroundColor3 = colour("ivory.50"),
+		BackgroundTransparency = 0,
+		BorderSizePixel = 0,
 		Size = UDim2.fromScale(0, 1),
 		AutomaticSize = Enum.AutomaticSize.X,
-		ZIndex = 51,
 	})
+	toastText.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.Bold)
+	make("UIPadding", toastText, { PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16) })
 	local toastToken = 0
-	ability.Notice:Connect(function(message: string, good: boolean)
+	local function showToast(message: string)
 		toastToken += 1
 		local mine = toastToken
-		-- a refusal carries a "!" as well as the red border
-		toastText.Text = if good then message else `!  {message}`
-		toastStroke.Color = colour(if good then "teal.400" else "danger.600")
+		-- The mockup stands it at the top centre, over the window's title. Here nothing lies over anything
+		-- (owner, 2026-11-17), so it stands in the top-left corner: right of the fight's MENU button, above the
+		-- menu strips, left of the strip.
+		local stage = PosterKit.stage()
+		local scale = stage.nav
+		local press = math.max(scale, PosterKit.Fit.Button)
+		toastText.Text = message
+		toast.Position = UDim2.fromOffset(22 + 58 * press + 14, 18 + 29 * press)
 		toast.Visible = true
-		task.delay(M.Toast, function()
+		Poster.run(toast, 0.55, function(t: number)
+			local s = spring(t)
+			toastScale.Scale = math.max(scale * (0.3 + 0.7 * s), 0.01)
+			toast.Rotation = -12 + 12 * s
+		end)
+		task.delay(2.2, function()
 			if toastToken == mine then
 				toast.Visible = false
 			end
 		end)
+	end
+	ability.Notice:Connect(function(message: string)
+		showToast(message)
 	end)
 
-	-- THE WINDOW ---------------------------------------------------------------------------------------
-	local backdrop = make("TextButton", gui, {
-		Name = "Backdrop",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = colour("ink.950"),
-		BackgroundTransparency = M.Backdrop,
-		BorderSizePixel = 0,
-		AutoButtonColor = false,
-		Text = "",
-		Selectable = false,
-		Modal = true, -- frees the mouse from shift lock while the window is open
-		Visible = false,
-		ZIndex = 10,
-	})
-	local window = Components.sticker(gui, {
-		Name = "Panel",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0.5, 0, 0.5, -4),
-		Size = UDim2.fromScale(M.ScreenShare.X, M.ScreenShare.Y),
-		Visible = false,
-		ZIndex = 11,
-	}, { depth = 10, radius = "l" })
-	local panel = window.face :: Frame
-	panel.Active = true
-	local panelScale = make("UIScale", window.holder, {})
+	-- STATE ----------------------------------------------------------------------------------------------
+	local entry: string? = nil
+	local lastEntry = "classes"
+	local pick: string = ability:GetKitId()
+	local confirming: string? = nil
+	local settingsState: { [string]: boolean } = { shake = true, flash = true, music = true }
+	local fieldColour = colour("coral.500")
+	local driftSince = os.clock()
+	local driftConn: RBXScriptConnection? = nil
+	local draw: (fresh: boolean) -> ()
+	local open: (to: string) -> ()
+	-- when Equip and Confirm were last pressed: their sounds answer only the player's own request
+	local askedEquip, askedBuy = -math.huge, -math.huge
+	local ASKED_FOR = 5
+	local close: () -> ()
 
-	-- Header: arrows, the three page tabs, Coins, close.
-	local header = make("Frame", panel, {
-		Name = "Header",
-		Size = UDim2.new(1, 0, 0, HEADER),
-		BackgroundColor3 = colour("ink.600"),
-		BorderSizePixel = 0,
-		ZIndex = 3,
-	})
-	Components.corner(header, "l")
-	make("Frame", header, { -- squares off the header's lower corners and draws the rule under it
-		Name = "Foot",
-		BackgroundColor3 = colour("ink.600"),
-		BorderSizePixel = 0,
-		Position = UDim2.new(0, 0, 1, -12),
-		Size = UDim2.new(1, 0, 0, 12),
-	})
-	make("Frame", header, {
-		Name = "Rule",
-		BackgroundColor3 = colour("ink.950"),
-		BorderSizePixel = 0,
-		Position = UDim2.new(0, 0, 1, 0),
-		Size = UDim2.new(1, 0, 0, 3),
-		ZIndex = 4,
-	})
-	local rail = make("Frame", header, {
-		Name = "Tabs",
-		Position = UDim2.fromOffset(SP[3], 0),
-		Size = UDim2.new(0, 0, 1, -LIP),
-		AutomaticSize = Enum.AutomaticSize.X,
-		BackgroundTransparency = 1,
-		ZIndex = 4,
-	})
-	list(rail, SP[2], true)
-
-	local function headerButton(
-		parent: Instance,
-		name: string,
-		width: number,
-		order: number
-	): TextButton
-		local b = make("TextButton", parent, {
-			Name = name,
-			LayoutOrder = order,
-			Size = UDim2.fromOffset(width, 46),
-			BackgroundColor3 = colour("ink.700"),
-			BorderSizePixel = 0,
-			AutoButtonColor = false,
-			Text = "",
-			Selectable = true,
-			ZIndex = 4,
-		})
-		Components.corner(b, "m")
-		outline(b, "ink.950", 3)
-		return b
-	end
-	local prevButton = headerButton(rail, "Previous", 34, 0)
-	small(
-		text(prevButton, "title", "ivory.50", {
-			Size = UDim2.fromScale(1, 1),
-			Text = "<",
-			TextXAlignment = Enum.TextXAlignment.Center,
-			ZIndex = 5,
-		}),
-		20
-	)
-	local nextButton = headerButton(rail, "Next", 34, 9)
-	small(
-		text(nextButton, "title", "ivory.50", {
-			Size = UDim2.fromScale(1, 1),
-			Text = ">",
-			TextXAlignment = Enum.TextXAlignment.Center,
-			ZIndex = 5,
-		}),
-		20
-	)
-
-	local closeSize = 44
-	local close = make("TextButton", header, {
-		Name = "Close",
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -SP[3], 0.5, -2),
-		Size = UDim2.fromOffset(closeSize, closeSize),
-		BackgroundColor3 = colour("danger.600"),
-		BorderSizePixel = 0,
-		AutoButtonColor = false,
-		Text = "",
-		Selectable = true,
-		ZIndex = 4,
-	})
-	Components.corner(close, "m")
-	outline(close, "ink.950", 3)
-	for _, angle in { 45, -45 } do
-		make("Frame", close, {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.new(0.55, 0, 0, 4),
-			Rotation = angle,
-			BackgroundColor3 = colour("ivory.50"),
-			BorderSizePixel = 0,
-			ZIndex = 5,
-		})
-	end
-	local wallet = make("Frame", header, {
-		Name = "Coins",
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -(SP[3] + closeSize + SP[3]), 0.5, -2),
-		Size = UDim2.fromOffset(0, 38),
-		AutomaticSize = Enum.AutomaticSize.X,
-		BackgroundColor3 = colour("ink.900"),
-		BorderSizePixel = 0,
-		ZIndex = 4,
-	})
-	Components.corner(wallet, "m")
-	outline(wallet, "ink.950", 3)
-	make(
-		"UIPadding",
-		wallet,
-		{ PaddingLeft = UDim.new(0, SP[3]), PaddingRight = UDim.new(0, SP[3]) }
-	)
-	list(wallet, SP[2], true)
-	local walletCoin = Icons.image(wallet, "coin", 20)
-	walletCoin.AnchorPoint = Vector2.zero
-	walletCoin.LayoutOrder = 1
-	walletCoin.ZIndex = 5
-	local coinsText = text(wallet, "StatSmall", "ivory.50", {
-		Size = UDim2.fromOffset(0, 38),
-		AutomaticSize = Enum.AutomaticSize.X,
-		Text = "0",
-		LayoutOrder = 2,
-		ZIndex = 5,
-	})
-
-	-- The pages: a clipping view and three frames laid side by side by a UIPageLayout.
-	local view = make("Frame", panel, {
-		Name = "View",
-		Position = UDim2.fromOffset(3, HEADER + 3),
-		Size = UDim2.new(1, -6, 1, -(HEADER + 6)),
-		BackgroundTransparency = 1,
-		ClipsDescendants = true,
-		ZIndex = 3,
-	})
-	local pager = make("UIPageLayout", view, {
-		FillDirection = Enum.FillDirection.Horizontal,
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		EasingStyle = Enum.EasingStyle.Quart,
-		EasingDirection = Enum.EasingDirection.Out,
-		TweenTime = 0.23,
-		Circular = false,
-		TouchInputEnabled = true, -- a sideways swipe changes page
-		ScrollWheelInputEnabled = false, -- the wheel belongs to the lists
-		GamepadInputEnabled = false, -- L1 / R1 are bound below, so the stick stays free to move focus
-	})
-	local pages: { [Tab]: Frame } = {}
-	for index, tab in TABS do
-		local page = make("Frame", view, {
-			Name = tab,
-			LayoutOrder = index,
-			Size = UDim2.fromScale(1, 1),
-			BackgroundTransparency = 1,
-			ClipsDescendants = true, -- a page never shows through into its neighbour
-		})
-		pad(page, SP[4])
-		pages[tab] = page
-	end
-	local dots = make("Frame", panel, {
-		Name = "Dots",
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -7),
-		Size = UDim2.fromOffset(#TABS * 28, 5),
-		BackgroundTransparency = 1,
-		ZIndex = 6,
-	})
-	local dotFrames: { Frame } = {}
-	for index in TABS do
-		local dot = make("Frame", dots, {
-			Position = UDim2.fromOffset((index - 1) * 28, 0),
-			Size = UDim2.fromOffset(22, 5),
-			BackgroundColor3 = colour("line.300"),
-			BorderSizePixel = 0,
-			ZIndex = 6,
-		})
-		Components.corner(dot, "full")
-		dotFrames[index] = dot
+	local function inRound(): boolean
+		return player:GetAttribute("HT_InRound") == true
 	end
 
-	-- A class page (Shop and Classes share it): cards in a grid that scrolls, the picked one large beside it.
-	type ClassPage = {
-		grid: ScrollingFrame,
-		gridContent: Frame,
-		gridLayout: UIGridLayout,
-		detail: Frame,
-		detailContent: Frame,
-		detailFoot: Frame,
-		title: TextLabel,
-	}
-	local function classPage(page: Frame): ClassPage
-		local title = small(
-			text(page, "label", "stone.300", {
-				Name = "Title",
-				Size = UDim2.new(1, 0, 0, 16),
-			}),
-			13
-		)
-		local grid = make("ScrollingFrame", page, {
-			Name = "Grid",
-			Position = UDim2.fromOffset(0, 24),
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			CanvasSize = UDim2.fromScale(0, 0),
-			AutomaticCanvasSize = Enum.AutomaticSize.Y,
-			ScrollBarThickness = 6,
-			ScrollBarImageColor3 = colour("line.300"),
-			ScrollingDirection = Enum.ScrollingDirection.Y,
-			Selectable = false,
-		})
-		local gridContent = make("Frame", grid, {
-			Name = "Content",
-			Position = UDim2.fromOffset(3, 3),
-			Size = UDim2.new(1, -14, 0, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundTransparency = 1,
-		})
-		local gridLayout = make("UIGridLayout", gridContent, {
-			CellPadding = UDim2.fromOffset(SP[3], SP[3]),
-			CellSize = UDim2.fromOffset(CELL.X, CELL.Y),
-			SortOrder = Enum.SortOrder.LayoutOrder,
-		})
-		local detail = make("Frame", page, {
-			Name = "Detail",
-			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.fromScale(1, 0),
-			Size = UDim2.new(0, DETAIL.Y, 1, -6),
-			BackgroundColor3 = colour("ink.600"),
-			BorderSizePixel = 0,
-		})
-		Components.corner(detail, "l")
-		outline(detail, "ink.950", 3)
-		local scroll = make("ScrollingFrame", detail, {
-			Name = "Scroll",
-			Position = UDim2.fromOffset(SP[3], SP[3]),
-			Size = UDim2.new(1, -SP[3] * 2, 1, -(SP[3] * 3 + M.Tab + LIP)),
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			CanvasSize = UDim2.fromScale(0, 0),
-			AutomaticCanvasSize = Enum.AutomaticSize.Y,
-			ScrollBarThickness = 4,
-			ScrollBarImageColor3 = colour("line.300"),
-			ScrollingDirection = Enum.ScrollingDirection.Y,
-			Selectable = false,
-		})
-		local detailContent = make("Frame", scroll, {
-			Name = "Content",
-			Position = UDim2.fromOffset(8, 8),
-			Size = UDim2.new(1, -18, 0, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundTransparency = 1,
-		})
-		list(detailContent, SP[2])
-		local detailFoot = make("Frame", detail, {
-			Name = "Side",
-			AnchorPoint = Vector2.new(0, 1),
-			Position = UDim2.new(0, SP[3], 1, -(SP[3] + LIP)),
-			Size = UDim2.new(1, -SP[3] * 2, 0, M.Tab),
-			BackgroundTransparency = 1,
-		})
-		return {
-			grid = grid,
-			gridContent = gridContent,
-			gridLayout = gridLayout,
-			detail = detail,
-			detailContent = detailContent,
-			detailFoot = detailFoot,
-			title = title,
-		}
-	end
-	local shopPage = classPage(pages.Shop)
-	local classesPage = classPage(pages.Abilities)
-
-	-- Cosmetics: nothing to show yet, said plainly.
-	do
-		local empty = make("Frame", pages.Cosmetics, {
-			Name = "Empty",
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.46),
-			Size = UDim2.fromOffset(420, 220),
-			BackgroundTransparency = 1,
-		})
-		local icon = Icons.image(empty, "cosmetics", 96, UDim2.new(0.5, 0, 0, 56))
-		icon.ImageTransparency = 0.25
-		text(empty, "headline", "ivory.50", {
-			Position = UDim2.fromOffset(0, 116),
-			Size = UDim2.new(1, 0, 0, 32),
-			Text = "NOTHING HERE YET",
-			TextXAlignment = Enum.TextXAlignment.Center,
-		})
-		local line = para(
-			empty,
-			"body",
-			"stone.300",
-			"Cosmetics and emotes aren't in the game yet. When they are, what you own will live here."
-		)
-		line.Position = UDim2.fromOffset(0, 152)
-		line.TextXAlignment = Enum.TextXAlignment.Center
+	-- The window's colour, and with it the dots, the word and the wipe (each the field mixed toward white).
+	local function tint(tone: Color3)
+		fieldColour = tone
+		field.BackgroundColor3 = tone
+		local white = Color3.new(1, 1, 1)
+		dots.ImageColor3 = tone:Lerp(white, 0.38)
+		words.ImageColor3 = tone:Lerp(white, 0.42)
+		Shapes.paint(wipe, tone:Lerp(white, 0.4))
 	end
 
-	-- The detail panel takes about a third of the page; the cards share the rest in two to four columns.
-	local function fit(made: ClassPage, page: Frame)
-		local width = page.AbsoluteSize.X / math.max(panelScale.Scale, 0.01) - SP[4] * 2
-		if width <= 0 then
+	-- The word repeated behind the page. A word with no tile draws none.
+	local function setWord(word: string)
+		local tile = Shapes.words[word]
+		words.Visible = tile ~= nil
+		if tile then
+			wordWidth = tile.width
+			words.Image = tile.id
+			words.TileSize = UDim2.fromOffset(tile.width, 168)
+			words.Size = UDim2.new(1, 2 * tile.width, 1, 168)
+		end
+	end
+
+	-- The drift: the word moves one word-and-gap right and two rows up every 18 s, the dots one cell every 7 s,
+	-- both looping without a seam. It runs only while the window is open, and not under Reduced Motion.
+	local function drift()
+		local t = os.clock() - driftSince
+		local a = (t / 18) % 1
+		words.Position = UDim2.fromOffset(-wordWidth + wordWidth * a, -168 * a)
+		local b = (t / 7) % 1
+		dots.Position = UDim2.fromOffset(-32 + 32 * b, -32 * b)
+	end
+	local function setDrift(on: boolean)
+		if driftConn then
+			driftConn:Disconnect()
+			driftConn = nil
+		end
+		drift()
+		if on and not HudMotion.reduced() then
+			driftConn = RunService.RenderStepped:Connect(drift)
+		end
+	end
+
+	-- The page change: one soft band sweeps across (0.5 s), and the paper gives a small kick (0.6 s).
+	local function hit()
+		if HudMotion.reduced() then
 			return
 		end
-		local detailWidth = math.clamp(math.floor(width * 0.34), DETAIL.X, DETAIL.Y)
-		made.detail.Size = UDim2.new(0, detailWidth, 1, -6)
-		made.grid.Size = UDim2.new(1, -(detailWidth + SP[4]), 1, -30)
-		local room = width - detailWidth - SP[4] - 14
-		local columns = math.clamp(math.floor((room + SP[3]) / (CELL.X + SP[3])), 2, 4)
-		local cell = math.floor((room - (columns - 1) * SP[3]) / columns)
-		made.gridLayout.CellSize = UDim2.fromOffset(cell, CELL.Y)
+		wipe.Visible = true
+		local width = SHEET.X * 0.34 + wipeLean
+		Poster.run(wipe, 0.5, function(t: number)
+			local e = PosterEase.easeOut(t)
+			wipe.Position = UDim2.new(-0.45, width * 4.7 * e, -0.1, 0)
+			local clear = 1 - 0.55 * (1 - e)
+			for _, piece in wipe:GetChildren() do
+				if piece:IsA("ImageLabel") then
+					piece.ImageTransparency = clear
+				elseif piece:IsA("Frame") then
+					piece.BackgroundTransparency = clear
+				end
+			end
+		end, function()
+			wipe.Visible = false
+		end)
+		Poster.run(decor, 0.6, function(t: number)
+			local s = spring(t)
+			slideScale.Scale = 0.9 + 0.1 * s
+			setTilt(4 + (TILT - 4) * s)
+		end)
 	end
 
-	local current: Tab = "Abilities"
-	local isOpen = false
-	local settingsOpen = false
-	local settingsState: { [string]: boolean } = { shake = true, flash = true, music = true }
-	local tabButtons: { [Tab]: TextButton } = {}
-	local tabLabels: { [Tab]: TextLabel } = {}
-	local picked: { [Tab]: string? } = {}
-	local confirming: string? = nil -- the class whose Buy was pressed once
+	-- PAGES ----------------------------------------------------------------------------------------------
+	local function clear()
+		Drift.clear("page")
+		for _, child in page:GetChildren() do
+			Poster.stop(child)
+			child:Destroy()
+		end
+		page.CanvasPosition = Vector2.zero
+		page.CanvasSize = UDim2.new()
+	end
 
-	local function clear(holder: Instance)
-		for _, child in holder:GetChildren() do
-			if child:IsA("GuiObject") then
-				child:Destroy()
+	-- An action button (`.act`): 250 x 66, the words in 28 px Oswald. `kind` picks its colours; "off" is a
+	-- button that can't be pressed, "sure" the second press of a purchase.
+	local function action(
+		parent: Instance,
+		x: number,
+		y: number,
+		words_: string,
+		kind: string,
+		onPress: (() -> ())?,
+		height: number?,
+		slot: number? -- which idle-drift pace it keeps when the page is drawn again
+	): (PosterKit.Cut, TextLabel)
+		local fill = if kind == "go"
+			then colour("go.400")
+			elseif kind == "buy" then colour("gold.400")
+			elseif kind == "sure" then colour("ink.900")
+			elseif kind == "plain" then colour("ivory.50")
+			else colour("violet.400")
+		local tall = height or 66
+		local cut = PosterKit.cut(parent, "act", Vector2.new(250, tall), fill)
+		PosterKit.place(cut, x, y)
+		local label = Poster.text(cut.face, "display", if tall < 60 then 20 else 28, "ink.900", {
+			Size = UDim2.fromScale(1, 1),
+			Text = string.upper(words_),
+			TextColor3 = colour(if kind == "sure" then "gold.400" else "ink.900"),
+			TextXAlignment = Enum.TextXAlignment.Center,
+		})
+		if kind == "sure" then
+			-- the mockup's dashed inner line; Roblox draws no dashes, so it is a plain one
+			local ring = make("Frame", cut.face, {
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(11, 11),
+				Size = UDim2.new(1, -22, 1, -22),
+			})
+			make("UIStroke", ring, { Color = colour("gold.400"), Thickness = 3 })
+		end
+		if onPress and kind ~= "off" then
+			PosterKit.pressable(cut, onPress)
+			if not Drift.lite then
+				Drift.add("page", cut.body, tall, 4, slot) -- up and down only: it carries words
 			end
+		end
+		return cut, label
+	end
+
+	-- The class you are wearing: EQUIPPED, quiet, until the pointer comes onto it. Then it turns red, says
+	-- UNEQUIP and gives a small wobble; pressing it puts the starting class back on (the owner, 2026-11-17).
+	-- On a phone the first tap shows UNEQUIP for a few seconds and the second one does it.
+	local WOBBLE = { { 0, 0 }, { 0.2, -4 }, { 0.5, 3 }, { 0.8, -1 }, { 1, 0 } }
+	local WORN = { Arm = 0.15, TouchHold = 3, Seconds = 0.45, Pop = 1.5 }
+	local function wornAction(parent: Instance, x: number, y: number)
+		local armedAt: number? = nil
+		local cut, label = action(parent, x, y, "Equipped", "worn", function()
+			if armedAt and os.clock() - armedAt >= WORN.Arm then
+				askedEquip = os.clock()
+				ability:Equip(book.DefaultKit)
+			end
+		end, nil, 40)
+		local labelScale = make("UIScale", label, {})
+		local quiet, loud = colour("violet.400"), colour("stop.400")
+		local function show(on: boolean)
+			if (armedAt ~= nil) == on then
+				return
+			end
+			armedAt = if on then os.clock() else nil
+			label.Text = if on then "UNEQUIP" else "EQUIPPED"
+			label.TextColor3 = colour(if on then "ivory.50" else "ink.900")
+			local from = cut.fill.ImageColor3
+			local to = if on then loud else quiet
+			Poster.run(cut.fill, WORN.Seconds, function(t: number)
+				cut.fill.ImageColor3 = from:Lerp(to, math.min(1, t * 3))
+				labelScale.Scale = if on then WORN.Pop + (1 - WORN.Pop) * spring(t) else 1
+				cut.shape.Rotation = if on
+					then PosterEase.keyframes(WOBBLE, t, PosterEase.ease)
+					else 0
+			end)
+		end
+		local button = cut.button
+		if button then
+			button.MouseEnter:Connect(function()
+				show(true)
+			end)
+			button.MouseLeave:Connect(function()
+				if UserInputService:GetLastInputType() == Enum.UserInputType.Touch then
+					task.delay(WORN.TouchHold, function()
+						if cut.root.Parent then
+							show(false)
+						end
+					end)
+				else
+					show(false)
+				end
+			end)
+		end
+	end
+
+	-- A class's name on a tile or a slab: the image of it in the mockup's own font (Ui/Shapes.letters), set in
+	-- the middle of a line `tall` high as the text was; real text for a class that isn't on the sheet yet.
+	local function className(
+		parent: Instance,
+		name: string,
+		css: number,
+		x: number,
+		y: number,
+		tall: number
+	)
+		local key = "class:" .. string.upper(name)
+		if Poster.hasWord("words", key) then
+			Poster.word(parent, "words", key, css, "ink.900", {
+				Position = UDim2.fromOffset(x, y + (tall - css) / 2),
+				ZIndex = 2,
+			})
+		else
+			Poster.text(parent, "display", css, "ink.900", {
+				Position = UDim2.fromOffset(x, y),
+				Size = UDim2.fromOffset(250, tall),
+				Text = string.upper(name),
+				ZIndex = 2,
+			})
 		end
 	end
 
 	local function standing(kitId: string, wearing: string, owned: { [string]: boolean }): string
 		return if kitId == wearing then "EQUIPPED" elseif owned[kitId] then "OWNED" else "NOT OWNED"
 	end
-	local function stateChip(parent: Instance, kit: AbilityKit.Kit, state: string): Frame
-		if state == "EQUIPPED" then
-			return chip(parent, "EQUIPPED", "teal.400", "ink.950")
-		elseif state == "OWNED" then
-			return chip(parent, "OWNED", "ink.500", "ivory.50")
+
+	-- the classes in the mockup's order, then any the game has that the mockup didn't know
+	local function classOrder(): { string }
+		local order = {}
+		for _, id in SWEEP do
+			if book.Kits[id] then
+				table.insert(order, id)
+			end
 		end
-		return chip(parent, tostring(kit.price), "gold.400", "ink.950", true)
+		for _, id in book.Order do
+			if not table.find(order, id) then
+				table.insert(order, id)
+			end
+		end
+		return order
 	end
 
-	-- A class card: its colour and emblem, its name, its two skills, and where you stand with it.
-	local function classCard(
-		made: ClassPage,
-		kit: AbilityKit.Kit,
-		order: number,
-		isPicked: boolean,
-		state: string,
-		dim: boolean,
-		onPick: () -> ()
-	)
-		local tone = classTone(kit.id)
-		local card = make("TextButton", made.gridContent, {
-			Name = kit.id,
-			BackgroundColor3 = colour(if isPicked then "ink.500" else "ink.700"),
-			BackgroundTransparency = if dim then 0.35 else 0,
-			BorderSizePixel = 0,
-			AutoButtonColor = false,
-			Text = "",
-			LayoutOrder = order,
-			Selectable = true,
-		})
-		Components.corner(card, "l")
-		outline(card, if isPicked then "ivory.50" else "ink.950", 3)
-		local art = make("Frame", card, {
-			Name = "Art",
-			Position = UDim2.fromOffset(9, 9),
-			Size = UDim2.new(1, -18, 1, -92),
-			BackgroundColor3 = Color3.new(1, 1, 1),
-			BorderSizePixel = 0,
-		})
-		Components.corner(art, "m")
-		outline(art, "ink.950", 2)
-		make("UIGradient", art, {
-			Color = ColorSequence.new(colour(tone), colour("ink.900")),
-			Rotation = 55,
-		})
-		local emblem = Icons.image(art, `class_{kit.id}`, 56)
-		emblem.ImageTransparency = if dim then 0.4 else 0
-		text(card, "title", if dim then "stone.300" else "ivory.50", {
-			AnchorPoint = Vector2.new(0, 1),
-			Position = UDim2.new(0, 10, 1, -54),
-			Size = UDim2.new(1, -20, 0, 22),
-			Text = string.upper(kit.name),
-			TextTruncate = Enum.TextTruncate.AtEnd,
-		})
-		small(
-			text(card, "caption", "stone.300", {
-				AnchorPoint = Vector2.new(0, 1),
-				Position = UDim2.new(0, 10, 1, -36),
-				Size = UDim2.new(1, -20, 0, 16),
-				Text = `{kit.mobility.name} · {kit.attack.name}`,
-				TextTruncate = Enum.TextTruncate.AtEnd,
-			}),
-			13
-		)
-		local tag = stateChip(card, kit, state)
-		tag.AnchorPoint = Vector2.new(0, 1)
-		tag.Position = UDim2.new(0, 10, 1, -10)
-		card.Activated:Connect(onPick)
-	end
-
-	-- The picked class, large: emblem, standing, name, what it is, Q and R, and one button.
-	local function drawDetail(
-		made: ClassPage,
-		kit: AbilityKit.Kit,
-		state: string,
-		label: string,
-		style: string,
-		onPress: (() -> ())?
-	)
-		clear(made.detailContent)
-		clear(made.detailFoot)
-		local tone = classTone(kit.id)
-		local hero = make("Frame", made.detailContent, {
-			Name = "Hero",
-			Size = UDim2.new(1, 0, 0, 104),
-			BackgroundColor3 = Color3.new(1, 1, 1),
-			BorderSizePixel = 0,
-			LayoutOrder = 1,
-		})
-		Components.corner(hero, "m")
-		outline(hero, "ink.950", 2)
-		make("UIGradient", hero, {
-			Color = ColorSequence.new(colour(tone), colour("ink.900")),
-			Rotation = 40,
-		})
-		Icons.image(hero, `class_{kit.id}`, 80)
-		stateChip(hero, kit, state).Position = UDim2.fromOffset(8, 8)
-		text(made.detailContent, "headline", "ivory.50", {
-			Size = UDim2.new(1, 0, 0, 30),
-			Text = string.upper(kit.name),
-			LayoutOrder = 2,
-		})
-		para(made.detailContent, "caption", "stone.300", kit.blurb, 3)
-		skillRow(made.detailContent, "Q", "dash", kit.mobility, 4)
-		skillRow(made.detailContent, "R", "punch", kit.attack, 5)
-		local b = button(made.detailFoot, label, style, onPress, style == "buy")
-		b.Name = "Action"
-	end
-
-	local redraw: () -> ()
-
-	local function drawClasses(made: ClassPage, shop: boolean)
+	local function drawClasses(fresh: boolean)
 		local wearing = ability:GetKitId()
 		local owned = ability:GetOwned()
-		local coins = ability:GetCoins()
-		local inRound = player:GetAttribute("HT_InRound") == true
-		local key: Tab = if shop then "Shop" else "Abilities"
-		made.title.Text = if shop
-			then "CLASSES  ·  PAY WITH COINS"
-			else "YOUR CLASSES  ·  PICK ONE TO FIGHT WITH"
-		local shown: { string } = {}
-		for _, kitId in book.Order do
-			if not shop or book.Kits[kitId].price > 0 then
-				table.insert(shown, kitId)
-			end
+		if not book.Kits[pick] then
+			pick = wearing
 		end
-		local pick = picked[key]
-		if not pick or not table.find(shown, pick) then
-			-- Classes opens on the one you wear; the Shop on the first you don't own
-			pick = if shop then shown[1] else wearing
-			if shop then
-				for _, kitId in shown do
-					if not owned[kitId] then
-						pick = kitId
-						break
-					end
-				end
-			end
-			picked[key] = pick
-		end
-		clear(made.gridContent)
-		for order, kitId in shown do
-			classCard(
-				made,
-				book.Kits[kitId],
-				order,
-				kitId == pick,
-				standing(kitId, wearing, owned),
-				not shop and not owned[kitId],
-				function()
-					if picked[key] ~= kitId then
-						picked[key] = kitId
-						confirming = nil
-						redraw()
-					end
-				end
+		local kit = book.Kits[pick]
+		tint(classColour(pick))
+		setWord(pick)
+		setTitle(kit.name)
+		sub.Text = "YOUR CLASSES · PICK ONE TO FIGHT WITH"
+		for index, id in classOrder() do
+			local other = book.Kits[id]
+			local state = standing(id, wearing, owned)
+			local picked = id == pick
+			local column, rowIndex = (index - 1) % 4, math.floor((index - 1) / 4)
+			local cut = PosterKit.cut(
+				page,
+				"class",
+				Vector2.new(132, 112),
+				classColour(id),
+				Vector2.new(5, 6)
 			)
-		end
-		local kit = book.Kits[pick :: string]
-		if not kit then
-			clear(made.detailContent)
-			clear(made.detailFoot)
-			return
-		end
-		local state = standing(kit.id, wearing, owned)
-		if shop then
-			if state ~= "NOT OWNED" then
-				drawDetail(made, kit, state, "Owned", "off", nil)
-			elseif inRound then
-				drawDetail(made, kit, state, "Locked in a round", "off", nil)
-			elseif coins < kit.price then
-				drawDetail(made, kit, state, `Need {kit.price - coins} more`, "off", nil)
-			elseif confirming == kit.id then
-				-- the second press spends the Coins
-				drawDetail(made, kit, state, `Confirm · {kit.price}`, "buy", function()
-					confirming = nil
-					ability:Buy(kit.id)
-				end)
-			else
-				drawDetail(made, kit, state, `Buy · {kit.price}`, "buy", function()
-					confirming = kit.id
-					redraw()
-				end)
+			PosterKit.place(
+				cut,
+				44 + column * 144,
+				128 - PAGE_TOP + rowIndex * 124 - (if picked then 8 else 0)
+			)
+			cut.root.ZIndex = if picked then 3 else 2
+			if state == "NOT OWNED" then
+				Shapes.image(cut.face, "classStripes", "ink.900", {
+					Position = UDim2.fromOffset(4, 4),
+					Size = UDim2.new(1, -8, 1, -8),
+					ImageTransparency = 0.6,
+				})
 			end
-		elseif state == "EQUIPPED" then
-			drawDetail(made, kit, state, "Equipped", "off", nil)
-		elseif state == "NOT OWNED" then
-			drawDetail(made, kit, state, "See it in the Shop", "plain", function()
-				picked.Shop = kit.id
-				MenuController._goTo("Shop", true)
-			end)
-		elseif inRound then
-			drawDetail(made, kit, state, "Locked in a round", "off", nil)
-		else
-			drawDetail(made, kit, state, "Equip", "equip", function()
-				ability:Equip(kit.id)
-			end)
-		end
-	end
-
-	-- The tab you're on is light with dark lettering and sits pressed in; the others are dark.
-	local function paintTabs()
-		for index, tab in TABS do
-			local on = tab == current
-			tabButtons[tab].BackgroundColor3 = colour(if on then "ivory.50" else "ink.700")
-			tabLabels[tab].TextColor3 = colour(if on then "ink.950" else "stone.300")
-			dotFrames[index].BackgroundColor3 = colour(if on then "coral.500" else "line.300")
-		end
-		local at = table.find(TABS, current) or 1
-		prevButton.BackgroundTransparency = if at == 1 then 0.6 else 0
-		nextButton.BackgroundTransparency = if at == #TABS then 0.6 else 0
-	end
-
-	redraw = function()
-		coinsText.Text = tostring(ability:GetCoins())
-		if not isOpen then
-			return
-		end
-		-- only the page you are on is drawn
-		if current == "Shop" then
-			fit(shopPage, pages.Shop)
-			local keep = shopPage.grid.CanvasPosition
-			drawClasses(shopPage, true)
-			shopPage.grid.CanvasPosition = keep
-		elseif current == "Abilities" then
-			fit(classesPage, pages.Abilities)
-			local keep = classesPage.grid.CanvasPosition
-			drawClasses(classesPage, false)
-			classesPage.grid.CanvasPosition = keep
-		end
-		paintTabs()
-	end
-	MenuController._redraw = redraw
-
-	-- Goes to a page: sliding when you browse there, at once when a shortcut asked for it.
-	local function goTo(tab: Tab, slide: boolean)
-		confirming = nil
-		current = tab
-		pager.Animated = slide and not HudMotion.reduced()
-		pager:JumpTo(pages[tab])
-		pager.Animated = true
-		redraw()
-		if
-			UserInputService.GamepadEnabled
-			and UserInputService:GetLastInputType().Name:match("Gamepad")
-		then
-			GuiService.SelectedObject = tabButtons[tab]
-		end
-	end
-	MenuController._goTo = goTo
-	-- a swipe changes the page without asking us: follow it
-	pager:GetPropertyChangedSignal("CurrentPage"):Connect(function()
-		local page = pager.CurrentPage
-		if page and isOpen and pages[current] ~= page then
-			for _, tab in TABS do
-				if pages[tab] == page then
-					confirming = nil
-					current = tab
-					redraw()
-				end
-			end
-		end
-	end)
-	local function step(by: number)
-		local at = table.find(TABS, current) or 1
-		local to = math.clamp(at + by, 1, #TABS)
-		if to ~= at then
-			goTo(TABS[to], true)
-		end
-	end
-	prevButton.Activated:Connect(function()
-		step(-1)
-	end)
-	nextButton.Activated:Connect(function()
-		step(1)
-	end)
-
-	for index, tab in TABS do
-		local b = headerButton(rail, tab, 0, index)
-		b.AutomaticSize = Enum.AutomaticSize.X
-		make("UIPadding", b, { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 14) })
-		list(b, 8, true)
-		local icon = Icons.image(b, TAB_ICONS[tab], 32)
-		icon.AnchorPoint = Vector2.zero
-		icon.LayoutOrder = 1
-		icon.ZIndex = 5
-		tabLabels[tab] = small(
-			text(b, "label", "stone.300", {
-				Size = UDim2.new(0, 0, 1, 0),
+			Poster.text(cut.face, "display", 62, "ink.900", {
+				AnchorPoint = Vector2.new(1, 0),
+				Position = UDim2.new(1, -10, 0, 4),
+				Size = UDim2.fromOffset(70, 62),
+				Text = string.upper(string.sub(other.name, 1, 1)),
+				TextTransparency = 0.72,
+				TextXAlignment = Enum.TextXAlignment.Right,
+			})
+			className(cut.face, other.name, 22, 12, 50, 32)
+			local badge = Poster.text(cut.face, "label", 15, "ivory.50", {
+				BackgroundColor3 = colour("ink.900"),
+				BackgroundTransparency = 0,
+				BorderSizePixel = 0,
+				Position = UDim2.fromOffset(10, 81),
+				Size = UDim2.fromOffset(0, 23),
 				AutomaticSize = Enum.AutomaticSize.X,
-				Text = string.upper(TAB_NAMES[tab]),
-				LayoutOrder = 2,
-				ZIndex = 5,
-			}),
-			16
-		)
-		b.Activated:Connect(function()
-			if current ~= tab then
-				goTo(tab, true)
+				Text = state,
+				ZIndex = 2,
+			})
+			make(
+				"UIPadding",
+				badge,
+				{ PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }
+			)
+			if picked then
+				-- the picked tile sits up, tipped, a little larger, with a cream line inside it
+				local ring = make("Frame", cut.face, {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(9.5, 9.5),
+					Size = UDim2.new(1, -19, 1, -19),
+					ZIndex = 3,
+				})
+				make("UIStroke", ring, { Color = colour("ivory.50"), Thickness = 3 })
+				cut.scale.Scale = 1.06
+				cut.root.Rotation = 0 -- (the mockup tips it 2 degrees; turned small text is drawn soft)
 			end
-		end)
-		tabButtons[tab] = b
+			PosterKit.pressable(cut, function()
+				if pick ~= id then
+					pick = id
+					confirming = nil
+					UiSound.play("ui_page")
+					hit()
+					draw(false)
+				end
+			end, picked)
+			if not picked and not Drift.lite then
+				-- (the picked tile answers no press, so it holds still)
+				Drift.add("page", cut.body, 112, 4, index)
+			end
+			if fresh then
+				PosterKit.pop(
+					cut.root,
+					cut.scale,
+					0.12 + (index - 1) * 0.04,
+					if picked then 1.06 else 1,
+					0
+				)
+			end
+		end
+		-- the picked class: what it is, its two skills, and the one thing to do with it
+		local blurb = Poster.text(page, "label", 18, "ink.900", {
+			Position = UDim2.fromOffset(28, 382 - PAGE_TOP),
+			Size = UDim2.fromOffset(540, 27),
+			Text = kit.blurb,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+		})
+		blurb.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.SemiBold)
+		local device = deviceOf()
+		local y = 417 - PAGE_TOP
+		for index, slot in { "mobility", "attack" } do
+			local skill = kit[slot]
+			local key = if device == "touch"
+				then nil
+				elseif device == "gamepad" then (if slot == "mobility" then "B" else "L2")
+				elseif slot == "mobility" then "Q"
+				else "R"
+			local cooldown = cooldownOf(skill.id)
+			local detail = if index == 1 then skill.blurb else nil
+			-- a line of the small text holds about 54 letters at this width; a longer one takes a second line
+			local height = if not detail then 46 elseif #detail > 54 then 98 else 72
+			local row = PosterKit.row(
+				page,
+				546,
+				height,
+				key,
+				skill.name,
+				detail,
+				if not skill.built then "PLANNED" elseif cooldown then seconds(cooldown) else nil
+			)
+			PosterKit.placeRow(row, 22, y)
+			y += height + 8
+		end
+		local state = standing(pick, wearing, owned)
+		local x, top = 586, 474 - PAGE_TOP
+		if state == "EQUIPPED" and not inRound() and pick ~= book.DefaultKit then
+			wornAction(page, x, top)
+		elseif state == "EQUIPPED" then
+			action(page, x, top, "Equipped", "off")
+		elseif state == "NOT OWNED" then
+			action(page, x, top, "See it in the Shop", "buy", function()
+				open("shop")
+			end, nil, 40)
+		elseif inRound() then
+			action(page, x, top, "Locked in a round", "off")
+		else
+			action(page, x, top, "Equip", "go", function()
+				askedEquip = os.clock()
+				ability:Equip(pick)
+			end, nil, 40)
+		end
 	end
 
-	-- THE SETTINGS PANEL: small, on its own, the same backdrop ---------------------------------------------
-	local settings = Components.sticker(gui, {
-		Name = "Settings",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(380, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		Visible = false,
-		ZIndex = 11,
-	}, { depth = 8, radius = "l" })
-	settings.face.AutomaticSize = Enum.AutomaticSize.Y
-	settings.face.Size = UDim2.fromScale(1, 0)
-	local settingsScale = make("UIScale", settings.holder, {})
-	local settingsBody = make("Frame", settings.face, {
-		Name = "Body",
-		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		ZIndex = 3,
-	})
-	pad(settingsBody, SP[4])
-	list(settingsBody, SP[2])
-	local function drawSettings()
-		clear(settingsBody)
-		local head = make("Frame", settingsBody, {
-			LayoutOrder = 1,
-			Size = UDim2.new(1, 0, 0, 44),
+	-- A planned thing: a plain outlined slab that says so (the mockup's dashed one; Roblox draws no dashes).
+	local function plannedSlab(
+		x: number,
+		y: number,
+		width: number,
+		name: string,
+		words_: string
+	): Frame
+		local slab = make("Frame", page, {
+			Name = name,
 			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(x, y),
+			Size = UDim2.fromOffset(width, 181),
 		})
-		Icons.image(head, "settings", 40, UDim2.new(0, 20, 0.5, 0))
-		text(head, "headline", "ivory.50", {
-			Position = UDim2.fromOffset(50, 0),
-			Size = UDim2.new(1, -100, 1, 0),
-			Text = "SETTINGS",
+		local ring = make("Frame", slab, {
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(2, 2),
+			Size = UDim2.new(1, -4, 1, -4),
 		})
-		local x = make("TextButton", head, {
-			Name = "Close",
-			AnchorPoint = Vector2.new(1, 0.5),
-			Position = UDim2.fromScale(1, 0.5),
-			Size = UDim2.fromOffset(38, 38),
-			BackgroundColor3 = colour("danger.600"),
-			BorderSizePixel = 0,
-			AutoButtonColor = false,
-			Text = "X",
-			TextColor3 = colour("ivory.50"),
+		make("UIStroke", ring, { Color = colour("ink.900"), Thickness = 4 })
+		Poster.text(slab, "display", 30, "ink.900", {
+			Position = UDim2.fromOffset(22, 20),
+			Size = UDim2.new(1, -44, 0, 45),
+			Text = string.upper(name),
 		})
-		Typography.apply(x, "button")
-		Components.corner(x, "m")
-		outline(x, "ink.950", 3)
-		x.Activated:Connect(function()
-			MenuController._setSettings(false)
-		end)
-		for index, setting in SETTINGS do
-			local on = settingsState[setting.id]
-			local row = make("TextButton", settingsBody, {
-				Name = setting.id,
-				LayoutOrder = 1 + index,
-				Size = UDim2.new(1, 0, 0, 44),
-				BackgroundColor3 = colour("ink.700"),
-				BorderSizePixel = 0,
-				AutoButtonColor = false,
-				Text = "",
-			})
-			Components.corner(row, "m")
-			outline(row, "ink.950", 2)
-			small(
-				text(row, "label", "ivory.50", {
-					Position = UDim2.fromOffset(12, 0),
-					Size = UDim2.new(1, -90, 1, 0),
-					Text = setting.name,
-				}),
-				15
+		local line = Poster.text(slab, "label", 16, "ink.900", {
+			Position = UDim2.fromOffset(22, 69),
+			Size = UDim2.new(1, -44, 0, 48),
+			Text = words_,
+			TextWrapped = true,
+			TextYAlignment = Enum.TextYAlignment.Top,
+		})
+		line.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.SemiBold)
+		PosterKit.tag(slab, "Planned", { Position = UDim2.new(0, 22, 1, -46) })
+		return slab
+	end
+
+	local function drawShop(fresh: boolean)
+		tint(colour(TONES.shop))
+		setWord("Shop")
+		setTitle("Shop")
+		sub.Text = "CLASSES · PAY WITH COINS"
+		local owned = ability:GetOwned()
+		local coins = ability:GetCoins()
+		local x, y, rowHeight, count = 40, 128 - PAGE_TOP, 0, 0
+		local function place(width: number, height: number): (number, number)
+			if x > 40 and x + width > 40 + 796 then
+				x = 40
+				y += rowHeight + 14
+				rowHeight = 0
+			end
+			local atX, atY = x, y
+			x += width + 14
+			rowHeight = math.max(rowHeight, height)
+			return atX, atY
+		end
+		for _, id in classOrder() do
+			local kit = book.Kits[id]
+			if not owned[id] then
+				count += 1
+				local sure = confirming == id
+				local height = if sure then 181 + 56 else 181
+				local atX, atY = place(286, height)
+				local cut = PosterKit.cut(
+					page,
+					"slab",
+					Vector2.new(286, height),
+					classColour(id),
+					Vector2.new(5, 6)
+				)
+				PosterKit.place(cut, atX, atY)
+				className(cut.face, kit.name, 30, 18, 16, 45)
+				local line = Poster.text(cut.face, "label", 16, "ink.900", {
+					Position = UDim2.fromOffset(18, 65),
+					Size = UDim2.fromOffset(250, 24),
+					Text = `{kit.mobility.name} · {kit.attack.name}`,
+				})
+				line.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.SemiBold)
+				if inRound() then
+					action(cut.face, 18, 99, "Locked in a round", "off")
+				elseif coins < kit.price then
+					action(cut.face, 18, 99, `Need {kit.price - coins} more`, "off")
+				elseif sure then
+					-- the second press spends the Coins
+					action(cut.face, 18, 99, `Confirm · {kit.price}`, "sure", function()
+						confirming = nil
+						askedBuy = os.clock()
+						ability:Buy(id)
+					end, nil, count * 2)
+					action(cut.face, 18, 99 + 66 + 8, "Cancel", "plain", function()
+						confirming = nil
+						draw(false)
+					end, 48, count * 2 + 1)
+				else
+					action(cut.face, 18, 99, `Buy · {kit.price}`, "buy", function()
+						confirming = id
+						draw(false)
+					end, nil, count * 2)
+				end
+				if fresh then
+					PosterKit.pop(cut.root, cut.scale, 0.12 + (count - 1) * 0.04)
+				end
+			end
+		end
+		if count == 0 then
+			local atX, atY = place(286, 120)
+			local cut = PosterKit.cut(
+				page,
+				"slab",
+				Vector2.new(286, 120),
+				colour("ivory.50"),
+				Vector2.new(5, 6)
 			)
-			local track = make("Frame", row, {
-				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -10, 0.5, 0),
-				Size = UDim2.fromOffset(44, 24),
-				BackgroundColor3 = colour(if on then "teal.400" else "ink.600"),
-				BorderSizePixel = 0,
+			PosterKit.place(cut, atX, atY)
+			Poster.text(cut.face, "display", 30, "ink.900", {
+				Position = UDim2.fromOffset(18, 16),
+				Size = UDim2.fromOffset(250, 45),
+				Text = "ALL OWNED",
 			})
-			Components.corner(track, "full")
-			outline(track, "ink.950", 2)
-			local knob = make("Frame", track, {
-				AnchorPoint = Vector2.new(0, 0.5),
-				Position = UDim2.new(0, if on then 24 else 4, 0.5, 0),
-				Size = UDim2.fromOffset(16, 16),
-				BackgroundColor3 = colour(if on then "ink.950" else "stone.300"),
-				BorderSizePixel = 0,
+			local line = Poster.text(cut.face, "label", 16, "ink.900", {
+				Position = UDim2.fromOffset(18, 65),
+				Size = UDim2.fromOffset(250, 24),
+				Text = "You own every class.",
 			})
-			Components.corner(knob, "full")
-			small(
-				text(row, "caption", "stone.300", {
-					AnchorPoint = Vector2.new(1, 0),
-					Position = UDim2.new(1, -62, 0, 0),
-					Size = UDim2.new(0, 30, 1, 0),
-					Text = if on then "ON" else "OFF",
-					TextXAlignment = Enum.TextXAlignment.Right,
-				}),
-				12
-			)
-			row.Activated:Connect(function()
-				settingsState[setting.id] = not settingsState[setting.id]
-				drawSettings()
+			line.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.SemiBold)
+		end
+		for _, name in { "Passes", "Cosmetics" } do
+			local atX, atY = place(294, 181)
+			plannedSlab(atX, atY, 294, name, "Planned. Not in the game yet.")
+		end
+		page.CanvasSize = UDim2.fromOffset(0, y + rowHeight + 24)
+	end
+
+	local function drawRanked()
+		tint(colour(TONES.ranked))
+		setWord("Ranked")
+		setTitle("Ranked")
+		sub.Text = "PLANNED · NOT IN THE GAME YET"
+		-- the mockup's one cream slab (420 wide inside 18 of padding), not a dashed "planned" one
+		local cut = PosterKit.cut(
+			page,
+			"slab",
+			Vector2.new(456, 166),
+			colour("ivory.50"),
+			Vector2.new(5, 6)
+		)
+		PosterKit.place(cut, 40, 128 - PAGE_TOP)
+		Poster.text(cut.face, "display", 30, "ink.900", {
+			Position = UDim2.fromOffset(18, 16),
+			Size = UDim2.fromOffset(420, 45),
+			Text = "COMING LATER",
+		})
+		local line = Poster.text(cut.face, "label", 16, "ink.900", {
+			Position = UDim2.fromOffset(18, 65),
+			Size = UDim2.fromOffset(420, 48),
+			Text = "This screen is a placeholder. The game has no ranked system, so no ranks, seasons or rewards are shown.",
+			TextWrapped = true,
+			TextYAlignment = Enum.TextYAlignment.Top,
+		})
+		line.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.SemiBold)
+		PosterKit.tag(cut.face, "Planned", { Position = UDim2.fromOffset(18, 123) })
+	end
+
+	-- Rows in two columns (`.list`): each pair as tall as its taller row.
+	type Item = {
+		key: string?,
+		name: string,
+		detail: string?,
+		right: string?,
+		press: (() -> ())?,
+	}
+	local function drawList(items: { Item }, fresh: boolean)
+		local y = 128 - PAGE_TOP
+		for index = 1, #items, 2 do
+			local height = 46
+			for offset = 0, 1 do
+				local item = items[index + offset]
+				if item and item.detail and item.detail ~= "" then
+					height = math.max(height, if #item.detail > 38 then 98 else 72)
+				end
+			end
+			for offset = 0, 1 do
+				local item = items[index + offset]
+				if item then
+					local row = PosterKit.row(
+						page,
+						381,
+						height,
+						item.key,
+						item.name,
+						item.detail,
+						item.right
+					)
+					PosterKit.placeRow(row, 40 + offset * 399, y)
+					if item.press then
+						PosterKit.pressRow(row, item.press)
+						if not Drift.lite then
+							Drift.add("page", row.body, height, 3, index + offset)
+						end
+					end
+					if fresh then
+						PosterKit.pop(row.root, row.scale, 0.12 + (index + offset - 1) * 0.04)
+					end
+				end
+			end
+			y += height + 8
+		end
+		page.CanvasSize = UDim2.fromOffset(0, y + 16)
+	end
+
+	local function drawMoves(fresh: boolean)
+		tint(colour(TONES.moves))
+		setWord("Moves")
+		setTitle("Moves")
+		local device = deviceOf()
+		sub.Text = if device == "touch"
+			then "CONTROLS ON TOUCH"
+			elseif device == "gamepad" then "CONTROLS ON A GAMEPAD"
+			else "CONTROLS ON KEYBOARD AND MOUSE"
+		local items: { Item } = {}
+		for _, move in (HudTheme.Guide :: any)[device] or {} do
+			local name, detail = splitMove(move.action)
+			table.insert(items, { key = move.key, name = name, detail = detail })
+		end
+		table.insert(items, 5, {
+			key = if device == "gamepad" then "Up" elseif device == "touch" then "Ult" else "G",
+			name = "Ultimate",
+			detail = "When ULT READY shows, land a hit, then press it.",
+		})
+		drawList(items, fresh)
+	end
+
+	local function drawMore(fresh: boolean)
+		tint(colour(TONES.more))
+		setWord("More")
+		setTitle("More")
+		local round = inRound()
+		sub.Text = if round then "WHAT OPENS DURING A ROUND" else "EVERYTHING ELSE"
+		local items: { Item } = {
+			{
+				name = "Settings",
+				detail = "Camera shake, hit flash, music",
+				press = function()
+					open("settings")
+				end,
+			},
+		}
+		if round then
+			table.insert(items, {
+				name = "Moves",
+				detail = "The controls",
+				press = function()
+					open("moves")
+				end,
+			})
+		else
+			if afkToggle then
+				local on = player:GetAttribute("HT_AFK") == true
+				table.insert(items, {
+					name = "AFK",
+					detail = "Sit out the next rounds",
+					right = if on then "ON" else "OFF",
+					press = function()
+						afkToggle:FireServer()
+					end,
+				})
+			end
+			table.insert(items, {
+				name = "Spectate",
+				detail = "Watch the round that is on",
+				press = function()
+					close()
+					spectate:Toggle()
+				end,
+			})
+			for _, name in PLANNED do
+				table.insert(items, { name = name, right = "Planned" })
+			end
+		end
+		drawList(items, fresh)
+	end
+
+	local function drawSettings(fresh: boolean)
+		tint(colour(TONES.settings))
+		setWord("Settings")
+		setTitle("Settings")
+		sub.Text = "THESE THREE SWITCHES DON'T CHANGE ANYTHING YET"
+		local items: { Item } = {}
+		for _, setting in SETTINGS do
+			table.insert(items, {
+				name = setting.name,
+				right = if settingsState[setting.id] then "ON" else "OFF",
+				press = function()
+					settingsState[setting.id] = not settingsState[setting.id]
+					draw(false)
+				end,
+			})
+		end
+		local saving = ability:IsReady() and not ability:IsTemporary()
+		table.insert(items, {
+			name = if not ability:IsReady()
+				then "Loading your data"
+				elseif saving then "Saved"
+				else "Not saving",
+			detail = if not ability:IsReady()
+				then "One moment."
+				elseif saving then "Your Coins and classes are saved."
+				else "Changes are lost when you leave this session.",
+		})
+		table.insert(items, {
+			name = "Back",
+			detail = "To More",
+			press = function()
+				open("more")
+			end,
+		})
+		drawList(items, fresh)
+	end
+
+	draw = function(fresh: boolean)
+		local now = entry
+		if not now then
+			return
+		end
+		clear()
+		if now == "classes" then
+			drawClasses(fresh)
+		elseif now == "shop" then
+			drawShop(fresh)
+		elseif now == "ranked" then
+			drawRanked()
+		elseif now == "moves" then
+			drawMoves(fresh)
+		elseif now == "settings" then
+			drawSettings(fresh)
+		else
+			drawMore(fresh)
+		end
+		if fresh then
+			-- the title slams in: twice its size and turned 16 degrees, on the spring over 0.6 s
+			Poster.run(titleBox, 0.6, function(t: number)
+				local s = spring(t)
+				titleScale.Scale = 2.1 + (1 - 2.1) * s
+				titleBox.Rotation = -16 + (titleRest + 16) * s
 			end)
 		end
-		small(
-			para(
-				settingsBody,
-				"caption",
-				"gold.400",
-				"These three switches don't change anything yet.",
-				8
-			),
-			13
-		)
-		local saving = ability:IsReady() and not ability:IsTemporary()
-		small(
-			para(
-				settingsBody,
-				"caption",
-				if saving then "teal.400" else "gold.400",
-				if not ability:IsReady()
-					then "Loading your data..."
-					elseif saving then "Your Coins and classes are saved."
-					else "!  Not saving this session. Changes are lost when you leave.",
-				9
-			),
-			13
-		)
 	end
 
-	-- OPEN AND CLOSE -----------------------------------------------------------------------------------
-	local function onCloseKey(
-		_name: string,
-		inputState: Enum.UserInputState
-	): Enum.ContextActionResult
-		if inputState == Enum.UserInputState.Begin then
-			MenuController._setOpen(false)
-			MenuController._setSettings(false)
+	-- OPEN AND CLOSE -------------------------------------------------------------------------------------
+	-- Where the window stands and how big: in the room that is left, so it never lies over anything (owner,
+	-- 2026-11-17). Above it is the HUD's strip; left of it, in the lobby, the menu strips (the open one sits out
+	-- to the right); under it, in a round, the skill tiles and the ULT READY badge over them, and in the lobby
+	-- the spectating chip. It is `Fit.Window` of the mockup's size where that fits, and smaller where it doesn't.
+	local away = SHEET.X * 1.12 -- how far right it starts and leaves, in its own units
+	local function layout()
+		local stage = PosterKit.stage()
+		local fit = PosterKit.Fit
+		local round = inRound()
+		local top = stage.top + 18 + 72 * stage.hud + 8
+		local below = if round and deviceOf() ~= "touch"
+			then 24 + 190 * stage.hud + 8
+			else 16 + 40 * stage.hud + 16
+		local left = if round then 26 * stage.scale else NAV_RIGHT * stage.nav
+		local right = 26 * stage.scale
+		local roomX = stage.view.X - left - right
+		local roomY = stage.view.Y - top - below
+		setTall(if round then ROUND_TALL else SHEET.Y)
+		local want = math.clamp(stage.scale * fit.Window, fit.WindowMin, fit.WindowMax)
+		-- (the 12 is the paper's hard shadow, which is part of what must fit)
+		local scale =
+			math.max(math.min(want, roomX / (SHEET.X + 12), roomY / (sheetTall + 12)), 0.3)
+		holderScale.Scale = scale
+		-- in the MIDDLE OF THE SCREEN (owner, 2026-11-17: centred in the room beside the strips it looked off
+		-- centre), moved right only as far as the menu strips make it
+		local wide = SHEET.X * scale
+		local x =
+			math.clamp((stage.view.X - wide) / 2, left, math.max(left, stage.view.X - right - wide))
+		holder.Position = UDim2.fromOffset(x, top + math.max(0, roomY - sheetTall * scale) * 0.4)
+		away = math.max(SHEET.X * 1.12, (stage.view.X - x) / scale + 60)
+	end
+
+	-- THE BLUR (owner, 2026-11-17): the world behind the open window goes a little soft, fading in over a quarter
+	-- second and out a little faster, so it never snaps. Not in a round: you are still fighting and have to see
+	-- it. Not at the two lowest graphics levels: a whole-screen effect is the first thing a weak phone can't
+	-- afford. Under Reduced Motion it is set at once.
+	local blur: BlurEffect? = nil
+	local blurTween: Tween? = nil
+	local function lowGraphics(): boolean
+		local ok, level = pcall(function()
+			return UserSettings():GetService("UserGameSettings").SavedQualityLevel.Value
+		end)
+		return ok and level >= 1 and level <= 2
+	end
+	local function setBlur(on: boolean)
+		local want = on and not inRound() and not lowGraphics()
+		if want and not blur then
+			blur = make("BlurEffect", Lighting, { Name = "HT_MenuBlur", Size = 0, Enabled = false })
+		end
+		local effect = blur
+		if not effect then
+			return
+		end
+		if blurTween then
+			blurTween:Cancel()
+			blurTween = nil
+		end
+		local goal = if want then BLUR.Size else 0
+		if want then
+			effect.Enabled = true
+		elseif not effect.Enabled then
+			return
+		end
+		if HudMotion.reduced() then
+			effect.Size = goal
+			effect.Enabled = want
+			return
+		end
+		local tween = TweenService:Create(
+			effect,
+			TweenInfo.new(
+				if want then BLUR.In else BLUR.Out,
+				Enum.EasingStyle.Quad,
+				Enum.EasingDirection.Out
+			),
+			{ Size = goal }
+		)
+		blurTween = tween
+		tween.Completed:Connect(function(state: Enum.PlaybackState)
+			if state == Enum.PlaybackState.Completed and not want then
+				effect.Enabled = false
+			end
+		end)
+		tween:Play()
+	end
+
+	local function onCloseKey(_: string, state: Enum.UserInputState): Enum.ContextActionResult
+		if state == Enum.UserInputState.Begin then
+			close()
 		end
 		return Enum.ContextActionResult.Sink -- every state, so the release never reaches the dash
 	end
-	local function bindKeys(on: boolean)
-		if on then
+
+	open = function(to: string)
+		if inRound() and not IN_ROUND_OK[to] then
+			return
+		end
+		local was = entry
+		entry = to
+		lastEntry = to
+		confirming = nil
+		layout()
+		if not was then
+			UiSound.play("ui_open")
+			holder.Visible = true
+			driftSince = os.clock()
 			ContextActionService:BindActionAtPriority(
 				CLOSE_ACTION,
 				onCloseKey,
@@ -1197,160 +1273,188 @@ function MenuController:KnitStart()
 				Enum.ContextActionPriority.High.Value + 1,
 				Enum.KeyCode.ButtonB
 			)
-		else
-			ContextActionService:UnbindAction(CLOSE_ACTION)
-			if GuiService.SelectedObject and GuiService.SelectedObject:IsDescendantOf(gui) then
-				GuiService.SelectedObject = nil
-			end
+			-- it comes in from the right, tipped 3 degrees, and settles on the spring over 0.7 s
+			Poster.run(slide, 0.7, function(t: number)
+				local s = spring(t)
+				slide.Position = UDim2.new(0.5, away * (1 - s), 0.5, 0)
+				setTilt(3 + (TILT - 3) * s)
+			end)
+		elseif was ~= to then
+			UiSound.play("ui_page")
+			hit()
 		end
-	end
-	-- The window keeps its real sizes down to a 700 x 400 screen (a small phone); under that the whole thing
-	-- shrinks together instead of crushing its contents.
-	local base = 1
-	local function sizeWindow()
-		local camera = workspace.CurrentCamera
-		local size = if camera then camera.ViewportSize else HudTheme.Scale.Reference
-		base = math.min(1, size.X / 700, size.Y / 400)
-		window.holder.Size = UDim2.fromOffset(
-			math.min(size.X * M.ScreenShare.X / base, M.MaxWidth),
-			math.min(size.Y * M.ScreenShare.Y / base, M.MaxHeight)
-		)
-		panelScale.Scale = base
-		settingsScale.Scale = base
-	end
-	local function opening(scale: UIScale)
-		-- in: a short rise and scale on the motion tokens; nothing scales under reduced motion
-		sizeWindow()
-		if not HudMotion.reduced() then
-			scale.Scale = base * 0.95
-		end
-		HudMotion.play(scale, "open", { Scale = base }, "release", "enter")
+		draw(true)
+		setDrift(true)
+		Drift.show("window", true)
+		Drift.show("page", true)
+		setBlur(true)
+		MenuController.Changed:Fire(to)
 	end
 
-	local function setSettings(open: boolean)
-		if open == settingsOpen then
+	close = function()
+		if not entry then
 			return
 		end
-		if open and isOpen then
-			MenuController._setOpen(false)
-		end
-		settingsOpen = open
-		backdrop.Visible = open
-		settings.holder.Visible = open
-		bindKeys(open)
-		if open then
-			drawSettings()
-			opening(settingsScale)
-		end
-	end
-	MenuController._setSettings = setSettings
-
-	local function setOpen(open: boolean, tab: Tab?)
-		if open and settingsOpen then
-			setSettings(false)
-		end
-		if open == isOpen then
-			if open and tab then
-				goTo(tab, false) -- a shortcut pressed while the window is up: straight to its page
-			end
-			return
-		end
-		isOpen = open
+		entry = nil
 		confirming = nil
-		backdrop.Visible = open
-		window.holder.Visible = open
-		bindKeys(open)
-		if open then
-			ContextActionService:BindActionAtPriority(
-				PAGE_ACTION,
-				function(_, inputState: Enum.UserInputState, input: InputObject)
-					if inputState == Enum.UserInputState.Begin then
-						step(if input.KeyCode == Enum.KeyCode.ButtonL1 then -1 else 1)
-					end
-					return Enum.ContextActionResult.Sink
-				end,
-				false,
-				Enum.ContextActionPriority.High.Value + 1,
-				Enum.KeyCode.ButtonL1,
-				Enum.KeyCode.ButtonR1
-			)
-			goTo(tab or current, false)
-			opening(panelScale)
-		else
-			ContextActionService:UnbindAction(PAGE_ACTION)
+		UiSound.play("ui_close")
+		ContextActionService:UnbindAction(CLOSE_ACTION)
+		setDrift(false)
+		Drift.show("window", false)
+		Drift.show("page", false)
+		setBlur(false)
+		MenuController.Changed:Fire(nil)
+		local function gone()
+			if not entry then
+				holder.Visible = false
+				clear()
+			end
+		end
+		if HudMotion.reduced() then
+			gone()
+			return
+		end
+		-- it leaves the way it came, quickly (0.12 s)
+		Poster.run(slide, 0.12, function(t: number)
+			local e = PosterEase.easeIn(t)
+			slide.Position = UDim2.new(0.5, away * e, 0.5, 0)
+			setTilt(TILT + (3 - TILT) * e)
+		end, gone)
+	end
+
+	-- the X: pink, 12 in from the top-right corner. 62 x 62 (the mockup's is 54): the window is drawn smaller
+	-- than the mockup's, and this has to stay easy to hit
+	local closeCut = PosterKit.cut(slide, "close", Vector2.new(62, 62), colour("danger.600"))
+	PosterKit.place(closeCut, SHEET.X - BORDER - 12 - 62, BORDER + 12)
+	closeCut.root.ZIndex = 7
+	Poster.text(closeCut.face, "display", 28, "ivory.50", {
+		Size = UDim2.fromScale(1, 1),
+		Text = "X",
+		TextXAlignment = Enum.TextXAlignment.Center,
+	})
+	PosterKit.pressable(closeCut, function()
+		close()
+	end)
+	Drift.add("window", closeCut.body, 62, 5) -- up and down only: the X is a letter
+
+	MenuController._open = open
+	MenuController._close = close
+	MenuController._entry = function(): string?
+		return entry
+	end
+	MenuController._toast = showToast
+
+	ContextActionService:BindAction(TOGGLE_ACTION, function(_: string, state: Enum.UserInputState)
+		if state == Enum.UserInputState.Begin then
+			if entry then
+				close()
+			else
+				open(if inRound() then "more" else lastEntry)
+			end
+		end
+		return Enum.ContextActionResult.Sink
+	end, false, Enum.KeyCode.M)
+
+	local function redraw()
+		if entry then
+			if inRound() and not IN_ROUND_OK[entry] then
+				close()
+			else
+				draw(false)
+			end
 		end
 	end
-	MenuController._setOpen = setOpen
-
-	close.Activated:Connect(function()
-		setOpen(false)
-	end)
-	-- A press outside closes whichever is up. Checked by position: an Active frame doesn't stop the backdrop
-	-- button under it from getting Activated (measured in Play, 2026-11-12).
-	backdrop.Activated:Connect(function(input: InputObject)
-		local at = Vector2.new(input.Position.X, input.Position.Y)
-		local target = if settingsOpen then settings.holder else window.holder
-		local low, size = target.AbsolutePosition, target.AbsoluteSize
-		local inside = at.X >= low.X
-			and at.Y >= low.Y
-			and at.X <= low.X + size.X
-			and at.Y <= low.Y + size.Y
-		if not inside then
-			setOpen(false)
-			setSettings(false)
+	local function ownedCount(): number
+		local count = 0
+		for _ in ability:GetOwned() do
+			count += 1
 		end
-	end)
-	ContextActionService:BindAction(
-		TOGGLE_ACTION,
-		function(_name: string, inputState: Enum.UserInputState)
-			if inputState == Enum.UserInputState.Begin then
-				setOpen(not isOpen)
-			end
-			return Enum.ContextActionResult.Sink
-		end,
-		false,
-		Enum.KeyCode.M
-	)
-
-	view:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-		if isOpen then
-			redraw()
+		return count
+	end
+	local ownedBefore = ownedCount()
+	ability.InventoryChanged:Connect(function()
+		-- bought: the owned list grew after a Confirm, never on the first Buy press or as the profile loads
+		local count = ownedCount()
+		if count > ownedBefore and os.clock() - askedBuy < ASKED_FOR then
+			askedBuy = -math.huge
+			UiSound.play("ui_buy")
 		end
+		ownedBefore = count
+		redraw()
 	end)
+	ability.KitChanged:Connect(function()
+		if os.clock() - askedEquip < ASKED_FOR then
+			askedEquip = -math.huge
+			UiSound.play("ui_equip")
+		end
+		-- a class just equipped is the one the window shows
+		pick = ability:GetKitId()
+		redraw()
+	end)
+	player:GetAttributeChangedSignal("HT_AFK"):Connect(redraw)
+	player:GetAttributeChangedSignal("HT_InRound"):Connect(function()
+		-- a round starting or ending moves what the window has to stand clear of, and a fight is never blurred
+		layout()
+		redraw()
+		setBlur(entry ~= nil)
+	end)
+	UserInputService.LastInputTypeChanged:Connect(layout)
 	local function watchCamera()
 		local camera = workspace.CurrentCamera
 		if camera then
-			camera:GetPropertyChangedSignal("ViewportSize"):Connect(sizeWindow)
+			camera:GetPropertyChangedSignal("ViewportSize"):Connect(layout)
 		end
-		sizeWindow()
+		layout()
 	end
 	workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchCamera)
 	watchCamera()
-	ability.InventoryChanged:Connect(redraw)
-	ability.KitChanged:Connect(redraw)
-	player:GetAttributeChangedSignal("HT_InRound"):Connect(redraw)
-	redraw()
-	gui.Parent = player:WaitForChild("PlayerGui")
+	tint(fieldColour)
+	local playerGui = player:WaitForChild("PlayerGui")
+	gui.Parent = playerGui
+	toastGui.Parent = playerGui
 end
 
---- Opens or closes the window (for tests and other controllers).
+--- Opens or closes the window (on the page it last showed).
 function MenuController:SetOpen(open: boolean)
-	if self._setOpen then
-		self._setOpen(open)
+	if open and self._open then
+		self._open("classes")
+	elseif not open and self._close then
+		self._close()
 	end
 end
 
---- Opens the window directly on a page: "Shop", "Abilities" (Classes) or "Cosmetics".
+--- Opens the window on a page: "classes", "shop", "ranked", "moves", "more" or "settings". The old window's
+--- names ("Shop", "Abilities", "Cosmetics") still work.
 function MenuController:Open(tab: string)
-	if self._setOpen and table.find(TABS, tab :: any) then
-		self._setOpen(true, tab)
+	local entry = OLD_NAMES[tab] or tab
+	if self._open and (entry == "classes" or TITLES[entry]) then
+		self._open(entry)
 	end
 end
 
---- Opens the small Settings panel.
+--- Closes the window.
+function MenuController:Close()
+	if self._close then
+		self._close()
+	end
+end
+
+--- Opens the Settings page.
 function MenuController:OpenSettings()
-	if self._setSettings then
-		self._setSettings(true)
+	if self._open then
+		self._open("settings")
+	end
+end
+
+--- The page that is open, or nil.
+function MenuController:GetEntry(): string?
+	return if self._entry then self._entry() else nil
+end
+
+--- Shows a line in the toast (top-left corner).
+function MenuController:Toast(message: string)
+	if self._toast then
+		self._toast(message)
 	end
 end
 
