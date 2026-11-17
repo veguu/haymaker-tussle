@@ -1,11 +1,12 @@
 --!strict
--- BotsFreezeController - the owner's Bots button, on the right edge at mid height. Only shown when the server has
+-- BotsFreezeController - the owner's Bots button, bottom-left, shown and hidden with F8. Only built when the server has
 -- marked you as allowed (player attribute HT_CanFreezeBots: in Studio, or the place's owner). Pressing it
 -- asks the server to stop or restart every bot; the server owns the state (workspace attribute
 -- HT_BotsFrozen) and this only shows it: "BOTS ON / fighting" or, on the yellow, "BOTS STOPPED / inspecting".
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -44,10 +45,10 @@ function BotsFreezeController:KnitStart()
 
 		local button = Instance.new("TextButton")
 		button.Name = "BotsButton"
-		-- Right edge, middle (2026-11-16): the left edge is the lobby navigation's now, and nothing else
-		-- lives here.
-		button.AnchorPoint = Vector2.new(1, 0.5)
-		button.Position = UDim2.new(1, -HudTheme.Size.Edge, 0.42, 0)
+		-- Bottom-left corner, and HIDDEN until the owner presses F8 (2026-11-18): the right edge is the lobby
+		-- tools' now. F8 also shows the stats line's detail (PerfController), through the attribute HT_DevUi.
+		button.AnchorPoint = Vector2.new(0, 1)
+		button.Position = UDim2.new(0, HudTheme.Size.Edge, 1, -HudTheme.Size.Edge)
 		button.Size = UDim2.fromOffset(S.Width, S.Height)
 		button.AutoButtonColor = true
 		button.BorderSizePixel = 0
@@ -103,6 +104,13 @@ function BotsFreezeController:KnitStart()
 		end
 		show()
 		layout()
+		gui.Enabled = false
+		UserInputService.InputBegan:Connect(function(input: InputObject)
+			if input.KeyCode == Enum.KeyCode.F8 then
+				gui.Enabled = not gui.Enabled
+				player:SetAttribute("HT_DevUi", gui.Enabled)
+			end
+		end)
 		gui.Parent = player:WaitForChild("PlayerGui")
 	end
 

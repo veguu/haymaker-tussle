@@ -19,7 +19,7 @@ let cap={}; try{cap=JSON.parse(decodeURIComponent(location.hash.slice(1))||'{}')
 const CLASSES=['Base','Bruiser','Inferno','Beast','Trickster','Dragon','Frost','Tempest'];
 // [name, text, mockup px, letter-spacing em]
 const SHEETS={
-  titles:{pad:28,cls:'title',items:[...CLASSES,'Shop','Ranked','Moves','More','Settings'].map(w=>['title:'+w.toUpperCase(),w,84,.02])},
+  titles:{pad:28,cls:'title',items:[...CLASSES,'Shop','Ranked','Moves','More','Settings','Menu'].map(w=>['title:'+w.toUpperCase(),w,84,.02])},
   words:{pad:6,cls:'',items:[
     ...['Classes','Shop','Ranked','Moves'].map(w=>['nav:'+w.toUpperCase(),w,34,.03]),
     ['nav:MORE','More',22,.03],

@@ -34,8 +34,8 @@ local Signal = require(ReplicatedStorage.Packages.Signal)
 local Abilities = require(ReplicatedStorage.Shared.Config.Abilities)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local PosterEase = require(ReplicatedStorage.Shared.Core.PosterEase)
-local Net = require(ReplicatedStorage.Shared.Net)
 local Tokens = require(ReplicatedStorage.Shared.Tokens)
+local ClassPreview = require(script.Parent.Parent.Ui.ClassPreview)
 local Drift = require(script.Parent.Parent.Ui.Drift)
 local HudMotion = require(script.Parent.Parent.Ui.HudMotion)
 local HudTheme = require(script.Parent.Parent.Ui.HudTheme)
@@ -45,6 +45,9 @@ local Shapes = require(script.Parent.Parent.Ui.Shapes)
 local UiSound = require(script.Parent.Parent.Ui.UiSound)
 
 local book: any = Abilities
+ClassPreview.lite = Drift.lite
+-- how many class tiles a page of the Classes screen holds (two rows of four)
+local CLASSES_PER_PAGE = 8
 local colour = Tokens.colour
 local make = PosterKit.make
 local spring = PosterEase.spring
@@ -82,13 +85,26 @@ local TONES = {
 	settings = "violet.400",
 }
 -- what opens while a round is on
-local IN_ROUND_OK = { more = true, moves = true, settings = true }
+-- In a round the MENU button's window is the Settings page and nothing else (the owner, 2026-11-18: simpler);
+-- the controls have their own small panel at the bottom right (NavController).
+local IN_ROUND_OK = { settings = true }
 -- the old window's page names, still accepted by Open()
 local OLD_NAMES = { Shop = "shop", Abilities = "classes", Cosmetics = "more" }
+-- `help` is what the "?" beside the name shows under the pointer
 local SETTINGS = {
-	{ id = "shake", name = "Camera shake" },
-	{ id = "flash", name = "Hit flash" },
-	{ id = "music", name = "Music" },
+	{ id = "shake", name = "Camera shake", help = "Shakes your camera on big hits." },
+	{ id = "flash", name = "Hit flash", help = "Flashes the fighter you hit." },
+	{ id = "music", name = "Music", help = "Plays the game's music." },
+}
+-- the Settings page's own plain rows: one column, a flat cream card each
+local SROW = {
+	X = 40,
+	Width = 780,
+	Height = 56,
+	Gap = 10,
+	Switch = Vector2.new(88, 36),
+	Knob = 24,
+	TipHold = 3,
 }
 local PLANNED = { "Cosmetics", "Profile", "Leaderboards", "Emotes", "Codes" }
 
@@ -144,10 +160,6 @@ end
 function MenuController:KnitStart()
 	local player = Players.LocalPlayer
 	local ability = Knit.GetController("AbilityController")
-	local spectate = Knit.GetController("SpectateController")
-	local afkToggle = if GameConfig.Round.Enabled and GameConfig.Round.AfkEnabled
-		then Net.client("AfkToggle")
-		else nil
 
 	local gui = make("ScreenGui", nil, {
 		Name = "HT_Menu",
@@ -343,6 +355,25 @@ function MenuController:KnitStart()
 		Size = UDim2.fromOffset(796, 24),
 		ZIndex = 3,
 	})
+	-- THE PICKED CLASS, STANDING: your avatar in that class's pose, right of the tiles and over the Equip button
+	-- (Ui/ClassPreview): an R6 body about 290 units across, standing INSIDE the window between the tiles and its
+	-- right edge. It is the window's own child, not the page's, so a pose that throws an arm wide is not cut off
+	-- at the page's edge: it reaches a little past the window's side, as the owner's references do.
+	local preview = ClassPreview.new(slide, {
+		-- (centred in the open space between the tiles and the window edge, and UNDER the page, since 2026-11-18:
+		-- the owner wants it further in, with the tiles, the rows and the button drawn over it where they meet)
+		Position = UDim2.fromOffset(BORDER + 84 + 525, BORDER + 8 + 44),
+		Size = UDim2.fromOffset(400, 430),
+		ZIndex = 4,
+	})
+	local classPage = 1
+	-- (a testing knob: the workspace attribute HT_ClassesPerPage makes pages smaller, to see the arrows)
+	local function classesPerPage(): number
+		local forced = workspace:GetAttribute("HT_ClassesPerPage")
+		return if typeof(forced) == "number" and forced >= 1
+			then math.floor(forced)
+			else CLASSES_PER_PAGE
+	end
 	-- the page: straight below the title, scrolling when it has more than fits (the shop, for a new player)
 	local page = make("ScrollingFrame", body, {
 		Name = "Page",
@@ -441,13 +472,15 @@ function MenuController:KnitStart()
 	end
 
 	-- The window's colour, and with it the dots, the word and the wipe (each the field mixed toward white).
-	local function tint(tone: Color3)
+	-- `detail`, when given, colours the dots, the word and the wipe itself: a WHITE window has nothing lighter to
+	-- mix toward, so its details are drawn in a pale tint instead.
+	local function tint(tone: Color3, detail: Color3?)
 		fieldColour = tone
 		field.BackgroundColor3 = tone
 		local white = Color3.new(1, 1, 1)
-		dots.ImageColor3 = tone:Lerp(white, 0.38)
-		words.ImageColor3 = tone:Lerp(white, 0.42)
-		Shapes.paint(wipe, tone:Lerp(white, 0.4))
+		dots.ImageColor3 = detail or tone:Lerp(white, 0.38)
+		words.ImageColor3 = detail or tone:Lerp(white, 0.42)
+		Shapes.paint(wipe, detail or tone:Lerp(white, 0.4))
 	end
 
 	-- The word repeated behind the page. A word with no tile draws none.
@@ -673,8 +706,22 @@ function MenuController:KnitStart()
 		tint(classColour(pick))
 		setWord(pick)
 		setTitle(kit.name)
-		sub.Text = "YOUR CLASSES · PICK ONE TO FIGHT WITH"
-		for index, id in classOrder() do
+		local order = classOrder()
+		local per = classesPerPage()
+		local pages = math.max(1, math.ceil(#order / per))
+		if fresh then
+			-- opened afresh: on the page that holds the picked class
+			classPage = math.ceil((table.find(order, pick) or 1) / per)
+		end
+		classPage = math.clamp(classPage, 1, pages)
+		sub.Text = if pages > 1
+			then `YOUR CLASSES · PICK ONE TO FIGHT WITH · PAGE {classPage} OF {pages}`
+			else "YOUR CLASSES · PICK ONE TO FIGHT WITH"
+		for index = 1, per do
+			local id = order[(classPage - 1) * per + index]
+			if not id then
+				break
+			end
 			local other = book.Kits[id]
 			local state = standing(id, wearing, owned)
 			local picked = id == pick
@@ -758,6 +805,39 @@ function MenuController:KnitStart()
 				)
 			end
 		end
+		-- More classes than one page holds: an arrow right of the tiles turns to the next page, and from the
+		-- second page on one left of them turns back (the owner, 2026-11-18). With one page there are none.
+		local function pageArrow(x: number, sign: string, to: number)
+			local cut = PosterKit.cut(
+				page,
+				"close",
+				Vector2.new(40, 72),
+				colour("ivory.50"),
+				Vector2.new(4, 5)
+			)
+			PosterKit.place(cut, x, 128 - PAGE_TOP + 82)
+			Poster.text(cut.face, "display", 28, "ink.900", {
+				Size = UDim2.fromScale(1, 1),
+				Text = sign,
+				TextXAlignment = Enum.TextXAlignment.Center,
+			})
+			PosterKit.pressable(cut, function()
+				classPage = to
+				UiSound.play("ui_page")
+				hit()
+				draw(false)
+			end)
+			if not Drift.lite then
+				Drift.add("page", cut.body, 72, 3, 20 + to)
+			end
+		end
+		if classPage < pages then
+			pageArrow(612, ">", classPage + 1)
+		end
+		if classPage > 1 then
+			pageArrow(0, "<", classPage - 1)
+		end
+		preview.show(pick, owned[pick] == true)
 		-- the picked class: what it is, its two skills, and the one thing to do with it
 		local blurb = Poster.text(page, "label", 18, "ink.900", {
 			Position = UDim2.fromOffset(28, 382 - PAGE_TOP),
@@ -1043,91 +1123,209 @@ function MenuController:KnitStart()
 		drawList(items, fresh)
 	end
 
+	-- MORE is a lobby page: Settings, Spectate and AFK have their own buttons on the right edge (NavController),
+	-- so it lists only what is planned. In a round there is no More page; MENU opens Settings.
 	local function drawMore(fresh: boolean)
 		tint(colour(TONES.more))
 		setWord("More")
 		setTitle("More")
-		local round = inRound()
-		sub.Text = if round then "WHAT OPENS DURING A ROUND" else "EVERYTHING ELSE"
-		local items: { Item } = {
-			{
-				name = "Settings",
-				detail = "Camera shake, hit flash, music",
-				press = function()
-					open("settings")
-				end,
-			},
-		}
-		if round then
-			table.insert(items, {
-				name = "Moves",
-				detail = "The controls",
-				press = function()
-					open("moves")
-				end,
-			})
-		else
-			if afkToggle then
-				local on = player:GetAttribute("HT_AFK") == true
-				table.insert(items, {
-					name = "AFK",
-					detail = "Sit out the next rounds",
-					right = if on then "ON" else "OFF",
-					press = function()
-						afkToggle:FireServer()
-					end,
-				})
-			end
-			table.insert(items, {
-				name = "Spectate",
-				detail = "Watch the round that is on",
-				press = function()
-					close()
-					spectate:Toggle()
-				end,
-			})
-			for _, name in PLANNED do
-				table.insert(items, { name = name, right = "Planned" })
-			end
+		sub.Text = "COMING LATER"
+		local items: { Item } = {}
+		for _, name in PLANNED do
+			table.insert(items, { name = name, right = "Planned" })
 		end
 		drawList(items, fresh)
 	end
 
-	local function drawSettings(fresh: boolean)
-		tint(colour(TONES.settings))
-		setWord("Settings")
+	-- SETTINGS: on purpose the PLAIN page (the owner, 2026-11-18: "similar style but looks different ... more
+	-- bland, and the toggles should be more readable"). The window goes a pale grey with no repeated word behind
+	-- it, and each setting is one flat cream row that reads left to right: its name, a "?" that shows what it
+	-- does while the pointer is on it (a tap shows it for a few seconds), and a real switch at the right, told by
+	-- its word (ON / OFF), its colour and where its knob stands. Nothing here tilts or drifts.
+	local function settingRow(setting: { id: string, name: string, help: string }, y: number)
+		local ink = colour("ink.900")
+		local row = make("Frame", page, {
+			Name = "Setting_" .. setting.id,
+			BackgroundColor3 = colour("ivory.50"),
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(SROW.X, y),
+			Size = UDim2.fromOffset(SROW.Width, SROW.Height),
+		})
+		make("UICorner", row, { CornerRadius = UDim.new(0, 8) })
+		make("UIStroke", row, { Color = ink, Thickness = 3 })
+		local press = make("TextButton", row, {
+			Name = "Press",
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			Text = "",
+			AutoButtonColor = false,
+			ZIndex = 1,
+		})
+		local left = make("Frame", row, {
+			Name = "Left",
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(18, 0),
+			Size = UDim2.new(1, -18 - SROW.Switch.X - 28, 1, 0),
+			ZIndex = 2,
+		})
+		make("UIListLayout", left, {
+			FillDirection = Enum.FillDirection.Horizontal,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 10),
+		})
+		Poster.text(left, "label", 20, "ink.900", {
+			Name = "Name",
+			AutomaticSize = Enum.AutomaticSize.X,
+			Size = UDim2.fromOffset(0, SROW.Height),
+			Text = setting.name,
+			LayoutOrder = 1,
+			ZIndex = 2,
+		})
+		local help = make("TextButton", left, {
+			Name = "Help",
+			BackgroundColor3 = ink,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(26, 26),
+			Text = "",
+			AutoButtonColor = false,
+			LayoutOrder = 2,
+			ZIndex = 3,
+		})
+		make("UICorner", help, { CornerRadius = UDim.new(0.5, 0) })
+		Poster.text(help, "label", 16, "ivory.50", {
+			Size = UDim2.fromScale(1, 1),
+			Text = "?",
+			TextXAlignment = Enum.TextXAlignment.Center,
+			ZIndex = 3,
+		})
+		local tip = Poster.text(left, "label", 15, "ivory.50", {
+			Name = "Tip",
+			AutomaticSize = Enum.AutomaticSize.X,
+			BackgroundColor3 = ink,
+			BackgroundTransparency = 0,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(0, 32),
+			Text = setting.help,
+			Visible = false,
+			LayoutOrder = 3,
+			ZIndex = 3,
+		})
+		make("UICorner", tip, { CornerRadius = UDim.new(0, 6) })
+		make("UIPadding", tip, { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) })
+
+		-- the switch: green with ON and the knob at the right, grey with OFF and the knob at the left
+		local size = SROW.Switch
+		local switch = make("Frame", row, {
+			Name = "Switch",
+			AnchorPoint = Vector2.new(1, 0.5),
+			BorderSizePixel = 0,
+			Position = UDim2.new(1, -14, 0.5, 0),
+			Size = UDim2.fromOffset(size.X, size.Y),
+			ZIndex = 2,
+		})
+		make("UICorner", switch, { CornerRadius = UDim.new(0.5, 0) })
+		make("UIStroke", switch, { Color = ink, Thickness = 3 })
+		local word = Poster.text(
+			switch,
+			"label",
+			15,
+			"ink.900",
+			{ Size = UDim2.fromScale(1, 1), ZIndex = 2 }
+		)
+		make("UIPadding", word, { PaddingLeft = UDim.new(0, 13), PaddingRight = UDim.new(0, 11) })
+		local knob = make("Frame", switch, {
+			Name = "Knob",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = colour("ivory.50"),
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(SROW.Knob, SROW.Knob),
+			ZIndex = 3,
+		})
+		make("UICorner", knob, { CornerRadius = UDim.new(0.5, 0) })
+		make("UIStroke", knob, { Color = ink, Thickness = 3 })
+		local knobX = size.Y / 2
+		local function paint(animate: boolean)
+			local on = settingsState[setting.id] == true
+			switch.BackgroundColor3 = colour(if on then "go.400" else "stone.300")
+			word.Text = if on then "ON" else "OFF"
+			word.TextXAlignment = if on then Enum.TextXAlignment.Left else Enum.TextXAlignment.Right
+			local from, to = knobX, if on then size.X - size.Y / 2 else size.Y / 2
+			Poster.run(knob, if animate then 0.18 else 0, function(t: number)
+				knobX = from + (to - from) * PosterEase.easeOut(t)
+				knob.Position = UDim2.new(0, knobX, 0.5, 0)
+			end)
+		end
+		paint(false)
+
+		press.MouseEnter:Connect(function()
+			UiSound.hover()
+			row.BackgroundColor3 = Color3.new(1, 1, 1)
+		end)
+		press.MouseLeave:Connect(function()
+			row.BackgroundColor3 = colour("ivory.50")
+		end)
+		press.MouseButton1Down:Connect(function()
+			UiSound.play("ui_press")
+		end)
+		press.Activated:Connect(function()
+			settingsState[setting.id] = not settingsState[setting.id]
+			paint(true)
+		end)
+		-- the "?": what the setting does, while the pointer is on it; a tap shows it for a few seconds
+		local shownAt = 0
+		local function showTip(on: boolean)
+			tip.Visible = on
+			if on then
+				shownAt = os.clock()
+			end
+		end
+		help.MouseEnter:Connect(function()
+			UiSound.hover()
+			showTip(true)
+		end)
+		help.Activated:Connect(function()
+			showTip(true)
+		end)
+		help.MouseLeave:Connect(function()
+			if UserInputService:GetLastInputType() ~= Enum.UserInputType.Touch then
+				showTip(false)
+				return
+			end
+			local mine = os.clock()
+			shownAt = mine
+			task.delay(SROW.TipHold, function()
+				if tip.Parent and shownAt == mine then
+					tip.Visible = false
+				end
+			end)
+		end)
+	end
+
+	local function drawSettings(_fresh: boolean)
+		tint(colour("ivory.50"):Lerp(colour("stone.300"), 0.45))
+		setWord("") -- no repeated word behind this page
 		setTitle("Settings")
 		sub.Text = "THESE THREE SWITCHES DON'T CHANGE ANYTHING YET"
-		local items: { Item } = {}
+		local y = 128 - PAGE_TOP
 		for _, setting in SETTINGS do
-			table.insert(items, {
-				name = setting.name,
-				right = if settingsState[setting.id] then "ON" else "OFF",
-				press = function()
-					settingsState[setting.id] = not settingsState[setting.id]
-					draw(false)
-				end,
-			})
+			settingRow(setting, y)
+			y += SROW.Height + SROW.Gap
 		end
+		-- whether your progress is being saved: one quiet line, not a row
 		local saving = ability:IsReady() and not ability:IsTemporary()
-		table.insert(items, {
-			name = if not ability:IsReady()
-				then "Loading your data"
-				elseif saving then "Saved"
-				else "Not saving",
-			detail = if not ability:IsReady()
-				then "One moment."
-				elseif saving then "Your Coins and classes are saved."
-				else "Changes are lost when you leave this session.",
+		Poster.text(page, "label", 15, "ink.900", {
+			Name = "Saving",
+			Position = UDim2.fromOffset(SROW.X + 4, y + 2),
+			Size = UDim2.fromOffset(SROW.Width, 22),
+			Text = if not ability:IsReady()
+				then "LOADING YOUR DATA  ·  One moment."
+				elseif saving then "SAVED  ·  Your Coins and classes are saved."
+				else "NOT SAVING  ·  Changes are lost when you leave this session.",
+			TextTransparency = 0.25,
 		})
-		table.insert(items, {
-			name = "Back",
-			detail = "To More",
-			press = function()
-				open("more")
-			end,
-		})
-		drawList(items, fresh)
+		y += 34
+		page.CanvasSize = UDim2.fromOffset(0, y + 16)
 	end
 
 	draw = function(fresh: boolean)
@@ -1136,6 +1334,9 @@ function MenuController:KnitStart()
 			return
 		end
 		clear()
+		if now ~= "classes" then
+			preview.hide()
+		end
 		if now == "classes" then
 			drawClasses(fresh)
 		elseif now == "shop" then
@@ -1169,7 +1370,8 @@ function MenuController:KnitStart()
 		local stage = PosterKit.stage()
 		local fit = PosterKit.Fit
 		local round = inRound()
-		local top = stage.top + 18 + 72 * stage.hud + 8
+		local strip = HudTheme.Strip
+		local top = stage.top + strip.Top + strip.Tall * strip.Shrink * stage.hud + 8
 		local below = if round and deviceOf() ~= "touch"
 			then 24 + 190 * stage.hud + 8
 			else 16 + 40 * stage.hud + 16
@@ -1254,6 +1456,9 @@ function MenuController:KnitStart()
 	end
 
 	open = function(to: string)
+		if inRound() and to == "more" then
+			to = "settings"
+		end
 		if inRound() and not IN_ROUND_OK[to] then
 			return
 		end
@@ -1297,6 +1502,7 @@ function MenuController:KnitStart()
 		end
 		entry = nil
 		confirming = nil
+		preview.hide()
 		UiSound.play("ui_close")
 		ContextActionService:UnbindAction(CLOSE_ACTION)
 		setDrift(false)

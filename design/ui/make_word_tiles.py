@@ -20,7 +20,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 OUT = HERE.parents[1] / "assets" / "ui"
 WORDS = [
     "Base", "Bruiser", "Inferno", "Beast", "Trickster", "Dragon", "Frost", "Tempest",
-    "Shop", "Ranked", "Moves", "More", "Settings",
+    "Shop", "Ranked", "Moves", "More", "Settings", "Menu",
 ]  # fmt: skip
 
 

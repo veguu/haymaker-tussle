@@ -155,6 +155,12 @@ HudTheme.Tile = {
 
 -- The strip at the top centre: a slanted ink plate with your class colour under it, the count in yellow.
 HudTheme.Strip = {
+	-- The owner, 2026-11-18: the strip a bit higher and a bit smaller, to leave the window more room. It
+	-- stands `Top` under Roblox's bar and is drawn at `Shrink` of the mockup's size; `Tall` is its height
+	-- there (MenuController starts the window under it).
+	Top = 2,
+	Shrink = 0.7,
+	Tall = 72,
 	Plate = "ink.900",
 	Count = "gold.400",
 	Word = "ivory.50",

@@ -19,6 +19,7 @@ return {
 		["title:MOVES"] = { 3, 0, 448, 538, 224 },
 		["title:MORE"] = { 3, 538, 448, 462, 224 },
 		["title:SETTINGS"] = { 3, 0, 672, 723, 224 },
+		["title:MENU"] = { 4, 0, 0, 456, 224 },
 	},
 	words = {
 		pad = 6,

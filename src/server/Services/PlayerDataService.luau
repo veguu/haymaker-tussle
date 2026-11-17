@@ -261,6 +261,33 @@ function PlayerDataService:KnitStart()
 		entries[player] = entry
 		publish(self, player, entry)
 	end
+	-- A STUDIO-ONLY testing knob (the owner, 2026-11-18, to see the Classes page's silhouette and the Shop with
+	-- something in it): setting the workspace attribute HT_DevDisown to a list of kit ids ("Dragon,Frost")
+	-- takes those classes away from everyone in the session, as if never bought, and it is saved like any
+	-- other change. The starting class can't be taken. It never runs on a live server.
+	if RunService:IsStudio() then
+		workspace:GetAttributeChangedSignal("HT_DevDisown"):Connect(function()
+			local list = workspace:GetAttribute("HT_DevDisown")
+			if typeof(list) ~= "string" then
+				return
+			end
+			for _, player in Players:GetPlayers() do
+				self:Update(player, function(profile)
+					local nextProfile = table.clone(profile)
+					nextProfile.owned = table.clone(profile.owned)
+					for id in string.gmatch(list, "[^,%s]+") do
+						if id ~= book.DefaultKit then
+							nextProfile.owned[id] = nil
+						end
+					end
+					if not nextProfile.owned[nextProfile.equipped] then
+						nextProfile.equipped = book.DefaultKit
+					end
+					return nextProfile
+				end)
+			end
+		end)
+	end
 	Players.PlayerAdded:Connect(join)
 	for _, player in Players:GetPlayers() do
 		task.spawn(join, player)

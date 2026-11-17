@@ -34,7 +34,7 @@ local make = PosterKit.make
 -- everything took too much of the screen). The window is the big one, so it gives the most; the strips are the
 -- lobby's buttons, so they give less and never go under 46 px tall.
 PosterKit.Fit = {
-	Window = 0.9,
+	Window = 1, -- (0.9 until 2026-11-18: the top strip shrank and moved up to give the window this room)
 	WindowMin = 0.7,
 	WindowMax = 1.2,
 	Nav = 0.85,

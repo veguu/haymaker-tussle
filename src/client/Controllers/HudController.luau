@@ -108,7 +108,12 @@ local L = {
 	TilePad = 34, -- room round the row inside its group, for the shadow, the pop and the result word
 	TileLine = 4, -- the ink outline
 	Cap = 28,
-	K = Vector2.new(34 + 84 + 14 + 84 + 14 + 104 + 14 + 104 + 34, 34 + 104 + 34),
+	-- the bottom-right group holds Jump and Punch only now, drawn at TileSmallScale (the owner, 2026-11-18:
+	-- smaller, and Q and R beside the speed dial): two tiles of 84 x 0.82 and the gap between them
+	K = Vector2.new(34 + 69 + 14 + 69 + 34, 34 + 104 + 34),
+	TileSmallScale = 0.82,
+	DialGap = 16, -- from the speed dial's side to the Q or the R tile
+	WordLift = 48, -- Jump's and Punch's result word stands this much higher, over the CONTROLS chip
 	-- THE STRIP: 72 tall with its 5-unit class-colour line, 18 from the top, leaning 10 degrees.
 	Strip = Vector2.new(460, 72),
 	StripEdge = 5,
@@ -154,8 +159,11 @@ local PAD_KEYS = {
 
 -- BUILDING ------------------------------------------------------------------------------------------
 
--- A group: a holder sized and placed by layout, with a CanvasGroup inside that fades and rises.
-type Group = { holder: Frame, fade: CanvasGroup, scale: UIScale, wanted: boolean }
+-- A group: a holder sized and placed by layout, with a plain Frame inside that is shown and hidden.
+-- It was a CanvasGroup that faded; a CanvasGroup draws its contents to a picture first, and scaled down that
+-- picture is SOFT: the strip's lettering was blurrier than the Coins and the window, which are not in one
+-- (the owner, 2026-11-18: everything at the same sharpness). So no group fades any more; it appears and goes.
+type Group = { holder: Frame, fade: Frame, scale: UIScale, wanted: boolean }
 
 local function group(parent: Instance, name: string, size: Vector2): Group
 	local holder = make("Frame", parent, {
@@ -164,11 +172,10 @@ local function group(parent: Instance, name: string, size: Vector2): Group
 		Size = UDim2.fromOffset(size.X, size.Y),
 	})
 	local scale = make("UIScale", holder, {})
-	local fade = make("CanvasGroup", holder, {
+	local fade = make("Frame", holder, {
 		Name = "Fade",
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
-		GroupTransparency = 1,
 		Visible = false,
 	})
 	return { holder = holder, fade = fade, scale = scale, wanted = false }
@@ -879,18 +886,28 @@ function HudController:KnitStart()
 	for _, action in HudTheme.Actions do
 		actionById[action.id] = action
 	end
-	-- Jump and Punch small on the left, then the class skills big: Q, and R outermost.
+	-- Jump and Punch, small, in the bottom-right corner; the class skills big, one each side of the speed dial:
+	-- Q on its left, R on its right (the owner, 2026-11-18). Q and R are children of the dial's group, so they
+	-- show, hide and scale with it; layout() places them.
 	local ORDER = { "kick", "punch", "propel", "uppercut" }
-	local BIG = { propel = true, uppercut = true }
 	local tiles: { [string]: Tile } = {}
 	do
 		local x = L.TilePad
-		for _, id in ORDER do
-			local big = BIG[id] == true
-			local tile = makeTile(kit.fade, id, x, big)
+		for _, id in { "kick", "punch" } do
+			local tile = makeTile(kit.fade, id, x, false)
+			-- drawn smaller as one piece, about its bottom-left corner, so it still stands on the row's line
+			tile.column.AnchorPoint = Vector2.new(0, 1)
+			tile.column.Position = UDim2.fromOffset(x, L.TilePad + L.TileBig)
+			make("UIScale", tile.column, { Scale = L.TileSmallScale })
+			tile.word.Position = UDim2.new(0.5, 0, 1, -(L.TileSmall + 2 + L.WordLift))
 			tile.name.Text = string.upper(actionById[id].name)
 			tiles[id] = tile
-			x += (if big then L.TileBig else L.TileSmall) + L.TileGap
+			x += L.TileSmall * L.TileSmallScale + L.TileGap
+		end
+		for _, id in { "propel", "uppercut" } do
+			local tile = makeTile(you.fade, id, 0, true)
+			tile.name.Text = string.upper(actionById[id].name)
+			tiles[id] = tile
 		end
 	end
 	-- The class skills' names sit in their tiles for good; they change only with the class.
@@ -924,6 +941,7 @@ function HudController:KnitStart()
 	-- F: the ring-out feed --------------------------------------------------------------------------------
 	local feed = group(gui, "Feed", Vector2.new(L.FeedWidth, L.FeedRows * (L.FeedRow + L.FeedGap)))
 	feed.holder.AnchorPoint = Vector2.new(1, 0)
+	feed.fade.ClipsDescendants = true -- a row leaves past this edge and is cut off there
 	type FeedRow = { frame: Frame, label: TextLabel, born: number }
 	local feedRows: { FeedRow } = {}
 
@@ -986,7 +1004,8 @@ function HudController:KnitStart()
 			g.scale.Scale = scale
 		end
 		local edge = L.Edge
-		strip.holder.Position = UDim2.new(0.5, 0, 0, L.StripTop)
+		strip.scale.Scale = scale * SS.Shrink
+		strip.holder.Position = UDim2.new(0.5, 0, 0, SS.Top)
 		-- out of a round your Coins stand in the top-right corner (NavController), so the feed starts under them
 		local underCoins = if player:GetAttribute("HT_InRound") ~= true
 			then 48 * PosterKit.stage().nav + 10
@@ -1007,6 +1026,14 @@ function HudController:KnitStart()
 		you.holder.AnchorPoint = Vector2.new(0.5, 1)
 		you.holder.Position = UDim2.new(0.5, 0, 1, margin * scale - D.bottom)
 		peakMark.Visible = device ~= "touch"
+		-- Q left of the dial and R right of it, standing on the dial's own foot line (phones have the real
+		-- buttons instead, so there the two tiles are hidden)
+		local wide = D.box.X * k + 2 * margin
+		local columnTop = D.box.Y * k + margin - (L.TilePad + L.TileBig)
+		tiles.propel.column.Position = UDim2.fromOffset(margin - L.DialGap - L.TileBig, columnTop)
+		tiles.uppercut.column.Position = UDim2.fromOffset(wide - margin + L.DialGap, columnTop)
+		tiles.propel.column.Visible = device ~= "touch"
+		tiles.uppercut.column.Visible = device ~= "touch"
 		paintStagger()
 	end
 
@@ -1046,26 +1073,10 @@ function HudController:KnitStart()
 	end
 
 	local function setGroup(g: Group, want: boolean)
-		local stepped = promptActive and (g == you or g == kit)
-		local goal = if stepped then 0.4 else 0 -- a timed cue or a clash dims you and your kit to 60 %
-		if want and not g.wanted then
-			g.wanted = true
-			HudMotion.enter(g.fade, UDim2.new(), SP[2], Tokens.motion.duration.base)
-			if goal > 0 then
-				HudMotion.to(
-					g.fade,
-					"fade",
-					{ GroupTransparency = goal },
-					Tokens.motion.duration.quick
-				)
-			end
-		elseif not want and g.wanted then
-			g.wanted = false
-			HudMotion.leave(g.fade, Tokens.motion.duration.quick, function()
-				return g.wanted
-			end)
-		elseif want then
-			HudMotion.to(g.fade, "fade", { GroupTransparency = goal }, Tokens.motion.duration.quick)
+		-- (a timed cue or a clash used to dim you and your kit to 60 %; that needed the CanvasGroup, which is gone)
+		if want ~= g.wanted then
+			g.wanted = want
+			g.fade.Visible = want
 		end
 	end
 

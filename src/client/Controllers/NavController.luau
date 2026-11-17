@@ -4,13 +4,15 @@
 -- buttons and its drawer.
 --
 -- IN THE LOBBY, down the left: five rough-cut strips, each a step further right than the one above.
---   CLASSES (1)  SHOP (2)  RANKED (3)  MOVES (4)  MORE
+--   SHOP (1)  CLASSES (2)  RANKED (3)  MOVES (4)  MORE
 -- Each opens MenuController's poster window on its page; pressing the one that is open closes it. The open one
 -- sits out to the right, a little larger, its word rocking. Your Coins are on a slanted plate at the top right.
 -- IN A ROUND all of that folds away into one small MENU button at the top left, which opens the window's More
 -- page: Settings and the controls. The match never pauses. Q and R are HudController's and stay.
 --
--- This is a LAUNCHER and owns no feature. AFK and Spectate are rows of the More page now. Sizes are the mockup's
+-- DOWN THE RIGHT EDGE in the lobby: three small tiles, SETTINGS, SPECTATE and AFK (2026-11-18; they were rows
+-- of the More page).
+-- This is a LAUNCHER and owns no feature. Sizes are the mockup's
 -- pixels at 1280 x 720; the lobby scales as a whole (Ui/PosterKit.lobbyScale).
 
 local ContextActionService = game:GetService("ContextActionService")
@@ -20,17 +22,23 @@ local UserInputService = game:GetService("UserInputService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local PosterEase = require(ReplicatedStorage.Shared.Core.PosterEase)
+local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
+local Net = require(ReplicatedStorage.Shared.Net)
 local Tokens = require(ReplicatedStorage.Shared.Tokens)
 local Drift = require(script.Parent.Parent.Ui.Drift)
 local HudMotion = require(script.Parent.Parent.Ui.HudMotion)
+local Icons = require(script.Parent.Parent.Ui.Icons)
 local Poster = require(script.Parent.Parent.Ui.Poster)
+local HudTheme = require(script.Parent.Parent.Ui.HudTheme)
 local PosterKit = require(script.Parent.Parent.Ui.PosterKit)
 local Shapes = require(script.Parent.Parent.Ui.Shapes)
+local UiSound = require(script.Parent.Parent.Ui.UiSound)
 
 local colour = Tokens.colour
 local make = PosterKit.make
 
 local IN_ROUND = "HT_InRound"
+local GEAR = 68 -- the fight's MENU button
 local KEYS_ACTION = "HaymakerNavKeys"
 local MOVES_ACTION = "HaymakerHelp"
 
@@ -47,14 +55,15 @@ type Entry = {
 	font: number,
 }
 
--- the mockup's five, top to bottom: 250 x 74 and 14 apart; MORE is the small cream one
+-- the mockup's five, top to bottom: 250 x 74 and 14 apart; MORE is the small cream one. SHOP stands above
+-- CLASSES (the owner, 2026-11-18; the mockup had them the other way), and the keys follow the order.
 local ENTRIES: { Entry } = {
 	{
-		id = "classes",
-		label = "Classes",
+		id = "shop",
+		label = "Shop",
 		key = Enum.KeyCode.One,
 		keyName = "1",
-		tone = "teal.400",
+		tone = "gold.400",
 		shape = "navA",
 		x = 0,
 		y = 0,
@@ -62,11 +71,11 @@ local ENTRIES: { Entry } = {
 		font = 34,
 	},
 	{
-		id = "shop",
-		label = "Shop",
+		id = "classes",
+		label = "Classes",
 		key = Enum.KeyCode.Two,
 		keyName = "2",
-		tone = "gold.400",
+		tone = "teal.400",
 		shape = "navB",
 		x = 16,
 		y = 88,
@@ -108,6 +117,15 @@ local ENTRIES: { Entry } = {
 		font = 22,
 	},
 }
+
+-- the right-edge tools, top to bottom: a tile 94 x 78 (wide enough for SPECTATE with air round it), 12 apart
+local TOOLS = {
+	{ id = "settings", label = "SETTINGS", icon = "toolSettings" },
+	{ id = "spectate", label = "SPECTATE", icon = "toolSpectate" },
+	{ id = "afk", label = "AFK", icon = "toolAfk" },
+}
+local TOOL = Vector2.new(94, 78)
+local TOOL_GAP = 12
 
 local NavController = Knit.CreateController({
 	Name = "NavController",
@@ -210,6 +228,80 @@ function NavController:KnitStart()
 		})
 	end
 
+	-- THE TOOLS: SETTINGS, SPECTATE, AFK ----------------------------------------------------------------------
+	-- Down the right edge in the lobby (the owner, 2026-11-18: they were rows of the More page, too important to
+	-- sit that deep). Three cream tiles, each its icon over its word. AFK turns yellow and says AFK ON while you
+	-- are sitting out. They stand under the Coins and the feed, and give way to the open window.
+	local tools = make("Frame", gui, {
+		Name = "Tools",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(1, 0),
+		Size = UDim2.fromOffset(TOOL.X + 8, #TOOLS * TOOL.Y + (#TOOLS - 1) * TOOL_GAP + 8),
+	})
+	local toolsScale = make("UIScale", tools, {})
+	type Tool = { id: string, cut: PosterKit.Cut, word: TextLabel, home: Vector2 }
+	local toolList: { Tool } = {}
+	local afkRemote = if GameConfig.Round.Enabled and GameConfig.Round.AfkEnabled
+		then Net.client("AfkToggle")
+		else nil
+	local spectate = Knit.GetController("SpectateController")
+	-- when the AFK tile was last pressed: the toast answers your own press, not the attribute arriving on join
+	local askedAfk = -math.huge
+	local function useTool(id: string)
+		if id == "settings" then
+			toggle("settings")
+		elseif id == "spectate" then
+			spectate:Toggle()
+		elseif id == "afk" and afkRemote then
+			askedAfk = os.clock()
+			afkRemote:FireServer()
+		end
+	end
+	for index, spec in TOOLS do
+		if spec.id ~= "afk" or afkRemote then
+			local cut = PosterKit.cut(tools, "tile", TOOL, colour("ivory.50"), Vector2.new(5, 6))
+			cut.root.Name = spec.id
+			local home = Vector2.new(TOOL.X / 2, (index - 1) * (TOOL.Y + TOOL_GAP) + TOOL.Y / 2)
+			cut.root.Position = UDim2.fromOffset(home.X, home.Y)
+			-- the mockup's line drawing, in ink
+			local icon = Icons.image(cut.face, spec.icon, 36, UDim2.new(0.5, 0, 0, 30))
+			icon.ImageColor3 = colour("ink.900")
+			local word = Poster.text(cut.face, "label", 15, "ink.900", {
+				Name = "Word",
+				Position = UDim2.new(0, 0, 1, -30),
+				Size = UDim2.new(1, 0, 0, 20),
+				Text = spec.label,
+				TextXAlignment = Enum.TextXAlignment.Center,
+			})
+			PosterKit.pressable(cut, function()
+				useTool(spec.id)
+			end)
+			Drift.add("tools", cut.body, TOOL.Y, 3) -- up and down only: they carry words
+			table.insert(toolList, { id = spec.id, cut = cut, word = word, home = home })
+		end
+	end
+	local function paintAfk()
+		local on = player:GetAttribute("HT_AFK") == true
+		for _, tool in toolList do
+			if tool.id == "afk" then
+				tool.cut.fill.ImageColor3 = colour(if on then "gold.400" else "ivory.50")
+				tool.word.Text = if on then "AFK ON" else "AFK"
+			end
+		end
+	end
+	player:GetAttributeChangedSignal("HT_AFK"):Connect(function()
+		paintAfk()
+		if os.clock() - askedAfk < 5 then
+			askedAfk = -math.huge
+			menu:Toast(
+				if player:GetAttribute("HT_AFK") == true
+					then "AFK on. You'll sit out the next round."
+					else "AFK off. You're in for the next round."
+			)
+		end
+	end)
+	paintAfk()
+
 	-- The open page's strip sits 18 to the right and a little larger, and its word rocks (the mockup's `wig`:
 	-- 2 degrees each way, half a second a swing) for as long as it is open.
 	local current: string? = nil
@@ -243,6 +335,12 @@ function NavController:KnitStart()
 		end
 	end
 	menu.Changed:Connect(setCurrent)
+	-- the tools give way to the open window (nothing lies over anything)
+	menu.Changed:Connect(function(entry: string?)
+		local showTools = entry == nil and player:GetAttribute(IN_ROUND) ~= true
+		tools.Visible = showTools
+		Drift.show("tools", showTools)
+	end)
 
 	-- The strips arriving (`nin`): each from off the left, tipped 10 degrees, on the spring, one after another.
 	local function enter()
@@ -259,6 +357,18 @@ function NavController:KnitStart()
 				)
 				cut.root.Rotation = -10 * (1 - s)
 			end, nil, (index - 1) * 0.07)
+		end
+		-- the tools the same way, from off the right
+		for index, tool in toolList do
+			local cut = tool.cut
+			cut.root.Visible = false
+			Poster.run(cut, 0.7, function(t: number)
+				local s = PosterEase.spring(t)
+				cut.root.Visible = true
+				cut.root.Position =
+					UDim2.fromOffset(tool.home.X + TOOL.X * 1.6 * (1 - s), tool.home.Y)
+				cut.root.Rotation = 10 * (1 - s)
+			end, nil, 0.2 + (index - 1) * 0.07)
 		end
 	end
 
@@ -312,19 +422,152 @@ function NavController:KnitStart()
 	refreshCoins()
 
 	-- THE FIGHT'S MENU BUTTON -----------------------------------------------------------------------------
-	-- 58 x 58, cream, 22 from the left and 18 from the top; it opens the window's More page
-	local gear = PosterKit.cut(topGui, "gear", Vector2.new(58, 58), colour("ivory.50"))
+	-- 68 x 68 (58 until 2026-11-18: the owner wanted it a little bigger), cream, 22 from the left and 18 from the
+	-- top; in a round it opens the window straight on its Settings, which is all the round's menu is
+	local gear = PosterKit.cut(topGui, "gear", Vector2.new(GEAR, GEAR), colour("ivory.50"))
 	gear.root.Name = "Menu"
-	local gearWord = Poster.text(gear.face, "label", 15, "ink.900", {
+	-- a cog, not the word MENU (the owner, 2026-11-18: it is only the settings button now): the same line
+	-- drawing as the lobby's SETTINGS tile, in ink
+	local gearIcon = Icons.image(gear.face, "toolSettings", 44)
+	gearIcon.ImageColor3 = colour("ink.900")
+	PosterKit.pressable(gear, function()
+		toggle(if player:GetAttribute(IN_ROUND) == true then "settings" else "more")
+	end)
+	Drift.add("fight", gear.body, GEAR, 5) -- up and down only: MENU is small text
+
+	-- THE FIGHT'S CONTROLS ---------------------------------------------------------------------------------
+	-- A small cream chip over Jump and Punch, "H . CONTROLS", and a small see-through panel that opens above it
+	-- with every control, scrolling (the owner, 2026-11-18: not the big window, the same style but simpler). H
+	-- opens and closes it in a round; in the lobby H still opens the window's Moves page.
+	local CHIP = Vector2.new(176, 30)
+	local PANEL = Vector2.new(320, 240)
+	local chipHolder = make("Frame", gui, {
+		Name = "ControlsChip",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(1, 1),
+		Size = UDim2.fromOffset(CHIP.X, CHIP.Y),
+		Visible = false,
+	})
+	local chipScale = make("UIScale", chipHolder, {})
+	local chip = PosterKit.cut(chipHolder, "act", CHIP, colour("ivory.50"), Vector2.new(3, 4))
+	chip.root.Position = UDim2.fromOffset(CHIP.X / 2, CHIP.Y / 2)
+	local chipWord = Poster.text(chip.face, "label", 15, "ink.900", {
 		Size = UDim2.fromScale(1, 1),
-		Text = "MENU",
 		TextXAlignment = Enum.TextXAlignment.Center,
 	})
-	gearWord.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.Bold)
-	PosterKit.pressable(gear, function()
-		toggle("more")
+	local panel = make("Frame", gui, {
+		Name = "ControlsPanel",
+		AnchorPoint = Vector2.new(1, 1),
+		BackgroundColor3 = colour("ink.900"),
+		BackgroundTransparency = 0.25,
+		BorderSizePixel = 0,
+		Size = UDim2.fromOffset(PANEL.X, PANEL.Y),
+		Visible = false,
+	})
+	local panelScale = make("UIScale", panel, {})
+	make("UIStroke", panel, { Color = colour("ink.900"), Thickness = 3 })
+	Poster.text(panel, "label", 15, "gold.400", {
+		Name = "Title",
+		Position = UDim2.fromOffset(12, 6),
+		Size = UDim2.new(1, -24, 0, 24),
+		Text = "CONTROLS",
+	})
+	local list = make("ScrollingFrame", panel, {
+		Name = "List",
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(10, 34),
+		Size = UDim2.new(1, -16, 1, -42),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		CanvasSize = UDim2.new(),
+		ScrollBarThickness = 4,
+		ScrollBarImageColor3 = colour("ivory.50"),
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+	})
+	make("UIListLayout", list, { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder })
+	local function deviceNow(): string
+		local kind = UserInputService:GetLastInputType()
+		if kind == Enum.UserInputType.Touch then
+			return "touch"
+		elseif string.find(kind.Name, "Gamepad") then
+			return "gamepad"
+		end
+		return "mouse"
+	end
+	-- the rows: a key in a cream cap, then what it does (the same list as the window's Moves page)
+	local listedFor = ""
+	local function fillControls()
+		local device = deviceNow()
+		if device == listedFor then
+			return
+		end
+		listedFor = device
+		for _, child in list:GetChildren() do
+			if child:IsA("Frame") then
+				child:Destroy()
+			end
+		end
+		local moves: { { key: string, action: string } } =
+			table.clone((HudTheme.Guide :: any)[device] or {})
+		table.insert(moves, math.min(5, #moves + 1), {
+			key = if device == "gamepad" then "Up" elseif device == "touch" then "Ult" else "G",
+			action = "Ultimate: when ULT READY shows, land a hit, then press it.",
+		})
+		for index, move in moves do
+			local name, rest = string.match(move.action, "^([^:%.]+)[:%.]%s*(.*)$")
+			local row = make("Frame", list, {
+				Name = "Row",
+				BackgroundTransparency = 1,
+				AutomaticSize = Enum.AutomaticSize.Y,
+				LayoutOrder = index,
+				Size = UDim2.new(1, -8, 0, 24),
+			})
+			local cap = Poster.text(row, "label", 14, "ink.900", {
+				Name = "Key",
+				BackgroundColor3 = colour("ivory.50"),
+				BackgroundTransparency = 0,
+				BorderSizePixel = 0,
+				Size = UDim2.fromOffset(64, 24),
+				Text = move.key,
+				TextXAlignment = Enum.TextXAlignment.Center,
+			})
+			cap.TextTruncate = Enum.TextTruncate.AtEnd
+			Poster.text(row, "label", 14, "ivory.50", {
+				Name = "What",
+				AutomaticSize = Enum.AutomaticSize.Y,
+				Position = UDim2.fromOffset(74, 0),
+				Size = UDim2.new(1, -74, 0, 24),
+				RichText = true,
+				Text = if name
+					then `<b>{string.upper(name)}</b>  <font color="{Tokens.hex["stone.300"]}">{rest}</font>`
+					else move.action,
+				TextWrapped = true,
+				TextYAlignment = Enum.TextYAlignment.Top,
+			})
+		end
+	end
+	local controlsOpen = false
+	local function setControls(on: boolean)
+		if on == controlsOpen then
+			return
+		end
+		controlsOpen = on
+		if on then
+			fillControls()
+		end
+		panel.Visible = on
+		UiSound.play(if on then "ui_open" else "ui_close")
+	end
+	PosterKit.pressable(chip, function()
+		setControls(not controlsOpen)
 	end)
-	Drift.add("fight", gear.body, 58, 5) -- up and down only: MENU is small text
+	Drift.add("fight", chip.body, CHIP.Y, 3)
+	-- it gives way to the open window
+	menu.Changed:Connect(function(entry: string?)
+		if entry then
+			setControls(false)
+		end
+	end)
 
 	-- LAYOUT AND WHAT SHOWS --------------------------------------------------------------------------------
 	local wasLobby: boolean? = nil
@@ -342,13 +585,34 @@ function NavController:KnitStart()
 		local press = math.max(scale, PosterKit.Fit.Button)
 		gear.restScale = press
 		gear.scale.Scale = press
-		gear.root.Position = UDim2.fromOffset(22 + 29 * press, 18 + 29 * press)
+		gear.root.Position = UDim2.fromOffset(22 + GEAR / 2 * press, 18 + GEAR / 2 * press)
 		local lobby = player:GetAttribute(IN_ROUND) ~= true
 		nav.Visible = lobby
 		coins.Visible = lobby
 		gear.root.Visible = not lobby
+		-- the tools: under the Coins and the feed's four rows, about the middle of the screen's right edge
+		toolsScale.Scale = scale
+		local under = stage.top + 18 + 58 * scale + 4 * 32 * stage.hud + 8
+		local middle = stage.top + room * 0.52 - tools.Size.Y.Offset * scale / 2
+		tools.Position = UDim2.new(1, -22 * scale, 0, math.max(under, middle))
+		local showTools = lobby and menu:GetEntry() == nil
+		tools.Visible = showTools
+		Drift.show("tools", showTools)
 		Drift.show("nav", lobby)
 		Drift.show("fight", not lobby)
+		-- the CONTROLS chip stands over the small Jump and Punch tiles (69 units at the HUD's scale, 24 from the
+		-- bottom, 26 from the right) and its panel over the ULT READY badge's place; a phone has neither
+		local device = deviceNow()
+		local showChip = not lobby and device ~= "touch"
+		chipScale.Scale = stage.hud
+		panelScale.Scale = stage.hud
+		chipHolder.Position = UDim2.new(1, -26, 1, -(24 + 77 * stage.hud))
+		panel.Position = UDim2.new(1, -26, 1, -(24 + 200 * stage.hud))
+		chipHolder.Visible = showChip
+		chipWord.Text = if device == "gamepad" then "SELECT  ·  CONTROLS" else "H  ·  CONTROLS"
+		if not showChip then
+			setControls(false)
+		end
 		-- the keys only mean anything with a keyboard in hand
 		local keyboard = UserInputService:GetLastInputType() ~= Enum.UserInputType.Touch
 			and not string.find(UserInputService:GetLastInputType().Name, "Gamepad")
@@ -401,7 +665,11 @@ function NavController:KnitStart()
 		MOVES_ACTION,
 		function(_: string, state: Enum.UserInputState)
 			if state == Enum.UserInputState.Begin then
-				toggle("moves")
+				if player:GetAttribute(IN_ROUND) == true then
+					setControls(not controlsOpen)
+				else
+					toggle("moves")
+				end
 			end
 			return Enum.ContextActionResult.Pass
 		end,

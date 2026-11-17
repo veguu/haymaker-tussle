@@ -32,7 +32,9 @@ local UltimateNotice = {}
 local colour = Tokens.colour
 -- the mockup's badge: 192 x 52, 26 from the right, 20 above the skill tiles, a 4-unit outline, a hard shadow
 local SIZE = Vector2.new(192, 52)
-local RIGHT, ABOVE_TILES, TILE, TILE_BOTTOM = 26, 20, 104, 24
+-- (TILE is the height the badge clears: the small Jump and Punch tiles, the CONTROLS chip over them and the
+-- result word over that; it was the 104 of a big skill tile until Q and R moved beside the dial, 2026-11-18)
+local RIGHT, ABOVE_TILES, TILE, TILE_BOTTOM = 26, 20, 112, 24
 local LINE = 4
 
 type Device = "mouse" | "gamepad" | "touch"

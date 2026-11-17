@@ -28,6 +28,11 @@ Icons.ids = {
 	afk = "rbxassetid://96445063426004",
 	spectate = "rbxassetid://125959764951345",
 	coin = "rbxassetid://71757211516933",
+	-- the lobby tools' LINE icons (2026-11-18): the mockup's own drawings, white on clear, so the tile tints them
+	-- (design/ui/make_tool_icons.py; assets/icons/poster). These are not placeholders.
+	toolSettings = "rbxassetid://118279305149410", -- a cog wheel (the first drawing, 84689908232322, read as a sun)
+	toolSpectate = "rbxassetid://137196821444275",
+	toolAfk = "rbxassetid://113101514810430",
 	-- skills: one generic drawing per slot until each class skill has its own
 	dash = "rbxassetid://94822682143267", -- Q, mobility
 	punch = "rbxassetid://110847993507835", -- R, attack

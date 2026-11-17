@@ -2962,3 +2962,236 @@ The owner: "while spectated you should make it so you're able to freely move you
   camera), touch and gamepad turning, the fighter going out while you watch, the round ending while you watch,
   the published game.
 - NEXT: the class-name band when an ultimate is used; then phone, gamepad and Reduced Motion tests.
+
+## ui-10a (2026-11-18): Shop above Classes, right-edge tools, a small stats line: SYNCED, SEEN RUNNING (NOT COMMITTED)
+ui-9c and ui-9d (spectate panel, free spectate camera) were approved and committed as 95ccb68. The owner then
+asked for four changes ("use your own intuition as well"). Stamp on disk `kits-7c+lobby-4+ui-10a`; the PLACE is
+still ui-9d (v441): Studio was in a Play session I did not start. 533 tests.
+- `NavController`: SHOP is the top strip and CLASSES the second (keys 1 and 2 follow the order; each place keeps
+  its own shape and step). The mockup is swapped too (published).
+- `NavController`, NEW right-edge TOOLS in the lobby: three cream "tile" cuts 84 x 78, 12 apart, each its icon
+  (`Ui/Icons`: settings, spectate, afk, the existing placeholder art, already uploaded) over its word. SETTINGS
+  toggles the window's Settings page, SPECTATE toggles the spectate panel, AFK fires `AfkToggle` and turns yellow
+  saying AFK ON while `HT_AFK` is set. They stand 22 from the right, under the Coins and the feed's four rows
+  (about the middle of the edge), come in from the right on the spring, drift in their own group ("tools"), and
+  hide while the window is open and in a round. NOT in the mockup.
+- `MenuController.drawMore`: in the lobby the More page lists only the planned things (its sub-line says COMING
+  LATER); Settings, AFK and Spectate rows are gone from it. In a round it is unchanged (Settings, Moves).
+- `PerfController` REWRITTEN: a stats line for EVERYONE, "198 FPS . 32 MS", 13 px cream with a thin ink line and
+  no plate, top-left: at the corner in the lobby, beside the MENU button in a round. Pink when frames are slower
+  than 30 a second. Ping is `Player:GetNetworkPing()`. SERVER REGION: shown when the workspace attribute
+  `HT_ServerRegion` is set; NOTHING SETS IT YET (Roblox has no API for it; it needs HttpService and an outside
+  lookup, which is the owner's decision).
+- THE OWNER'S PANELS are gone from the right edge: the Bots button is bottom-left and hidden until F8
+  (`BotsFreezeController`, sets `HT_DevUi`); F8 also shows the stats line's second line (worst frame, ms, MB, gfx).
+- SYNCED later the same day (178 scripts match, origin/main had nothing new), place saved v442. The owner saw the
+  pieces on the mockup page first (tools, stats line and the trimmed More page were added to it) and said push.
+- SEEN in my own play test (1118 x 536): strips in the order shop (key 1), classes (2), ranked, moves, more; the
+  tools at the right edge from y 166, under the feed's box (ends 152) and the Coins, all three icons loaded; the
+  stats line "229 FPS . 1 MS" at 24,18 in the lobby and at 78,31 beside the MENU button (21,17 44 x 44) in a
+  round, tools hidden in the round. PRESSED: AFK set `HT_AFK`, turned yellow and said AFK ON, and a second press
+  undid it; SPECTATE opened the spectate panel; SETTINGS opened the window on its Settings page and the tools hid
+  under it; F8 showed the Bots button bottom-left and the detail line. Console: only the known lines.
+- AFTER THAT the tiles were widened from 84 to 94 units (SETTINGS and SPECTATE nearly touched the edges); pushed
+  and saved, NOT looked at again.
+- NOT TESTED: the lobby More page by eye (it should list only the planned things under COMING LATER); the tools'
+  entrance; the tools against the spectate panel on a narrow screen; ping on a real server (Studio reads 0 to 1);
+  the stats line under Roblox's own top-bar buttons on a phone; a gamepad; Reduced Motion; the published game.
+- OPEN: the server region (nothing sets `HT_ServerRegion`); the icons are still the Ringside placeholders.
+- NEXT: the class-name band when an ultimate is used; then phone, gamepad and Reduced Motion tests.
+
+## ui-10b / ui-10c (2026-11-18): plain Settings page, stats line in the top bar, server region, line icons: WRITTEN, NOT SYNCED
+ui-10a is in the place (v442) and NOT committed. Stamp on disk `kits-7c+lobby-4+ui-10c`, 537 tests, gates green.
+Studio was in a Play session I did not start, so nothing of this is pushed or seen.
+- SETTINGS PAGE (the owner: "similar style but looks different ... more bland ... toggles more readable ... a
+  question mark next to it where you hover and it gives you the description"). `MenuController.settingRow` /
+  `drawSettings`: the window goes pale grey (ivory mixed 45 % to stone.300) with NO repeated word behind it; each
+  setting is one flat cream row 780 x 56 (rounded, 3-unit ink line, no slant, no shadow, no drift): its name at
+  20, a round ink "?" that shows the description in an ink bubble beside it while the pointer is on it (a tap
+  shows it for 3 s), and a switch at the right (88 x 36: green `go.400` with ON and the knob right, grey with OFF
+  and the knob left; the knob slides in 0.18 s). The whole row toggles. The save state is one quiet line under
+  the rows; the Back row shows only in a round. Descriptions are in `SETTINGS[].help`. The three switches still
+  change nothing (the sub-line says so). On the mockup too (the SETTINGS tile opens it).
+  A first version of this patch cut out `draw` and the window's `away`; selene caught it and the file was rebuilt
+  from HEAD plus the ui-10a and Settings patches.
+- STATS LINE (the owner circled Roblox's top bar, right of its buttons: "a lot smaller"): `PerfController` now
+  stands at `GuiService.TopbarInset`'s left end plus 12, on the bar's middle line, in a ScreenGui that ignores
+  the inset; lettering 10 (was 13), ink line 1. Same place in the lobby and in a round.
+- SERVER REGION (the owner: "also add server region"): NEW `Core/ServerRegion.label` (pure, 4 specs) and
+  `Services/ServerRegionService`: in Studio it sets `HT_ServerRegion` to "Studio"; on a real server it makes ONE
+  GET to ip-api.com 3 s after start (one retry after 20 s) and publishes "Region, CC". NEEDS "Allow HTTP
+  Requests" on for the game. ip-api's free tier is for NON-COMMERCIAL use: told to the owner; the URL is one
+  constant. NEVER RUN on a real server.
+- LINE ICONS (the owner: use the website's icons, not the coloured placeholders): `design/ui/make_tool_icons.py`
+  renders the mockup's three drawings white on clear, 256 px, to `assets/icons/poster/tool_*.png` (checked:
+  opaque pixels present, corners clear). NOT UPLOADED: the folder is not on Studio's approved upload list. NOT
+  WIRED: the tiles still show the Ringside placeholders.
+- TO DO NEXT: (1) owner approves `Projectssets\icons\poster` in Assistant Settings > MCP Permissions; upload the
+  three as Image to group 2970443; add ids to `Ui/Icons.luau` (`toolSettings`, `toolSpectate`, `toolAfk`), use them
+  in NavController's tiles with `ImageColor3` ink. (2) push in Edit mode; check the Settings page (rows, the ?
+  bubble, a switch press), the stats line's place in the top bar and its size, "STUDIO" as the region, the icons.
+  (3) save, correct this section, commit ui-10a to ui-10c when the owner approves.
+
+## ui-10b / ui-10c SYNCED (2026-11-18): Settings page, top-bar stats and region are in the place; icons still waiting
+Pushed (180 scripts match, origin/main had nothing new), place saved v443, 537 tests. NOT COMMITTED (ui-10a to 10c).
+- SEEN in my own play test (1118 x 536): the stats line stands in Roblox's top bar at x 220 (the free part starts
+  at 208), on the bar's middle line, reading "166 FPS . 2 MS . STUDIO"; the region attribute was "Studio".
+  The Settings page, opened from the SETTINGS tile: three flat rows, switches green with ON; pressing the Hit flash
+  row turned its switch grey with OFF and the knob left; the pointer on Camera shake's "?" showed "Shakes your
+  camera on big hits." One capture: it reads as the mockup's page does.
+- AFTER THAT the stats lettering was set to 12 REAL pixels on the label (`Poster.text` had turned "10" into 15;
+  the first version's "13" was 19): pushed and saved, NOT looked at again.
+- ICONS STILL NOT UPLOADED: Studio refused `assets/icons/poster` three times ("not inside a directory approved
+  for uploads"), also after the owner said it was approved. The tiles still show the Ringside placeholders.
+- NOT TESTED: the region lookup on a real server (and whether Allow HTTP Requests is on); the stats line beside
+  Roblox's real buttons on a phone; the "?" by touch; the Settings page in a round (short window, Back row);
+  Reduced Motion; the published game.
+
+## ui-10d (2026-11-18): the tools' line icons uploaded and wired (NOT COMMITTED)
+Build `kits-7c+lobby-4+ui-10d`, 537 tests, synced (180 scripts match), place saved v444. ui-10a to ui-10d are NOT
+committed.
+- The owner approved `assets/icons/poster`; uploaded as Image to group 2970443: tool_settings 84689908232322,
+  tool_spectate 137196821444275 (both Approved), tool_afk 113101514810430 (Reviewing at upload, loaded in play).
+  `Ui/Icons.luau`: `toolSettings`, `toolSpectate`, `toolAfk`; NavController's tiles draw them tinted ink.900.
+- SEEN in my own play test: all three loaded with the ink tint; the stats lettering is 12 px (95 x 13 for
+  "184 FPS . 1 MS . STUDIO"); one capture, taken while the More window was open, shows the lobby More page as
+  designed (COMING LATER; Cosmetics, Profile, Leaderboards, Emotes, Codes) and the tiles hidden under it.
+- NOT TESTED: the tiles with the new icons BY EYE (the window was over them in the capture); everything listed as
+  not tested under ui-10a to ui-10c.
+- NEXT: commit ui-10a to ui-10d when the owner approves; then the class-name band; then phone, gamepad and
+  Reduced Motion tests.
+
+## ui-10e (2026-11-18): in-arena MENU window on white, AFK toast: WRITTEN, GATES GREEN, NOT SYNCED
+Stamp on disk `kits-7c+lobby-4+ui-10e`; the PLACE is still ui-10d (v444). Studio was in a Play session I did not
+start, and the two new images are not uploaded. 537 tests. ui-10a to ui-10e are NOT committed.
+- IN A ROUND the More page becomes the MENU window (the owner: it should say MENU, on pure white, same style and
+  details): `MenuController.tint(tone, detail?)` takes an optional detail colour; `drawMore` in a round tints the
+  field pure white with the dots, the word and the wipe in violet.400 mixed 45 % to white, and sets the word and
+  the title to "Menu". GUARDED: until `Shapes.words.Menu` and `Shapes.letters.titles[4]` exist it still says More.
+- NEW IMAGES, drawn and NOT uploaded (Studio refuses `assets/ui`: not an approved upload directory):
+  `assets/ui/poster_titles_4.png` (the MENU title; `make_lettering.py` put it alone on a 4th sheet, sheets 1 to 3
+  came out byte-identical and `LetterRects.luau` gained one line, `title:MENU = { 4, 0, 0, 456, 224 }`) and
+  `assets/ui/words/menu.png` (219 x 168, the background tile). 'Menu' was added to the lists in
+  `poster_lettering.html` and `make_word_tiles.py`.
+- AFK TOAST (the owner): pressing the AFK tile now toasts "AFK on. You'll sit out the next round." or "AFK off.
+  You're in for the next round." (`NavController`, only within 5 s of your own press, through `menu:Toast`).
+- TO DO NEXT: owner approves `Project\assets\ui` (and `\words` if needed); upload both as Image to group
+  2970443; `Shapes.letters.titles[4] = id`, `Shapes.words.Menu = { id, width = 219 }`; push in Edit mode; check
+  the MENU window in a round (title, white field, pale details) and both AFK toasts; save; correct this section.
+
+## ui-11a (2026-11-18): smaller top strip, bigger window, class preview with poses, class pages; ui-10e synced (NOT COMMITTED)
+Build `kits-7c+lobby-4+ui-11a`, 537 tests, gates green, synced (181 scripts match, origin/main had nothing new),
+place saved (version in the UI Map). ui-10a to ui-11a are NOT committed.
+- TOP STRIP (the owner: "a bit higher and a bit smaller", to make room): `HudTheme.Strip.Top` 8 (was 18),
+  `Shrink` 0.82, `Tall` 72; HudController scales the strip's group by Shrink. The window starts under it
+  (`MenuController.layout`) and `PosterKit.Fit.Window` went 0.9 -> 1.
+- CLASS PREVIEW (the owner's idea: your character in the empty space, a pose and an idle for each class, a
+  silhouette for a class you don't own, allowed to reach outside the window). NEW `Ui/ClassPreview.luau`: one
+  ViewportFrame with a WorldModel, your avatar built once from your HumanoidDescription as R15 (fallback: a copy
+  of your character). NO animation assets: `POSES[kitId]` is joint angles in degrees put on Motor6D.C0, and the
+  idle is a breath and sway added 30 times a second while it shows (held still on phones and under Reduced
+  Motion). Not owned: `ImageColor3` ink.950 at 0.2 transparency. It is the SLIDE's child (656, 70 in body
+  coordinates, 300 x 400, ZIndex 6), so the page does not cut it and it reaches past the window's right edge.
+  FOUND: Roblox now joints avatars with AnimationConstraints (15, no Motor6D at all), which do not move in a
+  ViewportFrame; each is replaced by a Motor6D on the same two attachments. Angle signs are written in the
+  module's header and held in play (Base guard, Dragon wings).
+- CLASS PAGES: 8 tiles a page (`CLASSES_PER_PAGE`); with more, an arrow right of the tiles turns the page and from
+  page 2 one left of them turns back, and the sub-line adds "PAGE n OF m". No arrows with one page. The cream
+  panel on the left STAYS on later pages (the left arrow fits beside it; the owner had suggested removing it).
+  Testing knob: workspace attribute `HT_ClassesPerPage`.
+- SEEN in my own play test (1190 x 536): the strip's group at y 8; Base in a boxer's guard and Dragon with arms
+  spread, the avatar reaching past the window's right edge and clear of the tiles, the X and the Equip button;
+  idle moving; with the knob at 4: "PAGE 1 OF 2", a right arrow, and after pressing it "PAGE 2 OF 2", 4 tiles
+  and a left arrow; a silhouette (tint forced by hand, every class is owned on this account).
+  AFK toasts: "AFK on. You'll sit out the next round." and "AFK off. You're in for the next round."
+  Console: only the known lines.
+- MEASURED: 12 alternating 1 s samples with the preview shown and hidden: median 10.8 ms shown, 11.2 hidden: not
+  separable from Studio's noise.
+- AFTER THAT the arrows were enlarged (30 x 58 -> 40 x 72) and the preview moved 8 right: pushed, NOT looked at.
+- STILL WAITING: the MENU title and tile images (`assets/ui`) are refused by Studio as not approved, so the
+  in-round window is white but still says MORE.
+- NOT TESTED: Bruiser, Inferno, Beast, Trickster, Frost and Tempest poses by eye; a real not-owned class; an
+  avatar that fails to load; the white in-round window by eye; phones (held pose, window fit); gamepad; Reduced
+  Motion; the published game. The mockup page does NOT show the preview, the pages or the smaller strip.
+
+## ui-11b (2026-11-18): the class preview REDONE as R6 with Blender-pipeline idles; blur fix; smaller strip (NOT COMMITTED)
+The owner rejected ui-11a's preview: "why is it R15 poses, it should be R6 ... proportions are way too skinny ...
+they should fit inside the box ... make your idle animations in Blender before putting them into Studio", and
+asked for the counter to be visibly smaller and higher, all lettering equally sharp, and some classes taken away
+so the silhouette can be seen. Build `kits-7c+lobby-4+ui-11b`, 537 tests, gates green, synced (182 scripts match),
+place saved (version in the UI Map). ui-10a to ui-11b are NOT committed.
+- IDLES: NEW `animations/build_class_idles.py`, written with build_clips.py's own helpers (R6 joint Transforms,
+  feet planted with `lock_feet`): one loop a class, 24 frames. Base is the game's own stance clip; Bruiser wide
+  with arms held off the body; Inferno a fist pumping overhead; Beast low with both arms clawing; Trickster one
+  arm up and waving, rocking; Dragon arms lifted like half-open wings, beating slowly; Frost arms crossed low,
+  nearly still; Tempest leaning into a run. It bakes `animations/class_idles.json` and the generated
+  `shared/Config/ClassIdleClips.luau` (93 k characters). `animations/preview_class_idles.py` shows all eight on
+  R6 dummies in a Blender scene "HT_ClassIdles". BLENDER WAS NOT RUNNING (the MCP could not connect), so the
+  owner has NOT seen them in Blender and neither have I; they were checked in the game instead.
+- `Ui/ClassPreview.luau` REWRITTEN: the avatar is built as R6 (`CreateHumanoidModelFromDescription`, R6), the clip
+  is sampled 30 times a second and each joint's Transform goes on its Motor6D as `C0 = home x Transform`, joints
+  found by the part they move ("Torso", "Right Arm"...). AnimationConstraints are still converted. The camera
+  frames soles to head at about 72 units a stud; the frame is 400 x 430 at body (590, 44), so the figure stands
+  INSIDE the window between the tiles and its right edge and an arm reaches a little past it. Not owned: the
+  image is drawn BLACK at 0.3 transparency (an ink tint let the face and shirt show through).
+- BLUR FIX: `HudController.group()` made a CanvasGroup for every HUD group (strip, feed, dial, tiles, spectate
+  chip). A CanvasGroup draws to a picture first and is soft when scaled down: that is why the counter was
+  blurrier than the Coins and the window. Groups are plain Frames now and are shown and hidden with no fade; the
+  60 % dim of the dial and tiles during a timed cue or a clash is GONE with it. The feed's frame clips its rows.
+  STILL CanvasGroups: the window's drifting background word, Callouts' last moments, ClashBar.
+- STRIP: `HudTheme.Strip.Top` 2, `Shrink` 0.7 (ui-11a's 8 and 0.82 were too subtle for the owner to see).
+- STUDIO-ONLY KNOB in `PlayerDataService`: workspace attribute `HT_DevDisown` ("Dragon,Frost") takes those classes
+  from everyone in the session and saves it. USED ONCE on the owner's account: Dragon, Frost and Tempest are no
+  longer owned (their Coins were not given back; the account has about 21,900).
+- SEEN in my own play tests: all eight idles side by side on a test sheet, each a different silhouette; in the
+  window Bruiser (owned) and Dragon and Tempest (not owned, flat dark shapes) standing inside the window clear of
+  the tiles, the X and the button, an arm just past the right edge; the strip clearly smaller and higher.
+  Console: only the known lines.
+- NOT TESTED: the idles in MOTION by eye (stills only); the strip's sharpness judged on the published game (the
+  owner's rule: not in a small Studio view); the HUD with no fades during a fight; the frame cost of the R6
+  preview (ui-11a's R15 one measured as noise); phones; gamepad; Reduced Motion.
+- STILL WAITING: `assets/ui` upload approval for the MENU title images.
+
+## ui-12a (2026-11-18): Q and R beside the dial, small Jump and Punch, CONTROLS chip and panel, simpler round menu: SYNCED, SEEN RUNNING (NOT COMMITTED)
+Stamp on disk `kits-7c+lobby-4+ui-12a`; the PLACE is still ui-11b (v449): Studio was in a Play session I did not
+start. 537 tests, gates green. ui-10a to ui-12a are NOT committed.
+- `HudController`: the Q and R tiles are children of the DIAL's group (`you.fade`), one each side of the dial
+  (`L.DialGap` 16), standing on its foot line; hidden on touch. Jump and Punch stay bottom-right, drawn at
+  `L.TileSmallScale` 0.82 (a UIScale on the column, anchored bottom-left); their result word stands `WordLift`
+  higher, over the new chip. `L.K` shrank to those two tiles.
+- `UltimateNotice`: the ULT READY badge clears 112 units (was 104): small tiles, chip, result word.
+- `NavController`: the MENU button is 68 (was 58), lettering 17; in a round it toggles "settings". NEW CONTROLS
+  chip ("H . CONTROLS", cream, 176 x 30) over Jump and Punch, and a panel 320 x 240 above the badge's place:
+  ink at 0.25 transparency with an ink line, a yellow CONTROLS title and a scrolling list (key in a cream cap, the
+  action's name in bold and its detail in grey, from `HudTheme.Guide` plus the Ultimate row). H toggles it in a
+  round (in the lobby H still opens the Moves page); it closes when the window opens or the round ends. Both
+  scale with the HUD and are hidden on touch (a phone has NO way to the controls list in a round now).
+- `MenuController`: `IN_ROUND_OK = { settings = true }`; opening "more" in a round opens Settings; the Back row
+  and drawMore's round branch (the white MENU page of ui-10e) are gone, so the MENU title images are no longer
+  needed. The class figure is centred in the open space right of the tiles (body x 525, 400 x 430) at ZIndex 4,
+  UNDER the page, so tiles, rows and the button draw over it.
+- SYNCED later the same day (182 scripts match, origin/main had nothing new), place saved v450.
+- SEEN in my own play test (1190 x 536, in a fight): the dial at x 511 to 678 with the Q box at 422 to 499 and the
+  R box at 690 to 767 on its foot line, both showing cooldown seconds; Jump and Punch 51 px in the corner; the
+  chip "H . CONTROLS" just over them with the MISS word over the chip; MENU 51 px. H opened the panel (small,
+  dark and see-through, key caps and wrapped lines, a scroll bar) above the badge's place; H again closed it.
+  Pressing MENU opened the window on Settings with its three rows and closed the panel.
+  In the lobby the Bruiser figure stands further in, its near arm behind the Beast and Tempest tiles and its far
+  arm about 35 px past the window's edge. Console: only the known lines.
+- NOT TESTED: the Q and R tiles' ready pop and refusal shake in their new place; the ULT READY badge against the
+  chip and the open panel; the panel's scrolling by hand; a gamepad (chip says SELECT); phones (no chip, tiles
+  hidden); Reduced Motion; the published game. The mockup page shows none of this round.
+
+## ui-12b (2026-11-18): a cog on the fight's settings button and the lobby's SETTINGS tile: SYNCED, SEEN (NOT COMMITTED)
+Stamp on disk `kits-7c+lobby-4+ui-12b`; the PLACE is still ui-12a (v450): Studio was in a Play session I did not
+start. 537 tests, gates green. ui-10a to ui-12b are NOT committed.
+- The owner: the MENU button is only a settings button now, so it should be a cog wheel, in the style of the three
+  lobby icons, and the lobby's settings icon should be the same cog (the first drawing read as a sun).
+- `design/ui/make_tool_icons.py`: `cog()` draws eight blunt teeth and a hole as one outline, line 2.1 (the others
+  are 2.6; at 2.6 a cog closes up). Looked at beside the eye and the Zz: it reads as a cog and matches them.
+  Uploaded as Image to group 2970443: 118279305149410 (Reviewing at upload). `Icons.toolSettings` points at it.
+- `NavController`: the fight button shows the cog (44 units, ink) and no word. The mockup has the cog on both
+  (published).
+- SYNCED later the same day (182 scripts match), place saved v451. SEEN in my own play test: the cog on the
+  fight button (33 px at 1190 x 536, ink on the cream tile, no word), loaded; the lobby tile's icon is the same
+  asset and loaded, NOT looked at by eye. Not tested: phones, the published game.
