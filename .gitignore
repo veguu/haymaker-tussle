@@ -27,3 +27,22 @@ sfx-lab/rebuilt/
 sfx-lab/*_reel.wav
 sfx-lab/*_reel_order.txt
 sfx-lab/*.wav
+
+# Our own cutscene screen recordings stay local (contact sheets are what the repo keeps)
+design/references/ours-kits-*
+
+# Impact-frame study and preview iterations stay local; the final sheets and previews are kept
+design/vfx/study/out/*
+!design/vfx/study/out/study_sheet.png
+!design/vfx/study/out/plates_sheet.png
+!design/vfx/study/out/ref3_lines_map.png
+!design/vfx/study/out/ref3_slices.png
+!design/vfx/study/out/ref3_target_analysis.png
+!design/vfx/study/out/ref3_measured_sheet.png
+!design/vfx/study/out/ref3m_side_m4.png
+!design/vfx/study/out/ref3m_overlay_m4.png
+!design/vfx/study/out/ref2_side_v12.png
+!design/vfx/study/out/ref1_side_v4.png
+design/vfx/impact/out/*
+!design/vfx/impact/out/*_sheet.png
+!design/vfx/impact/out/impact_preview*.mp4

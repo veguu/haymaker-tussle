@@ -1,0 +1,449 @@
+// The fist impact frame (design/cutscene-study/15-drawing-techniques-study.md).
+// Construction: one perspective for everything, three vanishing points (two on a high horizon, one far below).
+// The torso is the measuring box: every point of the head, arms, fist and dent is measured in torso units
+// (x right, y up, z back; the torso's half sizes 1, 1, 0.5) along the lines to those vanishing points.
+// Pose: the target's Fold clip at the final punch (animations/build_strikes.luau FOLD_KEYS): folded onto the
+// fist, both arms flung forward and down past it, the head dropped ~14 deg. The chest caves in round the fist
+// (everything drawn in toward the contact, deeper frame by frame); the fist barely moves.
+// Style (the user's sketch references: zpicyowl, Kopinski, the ink sketches): no traced outlines. Edges are a
+// few thin searching lines, lost on the lit side, with dark accents only where forms overlap or press together.
+// Tone is shadow only: lit planes stay paper; shadow shapes are hatched with tapered strokes laid along the
+// surface (round the dent they follow its rings), denser toward the darkest spot, a second layer at a small
+// angle for the darks. White fills only hide what is behind a nearer form.
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+
+public struct V3
+{
+    public double X, Y, Z;
+    public V3(double x, double y, double z) { X = x; Y = y; Z = z; }
+    public static V3 operator +(V3 a, V3 b) { return new V3(a.X + b.X, a.Y + b.Y, a.Z + b.Z); }
+    public static V3 operator -(V3 a, V3 b) { return new V3(a.X - b.X, a.Y - b.Y, a.Z - b.Z); }
+    public static V3 operator *(V3 a, double k) { return new V3(a.X * k, a.Y * k, a.Z * k); }
+    public static double Dot(V3 a, V3 b) { return a.X * b.X + a.Y * b.Y + a.Z * b.Z; }
+    public static V3 Cross(V3 a, V3 b) { return new V3(a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X); }
+    public V3 Unit() { double l = Math.Sqrt(Dot(this, this)); return new V3(X / l, Y / l, Z / l); }
+}
+
+public class Plunge
+{
+    // ---- the perspective ----
+    static readonly PointF VL0 = new PointF(-2400, -500), VR0 = new PointF(2050, -500), VD0 = new PointF(620, 3600), T00 = new PointF(950, 160);
+    static readonly double WX = 0.26 / (2 * 0.74), WZ = 0.27 / 0.73, WD = 0.25 / (2 * 0.75);
+    public static double Zs = 1, Zdy = 0;                     // framing: as the earlier frames (the torso's middle the focus)
+    public static double HX = 0.06, HY = 0.14;                // the contact on the chest
+    public static double FH = 0.32;                            // the fist's half size
+    static readonly V3 Light = new V3(0.35, 0.8, -0.5).Unit();
+
+    public static PointF Fr(double x, double y) { return new PointF((float)(640 + (x - 640) * Zs), (float)(360 + (y - 360) * Zs + Zdy)); }
+    public static PointF VP(int which) { var p = which == 0 ? VL0 : which == 1 ? VR0 : VD0; return Fr(p.X, p.Y); }
+    public static PointF TP(V3 v)
+    {
+        double dx = v.X + 1, dz = v.Z + 0.5, dd = 1 - v.Y, den = 1 + dx * WX + dd * WD + dz * WZ; if (den < 0.05) den = 0.05;
+        return Fr((T00.X + dx * WX * VL0.X + dd * WD * VD0.X + dz * WZ * VR0.X) / den, (T00.Y + dx * WX * VL0.Y + dd * WD * VD0.Y + dz * WZ * VR0.Y) / den);
+    }
+    // The eye: the one point the construction can't map. A face is seen when it turns toward it.
+    public static V3 Eye()
+    {
+        double[,] m = { { WX * VL0.X, -WD * VD0.X, WZ * VR0.X }, { WX * VL0.Y, -WD * VD0.Y, WZ * VR0.Y }, { WX, -WD, WZ } };
+        double[] rhs = { -(T00.X + WX * VL0.X + WD * VD0.X + 0.5 * WZ * VR0.X), -(T00.Y + WX * VL0.Y + WD * VD0.Y + 0.5 * WZ * VR0.Y), -(1 + WX + WD + 0.5 * WZ) };
+        double d = Det(m); var r = new double[3];
+        for (int c = 0; c < 3; c++) { var mc = (double[,])m.Clone(); for (int k = 0; k < 3; k++) mc[k, c] = rhs[k]; r[c] = Det(mc) / d; }
+        return new V3(r[0], r[1], r[2]);
+    }
+    static double Det(double[,] m) { return m[0, 0] * (m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1]) - m[0, 1] * (m[1, 0] * m[2, 2] - m[1, 2] * m[2, 0]) + m[0, 2] * (m[1, 0] * m[2, 1] - m[1, 1] * m[2, 0]); }
+    public static string Info()
+    {
+        var e = Eye(); var t = new Plunge(); t.eye = e;
+        return string.Format("eye {0:0.00} {1:0.00} {2:0.00}; chest seen {3}, side seen {4}, top seen {5}", e.X, e.Y, e.Z,
+            t.Seen(new V3(0, 0, -0.5), new V3(0, 0, -1)), t.Seen(new V3(-1, 0, 0), new V3(-1, 0, 0)), t.Seen(new V3(0, 1, 0), new V3(0, 1, 0)));
+    }
+
+    // ---- the frame's state ----
+    double DD, DW, E; V3 eye; Random rnd; Graphics g;
+
+    // The cave-in: every point of the torso drawn in toward the contact on the page, most near it, so lines
+    // bow inward and the rings close up round the fist; it fades toward the back of the torso.
+    PointF DP(V3 v)
+    {
+        var p = TP(v); var c = TP(new V3(HX, HY, -0.5));
+        double zf = Math.Exp(-Math.Pow((v.Z + 0.5) / 0.7, 2));
+        return Pn.Pull(p, c.X, c.Y, (float)(DD * zf), (float)DW);
+    }
+    bool Seen(V3 p, V3 n) { return V3.Dot(n, eye - p) > 0; }
+    static double Lerp(double a, double b, double t) { return a + (b - a) * t; }
+    static double Clamp01(double x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
+    float R01() { return (float)rnd.NextDouble(); }
+    static float Ang(PointF a, PointF b) { return (float)(Math.Atan2(b.Y - a.Y, b.X - a.X) * 180 / Math.PI); }
+    static PointF Toward(PointF p, PointF vp, float len) { float l = Math.Max(1e-3f, Pn.D(p, vp)); return new PointF(p.X + (vp.X - p.X) / l * len, p.Y + (vp.Y - p.Y) / l * len); }
+    PointF[] Line3(V3 a, V3 b, int n, Func<V3, PointF> proj) { var o = new PointF[n + 1]; for (int k = 0; k <= n; k++) o[k] = proj(a + (b - a) * ((double)k / n)); return o; }
+
+    // ---- marks ----
+    void Hair(PointF[] path, float width, double weight)
+    {
+        if (weight < 0.04 || path.Length < 2) return;
+        Pn.Hair(g, path, width, Pn.Graphite((float)Math.Min(1, weight)));
+    }
+
+    // A searching line: thin tapered strokes, long and overlapping, a little off the path, the weight following
+    // weightAt(u) along it (lost where it fades out), `passes` layers, the ends running past.
+    void Search(PointF[] pts, Func<double, double> weightAt, float width, int passes)
+    {
+        var d = Pn.Densify(pts, 4f); int n = d.Length; if (n < 2) return;
+        var s = new float[n]; for (int i = 1; i < n; i++) s[i] = s[i - 1] + Pn.D(d[i - 1], d[i]);
+        float total = s[n - 1]; if (total < 3) return;
+        for (int pass = 0; pass < passes; pass++)
+        {
+            float pos = -16 * R01();
+            while (pos < total)
+            {
+                float L = 50 + 150 * R01(), a0 = pos, a1 = Math.Min(total + 14 * R01(), pos + L);
+                float off = (R01() - 0.5f) * (pass == 0 ? 2.4f : 4.5f), tilt = (R01() - 0.5f) * 3f;
+                var sub = new List<PointF>(); int m = Math.Max(3, (int)((a1 - a0) / 6));
+                for (int k = 0; k <= m; k++)
+                {
+                    PointF p, tan; At(d, s, a0 + (a1 - a0) * k / m, out p, out tan);
+                    float side = off + tilt * ((float)k / m - 0.5f);
+                    sub.Add(new PointF(p.X - tan.Y * side, p.Y + tan.X * side));
+                }
+                double wgt = weightAt(Clamp01((a0 + a1) / 2 / total)) * (0.75 + 0.5 * R01()) * (pass == 0 ? 1 : 0.7);
+                Hair(sub.ToArray(), width * (0.8f + 0.4f * R01()), wgt);
+                pos += L * (0.75f + 0.35f * R01());
+            }
+        }
+    }
+    void Search(PointF[] pts, double weight, float width, int passes) { Search(pts, u => weight, width, passes); }
+    static void At(PointF[] d, float[] s, float at, out PointF p, out PointF tan)
+    {
+        int n = d.Length;
+        if (at <= 0) { tan = Unit(d[0], d[1]); p = new PointF(d[0].X + tan.X * at, d[0].Y + tan.Y * at); return; }
+        if (at >= s[n - 1]) { tan = Unit(d[n - 2], d[n - 1]); float e = at - s[n - 1]; p = new PointF(d[n - 1].X + tan.X * e, d[n - 1].Y + tan.Y * e); return; }
+        int lo = 0, hi = n - 1; while (hi - lo > 1) { int mid = (lo + hi) / 2; if (s[mid] <= at) lo = mid; else hi = mid; }
+        float f = (at - s[lo]) / Math.Max(1e-4f, s[hi] - s[lo]);
+        p = new PointF(d[lo].X + (d[hi].X - d[lo].X) * f, d[lo].Y + (d[hi].Y - d[lo].Y) * f); tan = Unit(d[lo], d[hi]);
+    }
+    static PointF Unit(PointF a, PointF b) { float l = Math.Max(1e-4f, Pn.D(a, b)); return new PointF((b.X - a.X) / l, (b.Y - a.Y) / l); }
+
+    // Shadow hatching on a surface given as (u, v) in [0,1]^2: strokes placed where it is dark (more of them,
+    // and darker, the darker it is), each laid along the surface's own direction field, then projected; the
+    // darkest parts get a second layer turned a little.
+    delegate void Field(double u, double v, out double du, out double dv);
+    void Shade(Func<double, double, V3> pos, Func<V3, PointF> proj, Func<double, double, double> dark, Field dir, Func<double, double, bool> ok,
+               double lenUV, float spacing, float width)
+    {
+        double area = 0; int G = 8;
+        for (int a = 0; a < G; a++) for (int b = 0; b < G; b++)
+            {
+                var p0 = proj(pos((double)a / G, (double)b / G)); var p1 = proj(pos((a + 1.0) / G, (double)b / G));
+                var p2 = proj(pos((a + 1.0) / G, (b + 1.0) / G)); var p3 = proj(pos((double)a / G, (b + 1.0) / G));
+                area += Math.Abs((p0.X * p1.Y - p1.X * p0.Y) + (p1.X * p2.Y - p2.X * p1.Y) + (p2.X * p3.Y - p3.X * p2.Y) + (p3.X * p0.Y - p0.X * p3.Y)) / 2;
+            }
+        var c0 = proj(pos(0.45, 0.5)); var c1 = proj(pos(0.55, 0.5)); var c2 = proj(pos(0.5, 0.45)); var c3 = proj(pos(0.5, 0.55));
+        double lenPx = Math.Max(20, lenUV * 10 * (Pn.D(c0, c1) + Pn.D(c2, c3)) / 2);
+        int n = (int)Math.Min(20000, area / (spacing * lenPx));
+        for (int k = 0; k < n; k++)
+        {
+            double u = R01(), v = R01();
+            if (ok != null && !ok(u, v)) continue;
+            double d = dark(u, v); if (d <= 0.02 || R01() > d) continue;
+            StrokeAt(pos, proj, dir, ok, u, v, lenUV * (0.6 + 0.8 * R01()), width, d, 0);
+            if (d > 0.5 && R01() < (d - 0.5) * 1.6) StrokeAt(pos, proj, dir, ok, u, v, lenUV * (0.5 + 0.6 * R01()), width, d * 0.9, 0.42);
+        }
+    }
+    void StrokeAt(Func<double, double, V3> pos, Func<V3, PointF> proj, Field dir, Func<double, double, bool> ok, double u, double v, double len, float width, double d, double rot)
+    {
+        var fwd = new List<PointF>(); var back = new List<PointF>();
+        double cs = Math.Cos(rot), sn = Math.Sin(rot), bend = (R01() - 0.5) * 0.25;
+        for (int side = 0; side < 2; side++)
+        {
+            double cu = u, cv = v, sg = side == 0 ? 1 : -1;
+            for (int k = 0; k < 5; k++)
+            {
+                double du, dv; dir(cu, cv, out du, out dv);
+                double ru = du * cs - dv * sn, rv = du * sn + dv * cs, l = Math.Sqrt(ru * ru + rv * rv); if (l < 1e-9) break;
+                ru /= l; rv /= l; double b = bend * k / 5.0; double tu = ru - rv * b, tv = rv + ru * b;
+                cu += tu * sg * len / 10; cv += tv * sg * len / 10;
+                if (cu < -0.02 || cu > 1.02 || cv < -0.02 || cv > 1.02 || (ok != null && !ok(Clamp01(cu), Clamp01(cv)))) break;
+                (side == 0 ? fwd : back).Add(proj(pos(cu, cv)));
+            }
+        }
+        back.Reverse(); back.Add(proj(pos(u, v))); back.AddRange(fwd);
+        if (back.Count < 2) return;
+        Hair(back.ToArray(), width * (0.7f + 0.6f * R01()), (0.2 + 0.62 * d) * (0.8 + 0.4 * R01()));
+    }
+
+    public static Img Render(int i, int frames, int seed) { return new Plunge().Run(i, frames, seed); }
+
+    Img Run(int i, int frames, int seed)
+    {
+        rnd = new Random(seed + 31 * i); eye = Eye();
+        double t = frames > 1 ? (double)i / (frames - 1) : 1, e = 1 - (1 - t) * (1 - t); E = e;
+        double tp = frames > 1 ? Math.Max(0, (double)(i - 1) / (frames - 1)) : 1, ep = 1 - (1 - tp) * (1 - tp);
+        DD = 0.5 + 0.47 * e; DW = 210 + 80 * e;                 // the cave-in: deeper than before (0.9 -> 0.97), widening
+        var bmp = new Bitmap(1280, 720);
+        g = Graphics.FromImage(bmp); g.SmoothingMode = SmoothingMode.AntiAlias; g.Clear(Color.White);
+        Background(); Construction();
+        // the Fold pose, from the contact key toward the soak key
+        var right = Arm(1, Lerp(22, 26, e), Lerp(-25, -35, e)); var rightPrev = Arm(1, Lerp(22, 26, ep), Lerp(-25, -35, ep));
+        var left = Arm(-1, Lerp(18, 22, e), Lerp(-30, -38, e)); var leftPrev = Arm(-1, Lerp(18, 22, ep), Lerp(-30, -38, ep));
+        right.Lag = (rightPrev.Dir - right.Dir) * 0.6; left.Lag = (leftPrev.Dir - left.Dir) * 0.6;   // the middles drag behind
+        double split = Math.Max(-0.5, Math.Min(1.5, -0.5 / right.Dir.Z));   // where the right arm passes the chest's plane
+        DrawBox(right, -0.5, split);          // behind the torso (the far side)
+        Torso();
+        DrawBox(right, split, 1.5);           // in front of the chest's plane
+        Head(Lerp(9, 13.6, e));
+        DrawBox(left, -0.5, 1.5);             // the near side: in front of the side face
+        Motion(right, rightPrev); Motion(left, leftPrev);
+        if (i >= 1 && i <= 4) Impact(i);
+        Fist(-0.5 + 0.06 * e);                // the fist barely moves
+        g.Dispose();
+        return Pn.Paper(Img.FromBitmap(bmp), seed + i, 0.6f);
+    }
+
+    // ---- background and construction: a few long light strokes, the lines to the vanishing points ----
+    void Background()
+    {
+        for (int k = 0; k < 26; k++)
+        {
+            var p = new PointF(-120 + 1500 * R01(), -60 + 840 * R01()); double a = (-24 + (R01() - 0.5) * 16) * Math.PI / 180, L = 120 + 260 * R01();
+            Hair(new[] { p, new PointF((float)(p.X + Math.Cos(a) * L * 0.5), (float)(p.Y + Math.Sin(a) * L * 0.5 + (R01() - 0.5) * 8)), new PointF((float)(p.X + Math.Cos(a) * L), (float)(p.Y + Math.Sin(a) * L)) }, 1.3f, 0.14 + 0.14 * R01());
+        }
+    }
+    void Construction()
+    {
+        foreach (var c in new[] { new V3(1, 1, -0.5), new V3(-1, 1, -0.5), new V3(-1, 1, 0.5), new V3(-1, -1, -0.5), new V3(1, -1, -0.5) })
+        {
+            var p = TP(c);
+            for (int w = 0; w < 3; w++) { var vp = VP(w); Hair(new[] { Toward(p, vp, -200 * R01()), Toward(p, vp, 300 + 400 * R01()) }, 1.1f, 0.1 + 0.05 * R01()); }
+        }
+    }
+
+    // ---- the torso ----
+    double ChestDark(double u, double v)
+    {
+        double x = 1 - 2 * u, y = 1 - 2 * v, rx = x - HX, ry = y - HY, r = Math.Sqrt(rx * rx + ry * ry);
+        if (Math.Abs(rx) < FH * 0.9 && Math.Abs(ry) < FH * 0.9) return 0;                    // under the fist
+        double depth = Math.Exp(-Math.Pow(Math.Max(0, r - FH * 1.05) / (0.24 + 0.16 * E), 2));
+        double a = Math.Atan2(ry, rx), wall = 0.5 + 0.5 * (0.4 * Math.Cos(a) + 0.916 * Math.Sin(a));   // its upper wall faces down
+        double dent = depth * (0.15 + 0.85 * wall) * (0.6 + 0.4 * E);
+        double sx = -0.4, sy = -0.916, al = rx * sx + ry * sy, ac = -rx * sy + ry * sx;         // the fist's cast shadow: down, away from the light
+        double cast = al > 0 && Math.Abs(ac) < FH * 1.15 ? 0.72 * Math.Exp(-Math.Max(0, al - FH) / 0.55) * (1 - Math.Pow(Math.Abs(ac) / (FH * 1.15), 4)) : 0;
+        double contact = 0.85 * Math.Exp(-Math.Pow((Math.Max(Math.Abs(rx), Math.Abs(ry)) - FH) / 0.06, 2));   // pressed tight round the fist
+        return Math.Min(1, Math.Max(Math.Max(dent, cast), contact));
+    }
+    void ChestDir(double u, double v, out double du, out double dv)
+    {
+        double x = 1 - 2 * u, y = 1 - 2 * v, rx = x - HX, ry = y - HY, r = Math.Max(1e-6, Math.Sqrt(rx * rx + ry * ry));
+        double w = Math.Exp(-Math.Pow(Math.Max(0, r - 0.35) / 0.45, 2));
+        double tx = -ry / r, ty = rx / r; if (tx < 0) { tx = -tx; ty = -ty; }                    // round the dent ...
+        double hx = tx * w + (1 - w), hy = ty * w;                                              // ... easing to across the chest
+        du = -hx / 2; dv = -hy / 2;
+    }
+
+    void Torso()
+    {
+        V3 TL = new V3(1, 1, -0.5), T0 = new V3(-1, 1, -0.5), TR = new V3(-1, 1, 0.5), TB = new V3(1, 1, 0.5);
+        V3 B0 = new V3(-1, -1, -0.5), BL = new V3(1, -1, -0.5), BR = new V3(-1, -1, 0.5);
+        Func<V3, PointF> dp = DP;
+        var sil = new List<PointF>();
+        foreach (var ed in new[] { new[] { TL, TB }, new[] { TB, TR }, new[] { TR, BR }, new[] { BR, B0 }, new[] { B0, BL }, new[] { BL, TL } }) sil.AddRange(Line3(ed[0], ed[1], 40, dp));
+        g.FillPolygon(Brushes.White, sil.ToArray());
+        // shadow shapes: the dent, the fist's cast shadow, the side face, the head's shadow on the top
+        Shade((u, v) => new V3(1 - 2 * u, 1 - 2 * v, -0.5), dp, ChestDark, ChestDir, null, 0.16, 5.5f, 1.5f);
+        Shade((u, v) => new V3(-1, 1 - 2 * v, -0.5 + u), dp, (u, v) => 0.42 + 0.3 * (1 - u) - 0.1 * v,
+            (double u, double v, out double du, out double dv) => { du = 0.12; dv = 1; }, null, 0.22, 6f, 1.5f);
+        Shade((u, v) => new V3(1 - 2 * u, 1, -0.5 + v), dp, (u, v) =>
+        {
+            double x = 1 - 2 * u, z = -0.5 + v, px = x, pz = z;                                   // the head's shadow, swept back and to the right
+            double sx = -0.48, sz = 0.69, l2 = sx * sx + sz * sz, tt = Clamp01((px * sx + pz * sz) / l2);
+            double dx = px - sx * tt, dz = pz - sz * tt, dist = Math.Sqrt(dx * dx + dz * dz);
+            return dist < 0.62 ? 0.55 * (1 - Math.Pow(dist / 0.62, 6)) : 0;
+        }, (double u, double v, out double du, out double dv) => { du = 1; dv = 0.25; }, null, 0.25, 6f, 1.4f);
+        // form lines: a few light cross-contours bending into the dent, and the dent's rings, found on the
+        // shadowed upper wall and lost on the lit lower one
+        for (int q = 1; q < 6; q++)
+        {
+            double y = 1 - 2.0 * q / 6;
+            Search(Line3(new V3(0.98, y, -0.5), new V3(-0.98, y, -0.5), 60, dp), uu => 0.22 * Math.Max(0.15, Math.Exp(-Math.Pow((1 - 2 * uu * 0.98 - 0.98 + 0.98 - HX) / 0.7, 2))), 1.2f, 1);
+        }
+        foreach (double rr in new[] { 0.4, 0.47, 0.56, 0.68, 0.84 })
+        {
+            var pts = new List<PointF>(); var ang = new List<double>();
+            for (int k = 0; k <= 120; k++)
+            {
+                double a = 2 * Math.PI * k / 120, x = HX + rr * Math.Cos(a), y = HY + rr * Math.Sin(a);
+                if (Math.Abs(x) > 0.98 || Math.Abs(y) > 0.98) { RingRun(pts, ang, rr); pts = new List<PointF>(); ang = new List<double>(); continue; }
+                pts.Add(DP(new V3(x, y, -0.5))); ang.Add(a);
+            }
+            RingRun(pts, ang, rr);
+        }
+        // edges: thin searching lines; the silhouette a little firmer on the shadow side
+        Search(Line3(TL, BL, 50, dp), uu => 0.32 - 0.12 * uu, 1.3f, 2);
+        Search(Line3(TL, T0, 50, dp), uu => 0.26, 1.2f, 2);
+        Search(Line3(T0, B0, 50, dp), uu => 0.42, 1.4f, 2);
+        Search(Line3(T0, TR, 30, dp), uu => 0.38, 1.3f, 2);
+        Search(Line3(TR, BR, 50, dp), uu => 0.55, 1.5f, 2);
+        Search(Line3(TL, TB, 30, dp), uu => 0.2, 1.2f, 1); Search(Line3(TB, TR, 50, dp), uu => 0.24, 1.2f, 1);
+        Search(Line3(BL, B0, 50, dp), uu => 0.3, 1.3f, 1); Search(Line3(B0, BR, 30, dp), uu => 0.5, 1.4f, 2);
+    }
+    void RingRun(List<PointF> pts, List<double> ang, double rr)
+    {
+        if (pts.Count < 3) return;
+        var a = ang.ToArray(); int n = a.Length;
+        Search(pts.ToArray(), uu =>
+        {
+            double an = a[Math.Min(n - 1, (int)(uu * (n - 1)))], wall = 0.5 + 0.5 * (0.4 * Math.Cos(an) + 0.916 * Math.Sin(an));
+            return (0.08 + 0.55 * wall) * (1.15 - 0.6 * (rr - 0.4));
+        }, 1.3f, 1);
+    }
+
+    // ---- the head: a Roblox head, a rounded cylinder, dropped forward ----
+    void Head(double pitch)
+    {
+        double pt = pitch * Math.PI / 180;
+        V3 up = new V3(0, Math.Cos(pt), -Math.Sin(pt)), fw = new V3(0, -Math.Sin(pt), -Math.Cos(pt)), xr = new V3(1, 0, 0), neck = new V3(0, 1, 0);
+        const double R = 0.62, Hh = 1.22, bev = 0.15;
+        Func<double, double, double, V3> at = (h, rad, th) => neck + up * h + (xr * Math.Cos(th) + fw * Math.Sin(th)) * rad;
+        Func<double, V3> nrm = th => xr * Math.Cos(th) + fw * Math.Sin(th);
+        var hull = new List<PointF>();
+        for (int k = 0; k < 72; k++) { double th = 2 * Math.PI * k / 72; hull.Add(TP(at(0, R - bev, th))); hull.Add(TP(at(bev, R, th))); hull.Add(TP(at(Hh - bev, R, th))); hull.Add(TP(at(Hh, R - bev, th))); }
+        g.FillPolygon(Brushes.White, Pn.Hull(hull.ToArray()));
+        // its form shadow: the side away from the light, hatched round the cylinder
+        Func<V3, PointF> tp = TP;
+        Shade((u, v) => at(bev + (Hh - 2 * bev) * v, R, 2 * Math.PI * u), tp,
+            (u, v) => { double sd = V3.Dot(nrm(2 * Math.PI * u), Light); return Clamp01((0.18 - sd) / 0.38) * 0.68 + (v < 0.15 ? 0.15 : 0); },
+            (double u, double v, out double du, out double dv) => { du = 1; dv = 0.35; },
+            (u, v) => Seen(at(0.6, R, 2 * Math.PI * u), nrm(2 * Math.PI * u)), 0.07, 5.5f, 1.4f);
+        // the rims, thin; the chin where it hangs over the chest, dark; the sides where the surface turns away
+        Ring(at, nrm, up, 0, R - bev, -1, th => V3.Dot(nrm(th), new V3(0, 0, -1)) > 0.2 ? 0.75 : 0.35, 1.6f);
+        Ring(at, nrm, up, bev, R, 0, th => 0.2, 1.2f);
+        Ring(at, nrm, up, Hh - bev, R, 0, th => 0.22, 1.2f); Ring(at, nrm, up, Hh, R - bev, 1, th => 0.3, 1.3f);
+        bool prev = Seen(at(0.6, R, 0), nrm(0));
+        for (int k = 1; k <= 180; k++)
+        {
+            double th = 2 * Math.PI * k / 180; bool now = Seen(at(0.6, R, th), nrm(th));
+            if (now != prev) Search(new[] { TP(at(bev * 0.5, R - bev * 0.4, th)), TP(at(Hh - bev * 0.5, R - bev * 0.4, th)) }, V3.Dot(nrm(th), Light) < 0 ? 0.55 : 0.28, 1.4f, 2);
+            prev = now;
+        }
+    }
+    void Ring(Func<double, double, double, V3> at, Func<double, V3> nrm, V3 up, double h, double rad, int lip, Func<double, double> weightAt, float width)
+    {
+        var run = new List<PointF>(); var ths = new List<double>();
+        Action flush = () =>
+        {
+            if (run.Count > 2) { var a = ths.ToArray(); int n = a.Length; Search(run.ToArray(), uu => weightAt(a[Math.Min(n - 1, (int)(uu * (n - 1)))]), width, 2); }
+            run.Clear(); ths.Clear();
+        };
+        for (int k = 0; k <= 120; k++)
+        {
+            double th = 2 * Math.PI * k / 120; var n = nrm(th); if (lip != 0) n = (n * 0.6 + up * (0.8 * lip)).Unit();
+            var p = at(h, rad, th);
+            if (Seen(p, n)) { run.Add(TP(p)); ths.Add(th); } else flush();
+        }
+        flush();
+    }
+
+    // ---- the arms: R6 blocks (1 x 2 x 1) hung from the shoulders, aimed as the Fold clip aims them ----
+    class Box { public V3 Pv, Dir, B, C, Lag; }
+    Box Arm(int side, double sweep, double lift)
+    {
+        double s = sweep * Math.PI / 180, l = lift * Math.PI / 180;
+        var dir = new V3(side * Math.Sin(s) * Math.Cos(l), Math.Sin(l), -Math.Cos(s) * Math.Cos(l));
+        var bx = new V3(1, 0, 0); bx = (bx - dir * V3.Dot(bx, dir)).Unit();
+        return new Box { Pv = new V3(side * 1.5, 0.5, 0), Dir = dir, B = bx, C = V3.Cross(dir, bx), Lag = new V3(0, 0, 0) };
+    }
+    V3 BoxPt(Box b, double s, double eb, double ec) { return b.Pv + b.Dir * s + b.B * eb + b.C * ec + b.Lag * Math.Sin(Math.PI * (s + 0.5) / 2); }
+    void DrawBox(Box b, double s0, double s1)
+    {
+        if (s1 - s0 < 0.03) return;
+        Func<V3, PointF> tp = TP;
+        // the four long faces: (u along the arm, v across the face)
+        var faces = new List<KeyValuePair<V3, Func<double, double, V3>>>();
+        for (int ax = 0; ax < 2; ax++)
+            for (int sg = -1; sg <= 1; sg += 2)
+            {
+                int axc = ax, sgc = sg;
+                faces.Add(new KeyValuePair<V3, Func<double, double, V3>>((ax == 0 ? b.B : b.C) * sg,
+                    (u, v) => axc == 0 ? BoxPt(b, s0 + (s1 - s0) * u, 0.5 * sgc, v - 0.5) : BoxPt(b, s0 + (s1 - s0) * u, v - 0.5, 0.5 * sgc)));
+            }
+        var shown = new List<KeyValuePair<V3, Func<double, double, V3>>>();
+        foreach (var f in faces)
+        {
+            if (!Seen(f.Value(0.5, 0.5), f.Key)) continue;
+            var o = new List<PointF>(); foreach (var uv in new[] { new[] { 0.0, 0 }, new[] { 1.0, 0 }, new[] { 1.0, 1 }, new[] { 0.0, 1 } }) o.Add(TP(f.Value(uv[0], uv[1])));
+            g.FillPolygon(Brushes.White, o.ToArray());
+            shown.Add(f);
+        }
+        foreach (var f in shown)
+        {
+            double sd = V3.Dot(f.Key, Light), dk = Clamp01((0.3 - sd) / 0.6) * 0.72;
+            if (dk > 0.03) Shade(f.Value, tp, (u, v) => dk * (0.85 + 0.3 * u), (double u, double v, out double du, out double dv) => { du = 1; dv = 0.08; }, null, 0.35, 6f, 1.4f);
+        }
+        foreach (var f in shown)
+        {
+            double wgt = V3.Dot(f.Key, Light) < 0.2 ? 0.48 : 0.3;
+            Search(new[] { TP(f.Value(0, 0)), TP(f.Value(0.5, 0)), TP(f.Value(1, 0)) }, wgt, 1.3f, 2);
+            Search(new[] { TP(f.Value(0, 1)), TP(f.Value(0.5, 1)), TP(f.Value(1, 1)) }, wgt, 1.3f, 2);
+            if (s1 >= 1.49) Search(new[] { TP(f.Value(1, 0)), TP(f.Value(1, 1)) }, 0.42, 1.3f, 1);
+        }
+    }
+    void Motion(Box now, Box prev)
+    {
+        var h1 = TP(BoxPt(now, 1.1, 0, 0)); var h0 = TP(BoxPt(prev, 1.1, 0, 0)); if (Pn.D(h0, h1) < 1.5) return;
+        double a = Math.Atan2(h0.Y - h1.Y, h0.X - h1.X);
+        for (int k = 0; k < 5; k++)
+        {
+            var p = new PointF(h1.X + (R01() - 0.5f) * 70, h1.Y + (R01() - 0.5f) * 70); double L = 50 + 70 * R01();
+            Hair(new[] { p, new PointF((float)(p.X + Math.Cos(a) * L), (float)(p.Y + Math.Sin(a) * L)) }, 1.5f, 0.35);
+        }
+    }
+
+    // ---- the fist: the end of the attacker's arm block, square to the chest, pressed into the dent ----
+    void Fist(double zEnd)
+    {
+        double x0 = HX - FH, x1 = HX + FH, y0 = HY - FH, y1 = HY + FH, zn = -1.45;
+        Func<V3, PointF> tp = TP;
+        var faces = new[] {   // (u: from the chest out toward the attacker, v: across)
+            new KeyValuePair<V3, Func<double, double, V3>>(new V3(0, 1, 0), (u, v) => new V3(x0 + (x1 - x0) * v, y1, zEnd + (zn - zEnd) * u)),
+            new KeyValuePair<V3, Func<double, double, V3>>(new V3(0, -1, 0), (u, v) => new V3(x0 + (x1 - x0) * v, y0, zEnd + (zn - zEnd) * u)),
+            new KeyValuePair<V3, Func<double, double, V3>>(new V3(1, 0, 0), (u, v) => new V3(x1, y0 + (y1 - y0) * v, zEnd + (zn - zEnd) * u)),
+            new KeyValuePair<V3, Func<double, double, V3>>(new V3(-1, 0, 0), (u, v) => new V3(x0, y0 + (y1 - y0) * v, zEnd + (zn - zEnd) * u)) };
+        var vis = new List<KeyValuePair<V3, Func<double, double, V3>>>(); var all = new List<PointF>();
+        foreach (var f in faces)
+        {
+            if (!Seen(f.Value(0.5, 0.5), f.Key)) continue;
+            vis.Add(f); foreach (var uv in new[] { new[] { 0.0, 0 }, new[] { 1.0, 0 }, new[] { 1.0, 1 }, new[] { 0.0, 1 } }) all.Add(TP(f.Value(uv[0], uv[1])));
+        }
+        var outline = Pn.Hull(all.ToArray());
+        using (var gap = new Pen(Color.White, 18) { LineJoin = LineJoin.Round }) g.DrawPolygon(gap, outline);   // a sliver of paper round it
+        g.FillPolygon(Brushes.White, outline);
+        foreach (var f in vis)
+        {
+            double sd = V3.Dot(f.Key, Light), dk = sd < 0.3 ? 0.62 : 0.1;
+            Shade(f.Value, tp, (u, v) => Clamp01(dk + (u < 0.15 ? 0.2 * (1 - u / 0.15) : 0)), (double u, double v, out double du, out double dv) => { du = 1; dv = 0.06; }, null, 0.3, 5f, 1.5f);
+        }
+        // edges: the nearest form, so the firmest lines; the contact (where it meets the chest) darkest
+        foreach (var f in vis)
+        {
+            double wgt = V3.Dot(f.Key, Light) < 0.3 ? 0.7 : 0.5;
+            Search(new[] { TP(f.Value(0, 0)), TP(f.Value(1, 0)) }, wgt, 1.7f, 2);
+            Search(new[] { TP(f.Value(0, 1)), TP(f.Value(1, 1)) }, wgt, 1.7f, 2);
+            Search(new[] { TP(f.Value(0, 0)), TP(f.Value(0, 1)) }, 0.9, 2.2f, 3);
+        }
+    }
+
+    // ---- impact strokes out of the dent's rim ----
+    void Impact(int i)
+    {
+        var c = DP(new V3(HX, HY, -0.5));
+        for (int k = 0; k < 14; k++)
+        {
+            double a = 2 * Math.PI * k / 14 + (R01() - 0.5) * 0.3, x = HX + 0.95 * Math.Cos(a), y = HY + 0.95 * Math.Sin(a);
+            if (Math.Abs(x) > 0.98 || Math.Abs(y) > 0.98) continue;
+            var p0 = DP(new V3(x, y, -0.5)); double ang = Math.Atan2(p0.Y - c.Y, p0.X - c.X), L = (50 + 80 * R01()) * (1 - 0.15 * i);
+            Hair(new[] { p0, new PointF((float)(p0.X + Math.Cos(ang) * L), (float)(p0.Y + Math.Sin(ang) * L)) }, 2.2f, 0.75);
+        }
+    }
+}

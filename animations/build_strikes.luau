@@ -855,21 +855,19 @@ end
 -- back to the first chamber, so the loop joins
 table.insert(BARRAGE_UP_KEYS, flurryChamber(1, #FLURRY_PUNCHES * FLURRY_STEP))
 
--- HaymakerUp (kits-8a, rebuilt from the 10-reference cutscene study, design/cutscene-study): the leap AND the
--- haymaker in one clip, so nothing else fights it for the body. The owner on kits-7m: "the awkward windup between the
--- dash and the final punch, where the arm rotates". Every reference loads the strike BEFORE the travel, holds it
--- through the travel and lets it go in 1-3 frames (Azure 4.83-5.27, Human Battery F3 17.80-18.43, Garou vs Stinger
--- 11.38-11.88, Mumen 3.10-3.52, Tanktop); the R6 punch is the TORSO turning and the body leaning in behind an arm that
--- is already aimed, never the arm swinging round (Mumen Rider, 06 F4).
---   0.00-0.12  the load, in the crouch: the right fist pulled back at the chest (aimed at them, the arm drawn back
---              along itself), the torso turned away, low, leaning in
---   0.12-0.18  the take-off: the legs drive out, the load held
---   0.18-0.25  the travel pose (the hold point): diving in, lead knee up, the other leg trailing, the load held
---   0.25-0.32  the strike (0.32): the torso turns 65 deg into it and the arm drives out ALONG its aim (its sweep turns
---              back as the torso turns, so in the world it keeps pointing at them)
---   0.32-0.75  the driven follow-through (Tanktop 22.25-22.67), then it settles
--- The timeline (Ultimates swing `loaded`/`release`) plays 0-0.25 over the crouch and take-off, holds 0.25 through the
--- whole dash, and plays 0.25-0.32 in the last ~0.12 s before contact.
+-- HaymakerUp: the leap AND the haymaker in one clip, so nothing else fights it for the body (kits-8a).
+-- kits-8c, measured against the references (design/cutscene-study/12a, 12b; the owner: "the leap + dash have really
+-- weak impact, doesnt feel strong at all and feels like you just glide over"): the WAITING comes before the dash, in a
+-- coil that is deepest on its last frame (Azure 4.83-5.07, 0.23 s); the dash itself is short (Azure and Strongest
+-- Battlegrounds: 0.23 s) and hits on arrival; the strike is visibly LOADED and released in 1-3 frames (Mumen Rider's
+-- hand raised by the head, then the arm to horizontal in 2-3 frames; Serious Punch's fist cocked through the hold).
+-- kits-8a's load kept the arm aimed at the target, drawn back along itself, and on screen it read as already thrown.
+-- The clip runs on the timeline's clock 1:1 (Ultimates: LOAD is clip 0, TAKEOFF clip 0.30, the hit clip 0.45):
+--   0.00-0.30  the coil: crouching, turning away, the right fist cocked up and back by the ear, deepest at 0.30
+--   0.30-0.34  the take-off: the legs drive out (2 frames)
+--   0.34-0.38  the dive pose (the hold point), the fist still cocked; held through the dash
+--   0.38-0.45  the strike: the arm snaps from cocked to aimed at them while the torso turns 65 deg into it (0.07 s)
+--   0.45-0.88  the driven follow-through (Tanktop 22.25-22.67), then it settles
 local AIR_FEET = {
 	["Right Leg"] = { 0.55, -1.9, -1.3 }, -- the lead knee up
 	["Left Leg"] = { -0.55, -2.8, 0.9 }, -- trailing
@@ -882,36 +880,47 @@ local TAKEOFF_FEET = {
 	["Right Leg"] = { 0.5, GROUND - 0.2, 1.5 }, -- extended back, toes last off the floor
 	["Left Leg"] = { -0.5, -2.2, -0.6 }, -- the lead knee coming up
 }
--- the load: the right arm aimed AT them (straight ahead in the world, HAY_UP above level) but drawn back along itself,
--- so only the body has to move. An arm's aim is in the torso's frame: a turn of -45 faces the torso 45 deg to its
--- right (measured with tests/support/Rig), so the sweep follows the turn to keep the world aim straight ahead, and the
--- lift adds the lean (leaning in tips the torso's "level" down).
+-- An arm's aim is in the torso's frame: a turn of -45 faces the torso 45 deg to its right (measured with
+-- tests/support/Rig), so to keep a world aim the sweep follows the turn and the lift adds the lean.
 local HAY_TURN_LOADED = -45
 local HAY_TURN_STRUCK = 20
 local HAY_UP = 28
 local HAY_LEAN_LOADED = 35
 local HAY_LEAN_STRUCK = 22
 local HAY_INWARD = 18 -- a straight right aims at their middle: the fist crosses to the centreline at full reach
-local LOADED = { sweep = HAY_TURN_LOADED - HAY_INWARD, lift = HAY_UP + HAY_LEAN_LOADED, reach = 0.55 }
+-- cocked: the fist up and back by the ear (solved on the Rig for the loaded torso: world aim about (0.2, 0.87, 0.43))
+local COCKED_UP = { sweep = 122, lift = 28, reach = 0.65 }
 local STRUCK = { sweep = HAY_TURN_STRUCK - HAY_INWARD, lift = HAY_UP + HAY_LEAN_STRUCK, reach = 1.45 }
-local SIGHT = { sweep = -HAY_TURN_LOADED, lift = 25 + HAY_LEAN_LOADED, reach = 1.15 } -- the left hand out ahead at them
+local SIGHT = { sweep = -HAY_TURN_LOADED, lift = 25 + HAY_LEAN_LOADED, reach = 1.15 } -- the left hand out at them
 local HAYMAKER_UP_KEYS = {
 	{ t = 0, right = GUARDED, left = GUARDED, lean = STANCE_DIP, turn = STANCE_TURN, feet = STANCE_FEET },
 	{
-		t = 0.12,
+		t = 0.18,
 		ease = "out",
-		right = LOADED,
+		right = COCKED_UP,
 		left = SIGHT,
-		lean = HAY_LEAN_LOADED,
-		turn = HAY_TURN_LOADED,
-		crouch = -0.6,
+		lean = HAY_LEAN_LOADED - 5,
+		turn = HAY_TURN_LOADED + 10,
+		crouch = -0.45,
 		look = -10,
 		feet = LOAD_FEET,
 	},
 	{
-		t = 0.18,
+		-- deepest on the last frame before it goes
+		t = 0.3,
+		ease = "smooth",
+		right = COCKED_UP,
+		left = SIGHT,
+		lean = HAY_LEAN_LOADED,
+		turn = HAY_TURN_LOADED,
+		crouch = -0.65,
+		look = -12,
+		feet = LOAD_FEET,
+	},
+	{
+		t = 0.34,
 		ease = "snap",
-		right = LOADED,
+		right = COCKED_UP,
 		left = SIGHT,
 		lean = HAY_LEAN_LOADED,
 		turn = HAY_TURN_LOADED,
@@ -920,9 +929,9 @@ local HAYMAKER_UP_KEYS = {
 		feet = TAKEOFF_FEET,
 	},
 	{
-		t = 0.25,
+		t = 0.38,
 		ease = "out",
-		right = LOADED,
+		right = COCKED_UP,
 		left = SIGHT,
 		lean = HAY_LEAN_LOADED,
 		turn = HAY_TURN_LOADED,
@@ -931,7 +940,7 @@ local HAYMAKER_UP_KEYS = {
 		feet = AIR_FEET,
 	},
 	{
-		t = 0.32,
+		t = 0.45,
 		ease = "snap",
 		right = STRUCK,
 		left = { sweep = 160, lift = -30, reach = 0.9 }, -- yanked back by the side as the right goes
@@ -942,7 +951,7 @@ local HAYMAKER_UP_KEYS = {
 		feet = AIR_FEET,
 	},
 	{
-		t = 0.45,
+		t = 0.58,
 		ease = "outHard",
 		right = { sweep = 30 - HAY_INWARD, lift = HAY_UP + 4 + 18, reach = 1.5 },
 		left = { sweep = 160, lift = -32, reach = 0.9 },
@@ -953,7 +962,7 @@ local HAYMAKER_UP_KEYS = {
 		feet = AIR_FEET,
 	},
 	{
-		t = 0.75,
+		t = 0.88,
 		ease = "smooth",
 		right = { sweep = 32 - HAY_INWARD, lift = HAY_UP + 6 + 15, reach = 1.5 },
 		left = { sweep = 160, lift = -32, reach = 0.9 },
@@ -964,7 +973,7 @@ local HAYMAKER_UP_KEYS = {
 		feet = AIR_FEET,
 	},
 	{
-		t = 1.0,
+		t = 1.1,
 		ease = "smooth",
 		right = GUARDED,
 		left = GUARDED,
@@ -1182,8 +1191,8 @@ local ULTIMATE_CLIPS = {
 	HaymakerUp = simplify(
 		bakeKeyed(
 			HAYMAKER_UP_KEYS,
-			1.0,
-			{ loop = false, priority = "Action2", strike = 0.32, hold = 0.25 },
+			1.1,
+			{ loop = false, priority = "Action2", strike = 0.45, hold = 0.38 },
 			AIR_FEET
 		)
 	),

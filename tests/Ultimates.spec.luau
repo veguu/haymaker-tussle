@@ -405,27 +405,73 @@ return {
 		assert(targetAtUpper.Z - early.Z > back * 0.4, "the launch starts fast")
 	end,
 
-	["the haymaker's fist stays loaded through the dash: no wind-up turning the arm (kits-8a)"] = function()
-		-- the owner: "an awkward windup between the dash and the final punch, where the arm rotates" (kits-7m: a 0.86 s
-		-- coil spread over the rise, then a 158 deg swing). The arm's aim at its hold point and at the contact.
+	["the haymaker is cocked through the coil and the dash, then snaps out (kits-8a, kits-8c)"] = function()
+		-- the owner on kits-7m: "an awkward windup between the dash and the final punch, where the arm rotates" (a 0.86 s
+		-- coil spread over the rise). kits-8c, measured: the references load VISIBLY before the travel, hold it, and
+		-- release in 1-3 frames (kits-8a's load pointed the arm at the target and read as already thrown). So: the arm's
+		-- aim does not move from the end of the coil through the dive, and the strike takes 0.08 s at most.
 		local Rig = require("./support/Rig")
 		local UltimateClips = require("../src/shared/Config/AnimClipsUltimate")
 		local clip = (UltimateClips :: any).HaymakerUp
 		local root = Rig.CFrame.new()
-		local _, loaded = Rig.fist(Rig.parts(root, Rig.sample(clip, clip.hold))["Right Arm"])
-		local _, struck = Rig.fist(Rig.parts(root, Rig.sample(clip, clip.strike))["Right Arm"])
-		local turned = math.deg(math.acos(math.clamp(loaded:Dot(struck), -1, 1)))
-		assert(turned < 10, `the arm turns {turned} deg on the strike`)
-		-- and the timeline holds it there through the dash
+		local function aim(at: number): any
+			local _, direction = Rig.fist(Rig.parts(root, Rig.sample(clip, at))["Right Arm"])
+			return direction
+		end
+		local cocked = aim(0.18)
+		for _, at in { 0.24, 0.3, 0.34, clip.hold } do
+			local turned = math.deg(math.acos(math.clamp(cocked:Dot(aim(at)), -1, 1)))
+			assert(turned < 10, `the cocked arm turns {turned} deg by clip {at}`)
+		end
+		assert(clip.strike - clip.hold <= 0.08 + 1e-6, "the strike snaps out in 0.08 s at most")
+		-- the timeline plays it 1:1 from the coil to the dive, holds it, and lets it go in the last 0.08 s
 		local line = Ultimates.TIMELINES.Base
 		local held = false
 		for _, swing in line.swings do
 			if swing.side == "HaymakerUp" and swing.loaded and swing.release then
-				held = swing.release - swing.loaded >= 0.4
-					and swing.t + swing.windup - swing.release <= 0.15
+				held = math.abs((swing.loaded - swing.t) - clip.hold) < 0.02
+					and swing.t + swing.windup - swing.release <= 0.08 + 1e-6
 			end
 		end
-		assert(held, "loaded by the take-off, held through the dash, released in the last 0.15 s")
+		assert(held, "coiled on the clip's own clock, released in the last 0.08 s")
+	end,
+
+	["the dash is short and never slows before the contact: no glide (kits-8c)"] = function()
+		-- the owner on kits-8b: "the leap + dash have really weak impact ... feels like you just glide over". Measured
+		-- (design/cutscene-study/12a): Azure and Strongest Battlegrounds dash in 0.23 s at full speed and hit on arrival;
+		-- ours took 0.57 s easing out, then held still 0.26 s.
+		local line = Ultimates.TIMELINES.Base
+		local start = Vector3.new(0, 0, 12)
+		local takeoff, haymaker = 0, 0
+		for _, cue in line.cues do
+			if cue.name == "leap" then
+				takeoff = cue.t
+			elseif cue.name == "haymaker" then
+				haymaker = cue.t
+			end
+		end
+		assert(haymaker - takeoff <= 0.3 + 1e-6, `the dash takes {haymaker - takeoff} s`)
+		local step = 1 / 120
+		local slowest = math.huge
+		local t = takeoff + 0.05
+		while t <= haymaker do
+			local a = Ultimates.pose(line, t - step, start)
+			local b = Ultimates.pose(line, t, start)
+			slowest = math.min(slowest, (b - a).Magnitude / step)
+			t += step
+		end
+		assert(slowest > 25, `the dash drops to {slowest} studs/s before the contact`)
+		-- and the launch is parked before the coil ends: 0.4 s or more of hang before the take-off
+		local upper = 0
+		for _, cue in line.cues do
+			if cue.name == "uppercut" then
+				upper = cue.t
+			end
+		end
+		local _, a = Ultimates.pose(line, upper + 0.25 + 0.17, start)
+		local _, b = Ultimates.pose(line, upper + 0.25 + 0.17 + 0.05, start)
+		assert((b - a).Magnitude / 0.05 < 3, "the launch is parked by 0.17 s")
+		assert(takeoff - (upper + 0.25 + 0.17) >= 0.4 - 1e-6, "the coil waits 0.4 s or more")
 	end,
 
 	["the knockback starts on the hit and never stops into the flight (kits-8a)"] = function()

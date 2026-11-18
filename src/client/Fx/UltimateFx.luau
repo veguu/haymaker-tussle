@@ -53,7 +53,8 @@ type State = {
 	voice: { Sound }, -- the foreground sound now ringing (one at a time)
 	flurry: number?, -- flurry punches burst so far (they alternate sides)
 	sparks: number?, -- sparks played so far (each takes the next set turn)
-	impact: ImpactFrame.Prepared?, -- the haymaker's silhouettes, made in the wind-up (kits-7f)
+	-- the haymaker's three card runs' silhouettes, made in the wind-up (kits-7f; kits-8c: one set per run, each used once)
+	impacts: { ImpactFrame.Prepared }?,
 }
 
 -- Each spark's turn in degrees, in order (kits-7f, the owner's rule: every rotation set on purpose, never random).
@@ -69,23 +70,118 @@ local BED_VOLUME = 0.5 -- under the punches, never over them
 local DIP_FADE = 0.05
 local CHOKE = 0.04 -- how fast a punch's ring fades when the next one lands
 
--- The impact frame (memory: drawn two-tone frames, never a flash; Azure Flames frames 65-69): black with one
--- white slash, pure white, an ink sketch of the two of them with speed lines, black with white silhouettes
--- split red and cyan, then white with black four-point stars. ~0.3 s.
-local HAYMAKER_FRAME: ImpactFrame.Spec = {
+-- The impact frames (memory: drawn two-tone frames, never a flash). kits-8c, the owner: "there should be 3 impact frame
+-- moments, one in the initial contact and then another as the torso soaks the impact of the fist, and then a final one
+-- right before the target flies away", and "the impact frames need to be more detailed and flashy, right now they are
+-- super simple and plain". Three runs, each drawn from the bodies as they are at that moment (the fold deepening, then
+-- the body about to go), each its own look, with the motion running on between them. From the references' measured
+-- cards: 2-3 frames a card, cards that MOVE (lines closing in and redrawing, a slash thinning, shards flying, a push-in),
+-- the fighters both as solid shapes and as ink line art, a red ground for the last one (Acheron 9.217, Azure 6.833).
+-- House rules kept: no ring with lines coming out of it (no "sun"), every angle set on purpose.
+local INK_RED = Color3.fromRGB(205, 22, 44)
+-- 1. CONTACT, 0.2 s: the slash thinning through the hit with shards, the two in line art with lines closing in, white
+-- silhouettes split red and cyan, then turning stars.
+local CONTACT_FRAME: ImpactFrame.Spec = {
 	frames = {
-		{ bg = FxKit.BLACK, ink = FxKit.WHITE, figures = false, slash = true, hold = 0.05 },
-		{ bg = FxKit.WHITE, ink = FxKit.BLACK, figures = false, hold = 0.04 },
-		{ bg = FxKit.WHITE, ink = FxKit.BLACK, lines = true, zoom = 1.05, shake = 6, hold = 0.07 },
-		{ bg = FxKit.BLACK, ink = FxKit.WHITE, split = true, zoom = 1.08, shake = 8, hold = 0.05 },
+		{
+			bg = FxKit.BLACK,
+			ink = FxKit.WHITE,
+			figures = false,
+			slash = true,
+			thinning = true,
+			shards = true,
+			hold = 0.05,
+		},
+		{
+			bg = FxKit.WHITE,
+			ink = FxKit.BLACK,
+			outline = true,
+			lines = true,
+			closing = true,
+			zoom = 1,
+			zoomTo = 1.06,
+			shake = 6,
+			hold = 0.06,
+		},
+		{ bg = FxKit.BLACK, ink = FxKit.WHITE, split = true, zoom = 1.08, shake = 8, hold = 0.04 },
 		{
 			bg = FxKit.WHITE,
 			ink = FxKit.BLACK,
 			figures = false,
 			flares = true,
+			spin = true,
 			zoom = 1.1,
-			hold = 0.08,
+			hold = 0.05,
 		},
+	},
+}
+-- 2. THE SOAK, 0.15 s: pushed in close on the fold, solid black on white with lines closing, then white line art on
+-- black with shards, then solid again under turning stars.
+local SOAK_FRAME: ImpactFrame.Spec = {
+	frames = {
+		{
+			bg = FxKit.WHITE,
+			ink = FxKit.BLACK,
+			lines = true,
+			closing = true,
+			zoom = 1.1,
+			zoomTo = 1.18,
+			shake = 4,
+			hold = 0.05,
+		},
+		{
+			bg = FxKit.BLACK,
+			ink = FxKit.WHITE,
+			outline = true,
+			shards = true,
+			zoom = 1.16,
+			hold = 0.05,
+		},
+		{
+			bg = FxKit.WHITE,
+			ink = FxKit.BLACK,
+			flares = true,
+			spin = true,
+			zoom = 1.2,
+			hold = 0.05,
+		},
+	},
+}
+-- 3. THE RELEASE, 0.2 s, right before they fly: a white burst with a black core under turning stars, the two as solid
+-- black on a RED ground (line art on red read as red on red, measured) with lines closing and shards, white silhouettes split with the beams crossing, then the
+-- lines alone.
+local RELEASE_FRAME: ImpactFrame.Spec = {
+	frames = {
+		{
+			bg = FxKit.WHITE,
+			ink = FxKit.BLACK,
+			figures = false,
+			burst = true,
+			flares = true,
+			spin = true,
+			hold = 0.04,
+		},
+		{
+			bg = INK_RED,
+			ink = FxKit.BLACK,
+			lines = true,
+			closing = true,
+			shards = true,
+			zoom = 1.04,
+			shake = 6,
+			hold = 0.06,
+		},
+		{
+			bg = FxKit.BLACK,
+			ink = FxKit.WHITE,
+			split = true,
+			beams = true,
+			zoom = 1.06,
+			zoomTo = 1.12,
+			shake = 8,
+			hold = 0.05,
+		},
+		{ bg = FxKit.WHITE, ink = FxKit.BLACK, figures = false, lines = true, hold = 0.05 },
 	},
 }
 
@@ -313,15 +409,22 @@ local function leap(ctx: Context, state: State)
 	if root then
 		local floor = FxKit.floorUnder(root.Position, 8, { ctx.attacker, ctx.target })
 		if floor then
-			StepBurstFx.play(floor, 1.5, true)
+			-- kits-8c (the owner: the leap "doesnt feel strong at all"): the ground kicked away hard, the dust thrown fast
+			StepBurstFx.play(floor, 2.4, true)
 			for index = 1, DUST_RING do
 				local angle = (index - 1) / DUST_RING * math.pi * 2
 				local out = Vector3.new(math.cos(angle), 0, math.sin(angle))
-				AirFx.puff(floor + out * 1.2 + Vector3.new(0, 0.4, 0), out * 9)
+				AirFx.puff(floor + out * 1.2 + Vector3.new(0, 0.4, 0), out * 15)
 			end
 		end
-		AirFx.gust(root.Position - Vector3.new(0, 2, 0), Vector3.new(0, 1, 0))
-		AirFx.ribbon(root, 0.75, 2.2, 0.35)
+		-- the gust along the dash, toward them (it went straight up), and a wide streak behind the body the whole way
+		-- (Azure 5.10-5.30: a long white streak from attacker to target)
+		local theirs = rootOf(ctx.target)
+		local along = if theirs
+			then (theirs.Position - root.Position).Unit
+			else Vector3.new(0, 1, 0)
+		AirFx.gust(root.Position, along)
+		AirFx.ribbon(root, 0.4, 3.2, 0.3)
 	end
 	foreground(ctx, state, "dash", { volume = 0.6, pitch = 1.2, cut = 0.3 })
 end
@@ -331,10 +434,17 @@ end
 -- fist through the whole dash (the owner's "charging his punch while the leap", with no arm turning to show it).
 local function windup(ctx: Context, state: State)
 	-- the impact frames' silhouettes, cloned now so nothing heavy happens on the hit (kits-7f, the gap study)
+	-- (three sets, a frame or two apart, so the cloning never lands in one frame)
 	if ctx.mine then
-		state.impact = ImpactFrame.prepare({ ctx.attacker, ctx.target })
+		local impacts: { ImpactFrame.Prepared } = {}
+		state.impacts = impacts
+		for index = 1, 3 do
+			task.delay((index - 1) * 0.06, function()
+				impacts[index] = ImpactFrame.prepare({ ctx.attacker, ctx.target })
+			end)
+		end
 	end
-	fistGlint(ctx, 0.95, 1.6)
+	fistGlint(ctx, 0.55, 1.8)
 	if state.bed and state.bed.Parent then
 		tween(state.bed, 0.6, { Volume = BED_VOLUME * 1.8 }, Enum.EasingStyle.Sine)
 	end
@@ -357,27 +467,37 @@ end
 
 -- The haymaker: ONE complete designed hit (the user: one sound that is the thing, not a stack of parts), on
 -- the frame the fist lands, after the silence.
+-- One run of the haymaker's impact cards (`which` 1-3: contact, soak, release), drawn from a side profile of the pair
+-- as they are now (kits-7m: the live shot is a close-up, and silhouettes drawn from it filled the screen); 12 studs off
+-- on the attacker's right.
+local function cards(ctx: Context, state: State, spec: ImpactFrame.Spec, which: number)
+	if not ctx.mine then
+		return
+	end
+	local at = chest(ctx)
+	local a, b = rootOf(ctx.attacker), rootOf(ctx.target)
+	local middle = if a and b then a.Position:Lerp(b.Position, 0.5) else at
+	local view =
+		CFrame.lookAt(middle + ctx.anchor.RightVector * 12 + Vector3.new(0, 0.4, 0), middle)
+	local prepared = state.impacts and state.impacts[which]
+	task.spawn(ImpactFrame.play, spec, at, { ctx.attacker, ctx.target }, prepared, view, 50)
+end
+
 local function haymaker(ctx: Context, state: State)
 	local at = chest(ctx)
-	if ctx.mine then
-		-- the cards draw from a side profile of the pair (kits-7m: the live shot is a close-up on the fist now, and
-		-- silhouettes drawn from it filled the whole screen); 12 studs off on the attacker's right, as before
-		local a, b = rootOf(ctx.attacker), rootOf(ctx.target)
-		local middle = if a and b then a.Position:Lerp(b.Position, 0.5) else at
-		local view =
-			CFrame.lookAt(middle + ctx.anchor.RightVector * 12 + Vector3.new(0, 0.4, 0), middle)
-		task.spawn(
-			ImpactFrame.play,
-			HAYMAKER_FRAME,
-			at,
-			{ ctx.attacker, ctx.target },
-			state.impact,
-			view,
-			50
-		)
-	end
+	cards(ctx, state, CONTACT_FRAME, 1)
 	PunchHitFx.play(at + fistSide(ctx, "Right"), outward(ctx), 2.2, nil, true, nextTurn(state))
 	sound("ult_haymaker", ctx, state, { volume = 1 })
+end
+
+-- the torso soaking the fist, in the slow motion (kits-8c): the second card run
+local function soak(ctx: Context, state: State)
+	cards(ctx, state, SOAK_FRAME, 2)
+end
+
+-- right before they fly (kits-8c): the third card run, then the blast as it goes full speed
+local function release(ctx: Context, state: State)
+	cards(ctx, state, RELEASE_FRAME, 3)
 end
 
 -- The blast: colour back, the shockwave, and no new sound. Our heavy hit (ult_haymaker, kits-7a) already carries
@@ -428,6 +548,8 @@ local BASE: { [string]: (Context, State) -> () } = {
 	windup = windup,
 	dip = dip,
 	haymaker = haymaker,
+	soak = soak,
+	release = release,
 	blast = blast,
 	launch = launch,
 }

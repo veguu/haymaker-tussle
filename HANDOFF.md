@@ -3729,3 +3729,54 @@ Fixed from that recording:
 kits-8b is NOT seen in Studio. Studio's viewport froze on a stale frame, so the screen capture got stills. Restart Studio
 (its output also asks for a restart: the assistant plugin changed version), then record again. The acceptance
 checklist with each item's state is in `design/cutscene-study/11`, section 6.
+
+## kits-8c..8d (2026-11-18): the launch and dash retimed from measurements; three impact-frame runs
+Build stamp `kits-8d+lobby-4+ui-15c`. Everything is in `design/cutscene-study/13-launch-dash-retimed-kits-8d.md` (with the
+measurements in `12a`/`12b`).
+
+- **The dash:** the owner said "the leap + dash ... feels like you just glide over".
+  - The dash is 0.23 s at full speed and hits on arrival.
+  - It comes after a 0.30 s coil with the fist cocked by the ear.
+  - The camera stays put and pans ahead while the attacker shoots away from the lens.
+- **The launch:** kicked in 0.17 s under a still reverse-angle uppercut camera.
+- **Three impact-frame runs:** contact, soak and release. The cards are richer: moving lines, thinning slash, needles,
+  line art, a red card.
+- **Fixed on the way:**
+  - the silhouettes never recoloured (matched by index)
+  - first-shown card images drew blank (now kept warm on screen)
+- **A Studio replay tool:** `ReplicatedStorage.HT_UltReplay`, which runs slow or holds still.
+- **Gates:** rojo build OK, 556 tests, `selene src` 0, stylua clean.
+- **The video:** `design/references/ours-kits-8d.mp4` (a 0.5x replay sped up 2x; untracked).
+- **NOT DONE:**
+  - a live (non-replay) check at real speed with sound
+  - stage D
+  - the sound pass
+
+## impact frames (2026-11-18): reference study, drawing study, drawn previews (OFFLINE ONLY; nothing in the game yet)
+The owner rejected the procedural impact-frame textures and asked for practice copies of their references first, then a
+drawing-technique study. Nothing here is uploaded to Roblox or wired into `ImpactFrame.luau`.
+
+- **Reference study:** `design/cutscene-study/14-impact-frame-reference-copies.md`.
+  - Ref 1 (v4) and ref 2 (v12) are copied.
+  - Ref 3 is copied from its measured lines (m4); the owner said "Yes, it matches".
+  - Tools are in `design/vfx/study/`: `ImgLab.cs`, `Sketch.cs`, `Pencil.cs`, loaded by `load.ps1`.
+- **Drawing study:** `design/cutscene-study/15-drawing-techniques-study.md`, with plates in `design/vfx/study/plates.ps1`.
+  It covers perspective, curvilinear distortion, ellipses, cross-contours and marks.
+- **The two frames (`design/vfx/impact/`):**
+  - **Contact:** `build_contact.ps1`, the ref-2 ink burst redrawn as pencil, 10 frames exploding outward. The owner's
+    last word was that it "just flashes"; it was then animated, and they haven't reacted yet.
+  - **Fist impact:** `build_plunge.ps1` driving `Plunge.cs`. The torso, head, arms and fist share three vanishing
+    points, in the target's Fold pose. The chest caves in round the fist.
+- **The owner's style rules (latest):**
+  - The whole drawing is made of scratches only: thin tapered searching lines, no traced thick outlines.
+  - Tone is shadow only: lit planes stay paper, and the hatching follows the form.
+  - No scribble loops.
+  - The torso's middle is the focus, with the framing as before.
+  - The head and arms only peek in at the edges.
+- **IN PROGRESS:** the latest `Plunge.cs` rewrite (shadow-shape hatching, searching lines) rendered one frame that is
+  too faint and has not been shown to the owner. Next steps:
+  - stronger shadow shapes and contact accents;
+  - render all 8 frames;
+  - run `bash design/vfx/impact/make_previews.sh` and show the owner.
+- **Outputs:** `design/vfx/study/out` and `design/vfx/impact/out` are ignored except the final sheets and previews. The
+  `ours-kits-*` recordings stay local (ignored).

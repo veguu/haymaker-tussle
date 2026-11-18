@@ -51,6 +51,10 @@ FxKit.Tex = {
 	Shard = "rbxassetid://91703865151068", -- an ice crystal standing on the image's centre, pointing up
 	Leaf = "rbxassetid://107713021393708", -- a lens pointed at both ends, lying along X, tip to the right
 	Pinwheel = "rbxassetid://125971836125924", -- a ring broken into five crescents
+	-- the haymaker's impact-frame flipbooks (kits-8e, design/vfx/draw_impact_flipbooks.ps1): 2 x 2 frames of 512 px each
+	ImpactLinesA = "", -- rough manga speed lines closing in, frames 1-4
+	ImpactLinesB = "", -- and frames 5-8
+	ImpactBurst = "", -- a tonal, grainy burst opening out, 4 frames
 }
 
 FxKit.WHITE = Color3.new(1, 1, 1)
