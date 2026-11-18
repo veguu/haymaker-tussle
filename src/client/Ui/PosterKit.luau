@@ -18,7 +18,6 @@ local UiSound = require(script.Parent.UiSound)
 local PosterKit = {}
 
 local colour = Tokens.colour
-local TAN6 = math.tan(math.rad(6))
 
 function PosterKit.make(class: string, parent: Instance?, props: { [string]: any }): any
 	local object = Instance.new(class)
@@ -290,9 +289,18 @@ export type Row = {
 	button: TextButton?,
 }
 
---- A slanted ink row (`.sk`): a key cap when `key` is given, a name in Oswald, a smaller line under it when
---- `detail` is given, and `right` (a cooldown, PLANNED, ON) at its right end. `height` is 46 for a bare row, 72
---- with one line of detail, 98 with two.
+--- A row of words with NO FRAME (the owner, 2026-11-18: "having a frame isn't high quality, especially for the
+--- moves section"; seen on the mockup's Moves page first, `.mv`, then "apply that same new style to anything
+--- that's applicable"). Until then this was a slanted ink plate with cream words on it (`.sk`). Now nothing is
+--- behind the words, and what keeps them readable on the window's drifting field is:
+---   the KEY   on a small cream rough-cut tile with an ink edge and a hard ink shadow (when `key` is given);
+---   the NAME  as poster lettering: cream Oswald with an ink outline and a hard ink shadow. The outline is 1.5 units (2 at first: in a small window the letters of YOUR CLASS'S MOVE ran together)
+---             on a 35-unit letter, under the 7 % at which an outline starts to close a letter's counters (vault:
+---             "UIStroke on Text - Glyph Counters and the Stroke Ratio");
+---   the LINE  under it (`detail`) in plain ink, bold, straight on the field: ink on any class colour is the
+---             palette's strongest contrast;
+---   `right`   (a cooldown, PLANNED) in ink Oswald at the right end.
+--- `height` is 46 for a bare row and 26 more for every line of detail (the callers' own sums, unchanged).
 function PosterKit.row(
 	parent: Instance?,
 	width: number,
@@ -314,56 +322,90 @@ function PosterKit.row(
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
 	})
-	-- the plate leans 6 degrees; its box is that much wider than the row's contents
-	local lean = height * TAN6
-	local plate = Shapes.slant(body, "ink.900", lean, {
+	-- (kept so a Row still has its `plate`: an empty box where the ink plate was)
+	local plate = make("Frame", body, {
 		Name = "Plate",
-		Position = UDim2.fromOffset(-lean / 2, 0),
-		Size = UDim2.new(1, lean, 1, 0),
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
 	})
-	local x = 12
+	local x = 6
 	if key then
-		-- a cap is as wide as its key (about 8.7 units a letter at this size) and never under 42; the name
-		-- starts 10 past it
-		local capWidth = math.max(42, 12 + 8.7 * #key)
-		PosterKit.cap(body, key, {
-			Position = UDim2.fromOffset(12, 8),
-			Size = UDim2.fromOffset(capWidth, 30),
-			AutomaticSize = Enum.AutomaticSize.None,
+		-- a tile is as wide as its key (about 9 units a letter at this size) and never under 46; the name
+		-- starts 12 past it
+		local tileWidth = math.max(46, 20 + 9 * #key)
+		local tile = make("Frame", body, {
+			Name = "Key",
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(4, 2),
+			Size = UDim2.fromOffset(tileWidth, 40),
 			ZIndex = 2,
 		})
-		x = 12 + capWidth + 10
+		Shapes.image(
+			tile,
+			"tile",
+			"ink.900",
+			{ Name = "Shadow", Position = UDim2.fromOffset(3, 4) }
+		)
+		Shapes.image(tile, "tile", "ink.900", { Name = "Line", ZIndex = 2 })
+		Shapes.image(tile, "tile", "ivory.50", {
+			Name = "Fill",
+			Position = UDim2.fromOffset(3, 3),
+			Size = UDim2.new(1, -6, 1, -6),
+			ZIndex = 3,
+		})
+		-- (straight: small text turned even a degree is drawn soft)
+		Poster.text(tile, "display", 18, "ink.900", {
+			Name = "Letter",
+			Size = UDim2.fromScale(1, 1),
+			Text = key,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			ZIndex = 4,
+		})
+		x = 4 + tileWidth + 12
 	end
-	Poster.text(body, "display", 20, "ivory.50", {
-		Name = "Name",
-		Position = UDim2.fromOffset(x, 8),
-		Size = UDim2.new(1, -x - 70, 0, 30),
+	local nameProps = {
+		Position = UDim2.fromOffset(x, 3),
+		Size = UDim2.new(1, -x - 70, 0, 34),
 		Text = string.upper(name),
 		TextTruncate = Enum.TextTruncate.AtEnd,
-		ZIndex = 2,
-	})
+	}
+	-- the hard shadow: the same word in ink, 2 right and 3 down, under the cream one
+	local shadow = Poster.text(body, "display", 24, "ink.900", nameProps)
+	shadow.Name = "NameShadow"
+	shadow.Position = UDim2.fromOffset(x + 2, 6)
+	shadow.ZIndex = 2
+	make(
+		"UIStroke",
+		shadow,
+		{ Color = colour("ink.900"), Thickness = 1.5, LineJoinMode = Enum.LineJoinMode.Round }
+	)
+	local label = Poster.text(body, "display", 24, "ivory.50", nameProps)
+	label.Name = "Name"
+	label.ZIndex = 3
+	make(
+		"UIStroke",
+		label,
+		{ Color = colour("ink.900"), Thickness = 1.5, LineJoinMode = Enum.LineJoinMode.Round }
+	)
 	if detail and detail ~= "" then
 		-- 17, not the mockup's 15: the window is drawn smaller than the mockup's and this line was hard to read
-		-- (owner, 2026-11-17)
-		local small = Poster.text(body, "label", 17, "ivory.50", {
+		-- (owner, 2026-11-17). (Roblox drops a wrapped line that does not wholly fit: a line here is 26 units.)
+		local small = Poster.text(body, "label", 17, "ink.900", {
 			Name = "Detail",
-			-- (4 higher and 6 taller than at first: a line of this text is 26 units tall, and Roblox drops a
-			-- wrapped line that does not wholly fit, so an 88-unit row showed one line of two; 2026-11-18)
-			Position = UDim2.fromOffset(x, 34),
+			Position = UDim2.fromOffset(x, 38),
 			Size = UDim2.new(1, -x - 14, 0, height - 36),
 			Text = detail,
-			TextTransparency = 0.1,
 			TextWrapped = true,
 			TextYAlignment = Enum.TextYAlignment.Top,
 			ZIndex = 2,
 		})
-		-- the mockup's small line is Titillium Regular; SemiBold here, because the thin weight reads soft when small
-		small.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.SemiBold)
+		-- Bold: with no plate behind it the line needs its weight
+		small.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.Bold)
 	end
-	local rightLabel = Poster.text(body, "display", 18, "ivory.50", {
+	local rightLabel = Poster.text(body, "display", 18, "ink.900", {
 		Name = "Right",
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -12, 0, 8),
+		Position = UDim2.new(1, -12, 0, 7),
 		Size = UDim2.fromOffset(120, 26),
 		Text = right or "",
 		TextXAlignment = Enum.TextXAlignment.Right,

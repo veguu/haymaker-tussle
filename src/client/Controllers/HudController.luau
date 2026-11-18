@@ -1059,6 +1059,8 @@ function HudController:KnitStart()
 			else 0
 		-- and under the fighters' row while that is up: the row runs nearly the screen's width
 		local underRow = if rosterShown and fighting then SS.Top + (roster.tall + 6) * scale else 0
+		-- the pop-ups (last players, ULTIMATE, a class's name) stand under the row too, in a round or out of one
+		Callouts.under(if rosterShown then SS.Top + roster.tall * scale else nil)
 		feed.holder.Position = UDim2.new(1, -edge, 0, math.max(L.StripTop + underCoins, underRow))
 		spectate.holder.Position = UDim2.new(0.5, 0, 1, -edge)
 		-- the tile row keeps spare room round it inside its group; the tiles themselves stop at the mockup's
@@ -1260,9 +1262,65 @@ function HudController:KnitStart()
 		end)
 	end)
 
+	-- THE ROUND'S START: 3, 2, 1, TUSSLE! (ui-16a; it took the GET READY strip's place). The server holds the
+	-- phase "Starting" until CountdownEnd; the numbers land on the last three whole seconds before it and the
+	-- word as the fight begins. One thread per start, alive only for those few seconds; a number first seen
+	-- more than half a second late is skipped. Not under the open menu window, and never in training.
+	Callouts.start() -- its layers now, so the countdown's sheet is fetched before the first round
+	local countArmed: number? = nil
+	local function countRefresh(round: HudLogic.RoundState)
+		local finish = round.countdownEnd
+		if round.phase ~= "Starting" or finish == nil then
+			if round.phase ~= "Fighting" then
+				-- called off (or no round at all): nothing more lands, and what is up goes
+				if countArmed then
+					countArmed = nil
+					Callouts.countStop()
+				end
+			end
+			return
+		end
+		if countArmed == finish then
+			return
+		end
+		countArmed = finish
+		task.spawn(function()
+			local shown: number? = nil
+			while countArmed == finish do
+				local now = workspace:GetServerTimeNow()
+				local beat = HudLogic.countBeat(now, finish, 0.5)
+				if beat ~= shown then
+					shown = beat
+					local phase = readRound().phase
+					if beat == 0 then
+						if not menuOpen and (phase == "Starting" or phase == "Fighting") then
+							Callouts.go(classColour, device == "touch")
+						end
+						break
+					elseif
+						beat
+						and not menuOpen
+						and phase == "Starting"
+						and HudLogic.countLate(now, finish, beat) < 0.5
+					then
+						Callouts.count(beat, device == "touch")
+					end
+				end
+				if now > finish + 0.5 then
+					break
+				end
+				task.wait()
+			end
+			if countArmed == finish then
+				countArmed = nil
+			end
+		end)
+	end
+
 	local function refreshStrip(fromEvent: boolean)
 		local round = readRound()
 		rosterRefresh(round)
+		countRefresh(round)
 		local now = workspace:GetServerTimeNow()
 		local info = HudLogic.strip(round, now)
 		setGroup(strip, info.visible)
@@ -1273,7 +1331,7 @@ function HudController:KnitStart()
 		local roundText = if round.round then `ROUND {round.round}` else ""
 		local fightingNow = round.phase == "Fighting"
 		local counting = round.phase == "Intermission"
-		-- Fighting: [ 18  / 25  STANDING ]; intermission: [ NEXT ROUND  12  ROUND 4 ]; starting: [ GET READY  ROUND 4 ]
+		-- Fighting: [ 18  / 25  STANDING ]; intermission: [ NEXT ROUND  12  ROUND 4 ]; starting: hidden (the countdown)
 		stripCountSlot.Visible = info.count ~= nil and (fightingNow or counting)
 		stripCountSlot.Text = info.count or ""
 		Poster.setFigures(stripFigures, info.count or "")
@@ -1607,6 +1665,15 @@ function HudController:KnitStart()
 			charConns,
 			model:GetAttributeChangedSignal("HT_Spectating"):Connect(function()
 				refreshGroups()
+			end)
+		)
+		-- You use your ultimate (UltimateService marks you "attacker"): your class's name, in cards (ui-17a).
+		table.insert(
+			charConns,
+			model:GetAttributeChangedSignal("HT_Ultimate"):Connect(function()
+				if model:GetAttribute("HT_Ultimate") == "attacker" and not menuOpen then
+					Callouts.className(ability:GetKitId(), classColour, device == "touch")
+				end
 			end)
 		)
 		-- Nothing from a previous life carries over.

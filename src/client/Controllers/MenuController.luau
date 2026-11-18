@@ -16,7 +16,7 @@
 -- In a round only More, Moves and Settings open; the match never pauses.
 --
 -- Everything shown comes from AbilityController (the server's attributes); this only asks it to buy or equip.
--- Its notices show as a toast in the top-left corner, window open or not. M opens and closes the window; so do the X
+-- Its notices show as a toast at the top centre, under the strip, window open or not. M opens and closes the window; so do the X
 -- and gamepad B. Sizes are the mockup's pixels at 1280 x 720; the window scales as a whole (Ui/PosterKit).
 -- The window's edge leans 0.6 degrees as in the mockup; its CONTENTS stand straight, because Roblox cannot clip
 -- or scroll anything that is turned. The drifting word needs a CanvasGroup for the same reason.
@@ -38,6 +38,7 @@ local Tokens = require(ReplicatedStorage.Shared.Tokens)
 local ClassPreview = require(script.Parent.Parent.Ui.ClassPreview)
 local Drift = require(script.Parent.Parent.Ui.Drift)
 local HudMotion = require(script.Parent.Parent.Ui.HudMotion)
+local Callouts = require(script.Parent.Parent.Ui.Callouts)
 local HudTheme = require(script.Parent.Parent.Ui.HudTheme)
 local Poster = require(script.Parent.Parent.Ui.Poster)
 local PosterKit = require(script.Parent.Parent.Ui.PosterKit)
@@ -447,7 +448,7 @@ function MenuController:KnitStart()
 		Name = "Toast",
 		BackgroundColor3 = colour("ink.900"),
 		BorderSizePixel = 0,
-		AnchorPoint = Vector2.new(0, 0.5),
+		AnchorPoint = Vector2.new(0.5, 0.5),
 		Size = UDim2.fromOffset(0, 44),
 		AutomaticSize = Enum.AutomaticSize.X,
 		Rotation = 0, -- straight: small text turned even a degree is drawn soft (measured 2026-11-17)
@@ -469,35 +470,28 @@ function MenuController:KnitStart()
 	})
 	toastText.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.Bold)
 	make("UIPadding", toastText, { PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16) })
-	local TOAST = { Lower = 44, Bigger = 1.3 }
+	local TOAST = { Gap = 10, Bigger = 1.3 }
 	local toastToken = 0
 	local function showToast(message: string)
 		toastToken += 1
 		local mine = toastToken
-		-- The mockup stands it at the top centre, over the window's title. Here nothing lies over anything
-		-- (owner, 2026-11-17), so it stands in the top-left corner: right of the fight's MENU button, above the
-		-- menu strips, left of the strip.
+		-- AT THE TOP CENTRE, right under the top strip, as in the mockup (the owner, 2026-11-18, with a picture of
+		-- the mockup's: "i like it how it is in the screenshot, right in the middle on the top of ur screen"). From
+		-- 2026-11-17 until then it stood in the top-left corner, so that it lay over nothing; now it may lie on the
+		-- open window's top edge, as the mockup's does. It still stands UNDER the fighters' row and under a
+		-- pop-up that is on screen (`Callouts.taken`).
 		local stage = PosterKit.stage()
-		local scale = stage.nav
-		local press = math.max(scale, PosterKit.Fit.Button)
+		local full = stage.nav * TOAST.Bigger
+		local camera = workspace.CurrentCamera
+		local view = if camera then camera.ViewportSize else HudTheme.Scale.Reference
+		local strip = HudTheme.Strip
+		local under = strip.Top + strip.Tall * strip.Shrink * HudTheme.scaleFor(view)
+		under = math.max(under, Callouts.taken() or 0)
 		toastText.Text = message
-		-- (lower and bigger since 2026-11-18: on the owner's PC it read small, and it stood under Roblox's own
-		-- performance bar when that is switched on)
-		toast.Position = UDim2.fromOffset(22 + 68 * press + 14, 18 + 34 * press + TOAST.Lower)
+		toast.Position = UDim2.new(0.5, 0, 0, under + TOAST.Gap + 22 * full)
 		toast.Visible = true
 		Poster.run(toast, 0.55, function(t: number)
 			local s = spring(t)
-			-- A long line would reach over the open window's left edge (seen 2026-11-18, about 25 px): it is
-			-- drawn just small enough to end short of it, never under 0.9 of the lobby's scale.
-			local full = scale * TOAST.Bigger
-			local now = toastScale.Scale
-			if holder.Visible and now > 0.02 then
-				local natural = toast.AbsoluteSize.X / now
-				local room = holder.AbsolutePosition.X - 10 - toast.AbsolutePosition.X
-				if natural > 0 and room > 0 then
-					full = math.clamp(room / natural, scale * 0.9, full)
-				end
-			end
 			toastScale.Scale = math.max(full * (0.3 + 0.7 * s), 0.01)
 			toast.Rotation = -12 + 12 * s
 		end)
@@ -1819,7 +1813,7 @@ function MenuController:GetEntry(): string?
 	return if self._entry then self._entry() else nil
 end
 
---- Shows a line in the toast (top-left corner).
+--- Shows a line in the toast (top centre, under the strip).
 function MenuController:Toast(message: string)
 	if self._toast then
 		self._toast(message)
