@@ -305,6 +305,8 @@ function NavController:KnitStart()
 	-- The open page's strip sits 18 to the right and a little larger, and its word rocks (the mockup's `wig`:
 	-- 2 degrees each way, half a second a swing) for as long as it is open.
 	local current: string? = nil
+	-- strips and tools on their way in: they answer no pointer until they have landed (see `enter`)
+	local entering: { [any]: boolean } = {}
 	local function rock(strip: Strip, out: boolean)
 		if current ~= strip.entry.id or HudMotion.reduced() then
 			strip.word.Rotation = 0
@@ -325,8 +327,17 @@ function NavController:KnitStart()
 		for _, strip in strips do
 			local on = strip.entry.id == id
 			strip.cut.restScale = if on then 1.04 else 1
-			strip.cut.root.Position =
-				UDim2.fromOffset(strip.home.X + (if on then 18 else 0), strip.home.Y)
+			-- it SLIDES to its place over a quarter second (it used to jump the 18 units in one frame). One
+			-- still on its way in is left alone: `enter` reads `current` and lands it in the right place.
+			if not entering[strip.cut] then
+				local root = strip.cut.root
+				local from = root.Position.X.Offset
+				local to = strip.home.X + (if on then 18 else 0)
+				Poster.run(strip, 0.25, function(t: number)
+					local e = PosterEase.easeOut(t)
+					root.Position = UDim2.fromOffset(from + (to - from) * e, strip.home.Y)
+				end)
+			end
 			strip.cut.scale.Scale = strip.cut.restScale
 			-- the open strip holds still: its word rocks instead
 			Drift.hold(strip.cut.body, on)
@@ -347,6 +358,15 @@ function NavController:KnitStart()
 		for index, strip in strips do
 			local cut = strip.cut
 			cut.root.Visible = false
+			-- The entrance and the answer to the pointer (PosterKit.pressable) run under the SAME key, so a
+			-- pointer crossing a strip in flight replaced its entrance and left it standing where it was,
+			-- short of its place and tipped (found reading the code, 2026-11-18). Its button is put away
+			-- until it has landed.
+			entering[cut] = true
+			Poster.stop(strip)
+			if cut.button then
+				cut.button.Visible = false
+			end
 			Poster.run(cut, 0.7, function(t: number)
 				local s = PosterEase.spring(t)
 				local shift = (current == strip.entry.id) and 18 or 0
@@ -356,19 +376,33 @@ function NavController:KnitStart()
 					strip.home.Y
 				)
 				cut.root.Rotation = -10 * (1 - s)
-			end, nil, (index - 1) * 0.07)
+			end, function()
+				entering[cut] = nil
+				if cut.button then
+					cut.button.Visible = true
+				end
+			end, (index - 1) * 0.07)
 		end
 		-- the tools the same way, from off the right
 		for index, tool in toolList do
 			local cut = tool.cut
 			cut.root.Visible = false
+			entering[cut] = true
+			if cut.button then
+				cut.button.Visible = false
+			end
 			Poster.run(cut, 0.7, function(t: number)
 				local s = PosterEase.spring(t)
 				cut.root.Visible = true
 				cut.root.Position =
 					UDim2.fromOffset(tool.home.X + TOOL.X * 1.6 * (1 - s), tool.home.Y)
 				cut.root.Rotation = 10 * (1 - s)
-			end, nil, 0.2 + (index - 1) * 0.07)
+			end, function()
+				entering[cut] = nil
+				if cut.button then
+					cut.button.Visible = true
+				end
+			end, 0.2 + (index - 1) * 0.07)
 		end
 	end
 

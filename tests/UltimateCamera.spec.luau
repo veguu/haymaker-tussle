@@ -25,10 +25,16 @@ local STARTS = {
 	Vector3.new(0, 0, 12),
 }
 
--- The first hook's close-up and the impact frame are allowed to crop. (The wind-up is a framed two-shot since
--- kits-7b: the user found the close-up's framing wonky.)
-local function isWide(t: number): boolean
-	return not ((t >= 1.14 and t < 1.44) or (t >= 5.25 and t < 5.55))
+-- The close inserts (kits-7e: the lock-in and the wind-up, one fighter on purpose) and the impact frames are allowed
+-- to crop; every other shot keeps both fighters whole.
+local function isWide(line: any, t: number): boolean
+	local haymaker = 0
+	for _, cue in line.cues do
+		if cue.name == "haymaker" then
+			haymaker = cue.t
+		end
+	end
+	return not Ultimates.currentShot(line, t).insert and not (t >= haymaker and t < haymaker + 0.3)
 end
 
 -- A point's place on screen: -1..1 across and up, and its depth (+ in front).
@@ -75,7 +81,7 @@ local function check(): ({ Problem }, { [string]: string })
 			local t = 0
 			while t < line.cinematic do
 				local attackerAt, targetAt = Ultimates.pose(line, t, start)
-				local cam, look, fov, roll = Ultimates.shot(line, t, attackerAt, targetAt)
+				local cam, look, fov, roll = Ultimates.shot(line, t, attackerAt, targetAt, start)
 				-- with the hits' punch-ins applied (they narrow the view)
 				fov -= (Ultimates.kick(line, t))
 				local tag = string.format("start %s, %s", tostring(start), aspectName)
@@ -85,7 +91,7 @@ local function check(): ({ Problem }, { [string]: string })
 						table.insert(problems, { t = t, what = `camera inside the {who} ({tag})` })
 					end
 				end
-				if isWide(t) then
+				if isWide(line, t) then
 					local worst = 0
 					for who, root in { attacker = attackerAt, target = targetAt } do
 						for part, point in
@@ -108,8 +114,9 @@ local function check(): ({ Problem }, { [string]: string })
 							end
 						end
 					end
-					-- the juggle (1.44-3.18), close side views: both whole, feet and the floor under them in frame
-					if t >= 1.44 and t < 3.18 then
+					-- the side view from the first hook through the flurry (1.14-3.45): both whole, feet and the
+					-- floor under them in frame
+					if t >= 1.14 and t < 3.72 then
 						for who, root in { attacker = attackerAt, target = targetAt } do
 							local floorY = math.min(root.Y, 0) - ROOT_TO_FEET - FLOOR_BELOW_FEET
 							local x, y, depth = project(
@@ -154,7 +161,7 @@ local function check(): ({ Problem }, { [string]: string })
 					local tall = math.abs(top - bottom) / 2
 					-- the worm's-eye hang (4.2-4.5) shows them small against the sky on purpose (Azure 5.58-5.92),
 					-- but still readable
-					local needed = if t >= 4.2 and t < 4.5
+					local needed = if t >= 4.6 and t < 4.95
 						then HANG_TARGET_HEIGHT
 						else MIN_TARGET_HEIGHT
 					if tall < needed then

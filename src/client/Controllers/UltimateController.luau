@@ -36,6 +36,49 @@ local UltimateController = Knit.CreateController({
 	Name = "UltimateController",
 })
 
+-- THE CUTSCENE OWNS THE SCREEN (kits-7f, the gap study: every reference hides its HUD; ours left SHOP/CLASSES, the
+-- top bars and the "ULTIMATE" / "FIGHTERS LEFT" banners over the action). On the two fighters' screens every
+-- ScreenGui but the cutscene's own is switched off, AGAIN EVERY FRAME (several HUD pieces switch themselves back
+-- on), and exactly those are switched back on under the end's black dip. The Roblox core UI goes too.
+local StarterGui = game:GetService("StarterGui")
+local CUTSCENE_GUIS: { [string]: boolean } = { HT_CutsceneBlack = true, HT_ImpactFrame = true }
+
+local function hideUi(hidden: { [ScreenGui]: boolean })
+	local playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	if not playerGui then
+		return
+	end
+	for _, gui in playerGui:GetChildren() do
+		if gui:IsA("ScreenGui") and gui.Enabled and not CUTSCENE_GUIS[gui.Name] then
+			gui.Enabled = false
+			hidden[gui] = true
+		end
+	end
+end
+
+local function hideCore(): { [Enum.CoreGuiType]: boolean }
+	local was: { [Enum.CoreGuiType]: boolean } = {}
+	for _, kind in Enum.CoreGuiType:GetEnumItems() do
+		if kind ~= Enum.CoreGuiType.All then
+			was[kind] = StarterGui:GetCoreGuiEnabled(kind)
+		end
+	end
+	pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.All, false)
+	return was
+end
+
+local function restoreUi(hidden: { [ScreenGui]: boolean }, core: { [Enum.CoreGuiType]: boolean }?)
+	for gui in hidden do
+		if gui.Parent then
+			gui.Enabled = true
+		end
+	end
+	table.clear(hidden)
+	for kind, on in core or {} do
+		pcall(StarterGui.SetCoreGuiEnabled, StarterGui, kind, on)
+	end
+end
+
 local function rootOf(model: Model?): BasePart?
 	if not model then
 		return nil
@@ -108,6 +151,7 @@ function UltimateController:KnitStart()
 			local ending = line.cinematic + cfg.FlightSeconds
 			local lastT = -1
 			local barraging = false
+			local dashing = false
 			local fovBefore = if camera then camera.FieldOfView else 70
 			if role and camera then
 				camera.CameraType = Enum.CameraType.Scriptable
@@ -117,10 +161,16 @@ function UltimateController:KnitStart()
 				then CutsceneScreen.grade(line.grade, GRADE_IN)
 				else nil
 			local dipped = false
+			-- the cutscene owns the fighters' screens (hideUi): what was switched off, to switch back on
+			local hiddenUi: { [ScreenGui]: boolean } = {}
+			local coreWas = if role then hideCore() else nil
 
 			local connection: RBXScriptConnection? = nil
 			connection = RunService.RenderStepped:Connect(function()
 				local t = workspace:GetServerTimeNow() - startedAt
+				if role and t < ending + 0.1 then
+					hideUi(hiddenUi)
+				end
 				-- Cues, the attacker's swings and the target's flinches, on every screen (the timeline's lists).
 				for _, cue in Ultimates.cuesBetween(line, lastT, t) do
 					UltimateFx.cue(cue, ctx)
@@ -129,25 +179,45 @@ function UltimateController:KnitStart()
 					if swing.hold then
 						anim:HoldSwing(attacker, swing.side)
 					else
-						anim:PlaySwing(attacker, swing.side, swing.windup)
+						-- A swing noticed a frame or two late (measured at 30 fps, kits-7d: up to 0.05 s) gets that
+						-- much less windup, so its fist still lands on the beat.
+						local late = math.max(t - swing.t, 0)
+						anim:PlaySwing(attacker, swing.side, math.max(swing.windup - late, 0.02))
 					end
 				end
 				for _, blow in Ultimates.between(line.blows, lastT, t) do
 					-- a heavy blow at full strength (the most hit-stop, the heavy flinch); the rest as a
-					-- string's punches, the flinch alternating light and heavy
-					anim:HitLanded(
-						attacker,
-						target,
-						if blow.heavy then HEAVY_STRENGTH else 0,
-						blow.step
-					)
+					-- string's punches, the flinch alternating light and heavy. It waits for the swing's strike
+					-- (kits-7d: on the timeline's frame the hit-stop froze a late hook BEFORE its strike, so the
+					-- fist never came forward); inside the barrage loop no swing is pending and it lands at once.
+					anim:AtStrike(attacker, function()
+						anim:HitLanded(
+							attacker,
+							target,
+							if blow.heavy then HEAVY_STRENGTH else 0,
+							blow.step,
+							blow.freeze -- a big hit's freeze (kits-7e): the hit-stop holds the whole of it
+						)
+					end)
 				end
 				local barrage = line.barrage
 				if barrage then
 					local inside = t >= barrage.from and t < barrage.to
 					if inside ~= barraging then
 						barraging = inside
-						anim:SetBarrage(attacker, inside, 0)
+						anim:SetBarrage(attacker, inside, 0, barrage.clip)
+					end
+					if inside then
+						anim:SyncBarrage(attacker, t - barrage.from)
+					end
+				end
+				-- The rush in: the attacker's sprint plays while the body is set along the dash.
+				local dash = line.dash
+				if dash then
+					local inside = t >= dash.from and t < dash.to
+					if inside ~= dashing then
+						dashing = inside
+						anim:SetDash(attacker, inside)
 					end
 				end
 				lastT = t
@@ -174,15 +244,43 @@ function UltimateController:KnitStart()
 						myRoot.AssemblyLinearVelocity = (flightEnd - flightFrom) / cfg.FlightSeconds
 					end
 				end
+				-- The OTHER bodies, posed here too, every frame, from the same timeline (kits-7e, measured: the other
+				-- fighter's replicated body arrived ~0.1 s late, so fists met a target still on its way, and freezes
+				-- showed a body still drifting). Only what this screen shows: the owner (or the server, for a bot)
+				-- still moves the real body the same way.
+				if role ~= "attacker" and t < line.attackerFree then
+					local root = rootOf(attacker)
+					if root then
+						local at = anchor:PointToWorldSpace(attackerAt)
+						local faces = anchor:PointToWorldSpace(targetAt)
+						root.CFrame = CFrame.lookAt(at, Vector3.new(faces.X, at.Y, faces.Z))
+					end
+				end
+				if role ~= "target" then
+					local root = rootOf(target)
+					if root and t < line.cinematic then
+						local at = anchor:PointToWorldSpace(targetAt)
+						local faces = anchor:PointToWorldSpace(targetAt + Vector3.new(0, 0, 1))
+						root.CFrame = CFrame.lookAt(at, Vector3.new(faces.X, at.Y, faces.Z))
+					elseif root and t < ending then
+						local share = (t - line.cinematic) / cfg.FlightSeconds
+						local at = Ultimates.flightPoint(flightFrom, flightEnd, share, FLIGHT_RISE)
+						root.CFrame = CFrame.new(at) * CFrame.Angles(share * 14, share * 6, 0)
+					end
+				end
 				-- The cinematic camera on both their screens: the timeline's shots (cuts, moves, field of view,
 				-- tilt, shake), then the chase shot following the flight as it widens.
 				if role and camera then
-					local camAt, lookAt, fov, roll, shake =
-						Ultimates.shot(line, math.min(t, line.cinematic), attackerAt, targetAt)
-					-- the hits' camera kicks: a punch-in and a burst of shake, fading out (Ultimates.kick)
-					local kickFov, kickShake = Ultimates.kick(line, t)
+					local camAt, lookAt, fov, roll = Ultimates.shot(
+						line,
+						math.min(t, line.cinematic),
+						attackerAt,
+						targetAt,
+						attackerStart
+					)
+					-- any zoom punches the timeline still has (Haymaker Rush has none since kits-7e)
+					local kickFov = Ultimates.kick(line, t)
 					fov -= kickFov
-					shake += kickShake
 					local from = anchor:PointToWorldSpace(camAt)
 					local toward = anchor:PointToWorldSpace(lookAt)
 					if t >= line.cinematic then
@@ -190,17 +288,13 @@ function UltimateController:KnitStart()
 						toward = if targetRoot then targetRoot.Position else flightEnd
 						local share = math.clamp((t - line.cinematic) / cfg.FlightSeconds, 0, 1)
 						fov += (line.flightFov - fov) * (1 - (1 - share) * (1 - share))
-						shake *= 1 - share
 					end
-					-- Shake (kits-7c, the user: "add some good screen shake"): set waves of a few frequencies on the
-					-- shared clock, never random, so it jolts and rolls instead of buzzing frame to frame (the old
-					-- every-other-frame flip read as a tremble); a small roll twist sells the hit.
-					local w = t * math.pi * 2
-					local sx = (math.sin(w * 17) + 0.5 * math.sin(w * 31 + 1.3)) / 1.5 * shake
-					local sy = (math.sin(w * 23 + 0.7) + 0.5 * math.sin(w * 37 + 2.1)) / 1.5 * shake
-					local twist = math.sin(w * 13 + 0.4) * shake * 2.5
+					-- Shake (kits-7e, the camera study; the user: "the screen shake ... isnt really impactful"): the
+					-- flurry's constant jitter, a new set direction every 1/30 s, and one directional jolt as each
+					-- big hit's freeze ends (Ultimates.shake). It moves the camera sideways, so the aim stays put.
+					local sx, sy = Ultimates.shake(line, t)
 					camera.CFrame = CFrame.lookAt(from, toward)
-						* CFrame.Angles(0, 0, math.rad(roll + twist))
+						* CFrame.Angles(0, 0, math.rad(roll))
 						* CFrame.new(sx, sy, 0)
 					camera.FieldOfView = fov
 				end
@@ -216,9 +310,14 @@ function UltimateController:KnitStart()
 					if barraging then
 						anim:SetBarrage(attacker, false)
 					end
+					if dashing then
+						anim:SetDash(attacker, false)
+					end
 					if removeGrade then
 						removeGrade()
 					end
+					-- under the dip's full black: the HUD comes back with the normal camera
+					restoreUi(hiddenUi, coreWas)
 					if role and camera then
 						camera.CameraType = Enum.CameraType.Custom
 						camera.FieldOfView = fovBefore

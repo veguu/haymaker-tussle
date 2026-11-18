@@ -48,9 +48,15 @@ local book: any = Abilities
 ClassPreview.lite = Drift.lite
 -- how many class tiles a page of the Classes screen holds (two rows of four)
 local CLASSES_PER_PAGE = 8
+-- PLACEHOLDER TILES after the real classes (the owner, 2026-11-18: "make like 2 more pages with like 8
+-- placeholders for both", to see the page arrows): dark striped tiles that say SOON and answer no press. They are
+-- not classes: nothing about them is in Config/Abilities, the Shop or the saved data. Set to 0 to remove them.
+local PLACEHOLDER_CLASSES = 16
 local colour = Tokens.colour
 local make = PosterKit.make
 local spring = PosterEase.spring
+-- the window's way in: fast, then settling, passing its place by about a hundredth of the run
+local slideIn = PosterEase.bezier(0.22, 1.06, 0.36, 1)
 
 local TOGGLE_ACTION = "HaymakerMenu"
 local CLOSE_ACTION = "HaymakerMenuClose"
@@ -199,11 +205,38 @@ function MenuController:KnitStart()
 	make("Frame", decor, {
 		Name = "Shadow",
 		BackgroundColor3 = colour("ink.900"),
-		BackgroundTransparency = 0.15,
-		BorderSizePixel = 0,
+		BorderSizePixel = 0, -- solid: the corner bars below lie partly over it, and a see-through one showed darker there
 		Position = UDim2.fromOffset(10, 12),
 		Size = UDim2.fromScale(1, 1),
 	})
+	-- The shadow's two open corners, closed (owner, 2026-11-18: the top-right and bottom-left corners read as a
+	-- border that did not meet). One turned bar from each of the border's corners to the shadow's, so the paper
+	-- reads as one solid block. Each bar lies under the border and the shadow except for that small triangle.
+	do
+		local reach = Vector2.new(10, 12)
+		local long = reach.Magnitude
+		local thick = 8
+		local turn = math.deg(math.atan2(reach.Y, reach.X))
+		local normal = Vector2.new(-reach.Y, reach.X) / long * (thick / 2)
+		for _, corner in
+			{
+				{ name = "ShadowTopRight", x = 1, y = 0, side = 1 },
+				{ name = "ShadowBottomLeft", x = 0, y = 1, side = -1 },
+			}
+		do
+			local centre = reach / 2 + normal * corner.side
+			make("Frame", decor, {
+				Name = corner.name,
+				BackgroundColor3 = colour("ink.900"),
+				BorderSizePixel = 0,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(corner.x, centre.X, corner.y, centre.Y),
+				Size = UDim2.fromOffset(long, thick),
+				Rotation = turn,
+				ZIndex = 0,
+			})
+		end
+	end
 	make("Frame", decor, {
 		Name = "Border",
 		BackgroundColor3 = colour("ink.900"),
@@ -218,15 +251,16 @@ function MenuController:KnitStart()
 		Size = UDim2.new(1, -2 * BORDER, 1, -2 * BORDER),
 		ZIndex = 2,
 	})
-	-- the drifting dots and word: straight, and clipped a little inside the leaning border. A CanvasGroup,
-	-- because the word is turned 14 degrees and a turned thing is only ever clipped by one of these.
-	local backInset = 2 * BORDER
-	local back = make("CanvasGroup", slide, {
+	-- the drifting dots and word, clipped to the field EXACTLY and leaning with the paper (it is the paper's
+	-- child). A CanvasGroup, because the word is turned 14 degrees and a turned thing is only ever clipped by one
+	-- of these. (Until 2026-11-18 it stood straight, 12 in from the edge: a plain band showed all round the
+	-- pattern, widest along the top, and when the paper kicked to 4 degrees the pattern stuck out past its border.)
+	local back = make("CanvasGroup", decor, {
 		Name = "Back",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(backInset, backInset),
-		Size = UDim2.new(1, -2 * backInset, 1, -2 * backInset),
-		ZIndex = 2,
+		Position = UDim2.fromOffset(BORDER, BORDER),
+		Size = UDim2.new(1, -2 * BORDER, 1, -2 * BORDER),
+		ZIndex = 3,
 	})
 	local dots = make("ImageLabel", back, {
 		Name = "Dots",
@@ -265,25 +299,21 @@ function MenuController:KnitStart()
 	-- thin ink line along its edge
 	local inner = SHEET - Vector2.new(2 * BORDER, 2 * BORDER)
 	local slashTop, slashBottom = inner.X * 0.12, inner.X * 0.04
-	-- (it lies over the dots and the word, so it has its own layer above them, leaning with the paper)
-	local front = make("Frame", slide, {
-		Name = "PaperFront",
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromScale(1, 1),
-		Rotation = TILT,
-		ZIndex = 3,
-	})
+	-- (it lies over the dots, the word and the wipe, inside the same clipped group: the group cuts the ink
+	-- line's two ends flush with the border, where a turned bar's square ends used to stop short or stick out)
+	-- Things that stay upright but must keep their place on the leaning paper (the X) are told the lean too.
+	local tiltFollowers: { (degrees: number) -> () } = {}
 	local function setTilt(degrees: number)
 		decor.Rotation = degrees
-		front.Rotation = degrees
+		for _, follow in tiltFollowers do
+			follow(degrees)
+		end
 	end
-	local slash = make("Frame", front, {
+	local slash = make("Frame", back, {
 		Name = "Slash",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(BORDER, BORDER),
-		Size = UDim2.new(0, inner.X, 1, -2 * BORDER),
+		Size = UDim2.new(0, inner.X, 1, 0),
+		ZIndex = 4,
 	})
 	make("Frame", slash, {
 		BackgroundColor3 = colour("ivory.50"),
@@ -315,9 +345,13 @@ function MenuController:KnitStart()
 		local innerTall = tall - 2 * BORDER
 		local lineTurn = math.atan(lineLean / innerTall)
 		slashLine.Position =
-			UDim2.fromOffset(slashBottom + lineLean / 2 + lineWide / 2, innerTall / 2)
-		slashLine.Size =
-			UDim2.fromOffset(lineWide * math.cos(lineTurn), innerTall / math.cos(lineTurn))
+			-- (1.5 units onto the cream: with its edge exactly on the wedge's, the wedge's soft edge showed as a
+			-- pale hairline between the cream and the ink; seen enlarged, 2026-11-18)
+			UDim2.fromOffset(slashBottom + lineLean / 2 + lineWide / 2 - 1.5, innerTall / 2)
+		slashLine.Size = UDim2.fromOffset(
+			lineWide * math.cos(lineTurn),
+			innerTall / math.cos(lineTurn) + 4 * lineWide
+		)
 		slashLine.Rotation = math.deg(lineTurn)
 	end
 	setTall(SHEET.Y)
@@ -362,6 +396,8 @@ function MenuController:KnitStart()
 	local preview = ClassPreview.new(slide, {
 		-- (centred in the open space between the tiles and the window edge, and UNDER the page, since 2026-11-18:
 		-- the owner wants it further in, with the tiles, the rows and the button drawn over it where they meet)
+		-- (2026-11-18: tried CLEAR of the page arrow and the tiles, at 0.82 of this size and 93 further right,
+		-- 618, 121 at 328 x 353; the owner looked and had it put back here)
 		Position = UDim2.fromOffset(BORDER + 84 + 525, BORDER + 8 + 44),
 		Size = UDim2.fromOffset(400, 430),
 		ZIndex = 4,
@@ -423,6 +459,7 @@ function MenuController:KnitStart()
 	})
 	toastText.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.Bold)
 	make("UIPadding", toastText, { PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16) })
+	local TOAST = { Lower = 44, Bigger = 1.3 }
 	local toastToken = 0
 	local function showToast(message: string)
 		toastToken += 1
@@ -434,11 +471,24 @@ function MenuController:KnitStart()
 		local scale = stage.nav
 		local press = math.max(scale, PosterKit.Fit.Button)
 		toastText.Text = message
-		toast.Position = UDim2.fromOffset(22 + 58 * press + 14, 18 + 29 * press)
+		-- (lower and bigger since 2026-11-18: on the owner's PC it read small, and it stood under Roblox's own
+		-- performance bar when that is switched on)
+		toast.Position = UDim2.fromOffset(22 + 68 * press + 14, 18 + 34 * press + TOAST.Lower)
 		toast.Visible = true
 		Poster.run(toast, 0.55, function(t: number)
 			local s = spring(t)
-			toastScale.Scale = math.max(scale * (0.3 + 0.7 * s), 0.01)
+			-- A long line would reach over the open window's left edge (seen 2026-11-18, about 25 px): it is
+			-- drawn just small enough to end short of it, never under 0.9 of the lobby's scale.
+			local full = scale * TOAST.Bigger
+			local now = toastScale.Scale
+			if holder.Visible and now > 0.02 then
+				local natural = toast.AbsoluteSize.X / now
+				local room = holder.AbsolutePosition.X - 10 - toast.AbsolutePosition.X
+				if natural > 0 and room > 0 then
+					full = math.clamp(room / natural, scale * 0.9, full)
+				end
+			end
+			toastScale.Scale = math.max(full * (0.3 + 0.7 * s), 0.01)
 			toast.Rotation = -12 + 12 * s
 		end)
 		task.delay(2.2, function()
@@ -707,6 +757,9 @@ function MenuController:KnitStart()
 		setWord(pick)
 		setTitle(kit.name)
 		local order = classOrder()
+		for slot = 1, PLACEHOLDER_CLASSES do
+			table.insert(order, `?{slot}`)
+		end
 		local per = classesPerPage()
 		local pages = math.max(1, math.ceil(#order / per))
 		if fresh then
@@ -721,6 +774,59 @@ function MenuController:KnitStart()
 			local id = order[(classPage - 1) * per + index]
 			if not id then
 				break
+			end
+			if string.sub(id, 1, 1) == "?" then
+				-- a placeholder: where a class will stand one day
+				local cut = PosterKit.cut(
+					page,
+					"class",
+					Vector2.new(132, 112),
+					colour("poster.dark"),
+					Vector2.new(5, 6)
+				)
+				PosterKit.place(
+					cut,
+					44 + ((index - 1) % 4) * 144,
+					128 - PAGE_TOP + math.floor((index - 1) / 4) * 124
+				)
+				cut.root.ZIndex = 2
+				Shapes.image(cut.face, "classStripes", "ink.900", {
+					Position = UDim2.fromOffset(4, 4),
+					Size = UDim2.new(1, -8, 1, -8),
+					ImageTransparency = 0.6,
+				})
+				Poster.text(cut.face, "display", 62, "ivory.50", {
+					AnchorPoint = Vector2.new(1, 0),
+					Position = UDim2.new(1, -10, 0, 4),
+					Size = UDim2.fromOffset(70, 62),
+					Text = "?",
+					TextTransparency = 0.72,
+					TextXAlignment = Enum.TextXAlignment.Right,
+				})
+				Poster.text(cut.face, "display", 22, "ivory.50", {
+					Position = UDim2.fromOffset(12, 50),
+					Size = UDim2.fromOffset(110, 32),
+					Text = "SOON",
+				})
+				local soon = Poster.text(cut.face, "label", 15, "ivory.50", {
+					BackgroundColor3 = colour("ink.900"),
+					BackgroundTransparency = 0,
+					BorderSizePixel = 0,
+					Position = UDim2.fromOffset(10, 81),
+					Size = UDim2.fromOffset(0, 23),
+					AutomaticSize = Enum.AutomaticSize.X,
+					Text = "PLANNED",
+					ZIndex = 2,
+				})
+				make(
+					"UIPadding",
+					soon,
+					{ PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }
+				)
+				if fresh then
+					PosterKit.pop(cut.root, cut.scale, 0.12 + (index - 1) * 0.04, 1, 0)
+				end
+				continue
 			end
 			local other = book.Kits[id]
 			local state = standing(id, wearing, owned)
@@ -840,15 +946,15 @@ function MenuController:KnitStart()
 		preview.show(pick, owned[pick] == true)
 		-- the picked class: what it is, its two skills, and the one thing to do with it
 		local blurb = Poster.text(page, "label", 18, "ink.900", {
-			Position = UDim2.fromOffset(28, 382 - PAGE_TOP),
+			Position = UDim2.fromOffset(28, 374 - PAGE_TOP),
 			Size = UDim2.fromOffset(540, 27),
 			Text = kit.blurb,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 		})
 		blurb.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.SemiBold)
 		local device = deviceOf()
-		local y = 417 - PAGE_TOP
-		for index, slot in { "mobility", "attack" } do
+		local y = 400 - PAGE_TOP
+		for _, slot in { "mobility", "attack" } do
 			local skill = kit[slot]
 			local key = if device == "touch"
 				then nil
@@ -856,9 +962,12 @@ function MenuController:KnitStart()
 				elseif slot == "mobility" then "Q"
 				else "R"
 			local cooldown = cooldownOf(skill.id)
-			local detail = if index == 1 then skill.blurb else nil
-			-- a line of the small text holds about 54 letters at this width; a longer one takes a second line
-			local height = if not detail then 46 elseif #detail > 54 then 98 else 72
+			-- BOTH skills say what they do (until 2026-11-18 only the first did, to save room: the owner's review
+			-- found the two rows unlike each other). A line of the small text holds about 54 letters at this
+			-- width; a longer one takes a second line. Two two-line rows end exactly at the page's foot (400 + 88 + 4 + 88),
+			-- so nothing scrolls: the rows start 17 higher and stand 4 apart to make that room.
+			local detail = skill.blurb
+			local height = if not detail or detail == "" then 46 elseif #detail > 57 then 88 else 68
 			local row = PosterKit.row(
 				page,
 				546,
@@ -869,7 +978,7 @@ function MenuController:KnitStart()
 				if not skill.built then "PLANNED" elseif cooldown then seconds(cooldown) else nil
 			)
 			PosterKit.placeRow(row, 22, y)
-			y += height + 8
+			y += height + 4
 		end
 		local state = standing(pick, wearing, owned)
 		local x, top = 586, 474 - PAGE_TOP
@@ -1069,7 +1178,9 @@ function MenuController:KnitStart()
 			for offset = 0, 1 do
 				local item = items[index + offset]
 				if item and item.detail and item.detail ~= "" then
-					height = math.max(height, if #item.detail > 38 then 98 else 72)
+					-- a line of the small text holds about 36 letters here; every line the detail needs gets its
+					-- 26 units (with two heights only, Punch's three-line detail lost its last word; 2026-11-18)
+					height = math.max(height, 46 + 26 * math.ceil(#item.detail / 36))
 				end
 			end
 			for offset = 0, 1 do
@@ -1132,7 +1243,7 @@ function MenuController:KnitStart()
 		sub.Text = "COMING LATER"
 		local items: { Item } = {}
 		for _, name in PLANNED do
-			table.insert(items, { name = name, right = "Planned" })
+			table.insert(items, { name = name, right = "PLANNED" })
 		end
 		drawList(items, fresh)
 	end
@@ -1380,6 +1491,7 @@ function MenuController:KnitStart()
 		local roomX = stage.view.X - left - right
 		local roomY = stage.view.Y - top - below
 		setTall(if round then ROUND_TALL else SHEET.Y)
+		setTilt(decor.Rotation) -- the X keeps its corner at the new height
 		local want = math.clamp(stage.scale * fit.Window, fit.WindowMin, fit.WindowMax)
 		-- (the 12 is the paper's hard shadow, which is part of what must fit)
 		local scale =
@@ -1478,10 +1590,13 @@ function MenuController:KnitStart()
 				Enum.ContextActionPriority.High.Value + 1,
 				Enum.KeyCode.ButtonB
 			)
-			-- it comes in from the right, tipped 3 degrees, and settles on the spring over 0.7 s
+			-- it comes in from the right, tipped 3 degrees, over 0.7 s. Its TURN settles on the spring; its PLACE
+			-- on a curve that only just passes home. (Both were on the spring, which overshoots by a sixth: over
+			-- this long a run that carried the window about 170 units too far left, across the menu strips, for
+			-- a moment; caught in a capture, 2026-11-18. Callouts learned the same thing for its glide.)
 			Poster.run(slide, 0.7, function(t: number)
 				local s = spring(t)
-				slide.Position = UDim2.new(0.5, away * (1 - s), 0.5, 0)
+				slide.Position = UDim2.new(0.5, away * (1 - slideIn(t)), 0.5, 0)
 				setTilt(3 + (TILT - 3) * s)
 			end)
 		elseif was ~= to then
@@ -1533,6 +1648,22 @@ function MenuController:KnitStart()
 	local closeCut = PosterKit.cut(slide, "close", Vector2.new(62, 62), colour("danger.600"))
 	PosterKit.place(closeCut, SHEET.X - BORDER - 12 - 62, BORDER + 12)
 	closeCut.root.ZIndex = 7
+	-- It keeps its place by the paper's top-right corner while the paper leans (it stays upright itself: small
+	-- lettering is never turned). Standing still while the paper kicked to 4 degrees, its corner stuck out past
+	-- the border (seen with the kick frozen, 2026-11-18).
+	do
+		local restAt = Vector2.new(closeCut.root.Position.X.Offset, closeCut.root.Position.Y.Offset)
+		table.insert(tiltFollowers, function(degrees: number)
+			local centre = Vector2.new(SHEET.X / 2, sheetTall / 2)
+			local from = restAt - centre
+			local angle = math.rad(degrees)
+			closeCut.root.Position = UDim2.fromOffset(
+				centre.X + from.X * math.cos(angle) - from.Y * math.sin(angle),
+				centre.Y + from.X * math.sin(angle) + from.Y * math.cos(angle)
+			)
+		end)
+		setTilt(TILT)
+	end
 	Poster.text(closeCut.face, "display", 28, "ivory.50", {
 		Size = UDim2.fromScale(1, 1),
 		Text = "X",
@@ -1593,8 +1724,15 @@ function MenuController:KnitStart()
 			askedEquip = -math.huge
 			UiSound.play("ui_equip")
 		end
-		-- a class just equipped is the one the window shows
-		pick = ability:GetKitId()
+		-- a class just equipped is the one the window shows. When that CHANGES what the Classes page shows
+		-- (unequipping drops you back to the starting class), the page changes the way it does when you pick a
+		-- tile: the band sweeps across and the paper kicks. It used to snap (the owner, 2026-11-18).
+		local now = ability:GetKitId()
+		local moved = now ~= pick
+		pick = now
+		if moved and entry == "classes" then
+			hit()
+		end
 		redraw()
 	end)
 	player:GetAttributeChangedSignal("HT_AFK"):Connect(redraw)

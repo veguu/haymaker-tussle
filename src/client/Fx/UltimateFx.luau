@@ -12,9 +12,9 @@
 -- (vault: 07 Lighting VFX and Audio/Anime Impact Sound Anatomy - Measured From 20 References):
 --   charge   no sound (the user removed it); the low rumble swells in under the scene
 --   dash     a whoosh
---   blows    one of our M1 takes per barrage blow (m1_hit, the user's pick for v2, 2026-11-17); the first blow
---            and the uppercut are the heavier knockback take (m1_finish). Every take's transient is at sample 0,
---            so the sound lands on the cue's frame, which is the fist's contact (the old ult_rush peaked 0.13 s in)
+--   blows    the first blow and the uppercut are the heavier knockback take (m1_finish, transient at sample 0, so
+--            it lands on the cue's frame, the fist's contact)
+--   flurry   ONE rapid-punches sound over the whole barrage (ult_barrage, kits-7d); its punches add none
 --   wind-up  the rumble builds
 --   dip      every sound cut to silence for 0.15 s before the haymaker (7 of 8 big hits in the study)
 --   haymaker one designed huge hit (ult_haymaker, our heavy hit, kits-7a)
@@ -27,8 +27,8 @@ local FxKit = require(script.Parent.FxKit)
 local ImpactFrame = require(script.Parent.ImpactFrame)
 local PunchHitFx = require(script.Parent.PunchHitFx)
 local StepBurstFx = require(script.Parent.StepBurstFx)
-local DashFx = require(script.Parent.DashFx)
 local AirFx = require(script.Parent.AirFx)
+local CutsceneScreen = require(script.Parent.CutsceneScreen)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Sfx = require(ReplicatedStorage.Shared.Sfx)
 local SoundBank = require(ReplicatedStorage.Shared.Config.SoundBank)
@@ -51,7 +51,17 @@ type State = {
 	bed: Sound?,
 	sounds: { Sound },
 	voice: { Sound }, -- the foreground sound now ringing (one at a time)
+	flurry: number?, -- flurry punches burst so far (they alternate sides)
+	sparks: number?, -- sparks played so far (each takes the next set turn)
+	impact: ImpactFrame.Prepared?, -- the haymaker's silhouettes, made in the wind-up (kits-7f)
 }
+
+-- Each spark's turn in degrees, in order (kits-7f, the owner's rule: every rotation set on purpose, never random).
+local SPARK_TURNS = { 0, 22, 45, 11, 34 }
+local function nextTurn(state: State): number
+	state.sparks = (state.sparks or 0) + 1
+	return SPARK_TURNS[(state.sparks - 1) % #SPARK_TURNS + 1]
+end
 
 local states: { [Context]: State } = setmetatable({}, { __mode = "k" }) :: any
 
@@ -232,14 +242,24 @@ local function charge(ctx: Context)
 	end
 end
 
+-- The rush in: its whoosh only. The dash effect is gone (kits-7f, the owner: "i dont like the dash vfx for the
+-- animation"; the gap study: its white part copies stacked into a blob and no reference rush uses copies). Its
+-- replacement, the "Rush Lane" (a ground ring, one trail along the path, a skid), is stage E of
+-- design/haymaker-rush-v4-gaps.md.
 local function dash(ctx: Context, state: State)
-	DashFx.play(ctx.attacker, 0.3, 0.5)
-	foreground(ctx, state, "dash", { volume = 0.8, cut = 0.34 })
+	foreground(ctx, state, "dash", { volume = 0.8, cut = 0.7 })
 end
 
 -- The first blow, a right hook: big, and the bed comes up to its level.
 local function blow(ctx: Context, state: State)
-	PunchHitFx.play(chest(ctx) + fistSide(ctx, "Right"), outward(ctx), 1.4, nil, true)
+	PunchHitFx.play(
+		chest(ctx) + fistSide(ctx, "Right"),
+		outward(ctx),
+		1.4,
+		nil,
+		true,
+		nextTurn(state)
+	)
 	foreground(ctx, state, "m1_finish")
 	if state.bed then
 		tween(state.bed, 0.1, { Volume = BED_VOLUME })
@@ -248,14 +268,35 @@ end
 
 local function punch(side: string): (Context, State) -> ()
 	return function(ctx: Context, state: State)
-		PunchHitFx.play(chest(ctx) + fistSide(ctx, side), outward(ctx), 1, nil, false)
+		PunchHitFx.play(
+			chest(ctx) + fistSide(ctx, side),
+			outward(ctx),
+			1,
+			nil,
+			false,
+			nextTurn(state)
+		)
 		foreground(ctx, state, "m1_hit")
 	end
 end
 
+-- THE FLURRY (kits-7d): ONE complete rapid-punches sound over the whole barrage (ult_barrage, picked by ear in the
+-- sound picker), from its first punch; the uppercut's sound cuts off what is left. Each punch only bursts.
+local function barrage(ctx: Context, state: State)
+	foreground(ctx, state, "ult_barrage", { volume = 1 })
+end
+
+local function flurryHit(ctx: Context, state: State)
+	state.flurry = (state.flurry or 0) + 1
+	-- right lands first (BarrageUp), then left, in turn; each burst points up and away, the way the fist drives
+	local side = if state.flurry % 2 == 1 then "Right" else "Left"
+	local up = (outward(ctx) + Vector3.new(0, 1.2, 0)).Unit
+	PunchHitFx.play(chest(ctx) + fistSide(ctx, side) * 0.6, up, 0.8, nil, false, nextTurn(state))
+end
+
 local function uppercut(ctx: Context, state: State)
 	local up = (outward(ctx) * 0.4 + Vector3.new(0, 1, 0)).Unit
-	PunchHitFx.play(chest(ctx), up, 1.6, nil, true)
+	PunchHitFx.play(chest(ctx), up, 1.6, nil, true, nextTurn(state))
 	local floor = FxKit.floorUnder(chest(ctx), 12, { ctx.attacker, ctx.target })
 	if floor then
 		StepBurstFx.play(floor, 1.2, true)
@@ -278,6 +319,10 @@ end
 -- The wind-up (kits-6b): the haymaker drawn back and held in close-up, a bigger glint on the fist, the rumble
 -- building under it toward the silence (Serious Punch's long build).
 local function windup(ctx: Context, state: State)
+	-- the impact frames' silhouettes, cloned now so nothing heavy happens on the hit (kits-7f, the gap study)
+	if ctx.mine then
+		state.impact = ImpactFrame.prepare({ ctx.attacker, ctx.target })
+	end
 	fistGlint(ctx, 0.6, 1.6)
 	if state.bed and state.bed.Parent then
 		tween(state.bed, 0.6, { Volume = BED_VOLUME * 1.8 }, Enum.EasingStyle.Sine)
@@ -304,18 +349,18 @@ end
 local function haymaker(ctx: Context, state: State)
 	local at = chest(ctx)
 	if ctx.mine then
-		task.spawn(ImpactFrame.play, HAYMAKER_FRAME, at, { ctx.attacker, ctx.target })
+		task.spawn(ImpactFrame.play, HAYMAKER_FRAME, at, { ctx.attacker, ctx.target }, state.impact)
 	end
-	PunchHitFx.play(at + fistSide(ctx, "Right"), outward(ctx), 2.2, nil, true)
+	PunchHitFx.play(at + fistSide(ctx, "Right"), outward(ctx), 2.2, nil, true, nextTurn(state))
 	sound("ult_haymaker", ctx, state, { volume = 1 })
 end
 
 -- The blast: colour back, the shockwave, and no new sound. Our heavy hit (ult_haymaker, kits-7a) already carries
 -- the blast: its roar's highs sweep down (the muffle) and a bass downer sinks under it, designed into the one file,
 -- so nothing here re-filters or re-pitches it (v2; before kits-7a this muffled a community upload at run time).
-local function blast(ctx: Context, _state: State)
+local function blast(ctx: Context, state: State)
 	local at = chest(ctx)
-	PunchHitFx.play(at, outward(ctx), 3, nil, true)
+	PunchHitFx.play(at, outward(ctx), 3, nil, true, nextTurn(state))
 	local floor = FxKit.floorUnder(at, 16, { ctx.attacker, ctx.target })
 	if floor then
 		StepBurstFx.play(floor, 2, true)
@@ -328,11 +373,31 @@ local function launch(ctx: Context, _state: State)
 	end
 end
 
+-- The 1-frame white flash a big hit's camera snaps under (kits-7e, the camera study: every reference cuts to its
+-- new angle under a flash), on the two fighters' screens only, like the cutscene camera.
+local function flash(ctx: Context, _state: State)
+	if ctx.mine then
+		CutsceneScreen.fill(Color3.new(1, 1, 1), 0.15, 0, 1 / 30, 0.06)
+	end
+end
+
+-- The scene darkens through the held wind-up (Human Battery, Jotaro: the climax goes dark), cut off at once under
+-- the haymaker's impact frames.
+local function darken(ctx: Context, _state: State)
+	if ctx.mine then
+		CutsceneScreen.blackout(0.45, 0.25, 0.2, 0)
+	end
+end
+
 local BASE: { [string]: (Context, State) -> () } = {
+	flash = flash,
+	darken = darken,
 	dash = dash,
 	blow = blow,
 	punchLeft = punch("Left"),
 	punchRight = punch("Right"),
+	barrage = barrage,
+	flurryHit = flurryHit,
 	uppercut = uppercut,
 	leap = leap,
 	windup = windup,

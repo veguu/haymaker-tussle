@@ -150,7 +150,10 @@ function PunchHitFx.play(
 	direction: Vector3,
 	size: number,
 	colour: Color3?,
-	heavy: boolean?
+	heavy: boolean?,
+	-- kits-7f (the ultimate, the owner's "never random" rule): the spike set's turn in degrees, set by the caller,
+	-- and no drifting star glints. Ordinary punches leave it nil and look as before.
+	turn: number?
 )
 	local scale = if heavy then size * STRONG_SCALE else size
 	local way = FxKit.flat(direction)
@@ -168,12 +171,23 @@ function PunchHitFx.play(
 	-- The spikes and sparks are laid out as the camera sees them; the set is turned differently each
 	-- hit, except the two leaning spikes, which follow the hit.
 	face.CFrame = FxKit.screenAt(position)
-	local turned = math.random() * 360
+	local turned = turn or math.random() * 360
 	FxKit.arrange(parts.spikes, scale, turned, side)
 	FxKit.arrange(parts.lean, scale, 0, side)
 	FxKit.arrange(parts.sparks, scale, turned + 20, side)
 
 	FxKit.fire(rig, scale, colour, { strong = heavy == true })
+	if turn then
+		-- the glints scatter in every direction (SpreadAngle 180): not for the ultimate
+		for _, part in parts do
+			if typeof(part) == "Instance" then
+				local glints = part:FindFirstChild("Glints", true)
+				if glints and glints:IsA("ParticleEmitter") then
+					glints:Clear()
+				end
+			end
+		end
+	end
 end
 
 --- Builds every rig ahead of the first hit, so the textures are loaded by then.

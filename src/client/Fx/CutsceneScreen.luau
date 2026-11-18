@@ -59,6 +59,18 @@ end
 --- A black screen: in over `fadeIn`, held `hold`, out over `fadeOut` (0 snaps off). `floor` is how see-
 --- through it gets at its darkest (0 is solid black, 0.1 a near-black that still shows a hint).
 function CutsceneScreen.blackout(floor: number, fadeIn: number, hold: number, fadeOut: number)
+	CutsceneScreen.fill(Color3.new(0, 0, 0), floor, fadeIn, hold, fadeOut)
+end
+
+--- A whole-screen colour, like `blackout`: the 1-frame white FLASH a big hit snaps the camera under (kits-7e,
+--- the camera study: every reference cuts to its new angle under a 1-frame flash), or a darkening.
+function CutsceneScreen.fill(
+	colour: Color3,
+	floor: number,
+	fadeIn: number,
+	hold: number,
+	fadeOut: number
+)
 	pcall(function()
 		local playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
 		if not playerGui then
@@ -71,7 +83,7 @@ function CutsceneScreen.blackout(floor: number, fadeIn: number, hold: number, fa
 		gui.DisplayOrder = DISPLAY_ORDER
 		local black = Instance.new("Frame")
 		black.Size = UDim2.fromScale(1, 1)
-		black.BackgroundColor3 = Color3.new(0, 0, 0)
+		black.BackgroundColor3 = colour
 		black.BorderSizePixel = 0
 		black.BackgroundTransparency = if fadeIn > 0 then 1 else floor
 		black.Parent = gui

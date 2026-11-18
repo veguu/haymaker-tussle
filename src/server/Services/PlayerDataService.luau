@@ -249,6 +249,14 @@ function PlayerDataService:KnitStart()
 			dirty = false,
 			saving = false,
 		}
+		-- The one-time class reset (Config/Abilities.ClassReset): applied here, once, on the first join after
+		-- its version went out, and saved like any other change. A profile that could not be loaded is reset
+		-- too, but it is temporary and saves nothing.
+		local afterReset = AbilityKit.classReset(book, entry.profile, book.ClassReset)
+		if afterReset then
+			entry.profile = afterReset
+			entry.dirty = true
+		end
 		-- The builders' test balance (Config/Abilities.TestCoins): raised to its amount on joining,
 		-- never lowered. Decided here from the server's own UserId; no client can ask for it.
 		if AbilityKit.onTestList(book.TestCoins, player.UserId) then

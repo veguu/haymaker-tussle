@@ -46,51 +46,111 @@ local CYAN = Color3.fromRGB(40, 230, 255)
 local SHAKES =
 	{ Vector2.new(1, -0.6), Vector2.new(-0.8, 0.9), Vector2.new(0.5, 1), Vector2.new(-1, -0.4) }
 
--- Flat copies of these fighters in `viewport`, every part one colour.
-local function silhouettes(models: { Model }, colour: Color3, viewport: ViewportFrame)
-	viewport:ClearAllChildren()
-	local world = Instance.new("WorldModel")
-	world.Parent = viewport
+-- Strips a fighter's copy down to flat one-colour parts (no humanoid, scripts, clothes or effects).
+local function flatten(copy: Model, colour: Color3)
+	for _, item in copy:GetDescendants() do
+		if item:IsA("BasePart") then
+			item.Color = colour
+			item.Material = Enum.Material.SmoothPlastic
+			item.Transparency = if item.Name == "HumanoidRootPart" then 1 else 0
+			if item:IsA("MeshPart") then
+				item.TextureID = ""
+			end
+			item.Anchored = true
+			item.CastShadow = false
+		elseif item:IsA("SpecialMesh") then
+			item.TextureId = ""
+		elseif
+			item:IsA("Decal")
+			or item:IsA("Texture")
+			or item:IsA("Script")
+			or item:IsA("LocalScript")
+			or item:IsA("ParticleEmitter")
+			or item:IsA("Trail")
+			or item:IsA("Beam")
+			or item:IsA("Highlight")
+			or item:IsA("BillboardGui")
+			or item:IsA("SurfaceAppearance")
+			or item:IsA("Shirt")
+			or item:IsA("Pants")
+			or item:IsA("ShirtGraphic")
+			or item:IsA("Humanoid")
+		then
+			item:Destroy()
+		end
+	end
+end
+
+-- PREPARED SILHOUETTES (kits-7f, the gap study: the old way cloned both fighters again on every ink change, up to 8
+-- clones with their Humanoids at the moment of the hit, the likeliest cause of the drop to ~10 fps). Each fighter
+-- is cloned ONCE per layer (true, red split, cyan split), ahead of time (the wind-up); at the hit only the parts'
+-- CFrames are copied from the live bodies, and the true layer is recoloured in place.
+export type Prepared = {
+	worlds: { [string]: WorldModel },
+	pairs: { { live: BasePart, copies: { BasePart } } },
+	inked: { BasePart }, -- the true layer's parts, recoloured per frame
+}
+
+function ImpactFrame.prepare(models: { Model }): Prepared
+	local worlds: { [string]: WorldModel } = {}
+	local colours = { main = Color3.new(0, 0, 0), red = RED, cyan = CYAN }
+	for key in colours do
+		local world = Instance.new("WorldModel")
+		world.Name = key
+		worlds[key] = world
+	end
+	local prepared: Prepared = { worlds = worlds, pairs = {}, inked = {} }
 	for _, model in models do
 		if model.Parent then
-			local was = model.Archivable
-			model.Archivable = true
-			local copy = model:Clone()
-			model.Archivable = was
-			if copy then
-				for _, item in copy:GetDescendants() do
-					if item:IsA("BasePart") then
-						item.Color = colour
-						item.Material = Enum.Material.SmoothPlastic
-						item.Transparency = if item.Name == "HumanoidRootPart" then 1 else 0
-						if item:IsA("MeshPart") then
-							item.TextureID = ""
-						end
-						item.Anchored = true
-						item.CastShadow = false
-					elseif item:IsA("SpecialMesh") then
-						item.TextureId = ""
-					elseif
-						item:IsA("Decal")
-						or item:IsA("Texture")
-						or item:IsA("Script")
-						or item:IsA("LocalScript")
-						or item:IsA("ParticleEmitter")
-						or item:IsA("Trail")
-						or item:IsA("Beam")
-						or item:IsA("Highlight")
-						or item:IsA("BillboardGui")
-						or item:IsA("SurfaceAppearance")
-						or item:IsA("Shirt")
-						or item:IsA("Pants")
-						or item:IsA("ShirtGraphic")
-					then
-						item:Destroy()
-					end
+			local live = model:GetDescendants()
+			local lists: { [string]: { Instance } } = {}
+			for key, colour in colours do
+				local was = model.Archivable
+				model.Archivable = true
+				local copy = model:Clone()
+				model.Archivable = was
+				if copy then
+					-- a clone keeps the descendants' order, so index i here is index i in the live body
+					lists[key] = copy:GetDescendants()
+					flatten(copy, colour)
+					copy.Parent = worlds[key]
 				end
-				copy.Parent = world
+			end
+			for index, item in live do
+				if item:IsA("BasePart") then
+					local copies: { BasePart } = {}
+					for key, list in lists do
+						local twin = list[index]
+						if twin and twin.Parent and twin:IsA("BasePart") then
+							table.insert(copies, twin)
+							if key == "main" then
+								table.insert(prepared.inked, twin)
+							end
+						end
+					end
+					table.insert(prepared.pairs, { live = item, copies = copies })
+				end
 			end
 		end
+	end
+	return prepared
+end
+
+-- Puts the prepared copies where the live bodies are now.
+local function pose(prepared: Prepared)
+	for _, pair in prepared.pairs do
+		if pair.live.Parent then
+			local at = pair.live.CFrame
+			for _, copy in pair.copies do
+				copy.CFrame = at
+			end
+		end
+	end
+end
+
+local function ink(prepared: Prepared, colour: Color3, viewport: ViewportFrame)
+	for _, part in prepared.inked do
+		part.Color = colour
 	end
 	viewport.Ambient = colour
 	viewport.LightColor = colour
@@ -117,8 +177,9 @@ local function viewportFor(parent: Instance, camera: Camera, z: number): Viewpor
 end
 
 --- Plays `spec` on this screen, centred on `at` in the world, with `models` as the silhouettes. Returns
---- once it is over (it yields for its length).
-function ImpactFrame.play(spec: Spec, at: Vector3, models: { Model })
+--- once it is over (it yields for its length). `prepared` (ImpactFrame.prepare, made ahead of time) avoids
+--- cloning the fighters at the moment of the hit.
+function ImpactFrame.play(spec: Spec, at: Vector3, models: { Model }, prepared: Prepared?)
 	local camera = workspace.CurrentCamera
 	local player = Players.LocalPlayer
 	if not camera or not player then
@@ -250,17 +311,22 @@ function ImpactFrame.play(spec: Spec, at: Vector3, models: { Model })
 	round.CornerRadius = UDim.new(0.5, 0)
 	round.Parent = core
 
-	-- The red and cyan copies never change colour: drawn once.
-	silhouettes(models, RED, splitRed)
-	silhouettes(models, CYAN, splitCyan)
-	gui.Parent = player:WaitForChild("PlayerGui")
+	-- The copies, posed as the bodies are at the hit; the red and cyan ones never change colour.
+	local ready = prepared or ImpactFrame.prepare(models)
+	pose(ready)
+	ready.worlds.main.Parent = viewport
+	ready.worlds.red.Parent = splitRed
+	ready.worlds.cyan.Parent = splitCyan
+	splitRed.Ambient, splitRed.LightColor = RED, RED
+	splitCyan.Ambient, splitCyan.LightColor = CYAN, CYAN
 
 	local lastInk: Color3? = nil
-	for index, frame in spec.frames do
+	local function show(index: number)
+		local frame = spec.frames[index]
 		back.BackgroundColor3 = frame.bg
 		local figures = frame.figures ~= false
 		if figures and lastInk ~= frame.ink then
-			silhouettes(models, frame.ink, viewport)
+			ink(ready, frame.ink, viewport)
 			lastInk = frame.ink
 		end
 		viewport.Visible = figures
@@ -290,10 +356,37 @@ function ImpactFrame.play(spec: Spec, at: Vector3, models: { Model })
 		scale.Scale = frame.zoom or 1
 		local push = SHAKES[(index - 1) % #SHAKES + 1] * (frame.shake or 0)
 		stage.Position = UDim2.fromOffset(centre.X + push.X, centre.Y + push.Y)
-		local untilAt = os.clock() + (frame.hold or 1 / 30)
-		repeat
-			RunService.RenderStepped:Wait()
-		until os.clock() >= untilAt
+	end
+
+	-- Each card is picked by the time since the start (kits-7f): a slow frame skips a card instead of stretching
+	-- every one after it, so the run keeps its length at any frame rate.
+	local ends: { number } = {}
+	local total = 0
+	for index, frame in spec.frames do
+		total += frame.hold or 1 / 30
+		ends[index] = total
+	end
+	show(1)
+	gui.Parent = player:WaitForChild("PlayerGui")
+	local began = os.clock()
+	local shown = 1
+	while true do
+		RunService.RenderStepped:Wait()
+		local elapsed = os.clock() - began
+		if elapsed >= total then
+			break
+		end
+		local index = #spec.frames
+		for i, finish in ends do
+			if elapsed < finish then
+				index = i
+				break
+			end
+		end
+		if index ~= shown then
+			show(index)
+			shown = index
+		end
 	end
 	gui:Destroy()
 end

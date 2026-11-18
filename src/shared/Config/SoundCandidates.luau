@@ -33,9 +33,11 @@ export type Option = {
 -- (ORDER, ABOUT, OPTIONS, and AUDITION if it plays as a rhythm) to offer choices again.
 
 -- What each role is for, in the order the picker shows them.
-SoundCandidates.ORDER = {} :: { string }
+SoundCandidates.ORDER = { "ult_barrage" } :: { string }
 
-SoundCandidates.ABOUT = {} :: { [string]: string }
+SoundCandidates.ABOUT = {
+	ult_barrage = "Haymaker Rush's flurry: ONE rapid-punches sound over the whole 1.9 s barrage (kits-7d)",
+} :: { [string]: string }
 
 -- How the picker plays each role, so it sounds the way the game plays it: `options` as Sfx.play takes them,
 -- `beats` (seconds) to play it as a rhythm, and `with` another role layered under it the way the game does.
@@ -48,5 +50,37 @@ SoundCandidates.AUDITION = {} :: {
 	},
 }
 
-SoundCandidates.OPTIONS = {} :: { [string]: { Option } }
+-- ult_barrage (kits-7d, 2026-11-17, the user: a barrage needs "one complete rapid punches sound", picked by ear):
+-- community uploads that loaded in Studio on 2026-11-17, shortest first. Played from the start of the file on
+-- the flurry's first punch (1.5 s); the uppercut's sound cuts off whatever is left. Volumes not yet evened out.
+local function barrage(
+	label: string,
+	id: number,
+	length: number,
+	name: string,
+	creator: string
+): Option
+	return {
+		label = label,
+		name = name,
+		creator = `{creator} (community)`,
+		takes = { { id = id, length = length, start = 0, volume = 1 } },
+	}
+end
+SoundCandidates.OPTIONS = {
+	ult_barrage = {
+		barrage(
+			"A",
+			117958044865545,
+			1.02,
+			"dio punching barrage sfx 1 second",
+			"Your_uncleisreal"
+		),
+		barrage("B", 87361464437966, 1.65, "Dragon Ball Rapid Punches SFX", "QQshka1UP"),
+		barrage("C", 108575892208319, 1.70, "punch barrage sfx", "Axellatic"),
+		barrage("D", 95801559782723, 1.83, "one punch man barrage hit sfx", "Axellatic"),
+		barrage("E", 114289646726161, 2.12, "Rapid punches sfx", "isiahjen8"),
+		barrage("F", 102850005066154, 3.51, "Multi Punch / Barrage", "Kaaizarr"),
+	},
+} :: { [string]: { Option } }
 return SoundCandidates

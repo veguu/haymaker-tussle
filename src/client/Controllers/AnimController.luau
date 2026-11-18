@@ -32,6 +32,11 @@ local cfg = GameConfig.Animation
 -- Every clip that is played: the baked ones, and each kit's own punches made from them
 -- (Shared/AnimVariants).
 local Clips: any = AnimVariants.all(AnimClips :: any)
+-- The ultimate's own clips (kits-7d: BarrageUp, HaymakerUp) live in their own module, because AnimClips is at
+-- Studio's size limit.
+for name, clip in require(ReplicatedStorage.Shared.Config.AnimClipsUltimate) :: any do
+	Clips[name] = clip
+end
 
 -- The kit a fighter is wearing, for the punches it throws. Nil for bots and bodies with no player.
 local function kitOf(model: Model): string?
@@ -62,6 +67,7 @@ local SWING_ARMS: { [string]: string } = {
 	Right = "Right Arm",
 	Uppercut = "Right Arm",
 	Cyclone = "Right Arm",
+	HaymakerUp = "Right Arm",
 }
 
 local SWING_CLIPS: { [string]: string } = {
@@ -71,6 +77,8 @@ local SWING_CLIPS: { [string]: string } = {
 	-- The Cyclone is the right hook thrown while the whole body turns once round (the spin is added on
 	-- the root joint, below): AnimClips has no room for a clip of its own.
 	Cyclone = "HookRight",
+	-- the ultimate's rising haymaker, up and away (Haymaker Rush, held then let go)
+	HaymakerUp = "HaymakerUp",
 }
 -- How long each heavy swing takes to strike; the rest use the punch's windup.
 local SWING_WINDUPS: { [string]: number } = {
@@ -125,6 +133,8 @@ type Fighter = {
 	skidding: boolean,
 	spinAt: number, -- when a Cyclone's body spin started
 	spinSeconds: number,
+	barrageClip: string?, -- the barrage loop playing now (SetBarrage)
+	dashing: boolean, -- a scripted sprint (SetDash): the run shows though the body is set, not moving
 }
 
 local animations: { [string]: Animation } = {}
@@ -172,6 +182,7 @@ local function setUpFighter(model: Model): Fighter?
 		skidding = false,
 		spinAt = -math.huge,
 		spinSeconds = 1,
+		dashing = false,
 	}
 	for name, animation in animations do
 		local track = (animator :: Animator):LoadAnimation(animation)
@@ -514,12 +525,21 @@ local function updateFighter(model: Model, dt: number)
 
 	local sprint = fighter.tracks.Sprint
 	if sprint then
-		local blend =
-			clamp01((speed - cfg.SprintBlendLow) / (cfg.SprintBlendHigh - cfg.SprintBlendLow))
-		setWeight(sprint, if grounded and not braking then blend else 0)
-		sprint:AdjustSpeed(ramp * pace)
+		if fighter.dashing then
+			-- a scripted dash (the ultimate's rush): full sprint at the top stride, whatever the body's velocity says
+			setWeight(sprint, 1, FAST_FADE)
+			sprint:AdjustSpeed(cfg.RunRampEnd * cfg.RunPaceMax)
+		else
+			local blend =
+				clamp01((speed - cfg.SprintBlendLow) / (cfg.SprintBlendHigh - cfg.SprintBlendLow))
+			setWeight(sprint, if grounded and not braking then blend else 0)
+			sprint:AdjustSpeed(ramp * pace)
+		end
 	end
-	setWeight(fighter.tracks.Stance, if grounded and speed < cfg.StanceMaxSpeed then 1 else 0)
+	setWeight(
+		fighter.tracks.Stance,
+		if grounded and speed < cfg.StanceMaxSpeed and not fighter.dashing then 1 else 0
+	)
 	setWeight(fighter.tracks.Guard, 1)
 
 	-- The skid shows at once, as strongly as how fast you were going. When it ends the momentum rocks
@@ -564,7 +584,8 @@ function AnimController:PlaySwing(model: Model, side: string, windupOverride: nu
 		local velocity = root.AssemblyLinearVelocity
 		speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 	end
-	local chosen = if speed >= cfg.RunVariantSpeed and fighter.tracks[`{clip}Run`]
+	local chosen = if (speed >= cfg.RunVariantSpeed or fighter.dashing)
+			and fighter.tracks[`{clip}Run`]
 		then `{clip}Run`
 		else clip
 	local held = fighter.heldSwing
@@ -677,19 +698,57 @@ function AnimController:CancelSwing(model: Model?)
 	end
 end
 
---- Starts or stops the clash barrage on a fighter. `phase` is how far into the loop to start, so two
---- fighters half a loop apart alternate their punches.
-function AnimController:SetBarrage(model: Model?, playing: boolean, phase: number?)
+--- Starts or stops a barrage loop on a fighter: the clash barrage, or `clip` (the ultimate's BarrageUp).
+--- `phase` is how far into the loop to start, so two fighters half a loop apart alternate their punches.
+function AnimController:SetBarrage(model: Model?, playing: boolean, phase: number?, clip: string?)
 	local fighter = model and fighters[model]
-	local track = fighter and fighter.tracks.ClashBarrage
-	if not track then
+	if not fighter then
 		return
 	end
-	if playing then
-		track:Play(FAST_FADE, 1, 1)
-		track.TimePosition = (phase or 0) * track.Length
-	elseif track.IsPlaying then
-		track:Stop(FAST_FADE)
+	local old = fighter.barrageClip and fighter.tracks[fighter.barrageClip]
+	if
+		old
+		and old.IsPlaying
+		and (not playing or fighter.barrageClip ~= (clip or "ClashBarrage"))
+	then
+		old:Stop(FAST_FADE)
+	end
+	fighter.barrageClip = nil
+	local track = fighter.tracks[clip or "ClashBarrage"]
+	if not track or not playing then
+		return
+	end
+	-- the ultimate's loop: a swing still playing would fight it for the arms (the clash keeps its old behaviour)
+	if clip and fighter.swingName and fighter.tracks[fighter.swingName] then
+		fighter.tracks[fighter.swingName]:Stop(FAST_FADE)
+		fighter.swingName = nil
+	end
+	fighter.barrageClip = clip or "ClashBarrage"
+	track:Play(FAST_FADE, 1, 1)
+	track.TimePosition = (phase or 0) * track.Length
+end
+
+--- Keeps a playing barrage loop on the shared clock: `seconds` since it started. A slow frame or a hitch can't
+--- let the fists drift off the hits' beat (the flurry's hits are timed on the server's clock).
+function AnimController:SyncBarrage(model: Model?, seconds: number)
+	local fighter = model and fighters[model]
+	local track = fighter and fighter.barrageClip and fighter.tracks[fighter.barrageClip]
+	if not track or not track.IsPlaying or track.Length <= 0 then
+		return
+	end
+	local want = seconds % track.Length
+	local off = math.abs(track.TimePosition - want)
+	if math.min(off, track.Length - off) > 0.02 then
+		track.TimePosition = want
+	end
+end
+
+--- A scripted sprint on a body that is being set, not moved (the ultimate's rush): the run plays at its top
+--- stride while `on`, and a swing thrown meanwhile is its running variant.
+function AnimController:SetDash(model: Model?, on: boolean)
+	local fighter = model and fighters[model]
+	if fighter then
+		fighter.dashing = on
 	end
 end
 
@@ -730,9 +789,15 @@ end
 --- pained pose that says how hard and from where, frozen on its first frame through the stop while
 --- they shake, and their whole body is thrown over away from the hit and springs back. All of it is
 --- only what this client shows.
-function AnimController:HitLanded(attacker: Model?, target: Model, strength: number, step: number?)
+function AnimController:HitLanded(
+	attacker: Model?,
+	target: Model,
+	strength: number,
+	step: number?,
+	stopSeconds: number? -- a cutscene's freeze (Ultimates Blow.freeze): the hit-stop holds this long instead
+)
 	local share = clamp01(strength / cfg.HitStopFullStrength)
-	local stop = cfg.HitStopMin + (cfg.HitStopMax - cfg.HitStopMin) * share
+	local stop = stopSeconds or (cfg.HitStopMin + (cfg.HitStopMax - cfg.HitStopMin) * share)
 	local attackerFighter = attacker and fighters[attacker]
 	if attackerFighter then
 		if attackerFighter.lastSide == "Uppercut" then

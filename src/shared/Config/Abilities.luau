@@ -40,6 +40,17 @@ Abilities.StarterCoins = 1000
 -- coins"). Each time one of these accounts joins, their Coins are raised to `Amount` if they have
 -- fewer (never lowered), so every kit can be bought and tried. Roblox user ids: spicycaik, and the
 -- other account working in the Team Create place. Empty the list to switch it off.
+-- A ONE-TIME CLASS RESET FOR EVERYONE (the owner, 2026-11-18: so every player, the builders too, sees the
+-- Classes page's silhouettes and the Shop with something in it). The first time a player joins after this
+-- version went out, they keep the starter class and whichever of `Keep` they own, lose every other class, and
+-- get back the Coins each lost class costs (Core/AbilityKit.classReset, PlayerDataService). It happens ONCE
+-- for each player and each Version: raise Version to do it again; 0 switches it off for players not yet
+-- reset. It cannot be undone for a player it has already run for.
+Abilities.ClassReset = {
+	Version = 1,
+	Keep = { "Bruiser", "Inferno" },
+}
+
 Abilities.TestCoins = {
 	Amount = 20000,
 	UserIds = { 210649679, 190554622 },

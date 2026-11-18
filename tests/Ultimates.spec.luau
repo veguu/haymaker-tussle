@@ -108,19 +108,24 @@ return {
 		for _, shot in line.shots do
 			assert(shot.cam.X > 0, `shot at {shot.t} crosses the line`)
 		end
-		-- the barrage like a real one (kits-6d, from the user's references): no two blows closer than a hook can
-		-- strike and start to follow through (0.22 s), and not evenly spaced: bursts and breaths
-		local blowTimes = {}
+		-- the swung blows: no two closer than a hook can strike and start to follow through (0.22 s). The flurry
+		-- (kits-7d, the user: "a FAST CONSECUTIVE flurry, ~8 hits/s like Garou", one continuous flurry, which
+		-- overrides kits-6d's bursts and breaths) is the barrage loop: one unbroken run at its own beat.
+		local flurry = {}
+		local lastSwung = -math.huge
 		for _, blow in line.blows do
-			table.insert(blowTimes, blow.t)
+			if barrage and blow.t > barrage.from and blow.t < barrage.to then
+				table.insert(flurry, blow.t)
+			else
+				assert(blow.t - lastSwung >= 0.22 - 1e-6, `blows at {blow.t} too close`)
+				lastSwung = blow.t
+			end
 		end
-		local shortest, longest = math.huge, 0
-		for index = 2, #blowTimes do
-			local gap = blowTimes[index] - blowTimes[index - 1]
-			assert(gap >= 0.22 - 1e-6, `blows at {blowTimes[index]} too close`)
-			shortest, longest = math.min(shortest, gap), math.max(longest, gap)
+		assert(#flurry >= 12, "a real flurry, not a few punches")
+		for index = 2, #flurry do
+			local gap = flurry[index] - flurry[index - 1]
+			assert(gap >= 0.1 and gap <= 0.15, `the flurry breaks at {flurry[index]}`)
 		end
-		assert(longest - shortest >= 0.2, "the barrage has bursts and breaths, not one even beat")
 		-- the pace (kits-6b, the user: "too fast"): at least 4.5 s, and no shot shorter than 0.3 s
 		assert(line.cinematic >= 4.5, "long enough to read")
 		local cuts = {}
@@ -168,11 +173,102 @@ return {
 		local turned = Ultimates.shot(line, first.t, Vector3.new(12, 0, 0), target)
 		-- facing -X now: their right (+X local) is the anchor's -Z
 		assert(near(turned.Z, -first.cam.X, 0.001), "turned with them")
-		-- the wide shots ride on the pair's midpoint
-		local wide = line.shots[1]
-		assert(wide.rel == "pair", "the opening shot frames them both")
-		local wideCam = Ultimates.shot(line, 0, at, target)
+		-- the two-shots ride on the pair's midpoint
+		local wide
+		for _, shot in line.shots do
+			if shot.rel == "pair" then
+				wide = shot
+				break
+			end
+		end
+		assert(wide, "a shot frames them both")
+		local wideCam = Ultimates.shot(line, wide.t, at, target)
 		assert(near(wideCam.Z, 6 + wide.cam.Z, 0.001), "pair midpoint")
+	end,
+
+	["big hits freeze, snap the camera and jolt; the flurry jitters (the camera study)"] = function()
+		-- kits-7e (vault: 63 VFX Creation/Cutscene Camera and Impact - Measured From 10 References): every big hit
+		-- holds the scene, the camera cuts to a new angle on it, and one jolt follows the freeze
+		local line = Ultimates.TIMELINES.Base
+		local start = Vector3.new(0, 0, 9)
+		local frozen = 0
+		for _, blow in line.blows do
+			local freeze = blow.freeze
+			if freeze then
+				frozen += 1
+				assert(
+					freeze >= 0.15 - 1e-6 and freeze <= 0.4,
+					`freeze at {blow.t} out of the measured range`
+				)
+				local a1, t1 = Ultimates.pose(line, blow.t + 0.01, start)
+				local a2, t2 = Ultimates.pose(line, blow.t + freeze - 0.01, start)
+				assert(
+					(a1 - a2).Magnitude < 1e-3 and (t1 - t2).Magnitude < 1e-3,
+					`bodies move in the freeze at {blow.t}`
+				)
+				local cut = false
+				for _, shot in line.shots do
+					if shot.cut and math.abs(shot.t - blow.t) < 1e-6 then
+						cut = true
+					end
+				end
+				assert(cut, `no snap on the hit at {blow.t}`)
+				local jolted = false
+				for _, jolt in line.jolts or {} do
+					if math.abs(jolt.t - (blow.t + freeze)) < 1e-6 then
+						jolted = true
+					end
+				end
+				assert(jolted, `no jolt after the freeze at {blow.t}`)
+				-- the jolt is out at once, then gone
+				local x, y = Ultimates.shake(line, blow.t + freeze + 0.005)
+				assert(math.sqrt(x * x + y * y) > 0.5, `the jolt at {blow.t} is too small`)
+			end
+		end
+		assert(frozen >= 3, "the first hook, the uppercut and the haymaker freeze")
+		-- the flurry's jitter: on through it, a new direction every 1/30 s, off outside
+		local barrage = line.barrage :: any
+		local mid = (barrage.from + barrage.to) / 2
+		local x1, y1 = Ultimates.shake(line, mid)
+		local x2, y2 = Ultimates.shake(line, mid + 1 / 30)
+		assert(math.sqrt(x1 * x1 + y1 * y1) > 0.1, "the flurry jitters")
+		assert(math.abs(x1 - x2) + math.abs(y1 - y2) > 0.1, "a new direction each frame")
+		local xs, ys = Ultimates.shake(line, 0.2)
+		assert(xs == 0 and ys == 0, "still before anything lands")
+	end,
+
+	["the rush in is a real run: it speeds up all the way, seen from behind"] = function()
+		-- kits-7d, the user: "an animation of the rush itself, with an accompanying camera angle that shows you
+		-- speeding up to them from behind you. right now it just teleports"
+		local line = Ultimates.TIMELINES.Base
+		local dash = line.dash
+		assert(dash, "the attacker sprints while carried in")
+		assert(dash.to - dash.from >= 0.6, "long enough to see (it was 0.34 s)")
+		for _, start in { Vector3.new(0, 0, 6), Vector3.new(4, 0, 14), Vector3.new(-8, 0, 20) } do
+			local lastSpeed = 0
+			local step = 1 / 30
+			local t = dash.from + step
+			while t <= dash.to - step do
+				local before = Ultimates.pose(line, t - step, start)
+				local now = Ultimates.pose(line, t, start)
+				local speed = (now - before).Magnitude / step
+				assert(speed >= lastSpeed - 1e-3, `slows at {t} from {start}`)
+				lastSpeed = speed
+				-- the camera behind them (their own +Z) and on their right
+				local attackerAt, targetAt = Ultimates.pose(line, t, start)
+				local cam = Ultimates.shot(line, t, attackerAt, targetAt, start)
+				if t < dash.to - 0.2 then
+					local frame = Ultimates.attackerFrame(attackerAt, targetAt)
+					local inFrame = frame:PointToObjectSpace(cam)
+					assert(
+						inFrame.Z > 3 and inFrame.X > 0,
+						`camera not behind them at {t} from {start}`
+					)
+				end
+				t += step
+			end
+			assert(lastSpeed > 0, "they move")
+		end
 	end,
 
 	["the anchor faces outward from the arena's middle"] = function()

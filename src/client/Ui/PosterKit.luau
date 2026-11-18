@@ -168,7 +168,18 @@ function PosterKit.pressable(cut: Cut, onPress: () -> (), still: boolean?): Text
 	})
 	cut.button = button
 	local size, turn = 1, 0
+	local over = false -- the pointer is on it
+	-- Its entrance pop (PosterKit.pop) writes the same scale and turn under another key: a pointer arriving
+	-- during the pop had two runs writing them in turn, frame by frame, and the tile shivered (found reading
+	-- the code, 2026-11-18). The first answer to the pointer ends the pop where it is.
+	local function endPop()
+		if Poster.running(cut.root) then
+			Poster.stop(cut.root)
+			cut.root.Visible = true
+		end
+	end
 	local function go(toSize: number, toTurn: number, seconds: number)
+		endPop()
 		local fromSize, fromTurn = cut.scale.Scale, cut.root.Rotation
 		size, turn = toSize, toTurn
 		Poster.run(cut, seconds, function(t: number)
@@ -180,19 +191,24 @@ function PosterKit.pressable(cut: Cut, onPress: () -> (), still: boolean?): Text
 	-- `still`: it only answers the press (a tile that is already picked keeps its own tilt)
 	if not still then
 		button.MouseEnter:Connect(function()
+			over = true
 			UiSound.hover()
 			go(cut.restScale * 1.07, cut.restTurn, 0.55)
 		end)
 		button.MouseLeave:Connect(function()
+			over = false
 			go(cut.restScale, cut.restTurn, 0.55)
 		end)
 		button.MouseButton1Down:Connect(function()
 			UiSound.play("ui_press")
+			endPop()
 			Poster.stop(cut)
 			cut.scale.Scale = cut.restScale * 0.94
 		end)
 		button.MouseButton1Up:Connect(function()
-			go(cut.restScale, cut.restTurn, 0.55)
+			-- back to the size it has under the pointer, not to rest: let go with the pointer still on it, it
+			-- used to shrink to rest and stay there, looking un-hovered until the pointer left and came back
+			go(cut.restScale * (if over then 1.07 else 1), cut.restTurn, 0.55)
 		end)
 	end
 	button.Activated:Connect(onPress)
@@ -331,8 +347,10 @@ function PosterKit.row(
 		-- (owner, 2026-11-17)
 		local small = Poster.text(body, "label", 17, "ivory.50", {
 			Name = "Detail",
-			Position = UDim2.fromOffset(x, 38),
-			Size = UDim2.new(1, -x - 14, 0, height - 46),
+			-- (4 higher and 6 taller than at first: a line of this text is 26 units tall, and Roblox drops a
+			-- wrapped line that does not wholly fit, so an 88-unit row showed one line of two; 2026-11-18)
+			Position = UDim2.fromOffset(x, 34),
+			Size = UDim2.new(1, -x - 14, 0, height - 36),
 			Text = detail,
 			TextTransparency = 0.1,
 			TextWrapped = true,
@@ -372,26 +390,39 @@ function PosterKit.pressRow(row: Row, onPress: () -> ()): TextButton
 		ZIndex = 9,
 	})
 	row.button = button
+	local over = false
+	-- (as PosterKit.pressable: the pointer ends the row's entrance pop, and letting go leaves it hovered)
+	local function endPop()
+		if Poster.running(row.root) then
+			Poster.stop(row.root)
+			row.root.Visible = true
+			row.root.Rotation = 0
+		end
+	end
 	local function go(to: number)
+		endPop()
 		local from = row.scale.Scale
 		Poster.run(row, 0.55, function(t: number)
 			row.scale.Scale = from + (to - from) * PosterEase.spring(t)
 		end)
 	end
 	button.MouseEnter:Connect(function()
+		over = true
 		UiSound.hover()
 		go(1.03)
 	end)
 	button.MouseLeave:Connect(function()
+		over = false
 		go(1)
 	end)
 	button.MouseButton1Down:Connect(function()
 		UiSound.play("ui_press")
+		endPop()
 		Poster.stop(row)
 		row.scale.Scale = 0.97
 	end)
 	button.MouseButton1Up:Connect(function()
-		go(1)
+		go(if over then 1.03 else 1)
 	end)
 	button.Activated:Connect(onPress)
 	return button

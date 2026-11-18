@@ -28,6 +28,8 @@ export type Profile = {
 	coins: number,
 	owned: { [string]: boolean },
 	equipped: string,
+	-- the last one-time class reset this profile has been through (Config/Abilities.ClassReset.Version); 0 = none
+	reset: number,
 }
 
 AbilityKit.VERSION = 1
@@ -44,6 +46,7 @@ function AbilityKit.newProfile(book: Book): Profile
 		coins = book.StarterCoins,
 		owned = { [book.DefaultKit] = true },
 		equipped = book.DefaultKit,
+		reset = 0,
 	}
 end
 
@@ -75,7 +78,18 @@ function AbilityKit.sanitize(book: Book, raw: any): Profile
 	local equipped = if typeof(raw.equipped) == "string" and owned[raw.equipped]
 		then raw.equipped
 		else book.DefaultKit
-	return { version = AbilityKit.VERSION, coins = coins, owned = owned, equipped = equipped }
+	local reset = if typeof(raw.reset) == "number"
+			and isFinite(raw.reset)
+			and raw.reset >= 0
+		then math.floor(raw.reset)
+		else 0
+	return {
+		version = AbilityKit.VERSION,
+		coins = coins,
+		owned = owned,
+		equipped = equipped,
+		reset = reset,
+	}
 end
 
 local function copy(profile: Profile): Profile
@@ -84,7 +98,45 @@ local function copy(profile: Profile): Profile
 		coins = profile.coins,
 		owned = table.clone(profile.owned),
 		equipped = profile.equipped,
+		reset = profile.reset,
 	}
+end
+
+--- A ONE-TIME CLASS RESET (`reset`: { Version, Keep }, Config/Abilities.ClassReset): a profile that has not
+--- been through this version yet keeps the starter kit and whichever of the `Keep` kits it owns, loses every
+--- other kit, and gets back the Coins each lost kit costs today. The equipped kit falls back to the starter
+--- if it was lost. Returns the new profile, or nil when there is nothing to do: already reset to this
+--- version, or `reset` is malformed or switched off (Version 0). The old profile is never changed.
+function AbilityKit.classReset(book: Book, profile: Profile, reset: any): Profile?
+	if typeof(reset) ~= "table" or typeof(reset.Version) ~= "number" or reset.Version < 1 then
+		return nil
+	end
+	if profile.reset >= reset.Version then
+		return nil
+	end
+	local keep: { [string]: boolean } = { [book.DefaultKit] = true }
+	if typeof(reset.Keep) == "table" then
+		for _, kitId in reset.Keep do
+			if typeof(kitId) == "string" then
+				keep[kitId] = true
+			end
+		end
+	end
+	local nextProfile = copy(profile)
+	local refund = 0
+	for kitId in profile.owned do
+		if not keep[kitId] then
+			nextProfile.owned[kitId] = nil
+			local kit = book.Kits[kitId]
+			refund += if kit then math.max(kit.price, 0) else 0
+		end
+	end
+	nextProfile.coins = math.min(profile.coins + refund, AbilityKit.MAX_COINS)
+	if not nextProfile.owned[nextProfile.equipped] then
+		nextProfile.equipped = book.DefaultKit
+	end
+	nextProfile.reset = math.floor(reset.Version)
+	return nextProfile
 end
 
 --- Why a kit can't be bought, or "ok": "unknown" (no such kit), "owned", or "coins" (not enough).

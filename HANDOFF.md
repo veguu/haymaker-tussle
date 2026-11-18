@@ -3195,3 +3195,42 @@ start. 537 tests, gates green. ui-10a to ui-12b are NOT committed.
 - SYNCED later the same day (182 scripts match), place saved v451. SEEN in my own play test: the cog on the
   fight button (33 px at 1190 x 536, ink on the cream tile, no word), loaded; the lobby tile's icon is the same
   asset and loaded, NOT looked at by eye. Not tested: phones, the published game.
+
+## kits-7d..7f (2026-11-17): Haymaker Rush rush-in, flurry, camera study, gap study, stage A (NOT PLAY-TESTED: the place kept being overwritten)
+Build stamp `kits-7f+lobby-4+ui-13c`. Spec chain: `design/haymaker-rush-v3-beats.md` (camera study and the owner's picks), then
+`design/haymaker-rush-gap-study-prompt.md` (the study brief) and `design/haymaker-rush-v4-gaps.md` (the ranked fix list, owner picks
+recorded). Vault: `63 VFX Creation/Cutscene Camera and Impact - Measured From 10 References.md` and `Haymaker Rush vs References - Gap
+Report.md` (plus four area notes).
+- kits-7d:
+  - The rush-in is a real 0.74 s sprint (AnimController.SetDash).
+  - The flurry is 16 rising punches (BarrageUp, every 0.125 s), with the target juggled above. The uppercut is the finisher, and the
+    haymaker comes from below (HaymakerUp).
+  - `ult_barrage` is in SoundCandidates, with 6 options to pick from in the sound picker.
+  - The camera is a smooth spline (`ease = "smooth"`).
+  - Swings that start late shorten their windup, and the hit-stop waits for the strike (AtStrike).
+  - Each client poses both fighters itself; the replicated target arrived about 0.1 s late.
+- kits-7e:
+  - Big hits freeze (0.2, 0.25 and 0.15 s; `Blow.freeze`, the keys hold the bodies) and the camera snaps to a new angle under a
+    1-frame flash.
+  - Shake is constant flurry jitter plus one jolt after each freeze (`Ultimates.shake`); there are no zoom kicks.
+  - The rush camera is fixed (`rel = "start"`).
+  - Close inserts (`insert`) on the lock-in and the wind-up; the screen darkens before the haymaker.
+- kits-7f (stage A of the fix list):
+  - The HUD and the Roblox core UI are hidden on the fighters' screens during the ultimate. They are re-hidden every frame and
+    restored under the end's dip to black.
+  - The dash effect is removed from the ultimate.
+  - ImpactFrame.prepare clones the silhouettes in the wind-up (the old code made up to 8 character clones on the hit), and the cards
+    are picked by elapsed time.
+  - Ultimate sparks turn by a set cycle, with no glints (`PunchHitFx.play` takes a `turn`).
+- Measured in play (kits-7e, 34-38 fps):
+  - The haymaker lands, and the bodies hold still through each freeze.
+  - The hook fist is 3 studs off and the uppercut's 1.4. Their freezes start before the fist arrives, and the fix is still to do (A4).
+  - Studio dropped to about 10 fps from the wind-up to the end, probably from the ImpactFrame clones.
+- SAVED FROM THE PLACE (the teammate's live Rojo overwrote the place three times this session): ui-13a (the class reset in
+  Abilities and AbilityKit, PlayerDataService, Hud and Menu), ui-13b (Hud, Menu, PosterKit) and ui-13c (Hud, Menu, Nav, HudTheme,
+  PosterKit). Each was checked by checksum against the place.
+- Gates: build OK, 539 tests, selene 0, stylua clean.
+- NEXT:
+  - Play-test stage A at 16:9, after the teammate pulls and stops or restarts their Rojo.
+  - A4: measure the hook's real contact time and start its freeze there.
+  - Then stage B (animation) and stage C (camera), per `design/haymaker-rush-v4-gaps.md`.

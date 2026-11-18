@@ -220,7 +220,13 @@ type Tile = {
 local function makeTile(parent: Instance, id: string, x: number, big: boolean): Tile
 	local size = if big then L.TileBig else L.TileSmall
 	local inner = size - 2 * L.TileLine
-	local iconSize = if big then 46 else 34
+	-- A small tile (84) has only 17 units between a 28-unit key cap and the name, and its 34-unit icon stood
+	-- half under the cap ("Space" and "Click" covered the boot and the glove; seen enlarged, 2026-11-18). So a
+	-- small tile gets a lower cap, a smaller icon and the icon's place between the two.
+	local iconSize = if big then 46 else 26
+	local iconMid = if big then 0.44 else 0.545
+	local capAt = if big then 8 else 6
+	local capTall = if big then L.Cap else 24
 	local column = make("Frame", parent, {
 		Name = id,
 		BackgroundTransparency = 1,
@@ -294,7 +300,7 @@ local function makeTile(parent: Instance, id: string, x: number, big: boolean): 
 		Name = "Icon",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.44),
+		Position = UDim2.fromScale(0.5, iconMid),
 		Size = UDim2.fromOffset(iconSize, iconSize),
 		Image = HudTheme.Icons[id] or "",
 		ScaleType = Enum.ScaleType.Fit,
@@ -334,8 +340,8 @@ local function makeTile(parent: Instance, id: string, x: number, big: boolean): 
 		Name = "Cap",
 		BackgroundColor3 = colour("ivory.50"),
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(8, 8),
-		Size = UDim2.fromOffset(30, L.Cap),
+		Position = UDim2.fromOffset(capAt, capAt),
+		Size = UDim2.fromOffset(30, capTall),
 		AutomaticSize = Enum.AutomaticSize.X,
 		ZIndex = 5,
 	})
@@ -353,13 +359,13 @@ local function makeTile(parent: Instance, id: string, x: number, big: boolean): 
 	local capGlyph = make("ImageLabel", cap, {
 		Name = "Glyph",
 		BackgroundTransparency = 1,
-		Size = UDim2.fromOffset(L.Cap, L.Cap),
+		Size = UDim2.fromOffset(capTall, capTall),
 		ScaleType = Enum.ScaleType.Fit,
 		Visible = false,
 	})
 	-- the flag, top right (Q and R): READY with a tick, or why the skill can't be used. In the mockup it lies
-	-- over the key cap and hides the key; the key must always show, so here it reaches 8 units past the tile's
-	-- right edge instead.
+	-- over the key cap and hides the key; the key must always show, so here it stands right of the cap and
+	-- reaches past the tile's right edge instead.
 	local flag: Frame? = nil
 	local flagWord: TextLabel? = nil
 	local tick: Frame? = nil
@@ -368,13 +374,21 @@ local function makeTile(parent: Instance, id: string, x: number, big: boolean): 
 			Name = "Flag",
 			BackgroundColor3 = colour(TT.Ready),
 			BorderSizePixel = 0,
-			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, 6, 0, 10),
+			Position = UDim2.fromOffset(8 + 30 + 3, 10),
 			Size = UDim2.fromOffset(0, L.LineHeight),
 			AutomaticSize = Enum.AutomaticSize.X,
 			Visible = false,
 			ZIndex = 6,
 		})
+		-- It starts just right of the key cap, however wide the cap or the word is, and grows to the right
+		-- past the tile's edge. (It was hung from the tile's right edge and grew LEFT: READY cleared the cap,
+		-- but the longer CAN'T USE and STUNNED lay over the key; seen 2026-11-18.)
+		local function seatFlag()
+			local wide = box.AbsoluteSize.X
+			local unit = if wide > 0 then size / wide else 1
+			made.Position = UDim2.fromOffset(8 + math.max(30, cap.AbsoluteSize.X * unit) + 3, 10)
+		end
+		cap:GetPropertyChangedSignal("AbsoluteSize"):Connect(seatFlag)
 		make("UIStroke", made, {
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 			Color = colour(TT.Line),
@@ -535,6 +549,7 @@ end
 function HudController:KnitStart()
 	local player = Players.LocalPlayer
 	local playerGui = player:WaitForChild("PlayerGui")
+	local menuOpen = false -- the menu window is open (set where MenuController.Changed is heard)
 	local movement = Knit.GetController("MovementController")
 	local combat = Knit.GetController("CombatController")
 	local ability = Knit.GetController("AbilityController")
@@ -575,7 +590,16 @@ function HudController:KnitStart()
 	local stripPlateHeight = L.Strip.Y - L.StripEdge
 	-- the plate is the top of the same slanted shape, so it starts a little right of the edge's bottom corner
 	local stripSlip = L.StripLean * L.StripEdge / L.Strip.Y
-	local stripEdge = Shapes.slant(stripPanel, "coral.500", L.StripLean, { Name = "Edge" })
+	-- The coloured edge is ONLY the band under the plate (one unit of it tucked under the ink), on the same
+	-- slope. It used to be the whole slanted shape with the ink laid over it, and where two soft edges lie on
+	-- one line the under colour shows through: a yellow hairline up the strip's right side (seen 2026-11-18).
+	local stripBand = L.StripEdge + 1
+	local stripBandLean = L.StripLean * stripBand / L.Strip.Y
+	local stripEdge = Shapes.slant(stripPanel, "coral.500", stripBandLean, {
+		Name = "Edge",
+		Position = UDim2.fromOffset(0, L.Strip.Y - stripBand),
+		Size = UDim2.new(1, -(L.StripLean - stripBandLean), 0, stripBand),
+	})
 	Shapes.slant(stripPanel, SS.Plate, L.StripLean - stripSlip, {
 		Name = "Plate",
 		Position = UDim2.fromOffset(stripSlip, 0),
@@ -747,6 +771,9 @@ function HudController:KnitStart()
 	end
 	local peakMark = bar("Peak", D.peak, colour(ST.Text))
 	peakMark.Visible = false
+	-- (it shows only on a device that draws it, and only while it stands clear of the reading: at rest it sat
+	-- at the dial's foot, half under the stagger strip, a stray white dash; seen 2026-11-18)
+	local peakAllowed = false
 	Poster.text(youPlate, "label", D.labelFont, ST.Label, {
 		Name = "Label",
 		Position = UDim2.fromOffset(0, D.labelTop),
@@ -867,10 +894,14 @@ function HudController:KnitStart()
 			end
 			shownLit = lit
 		end
-		if peakMark.Visible then
+		if peakAllowed then
 			peak = math.max(speed, peak - SPD.PeakFall * dt)
 			local steps = (SPD.Ticks - 1) * 2
 			local at = math.floor(math.clamp(peak / SPEED_MAX, 0, 1) * steps + 0.5)
+			local clear = peak - speed > SPEED_MAX / steps
+			if peakMark.Visible ~= clear then
+				peakMark.Visible = clear
+			end
 			if at ~= shownPeak then
 				shownPeak = at
 				onArc(peakMark, at / steps, D.peakRadius)
@@ -1025,7 +1056,10 @@ function HudController:KnitStart()
 		you.holder.Size = UDim2.fromOffset(D.box.X * k + 2 * margin, D.box.Y * k + 2 * margin)
 		you.holder.AnchorPoint = Vector2.new(0.5, 1)
 		you.holder.Position = UDim2.new(0.5, 0, 1, margin * scale - D.bottom)
-		peakMark.Visible = device ~= "touch"
+		peakAllowed = device ~= "touch"
+		if not peakAllowed then
+			peakMark.Visible = false
+		end
 		-- Q left of the dial and R right of it, standing on the dial's own foot line (phones have the real
 		-- buttons instead, so there the two tiles are hidden)
 		local wide = D.box.X * k + 2 * margin
@@ -1103,7 +1137,11 @@ function HudController:KnitStart()
 		local fighting = alive and not out and not over and inFight()
 		setGroup(you, fighting)
 		setGroup(kit, fighting and device ~= "touch")
-		setGroup(spectate, out and not over)
+		-- SPECTATING only while you really are watching a fighter (SpectateController marks your character). It
+		-- used to show whenever you were out, also while you stood in the lobby looking at nothing, and never
+		-- for someone who sat a round out and watched it (2026-11-18).
+		local watching = character ~= nil and character:GetAttribute("HT_Spectating") == true
+		setGroup(spectate, watching and not over)
 	end
 
 	local function refreshStrip(fromEvent: boolean)
@@ -1171,6 +1209,9 @@ function HudController:KnitStart()
 				and alive < was
 				and lastPhase == "Fighting"
 				and Callouts.hasLast(alive)
+				-- (not under the open menu window: the popup stands where the window's top is, and it slid
+				-- along half hidden behind it, with its bars across the screen's edges; seen 2026-11-18)
+				and not menuOpen
 			then
 				Callouts.last(alive, device == "touch", bumpCount)
 			else
@@ -1260,7 +1301,14 @@ function HudController:KnitStart()
 			Size = UDim2.fromScale(1, 1),
 		})
 		if mine then
-			Shapes.slant(slide, "coral.500", L.ChipLean, { Name = "Edge" })
+			-- only the right end, its left side well under the ink (a whole plate under the ink showed as a
+			-- yellow hairline down the row's left side too)
+			Shapes.slant(slide, "coral.500", L.ChipLean, {
+				Name = "Edge",
+				AnchorPoint = Vector2.new(1, 0),
+				Position = UDim2.fromScale(1, 0),
+				Size = UDim2.new(0, 2 * L.ChipLean + L.FeedEdge + 2, 1, 0),
+			})
 		end
 		Shapes.slant(slide, ST.Plate, L.ChipLean, {
 			Name = "Plate",
@@ -1437,6 +1485,12 @@ function HudController:KnitStart()
 		end
 		table.clear(charConns)
 		character = model
+		table.insert(
+			charConns,
+			model:GetAttributeChangedSignal("HT_Spectating"):Connect(function()
+				refreshGroups()
+			end)
+		)
 		-- Nothing from a previous life carries over.
 		stagger = 0
 		setStagger((model:GetAttribute("HT_Stagger") or 0) :: number, false)
@@ -1485,7 +1539,6 @@ function HudController:KnitStart()
 		end)
 	end
 	-- The feed gives way to the open menu window: its rows would lie over the window's corner.
-	local menuOpen = false
 	Knit.GetController("MenuController").Changed:Connect(function(entry: string?)
 		menuOpen = entry ~= nil
 		feed.holder.Visible = not menuOpen
