@@ -47,6 +47,9 @@ Shapes.ids = {
 	act = "rbxassetid://81122324445766", -- an action button (Equip, Buy, Confirm)
 	slab = "rbxassetid://128027657366818", -- a shop slab
 	dots = "rbxassetid://99839905290934", -- one cell of the window's dot pattern, four times its size
+	-- the kill leader's crown in the fighters' row: pixel art, 21 x 15 cells at 16 px (design/ui/make_crown.py);
+	-- drawn with ResampleMode Pixelated. NOT tinted: it carries its own colours.
+	crownPixel = "rbxassetid://112758624871088",
 } :: { [string]: string }
 
 -- The window's drifting word: one TILE per word, from design/ui/make_word_tiles.py (the browser draws them in

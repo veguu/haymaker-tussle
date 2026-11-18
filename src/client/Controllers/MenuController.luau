@@ -100,6 +100,12 @@ local IN_ROUND_OK = { settings = true }
 local OLD_NAMES = { Shop = "shop", Abilities = "classes", Cosmetics = "more" }
 -- `help` is what the "?" beside the name shows under the pointer
 local SETTINGS = {
+	-- (the one switch that DOES something so far: HudController hears it and shows the old count instead)
+	{
+		id = "roster",
+		name = "Fighter row",
+		help = "Shows everyone still standing across the top in a fight.",
+	},
 	{ id = "shake", name = "Camera shake", help = "Shakes your camera on big hits." },
 	{ id = "flash", name = "Hit flash", help = "Flashes the fighter you hit." },
 	{ id = "music", name = "Music", help = "Plays the game's music." },
@@ -120,6 +126,8 @@ local MenuController = Knit.CreateController({
 	Name = "MenuController",
 	-- (entry: string?) when the window opens on a page, changes page or closes
 	Changed = Signal.new(),
+	-- (id: string, on: boolean) when a Settings switch is pressed
+	SettingChanged = Signal.new(),
 })
 
 local function classColour(kitId: string): Color3
@@ -508,7 +516,9 @@ function MenuController:KnitStart()
 	local lastEntry = "classes"
 	local pick: string = ability:GetKitId()
 	local confirming: string? = nil
-	local settingsState: { [string]: boolean } = { shake = true, flash = true, music = true }
+	local settingsState: { [string]: boolean } =
+		{ roster = true, shake = true, flash = true, music = true }
+	MenuController._settings = settingsState
 	local fieldColour = colour("coral.500")
 	local driftSince = os.clock()
 	local driftConn: RBXScriptConnection? = nil
@@ -1388,6 +1398,7 @@ function MenuController:KnitStart()
 		press.Activated:Connect(function()
 			settingsState[setting.id] = not settingsState[setting.id]
 			paint(true)
+			MenuController.SettingChanged:Fire(setting.id, settingsState[setting.id])
 		end)
 		-- the "?": what the setting does, while the pointer is on it; a tap shows it for a few seconds
 		local shownAt = 0
@@ -1423,7 +1434,7 @@ function MenuController:KnitStart()
 		tint(colour("ivory.50"):Lerp(colour("stone.300"), 0.45))
 		setWord("") -- no repeated word behind this page
 		setTitle("Settings")
-		sub.Text = "THESE THREE SWITCHES DON'T CHANGE ANYTHING YET"
+		sub.Text = "FIGHTER ROW WORKS  ·  THE OTHER THREE DON'T CHANGE ANYTHING YET"
 		local y = 128 - PAGE_TOP
 		for _, setting in SETTINGS do
 			settingRow(setting, y)
@@ -1794,6 +1805,13 @@ function MenuController:OpenSettings()
 	if self._open then
 		self._open("settings")
 	end
+end
+
+--- Whether a Settings switch is on (nil before the menu has started, or for a switch that does not exist).
+--- Nothing here is saved: every switch is back on in a new session.
+function MenuController:GetSetting(id: string): boolean?
+	local state = self._settings
+	return if state then state[id] else nil
 end
 
 --- The page that is open, or nil.

@@ -40,6 +40,7 @@ local Knit = require(ReplicatedStorage.Packages.Knit)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local HudLogic = require(ReplicatedStorage.Shared.Core.HudLogic)
+local RosterLogic = require(ReplicatedStorage.Shared.Core.RosterLogic)
 local Lobby = require(ReplicatedStorage.Shared.Core.Lobby)
 local PosterEase = require(ReplicatedStorage.Shared.Core.PosterEase)
 local Tokens = require(ReplicatedStorage.Shared.Tokens)
@@ -50,6 +51,7 @@ local Callouts = require(script.Parent.Parent.Ui.Callouts)
 local HudTheme = require(script.Parent.Parent.Ui.HudTheme)
 local Poster = require(script.Parent.Parent.Ui.Poster)
 local PosterKit = require(script.Parent.Parent.Ui.PosterKit)
+local Roster = require(script.Parent.Parent.Ui.Roster)
 local Shapes = require(script.Parent.Parent.Ui.Shapes)
 local UiSound = require(script.Parent.Parent.Ui.UiSound)
 
@@ -578,6 +580,9 @@ function HudController:KnitStart()
 	-- the contents are a row inside it: the number in Oswald, the words beside it on the same baseline
 	local strip = group(gui, "Strip", Vector2.new(L.Strip.X, L.Strip.Y + SP[2] + L.Chip))
 	strip.holder.AnchorPoint = Vector2.new(0.5, 0)
+	-- The fighters' row (Ui/Roster): in a fight it stands where the strip's count stood. Wired further down.
+	local roster = Roster.new(gui)
+	local rosterShown = false -- the row is on screen (the feed and the ARENA CLOSING chip stand under it then)
 	local stripPanel = make("Frame", strip.fade, {
 		Name = "Panel",
 		BackgroundTransparency = 1,
@@ -1037,11 +1042,24 @@ function HudController:KnitStart()
 		local edge = L.Edge
 		strip.scale.Scale = scale * SS.Shrink
 		strip.holder.Position = UDim2.new(0.5, 0, 0, SS.Top)
+		-- the fighters' row: the strip's place, and never under the feed or the settings button (it keeps the
+		-- feed's width clear on BOTH sides, so it stays centred)
+		roster.scale.Scale = scale
+		roster.holder.Position = UDim2.new(0.5, 0, 0, SS.Top)
+		-- In a round only the settings button is beside it, so it runs nearly the screen's width and the feed
+		-- stands under it. Out of a round the feed stays where it was, under your Coins (moved under the row
+		-- there, it ran down into the SETTINGS tile; seen 2026-11-18), so the row keeps the feed's whole column
+		-- clear on both sides instead.
+		local fighting = player:GetAttribute("HT_InRound") == true
+		local beside = if fighting then 110 else L.FeedWidth + L.Edge + 12
+		roster.setRoom(view.X / scale - 2 * beside)
 		-- out of a round your Coins stand in the top-right corner (NavController), so the feed starts under them
 		local underCoins = if player:GetAttribute("HT_InRound") ~= true
 			then 48 * PosterKit.stage().nav + 10
 			else 0
-		feed.holder.Position = UDim2.new(1, -edge, 0, L.StripTop + underCoins)
+		-- and under the fighters' row while that is up: the row runs nearly the screen's width
+		local underRow = if rosterShown and fighting then SS.Top + (roster.tall + 6) * scale else 0
+		feed.holder.Position = UDim2.new(1, -edge, 0, math.max(L.StripTop + underCoins, underRow))
 		spectate.holder.Position = UDim2.new(0.5, 0, 1, -edge)
 		-- the tile row keeps spare room round it inside its group; the tiles themselves stop at the mockup's
 		-- 26 from the right and 24 from the bottom
@@ -1144,8 +1162,107 @@ function HudController:KnitStart()
 		setGroup(spectate, watching and not over)
 	end
 
+	-- THE FIGHTERS' ROW -------------------------------------------------------------------------------------
+	-- Who is in it: every body RoundService has tagged HT_Fighter (the same list Spectate uses), while the phase
+	-- is Fighting. A ring-out (the RingOut event, by name) crosses its fighter out and credits the one who did
+	-- it; ring-outs are counted HERE from those events, so someone who joins mid-round sees only the ones since.
+	-- A body that loses its tag with no ring-out behind it (the round ending under it) just sinks away.
+	local FIGHTER_TAG = "HT_Fighter"
+	local rosterOn = false
+	local rosterWanted = true -- the Settings page's "Fighter row" switch; off, the strip shows its count again
+	local rosterKills: { [any]: number } = {}
+	local rosterSince: { [any]: number } = {}
+	local rosterSeq = 0
+	local function rosterShow()
+		-- (it gives way to the open menu window, like the feed: the window is laid out to clear the strip, and
+		-- the taller row ran under its top edge; seen 2026-11-18. The strip's count shows meanwhile.)
+		local shown = rosterOn and roster.count() > 0 and not menuOpen
+		roster.holder.Visible = shown
+		-- (the strip's own panel gives way; its ARENA CLOSING chip stays, moved down to stand under the row:
+		-- the strip is drawn at SS.Shrink, so the row's height is taken into the strip's own units)
+		stripPanel.Visible = not shown
+		closing.Position =
+			UDim2.new(0.5, 0, 0, if shown then (roster.tall + 4) / SS.Shrink else L.Strip.Y + SP[2])
+		if shown ~= rosterShown then
+			rosterShown = shown
+			layout()
+		end
+	end
+	local function rosterAdd(model: Instance, wait: number?)
+		if not model:IsA("Model") then
+			return
+		end
+		local who = Players:GetPlayerFromCharacter(model)
+		local kitId = if who then who:GetAttribute("HT_Kit") else nil
+		local hex = Tokens.hex[`class.{if typeof(kitId) == "string" then kitId else "Base"}`]
+		roster.add({
+			id = model,
+			name = if who then who.DisplayName else model.Name,
+			userId = if who then who.UserId else nil,
+			colour = if hex then Color3.fromHex(hex) else colour("coral.500"),
+			me = who == player,
+		}, wait)
+		rosterShow()
+	end
+	local function rosterCrown()
+		roster.crown(RosterLogic.leader(roster.ids(), rosterKills, rosterSince))
+	end
+	local function rosterRingOut(victim: string, attacker: string?, cause: string)
+		if not rosterOn then
+			return
+		end
+		if attacker and cause == "knocked" then
+			local by = roster.find(attacker)
+			if by ~= nil then
+				rosterSeq += 1
+				rosterKills[by] = (rosterKills[by] or 0) + 1
+				rosterSince[by] = rosterSeq
+				roster.kills(by, rosterKills[by])
+			end
+		end
+		local out = roster.find(victim)
+		if out ~= nil then
+			roster.out(out, cause ~= "left")
+		end
+		rosterCrown()
+	end
+	local function rosterRefresh(round: HudLogic.RoundState)
+		local want = round.phase == "Fighting" and rosterWanted
+		if want and not rosterOn then
+			rosterOn = true
+			roster.clear()
+			table.clear(rosterKills)
+			table.clear(rosterSince)
+			for index, model in CollectionService:GetTagged(FIGHTER_TAG) do
+				rosterAdd(model, (index - 1) * 0.02)
+			end
+		elseif not want and rosterOn then
+			rosterOn = false
+			roster.clear()
+		end
+		rosterShow()
+	end
+	CollectionService:GetInstanceAddedSignal(FIGHTER_TAG):Connect(function(model)
+		if rosterOn then
+			rosterAdd(model)
+		end
+	end)
+	CollectionService:GetInstanceRemovedSignal(FIGHTER_TAG):Connect(function(model)
+		if not (rosterOn and roster.has(model)) then
+			return
+		end
+		-- its ring-out normally arrives with this; if none does, the tile leaves without the X
+		task.delay(0.6, function()
+			if rosterOn and roster.has(model) then
+				roster.out(model, false)
+				rosterCrown()
+			end
+		end)
+	end)
+
 	local function refreshStrip(fromEvent: boolean)
 		local round = readRound()
+		rosterRefresh(round)
 		local now = workspace:GetServerTimeNow()
 		local info = HudLogic.strip(round, now)
 		setGroup(strip, info.visible)
@@ -1395,6 +1512,7 @@ function HudController:KnitStart()
 					function(victim: string, attacker: string?, cause: string)
 						if not inTraining() then
 							pushFeed(victim, attacker, cause or "fell")
+							rosterRingOut(victim, attacker, cause or "fell")
 						end
 					end
 				)
@@ -1539,9 +1657,20 @@ function HudController:KnitStart()
 		end)
 	end
 	-- The feed gives way to the open menu window: its rows would lie over the window's corner.
+	do
+		local menu = Knit.GetController("MenuController")
+		rosterWanted = menu:GetSetting("roster") ~= false
+		menu.SettingChanged:Connect(function(id: string, on: boolean)
+			if id == "roster" then
+				rosterWanted = on
+				refreshStrip(false)
+			end
+		end)
+	end
 	Knit.GetController("MenuController").Changed:Connect(function(entry: string?)
 		menuOpen = entry ~= nil
 		feed.holder.Visible = not menuOpen
+		rosterShow()
 	end)
 
 	-- Press and result feedback ----------------------------------------------------------------------
