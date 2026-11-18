@@ -185,20 +185,42 @@ function UltimateController:KnitStart()
 						anim:PlaySwing(attacker, swing.side, math.max(swing.windup - late, 0.02))
 					end
 				end
+				-- The big swings run ON THE TIMELINE'S CLOCK (kits-7f, measured: freezes waiting on the strike marker
+				-- landed 0.07-0.08 s late, so the fist had swept past or not arrived). Each swing reaches its contact
+				-- pose exactly at its hit, holds it through the freeze, then plays on by itself.
+				for _, swing in line.swings do
+					if not swing.hold and not swing.fromHold then
+						local hitAt = swing.t + swing.windup
+						local freeze = 0
+						for _, blow in line.blows do
+							if math.abs(blow.t - hitAt) < 0.011 then
+								freeze = blow.freeze or 0
+							end
+						end
+						local releaseAt = hitAt + freeze
+						if t >= swing.t and t < releaseAt then
+							anim:SyncSwing(
+								attacker,
+								math.clamp((t - swing.t) / math.max(swing.windup, 1e-3), 0, 1),
+								0,
+								swing.contact
+							)
+						elseif lastT < releaseAt and t >= releaseAt then
+							anim:ReleaseSwing(attacker)
+						end
+					end
+				end
 				for _, blow in Ultimates.between(line.blows, lastT, t) do
 					-- a heavy blow at full strength (the most hit-stop, the heavy flinch); the rest as a
-					-- string's punches, the flinch alternating light and heavy. It waits for the swing's strike
-					-- (kits-7d: on the timeline's frame the hit-stop froze a late hook BEFORE its strike, so the
-					-- fist never came forward); inside the barrage loop no swing is pending and it lands at once.
-					anim:AtStrike(attacker, function()
-						anim:HitLanded(
-							attacker,
-							target,
-							if blow.heavy then HEAVY_STRENGTH else 0,
-							blow.step,
-							blow.freeze -- a big hit's freeze (kits-7e): the hit-stop holds the whole of it
-						)
-					end)
+					-- string's punches, the flinch alternating light and heavy. On its time: the swing's contact
+					-- pose is there on the same clock (above).
+					anim:HitLanded(
+						attacker,
+						target,
+						if blow.heavy then HEAVY_STRENGTH else 0,
+						blow.step,
+						blow.freeze -- a big hit's freeze (kits-7e): the hit-stop holds the whole of it
+					)
 				end
 				local barrage = line.barrage
 				if barrage then

@@ -48,6 +48,8 @@ local book: any = Abilities
 ClassPreview.lite = Drift.lite
 -- how many class tiles a page of the Classes screen holds (two rows of four)
 local CLASSES_PER_PAGE = 8
+-- What every skill row on the Classes page says instead of the skill's own description. "" shows the real ones.
+local SKILL_DETAIL_PLACEHOLDER = "Placeholder. This move's description comes later."
 -- PLACEHOLDER TILES after the real classes (the owner, 2026-11-18: "make like 2 more pages with like 8
 -- placeholders for both", to see the page arrows): dark striped tiles that say SOON and answer no press. They are
 -- not classes: nothing about them is in Config/Abilities, the Shop or the saved data. Set to 0 to remove them.
@@ -966,7 +968,11 @@ function MenuController:KnitStart()
 			-- found the two rows unlike each other). A line of the small text holds about 54 letters at this
 			-- width; a longer one takes a second line. Two two-line rows end exactly at the page's foot (400 + 88 + 4 + 88),
 			-- so nothing scrolls: the rows start 17 higher and stand 4 apart to make that room.
-			local detail = skill.blurb
+			-- (PLACEHOLDER text for now, the owner, 2026-11-18: the moves are not final, so their real
+			-- descriptions, still in Config/Abilities as each skill's `blurb`, are not shown here yet)
+			local detail = if SKILL_DETAIL_PLACEHOLDER ~= ""
+				then SKILL_DETAIL_PLACEHOLDER
+				else skill.blurb
 			local height = if not detail or detail == "" then 46 elseif #detail > 57 then 88 else 68
 			local row = PosterKit.row(
 				page,

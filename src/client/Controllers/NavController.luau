@@ -581,6 +581,19 @@ function NavController:KnitStart()
 		end
 	end
 	local controlsOpen = false
+	-- how far the panel's foot stands above the screen's bottom margin, in HUD units, and its slide between the
+	-- two places when the ultimate arrives or goes
+	local panelHud = 1
+	local function panelLift(): number
+		return if player:GetAttribute("HT_UltReady") == true then 200 else 77 + CHIP.Y + 8
+	end
+	player:GetAttributeChangedSignal("HT_UltReady"):Connect(function()
+		local from = panel.Position.Y.Offset
+		local to = -(24 + panelLift() * panelHud)
+		Poster.run(panel, 0.25, function(t: number)
+			panel.Position = UDim2.new(1, -26, 1, from + (to - from) * PosterEase.easeOut(t))
+		end)
+	end)
 	local function setControls(on: boolean)
 		if on == controlsOpen then
 			return
@@ -641,7 +654,12 @@ function NavController:KnitStart()
 		chipScale.Scale = stage.hud
 		panelScale.Scale = stage.hud
 		chipHolder.Position = UDim2.new(1, -26, 1, -(24 + 77 * stage.hud))
-		panel.Position = UDim2.new(1, -26, 1, -(24 + 200 * stage.hud))
+		-- The panel stands right on top of the chip (8 units of air). Only while you HOLD your ultimate does
+		-- it stand higher, clear of the ULT READY badge's place, and it comes back down when the ultimate is
+		-- used (the owner, 2026-11-18: it always stood high, with an empty gap under it).
+		panelHud = stage.hud
+		Poster.stop(panel)
+		panel.Position = UDim2.new(1, -26, 1, -(24 + panelLift() * panelHud))
 		chipHolder.Visible = showChip
 		chipWord.Text = if device == "gamepad" then "SELECT  ·  CONTROLS" else "H  ·  CONTROLS"
 		if not showChip then

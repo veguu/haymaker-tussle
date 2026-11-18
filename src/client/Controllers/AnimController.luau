@@ -743,6 +743,32 @@ function AnimController:SyncBarrage(model: Model?, seconds: number)
 	end
 end
 
+--- A cutscene's swing on the shared clock (kits-7f, measured: the strike marker's freeze landed 0.07-0.08 s late
+--- and a frame rate drop delayed swings, so fists missed). `lead` 0..1 is how far through the lead-in to contact,
+--- `after` seconds past the held contact; `contact` moves the contact pose off the clip's strike (seconds, as
+--- measured in play). The track is held at that time; ReleaseSwing lets it run on.
+function AnimController:SyncSwing(model: Model?, lead: number, after: number, contact: number?)
+	local fighter = model and fighters[model]
+	local name = fighter and fighter.swingName
+	local track = name and fighter and fighter.tracks[name]
+	if not track or not track.IsPlaying then
+		return
+	end
+	local hold = (Clips[name].strike or 0) + (contact or 0)
+	track:AdjustSpeed(0)
+	track.TimePosition = math.clamp(lead * hold + after, 0, math.max(track.Length - 0.02, 0))
+end
+
+--- Lets a SyncSwing'd swing play on by itself from where it is.
+function AnimController:ReleaseSwing(model: Model?)
+	local fighter = model and fighters[model]
+	local name = fighter and fighter.swingName
+	local track = name and fighter and fighter.tracks[name]
+	if track and track.IsPlaying then
+		track:AdjustSpeed(1)
+	end
+end
+
 --- A scripted sprint on a body that is being set, not moved (the ultimate's rush): the run plays at its top
 --- stride while `on`, and a swing thrown meanwhile is its running variant.
 function AnimController:SetDash(model: Model?, on: boolean)

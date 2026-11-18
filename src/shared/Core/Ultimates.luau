@@ -61,7 +61,16 @@ export type Shot = {
 
 -- The attacker's swings, by time: which swing (AnimController's sides) and how long it takes to strike.
 -- `hold`: draw it back and wait there (AnimController.HoldSwing); `fromHold`: let a held swing go.
-export type Swing = { t: number, side: string, windup: number, hold: boolean?, fromHold: boolean? }
+-- `contact` (kits-7f): where the fist actually meets the target, in clip seconds off the clip's strike, as measured in
+-- play; the swing runs on the timeline's clock to that pose at its hit (UltimateController, AnimController.SyncSwing).
+export type Swing = {
+	t: number,
+	side: string,
+	windup: number,
+	hold: boolean?,
+	fromHold: boolean?,
+	contact: number?,
+}
 
 -- The blows that land: `step` alternates the light and heavy flinch on the target (AnimController.HitLanded);
 -- `heavy` is a launching blow.
@@ -149,14 +158,18 @@ local BLAST = 6.15
 local THROWN = 6.7 -- the flight takes over
 local HOOK_STRIKE = 0.16 -- AnimClips HookLeft/HookRight `strike`
 local HAYMAKER_STRIKE = 0.07 -- AnimClipsUltimate HaymakerUp: from its hold (0.25) to its strike (0.32)
-local REACH = 3.0 -- root to root when the running hook lands on a standing target
+-- root to root when the running hook lands on a standing target. Measured in play (kits-7f): at 3.0 the hook's fist
+-- stopped 2.3 studs short; its arc closes about 0.7 studs in front of the attacker (anime blows land at zero distance)
+local REACH = 1.5
 -- The juggle: BarrageUp's fist meets the torso of someone this far ahead and this high (root to root). The fist
 -- is 2.3 studs out from the shoulder at 50 degrees up (animations/build_strikes.luau UP_PUNCH).
 local UP_REACH = 2.0
 local JUGGLE_Y = 2.2
 local JUGGLE_BOB = 0.2 -- each punch knocks them up this much; they sink back into the next
 local JUGGLE_BACK = 0.04 -- and drives them back this far
-local UPPER_REACH = 2.2 -- closer for the uppercut, which rises in front of the body
+-- root to root for the uppercut. Measured in play (kits-7f): at 2.2 the fist ends 0.8-1.3 studs off the torso (past its
+-- side); 2.8 was worse (2-4). Left at 2.2: the uppercut is rebuilt in stage B (design/haymaker-rush-v4-gaps.md B11).
+local UPPER_REACH = 2.2
 -- The haymaker from below: HaymakerUp's fist (55 degrees up) meets a torso this far ahead and this much higher.
 local HAY_GAP = 1.35 -- measured in play (kits-7d): at 1.85 the fist stopped 0.5-0.7 studs short
 local HAY_RISE = 2.4
@@ -320,8 +333,10 @@ end
 -- let go: from the hold it strikes 0.07 s later.
 local function rushSwings(): { Swing }
 	return {
-		{ t = BLOW - HOOK_STRIKE, side = "Right", windup = HOOK_STRIKE },
-		{ t = UPPERCUT - 0.1, side = "Uppercut", windup = 0.1 },
+		-- the hook's fist is centred on the target 0.02 s after its strike (measured)
+		{ t = BLOW - HOOK_STRIKE, side = "Right", windup = HOOK_STRIKE, contact = 0.025 },
+		-- the uppercut meets the torso at 0.075 s of its clip, a little before its strike (0.089, measured)
+		{ t = UPPERCUT - 0.1, side = "Uppercut", windup = 0.1, contact = -0.014 },
 		{ t = WINDUP, side = "HaymakerUp", windup = 0, hold = true },
 		{
 			t = HAYMAKER - HAYMAKER_STRIKE,
@@ -375,7 +390,7 @@ local HAYMAKER_RUSH: Timeline = {
 		-- away from it (Azure Flames 2.17-2.92)
 		{
 			t = DASH,
-			cam = Vector3.new(3, 3.6, 7),
+			cam = Vector3.new(3.6, 4.4, 7),
 			look = Vector3.new(0, 0.3, -12),
 			fov = 58,
 			rel = "start",
@@ -383,7 +398,7 @@ local HAYMAKER_RUSH: Timeline = {
 		},
 		{
 			t = BLOW,
-			cam = Vector3.new(3, 3.5, 6.6),
+			cam = Vector3.new(3.6, 4.3, 6.6),
 			look = Vector3.new(0, 0.3, -12),
 			fov = 56,
 			rel = "start",

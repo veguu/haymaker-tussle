@@ -292,55 +292,63 @@ local SoundBank: { [string]: Entry } = {
 		name = "BOOM-Mid Boom 07",
 		creator = "APMOfficial",
 	},
+	-- THE EIGHT SOUNDS OF TOUCHING THE INTERFACE ARE THE "PUNCHY" SET SINCE 2026-11-18 (the owner: "louder and less
+	-- soft ... really feel like you're interacting", heard on the mockup page first): ui_press, ui_hover, ui_open,
+	-- ui_close, ui_page, ui_equip, ui_buy, ui_deny. Each is a noise click, a low body and its notes
+	-- (make_ui_sounds.py, PUNCHY). `volume` is their mockup peak x 2.2, NOT the soft set's x 4.3: at x 4.3 a
+	-- press (1.03) would be as loud as a punch landing. A press is now about 3.5 times its old level. The SOFT ids they replaced, to go back: ui_press
+	-- 97006914075932 (0.09 s, 0.15), ui_open 140346518500681 (0.37, 0.28), ui_close 140631035788633 (0.14, 0.17),
+	-- ui_page 91442953128650 (0.11, 0.25), ui_equip 94748514757177 (0.32, 0.25), ui_buy 86516525084890 (0.33, 0.2),
+	-- ui_deny 92136914494187 (0.21, 0.25), ui_hover 119602077656645 (0.1, 0.1).
 	-- THE FIGHT-POSTER UI'S SOFT SOUNDS (ui-8b, 2026-11-17): the mockup's own `sfx()` recipes rendered by
 	-- design/ui/make_ui_sounds.py and uploaded to the game's group. Played flat (2D) by client Ui/UiSound. Every
 	-- file peaks at -6 dBFS; `volume` follows the mockup's own peak (x 4.3), so the last_* are about 3 x the
 	-- others, as there. `length` is the file's; each starts at sample 0.
 	-- pop: pointer down on any button
 	["ui_press"] = {
-		takes = { { id = 97006914075932, length = 0.09, start = 0, volume = 0.15 } },
+		takes = { { id = 91500867807243, length = 0.1, start = 0, volume = 0.53 } },
 		looped = false,
 		name = "HT ui_press",
 		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
 	},
 	-- whoosh: the window opens
 	["ui_open"] = {
-		takes = { { id = 140346518500681, length = 0.37, start = 0, volume = 0.28 } },
+		takes = { { id = 73226715728690, length = 0.32, start = 0, volume = 0.54 } },
 		looped = false,
 		name = "HT ui_open",
 		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
 	},
 	-- the window closes
 	["ui_close"] = {
-		takes = { { id = 140631035788633, length = 0.14, start = 0, volume = 0.17 } },
+		takes = { { id = 112607708993860, length = 0.17, start = 0, volume = 0.42 } },
 		looped = false,
 		name = "HT ui_close",
 		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
 	},
 	-- snap: page change, tile pick
 	["ui_page"] = {
-		takes = { { id = 91442953128650, length = 0.11, start = 0, volume = 0.25 } },
+		takes = { { id = 118179764499470, length = 0.1, start = 0, volume = 0.41 } },
 		looped = false,
 		name = "HT ui_page",
 		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
 	},
 	-- a class equipped
 	["ui_equip"] = {
-		takes = { { id = 94748514757177, length = 0.32, start = 0, volume = 0.25 } },
+		takes = { { id = 102801942993328, length = 0.33, start = 0, volume = 0.53 } },
 		looped = false,
 		name = "HT ui_equip",
 		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
 	},
 	-- coin: a class bought
 	["ui_buy"] = {
-		takes = { { id = 86516525084890, length = 0.33, start = 0, volume = 0.2 } },
+		takes = { { id = 94696095664151, length = 0.38, start = 0, volume = 0.53 } },
 		looped = false,
 		name = "HT ui_buy",
 		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
 	},
 	-- nope: Q or R refused
 	["ui_deny"] = {
-		takes = { { id = 92136914494187, length = 0.21, start = 0, volume = 0.25 } },
+		takes = { { id = 101128195701132, length = 0.23, start = 0, volume = 0.37 } },
 		looped = false,
 		name = "HT ui_deny",
 		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
@@ -390,7 +398,7 @@ local SoundBank: { [string]: Entry } = {
 	-- The pointer comes onto a button. NOT in the mockup (the owner asked for it, 2026-11-17): a soft sine that
 	-- lifts a little where the press falls, at about half the press's level.
 	["ui_hover"] = {
-		takes = { { id = 119602077656645, length = 0.1, start = 0, volume = 0.1 } },
+		takes = { { id = 97267587317411, length = 0.07, start = 0, volume = 0.12 } },
 		looped = false,
 		name = "HT ui_hover",
 		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
