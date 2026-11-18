@@ -44,7 +44,7 @@ def gain_curve(dur, vol, attack):
     return np.concatenate([exp_ramp(0.0001, vol, up), exp_ramp(vol, 0.0001, total - up)])
 
 
-def osc(f1, f2, dur, kind="sine", vol=0.1, delay=0.0):
+def osc(f1, f2, dur, kind="sine", vol=0.1, delay=0.0, attack=None):
     n = int(round(dur * RATE))
     freq = exp_ramp(f1, f2, n) if (f2 and f2 != f1) else np.full(n, float(f1))
     phase = 2 * math.pi * np.cumsum(freq) / RATE
@@ -52,7 +52,7 @@ def osc(f1, f2, dur, kind="sine", vol=0.1, delay=0.0):
         tone = 2 / math.pi * np.arcsin(np.sin(phase))
     else:
         tone = np.sin(phase)
-    return delay, tone * gain_curve(dur, vol, min(0.012, dur * 0.25))
+    return delay, tone * gain_curve(dur, vol, attack or min(0.012, dur * 0.25))
 
 
 def lowpass_swept(x, cut, q_db):
@@ -81,13 +81,43 @@ def noise(dur, vol, f1, f2, delay=0.0):
     return delay, filtered * gain_curve(dur, vol, min(0.03, dur * 0.3))
 
 
-def mix(parts):
+def bandpass_swept(x, cut, q):
+    """The Web Audio bandpass biquad (Q is a plain number here, not decibels), cutoff free to change."""
+    y = np.zeros_like(x)
+    x1 = x2 = y1 = y2 = 0.0
+    cut = np.broadcast_to(cut, x.shape)
+    for i in range(len(x)):
+        w0 = 2 * math.pi * min(cut[i], RATE * 0.49) / RATE
+        cw, alpha = math.cos(w0), math.sin(w0) / (2 * q)
+        a0, a1, a2 = 1 + alpha, -2 * cw, 1 - alpha
+        out = (alpha * x[i] - alpha * x2 - a1 * y1 - a2 * y2) / a0
+        x2, x1 = x1, x[i]
+        y2, y1 = y1, out
+        y[i] = out
+    return y
+
+
+def click(dur, vol, f1, f2, delay=0.0, attack=0.001, q=1.0, kind="bandpass"):
+    """The punchy set's noise voice: `nz()` in the mockup with its attack and Q given."""
+    n = int(round(dur * RATE))
+    raw = RNG.uniform(-1, 1, n)
+    sweep = exp_ramp(f1, f2, n)
+    filtered = bandpass_swept(raw, sweep, q) if kind == "bandpass" else lowpass_swept(raw, sweep, q)
+    return delay, filtered * gain_curve(dur, vol, attack)
+
+
+def mix(parts, gain=MASTER_GAIN, cut=MASTER_CUT):
     length = max(int(round(d * RATE)) + len(s) for d, s in parts) + int(TAIL * RATE)
     out = np.zeros(length)
     for delay, samples in parts:
         at = int(round(delay * RATE))
         out[at : at + len(samples)] += samples
-    return lowpass_swept(out * MASTER_GAIN, MASTER_CUT, MASTER_Q_DB)
+    return lowpass_swept(out * gain, cut, MASTER_Q_DB)
+
+
+# The PUNCHY set's own master (the mockup's MG2 and LP2): louder and brighter than the soft one.
+PUNCH_GAIN = 0.85
+PUNCH_CUT = 9000.0
 
 
 def count(f, final):
@@ -123,15 +153,64 @@ SOUNDS = {
 }
 
 
+# THE PUNCHY SET (the owner, 2026-11-18: "louder and less soft ... really feel like you're interacting"; he heard
+# it on the mockup page and said to add it). Only the sounds of touching the interface. Each is the mockup's
+# `punch()` case at v = 1: a CLICK (band-passed noise, 1 ms attack), a BODY (a low tone that drops) and its notes.
+# These REPLACE the soft files of the same names; `--soft` renders the old ones again.
+def deny():
+    parts = []
+    for i, d in enumerate((0.0, 0.11)):
+        parts.append(osc(170 - 20 * i, 120 - 20 * i, 0.09, "triangle", 0.24, d, 0.002))
+        parts.append(click(0.06, 0.12, 400, 200, d, 0.002, 1.0, "lowpass"))
+    return parts
+
+
+PUNCHY = {
+    "ui_hover": [click(0.016, 0.07, 3800, 3200, 0, 0.001, 1.2), osc(900, 1050, 0.035, "sine", 0.05, 0, 0.002)],
+    "ui_press": [
+        click(0.028, 0.22, 2600, 1800, 0, 0.001, 1.2),
+        osc(240, 130, 0.07, "triangle", 0.26, 0, 0.002),
+        osc(1250, 900, 0.025, "triangle", 0.07, 0, 0.001),
+    ],
+    "ui_open": [
+        click(0.22, 0.16, 500, 3200, 0, 0.05, 0.8),
+        osc(170, 80, 0.16, "sine", 0.3, 0.13, 0.003),
+        click(0.03, 0.14, 2400, 1600, 0.13, 0.001, 1.2),
+    ],
+    "ui_close": [click(0.14, 0.12, 2600, 500, 0, 0.01, 0.8), osc(200, 100, 0.1, "sine", 0.24, 0.02, 0.002)],
+    "ui_page": [
+        click(0.05, 0.22, 3200, 1500, 0, 0.001, 1.0),
+        osc(520, 330, 0.07, "triangle", 0.16, 0, 0.002),
+        osc(780, 620, 0.05, "triangle", 0.06, 0, 0.002),
+    ],
+    "ui_equip": [
+        click(0.03, 0.2, 2400, 1700, 0, 0.001, 1.2),
+        osc(150, 90, 0.12, "sine", 0.22, 0, 0.002),
+        osc(440, 440, 0.09, "triangle", 0.2, 0, 0.003),
+        osc(660, 660, 0.22, "triangle", 0.2, 0.08, 0.003),
+    ],
+    "ui_buy": [
+        click(0.025, 0.16, 3000, 2200, 0, 0.001, 1.2),
+        osc(180, 100, 0.1, "sine", 0.2, 0, 0.002),
+        osc(988, 988, 0.07, "triangle", 0.16, 0, 0.002),
+        osc(1319, 1319, 0.28, "triangle", 0.17, 0.07, 0.002),
+        osc(1976, 1976, 0.2, "sine", 0.05, 0.07, 0.002),
+    ],
+    "ui_deny": deny(),
+}
+
+
 def main():
     out_dir = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "sfx", "ui")
     os.makedirs(out_dir, exist_ok=True)
-    only = set(sys.argv[1:])
+    soft = "--soft" in sys.argv[1:]
+    only = set(a for a in sys.argv[1:] if not a.startswith("--"))
     print(f"{'file':<18}{'seconds':>8}{'mock peak':>11}{'gain':>7}")
     for name, parts in SOUNDS.items():
         if only and name not in only:
             continue
-        samples = mix(parts)
+        punchy = name in PUNCHY and not soft
+        samples = mix(PUNCHY[name], PUNCH_GAIN, PUNCH_CUT) if punchy else mix(parts)
         peak = float(np.max(np.abs(samples)))
         gain = PEAK / peak
         data = np.clip(samples * gain, -1, 1)
@@ -141,7 +220,8 @@ def main():
             f.setsampwidth(2)
             f.setframerate(RATE)
             f.writeframes(struct.pack(f"<{len(data)}h", *(np.round(data * 32767).astype(int))))
-        print(f"{name + '.wav':<18}{len(data) / RATE:>8.2f}{peak:>11.3f}{gain:>7.1f}")
+        size = os.path.getsize(path)
+        print(f"{name + '.wav':<18}{len(data) / RATE:>8.2f}{peak:>11.3f}{gain:>7.1f}{size:>8}  {'punchy' if punchy else 'soft'}")
 
 
 if __name__ == "__main__":

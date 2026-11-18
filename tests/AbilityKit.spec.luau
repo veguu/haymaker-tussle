@@ -20,6 +20,48 @@ local function cheapestPaid(): any
 end
 
 return {
+	["the one-time class reset keeps the starter and the kept kits, refunds the rest, and runs once"] = function()
+		local reset = { Version = 1, Keep = { "Bruiser", "Inferno" } }
+		local profile = AbilityKit.newProfile(BOOK)
+		profile.coins = 100
+		profile.owned = { Base = true, Bruiser = true, Dragon = true, Frost = true }
+		profile.equipped = "Dragon"
+		local after = AbilityKit.classReset(BOOK, profile, reset)
+		assert(after ~= nil, "a profile not yet reset is reset")
+		local refund = BOOK.Kits.Dragon.price + BOOK.Kits.Frost.price
+		assert(after.coins == 100 + refund, `coins {after.coins}`)
+		assert(after.owned.Base and after.owned.Bruiser, "the starter and a kept kit stay")
+		assert(not after.owned.Dragon and not after.owned.Frost, "the others go")
+		assert(not after.owned.Inferno, "a kept kit that was never owned is not given")
+		assert(after.equipped == BOOK.DefaultKit, "a lost kit is unequipped")
+		assert(after.reset == 1)
+		assert(profile.owned.Dragon and profile.coins == 100, "the old profile is not changed")
+		assert(AbilityKit.classReset(BOOK, after, reset) == nil, "it runs once for a version")
+		assert(
+			AbilityKit.classReset(BOOK, after, { Version = 2, Keep = {} }) ~= nil,
+			"a later version runs again"
+		)
+	end,
+
+	["the class reset does nothing when switched off or malformed, and a save keeps its mark"] = function()
+		local profile = AbilityKit.newProfile(BOOK)
+		assert(AbilityKit.classReset(BOOK, profile, nil) == nil)
+		assert(AbilityKit.classReset(BOOK, profile, { Version = 0, Keep = {} }) == nil)
+		assert(AbilityKit.classReset(BOOK, profile, { Version = "1" }) == nil)
+		local fresh = AbilityKit.classReset(BOOK, profile, { Version = 1 })
+		assert(
+			fresh ~= nil and fresh.coins == profile.coins,
+			"a new player loses nothing and gains nothing"
+		)
+		local saved = AbilityKit.sanitize(
+			BOOK,
+			{ coins = 5, owned = { Base = true }, equipped = "Base", reset = 1 }
+		)
+		assert(saved.reset == 1, "the mark survives loading")
+		assert(AbilityKit.sanitize(BOOK, { coins = 5 }).reset == 0, "an old save has no mark")
+		assert(AbilityKit.sanitize(BOOK, { reset = -3 }).reset == 0)
+	end,
+
 	["the catalogue is sound"] = function()
 		local found = AbilityKit.problems(BOOK)
 		assert(#found == 0, table.concat(found, "; "))
