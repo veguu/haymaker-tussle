@@ -619,16 +619,24 @@ local function stepDummy(
 		if t < line.cinematic then
 			local _, at = Ultimates.pose(line, t, Vector3.zero)
 			local spot = ult.anchor:PointToWorldSpace(at)
-			-- facing back toward the attacker, who stands behind them (+Z in the anchor)
+			-- facing back toward the attacker, who stands behind them (+Z in the anchor), turned as the timeline turns
+			-- it (kits-8a: the same pose the fighters' screens show, so everyone else sees the fold and the flip too)
 			local toward = ult.anchor:PointToWorldSpace(at + Vector3.new(0, 0, 1))
-			root.CFrame = CFrame.lookAt(spot, Vector3.new(toward.X, spot.Y, toward.Z))
+			root.CFrame = Ultimates.targetCFrame(spot, toward, Ultimates.tilt(line, t))
 			root.AssemblyLinearVelocity = Vector3.zero
 		else
-			local from = ult.flightFrom or root.Position
-			local share = (t - line.cinematic) / GameConfig.Ultimate.FlightSeconds
-			local spot = Ultimates.flightPoint(from, ult.flightEnd, share, 18)
-			root.CFrame = CFrame.new(spot) * CFrame.Angles(share * 14, share * 6, 0)
-			root.AssemblyLinearVelocity = (ult.flightEnd - from) / GameConfig.Ultimate.FlightSeconds
+			-- on from the knockback at its speed and turn (kits-8a, Ultimates.flight: no stall, no snap)
+			local flying, velocity = Ultimates.flight(
+				line,
+				ult.anchor,
+				ult.flightFrom or root.Position,
+				ult.flightEnd,
+				GameConfig.Ultimate.FlightSeconds,
+				18,
+				t
+			)
+			root.CFrame = flying
+			root.AssemblyLinearVelocity = velocity
 		end
 		return
 	end

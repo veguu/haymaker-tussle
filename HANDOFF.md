@@ -3505,3 +3505,62 @@ Build stamp `kits-7m+lobby-4+ui-14a` (the place has it). The last commit is 130a
   - The target-like hit rings and the plain white flash (stages E and D of design/haymaker-rush-v4-gaps.md).
   - The sun in the flurry shot (stage C).
   - The teammate's Rojo overwrote the place 3 times this day: compare the stamp before every test.
+
+## kits-8a (2026-11-18): Haymaker Rush rebuilt from a 10-reference cutscene study (NOT COMMITTED; NOT YET SEEN IN STUDIO)
+Build stamp `kits-8a+lobby-4+ui-15c`. The owner's six problems on kits-7m (torso not facing the fist, launch too short for
+a long dash, a strange rush, an arm rotating between the dash and the punch, a delayed knockback, a stiff camera and
+bodies), each traced to its cause and fixed. The study and the plan are in `design/cutscene-study/`:
+- `00`: our map and the measured diagnosis (anchoring REJECTED as a cause; the dummy is unanchored)
+- `01`-`10`: one report per reference
+- `11`: findings, gap analysis, storyboard and to-do list with status
+
+What changed:
+- Target facing. A `Fold` pose clip holds the target from each big contact, so `HitLanded`'s flinch can't turn it.
+  Contact spacing and tilts were solved on the baked clips:
+  - the uppercut is held at clip 0.075 (it was 0.066, with the fist still under the belly: the old "1 stud off" bug);
+    the target is caught 2.4 up, 1.5 back and 1.2 to the right, tilted -55
+  - the haymaker is 2.7 back, 2.4 below and 0.6 to the left, upright
+  - measured with `lune run lune/contact_check` and asserted by `tests/Ultimates.spec`, using `tests/support/Rig`
+    (R6 joints posed by our clips)
+- Launch: 9.5 back and 5 up (a `whip` ease). The dash covers about 9.3 studs.
+- Rush:
+  - `RushIn` is now only the lock-in and crouch. `RushRun` (arms and head) runs over the real Sprint legs.
+  - The camera is over the TARGET's shoulder (C5-A), with `Shot.lookRel` aiming at the runner.
+  - A `launch` ease: full speed within the first fifth, never slowing.
+- Dash to punch. `HaymakerUp` is one clip: load in the crouch, take-off, hold, drive. The arm's world aim stays
+  constant (the sweep follows the torso turn, and the lift adds the lean). The timeline syncs it in three parts
+  (`Swing.loaded`, `release`, `holdShare`). `LeapUp` is gone.
+- Knockback. The target moves from the contact frame: 0.9 studs under the impact frames, then about 3 studs/s in slow
+  motion, then a `throw` ease into `Ultimates.flight`, which starts at that speed and turns on from the last pose. That
+  removes kits-7m's stall, its 56-101 studs/s jump and its 46 deg turn snap. `DummyService` uses it, and now poses the
+  dummy with the tilt.
+- Camera:
+  - a whip up after the launch
+  - one panning dash shot from a fixed low spot
+  - a two-shot beat, then a whip zoom that lands before contact
+  - a pull-back over the slow knockback, then the throw line
+  - creeps through the freezes
+- `targetCFrame` is built from its axes (Lune's lookAt is backwards on exact +-Z).
+- The teammate's ui-15a and ui-15c (roster row, `MenuController`, `Shapes`, `RosterFrames`) were saved from the place by
+  checksum. All of it matches the place exactly.
+
+Gates: rojo build OK, 546 tests, `selene src` 0, stylua clean.
+
+NOT DONE:
+- Seeing it in Studio. The place still runs kits-7m+ui-15c. It needs Rojo Connect to this folder (port 34872) with the
+  teammate's Rojo stopped, then a 16:9 recording and the acceptance list in `design/cutscene-study/11` section 6.
+- Stage D screen effects.
+
+## kits-8b (2026-11-18): fixes from the first kits-8a recording
+Build stamp `kits-8b+lobby-4+ui-15c`, saved in the place (version 482). The kits-8a recording is
+`design/references/ours-kits-8a.mp4` (untracked). Studio only rendered 7-10 fps that run.
+
+Fixed from that recording:
+- the rush's right arm stuck out like a wave; the fist is now drawn back by the hip (`RUN_COCKED`)
+- the target's shoulder filled the rush frame; the camera moved out and up
+- the attacker's back hid the target at the uppercut; the camera moved right and out
+- the final zoom read as flat blocks; it was eased to FOV 47
+
+kits-8b is NOT seen in Studio. Studio's viewport froze on a stale frame, so the screen capture got stills. Restart Studio
+(its output also asks for a restart: the assistant plugin changed version), then record again. The acceptance
+checklist with each item's state is in `design/cutscene-study/11`, section 6.

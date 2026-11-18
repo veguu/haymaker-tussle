@@ -27,6 +27,8 @@ local STARTS = {
 
 -- The close inserts (kits-7e: the lock-in and the wind-up, one fighter on purpose) and the impact frames are allowed
 -- to crop; every other shot keeps both fighters whole.
+-- kits-8a: so is a push INTO an insert once it is moving (the owner's "zoom in onto the fist and the targets torso":
+-- the zoom crops on its way in).
 local function isWide(line: any, t: number): boolean
 	local haymaker = 0
 	for _, cue in line.cues do
@@ -34,7 +36,16 @@ local function isWide(line: any, t: number): boolean
 			haymaker = cue.t
 		end
 	end
-	return not Ultimates.currentShot(line, t).insert and not (t >= haymaker and t < haymaker + 0.3)
+	local current = Ultimates.currentShot(line, t)
+	local nextShot
+	for _, shot in line.shots do
+		if shot.t > t then
+			nextShot = shot
+			break
+		end
+	end
+	local pushingIn = nextShot ~= nil and nextShot.insert and not nextShot.cut and t > current.t
+	return not current.insert and not pushingIn and not (t >= haymaker and t < haymaker + 0.3)
 end
 
 -- A point's place on screen: -1..1 across and up, and its depth (+ in front).

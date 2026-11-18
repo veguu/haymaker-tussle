@@ -5,6 +5,7 @@ local Round = require("../src/shared/Core/Round")
 local GameConfig = require("../src/shared/Config/GameConfig")
 
 local Vector3 = roblox.Vector3
+local CFrame = roblox.CFrame
 local CFG: any = GameConfig.Ultimate
 local ARENA: any = GameConfig.Arena
 
@@ -260,9 +261,8 @@ return {
 		local blow = line.blows[1]
 		assert(Ultimates.tilt(line, blow.t - 0.05).Magnitude < 1, "upright before the hook lands")
 		assert(Ultimates.tilt(line, blow.t + 0.1).Z > 20, "rolled over by the hook")
-		-- a backflip on the uppercut's rise, and a whole number of turns when the flight takes over
-		local finish = Ultimates.tilt(line, line.cinematic)
-		assert(math.abs(finish.X % 360) < 1e-3, "upright (whole turns) when the flight starts")
+		-- a backflip on the uppercut's rise (kits-8a: the flight then turns ON from the last pose, see "the knockback
+		-- starts on the hit", so it no longer has to end on whole turns)
 		local most = 0
 		for _, key in line.keys do
 			if key.targetTilt then
@@ -272,38 +272,202 @@ return {
 		assert(most >= 180, "a flip somewhere")
 	end,
 
-	["the rush in is a real run: it speeds up all the way, seen from behind"] = function()
-		-- kits-7d, the user: "an animation of the rush itself, with an accompanying camera angle that shows you
-		-- speeding up to them from behind you. right now it just teleports"
+	["the rush in is a real run at the lens: it never slows, and it grows toward the camera (kits-8a)"] = function()
+		-- kits-7d, the user: "an animation of the rush itself ... right now it just teleports"; kits-8a, the owner: "the
+		-- opening rush animation looks strange and does not read clearly as a rush" (measured: a held stride sliding,
+		-- filmed from straight behind). Now the Sprint legs run under RushRun's arms, and the camera is over the
+		-- TARGET's shoulder (the owner's C5-A pick), the attacker charging at the lens.
 		local line = Ultimates.TIMELINES.Base
 		local dash = line.dash
 		assert(dash, "the attacker sprints while carried in")
 		assert(dash.to - dash.from >= 0.6, "long enough to see (it was 0.34 s)")
+		local running = false
+		for _, clip in line.clips or {} do
+			if clip.name == "RushRun" and math.abs(clip.t - dash.from) < 1e-6 then
+				running = true
+			end
+		end
+		assert(running, "the run's arms start with the sprint")
 		for _, start in { Vector3.new(0, 0, 6), Vector3.new(4, 0, 14), Vector3.new(-8, 0, 20) } do
 			local lastSpeed = 0
 			local step = 1 / 30
 			local t = dash.from + step
+			local firstDistance, lastDistance
 			while t <= dash.to - step do
 				local before = Ultimates.pose(line, t - step, start)
 				local now = Ultimates.pose(line, t, start)
 				local speed = (now - before).Magnitude / step
 				assert(speed >= lastSpeed - 1e-3, `slows at {t} from {start}`)
 				lastSpeed = speed
-				-- the camera behind them (their own +Z) and on their right
+				-- the camera IN FRONT of them (their own -Z), on their right of the line, looking at them
 				local attackerAt, targetAt = Ultimates.pose(line, t, start)
-				local cam = Ultimates.shot(line, t, attackerAt, targetAt, start)
-				if t < dash.to - 0.2 then
-					local frame = Ultimates.attackerFrame(attackerAt, targetAt)
-					local inFrame = frame:PointToObjectSpace(cam)
-					assert(
-						inFrame.Z > 3 and inFrame.X > 0,
-						`camera not behind them at {t} from {start}`
-					)
-				end
+				local cam, look = Ultimates.shot(line, t, attackerAt, targetAt, start)
+				local frame = Ultimates.attackerFrame(attackerAt, targetAt)
+				local inFrame = frame:PointToObjectSpace(cam)
+				assert(inFrame.Z < -2, `camera not ahead of them at {t} from {start}`)
+				local aim = (look - cam).Unit:Dot((attackerAt - cam).Unit)
+				assert(aim > 0.95, `camera not on them at {t} from {start}`)
+				local distance = (attackerAt - cam).Magnitude
+				firstDistance = firstDistance or distance
+				lastDistance = distance
 				t += step
 			end
 			assert(lastSpeed > 0, "they move")
+			-- charging at the lens: a third closer at least, even from the nearest start (6 studs)
+			assert(lastDistance < firstDistance * 0.65, `not charging at the lens from {start}`)
 		end
+	end,
+
+	["the fist lands square on the chest front at the uppercut and the haymaker (kits-8a)"] = function()
+		-- the owner: "the target's torso still does not face the player's fist at the moment of impact". Measured in play
+		-- (design/cutscene-study/00): a flinch turned the chest ~30 deg away on the haymaker's contact frame, and the
+		-- uppercut's fist met the torso 58 deg off its front. Here the bodies are posed from the baked clips at each big
+		-- contact (tests/support/Rig): the fist touches the torso, in FRONT of the chest, near its middle, driving into it.
+		local Rig = require("./support/Rig")
+		local Clips = require("../src/shared/Config/AnimClips")
+		local UltimateClips = require("../src/shared/Config/AnimClipsUltimate")
+		local line = Ultimates.TIMELINES.Base
+		local function clipAt(list: { any }?, t: number): (any, number)
+			local current
+			for _, clip in list or {} do
+				if clip.t <= t then
+					current = clip
+				end
+			end
+			if current and current.name ~= "" then
+				return (UltimateClips :: any)[current.name] or (Clips :: any)[current.name],
+					t - current.t
+			end
+			return nil, 0
+		end
+		local checked = 0
+		for _, swing in line.swings do
+			if swing.side == "Uppercut" or swing.side == "HaymakerUp" then
+				local hitAt = swing.t + swing.windup
+				local clip = (UltimateClips :: any)[swing.side] or (Clips :: any)[swing.side]
+				local attackerAt, targetAt = Ultimates.pose(line, hitAt, Vector3.new(0, 0, 12))
+				local root = Ultimates.attackerFrame(attackerAt, targetAt)
+				local at = (clip.strike or 0) + (swing.contact or 0)
+				local tip, motion = Rig.strike(root, clip, at)
+				local _, arm = Rig.fist(Rig.parts(root, Rig.sample(clip, at))["Right Arm"])
+				-- an uppercut sweeps up across the arm; the haymaker drives along it
+				local drive = if swing.side == "Uppercut" then motion else arm
+				local targetRoot = Ultimates.targetCFrame(
+					targetAt,
+					targetAt + Vector3.new(0, 0, 1),
+					Ultimates.tilt(line, hitAt)
+				)
+				local targetClip, into = clipAt(line.targetClips, hitAt)
+				assert(targetClip, `nothing holds the target at {hitAt} (the flinch would turn it)`)
+				local torso = Rig.parts(targetRoot, Rig.sample(targetClip, into)).Torso
+				local l = torso:PointToObjectSpace(tip)
+				assert(Rig.torsoGap(torso, tip) < 0.1, `the fist misses the torso at {hitAt}`)
+				assert(l.Z < -0.15, `the fist is not on the chest front at {hitAt}`)
+				assert(
+					math.abs(l.X) < 0.7 and math.abs(l.Y) < 0.7,
+					`the fist is off the chest's middle at {hitAt}`
+				)
+				local square = Rig.squareness(torso, drive)
+				assert(
+					square < (if swing.side == "Uppercut" then 40 else 15),
+					`not square at {hitAt} ({square} deg)`
+				)
+				checked += 1
+			end
+		end
+		assert(checked == 2, "the uppercut and the haymaker")
+	end,
+
+	["the uppercut launches them up and back, and the dash after them covers the gap (kits-8a)"] = function()
+		-- the owner: "the uppercut should launch the target farther backward, so the dash section covers a noticeably
+		-- longer distance" (kits-7m: 0.2 studs of travel back)
+		local line = Ultimates.TIMELINES.Base
+		local start = Vector3.new(0, 0, 12)
+		local upper, haymaker
+		for _, swing in line.swings do
+			if swing.side == "Uppercut" then
+				upper = swing.t + swing.windup
+			elseif swing.side == "HaymakerUp" then
+				haymaker = swing.t + swing.windup
+			end
+		end
+		local attackerAtUpper, targetAtUpper = Ultimates.pose(line, upper, start)
+		local attackerAtHit, targetAtHit = Ultimates.pose(line, haymaker, start)
+		local back = targetAtUpper.Z - targetAtHit.Z
+		assert(back >= 8, `thrown only {back} studs back`)
+		local flat =
+			Vector3.new(attackerAtHit.X - attackerAtUpper.X, 0, attackerAtHit.Z - attackerAtUpper.Z)
+		assert(flat.Magnitude >= 7, `the dash covers only {flat.Magnitude} studs across`)
+		assert((attackerAtHit - attackerAtUpper).Magnitude >= 9, "the dash is a long one")
+		-- the launch is fast at first: half of it within its first sixth
+		local quarter = upper + 0.25 + 0.06
+		local _, early = Ultimates.pose(line, quarter, start)
+		assert(targetAtUpper.Z - early.Z > back * 0.4, "the launch starts fast")
+	end,
+
+	["the haymaker's fist stays loaded through the dash: no wind-up turning the arm (kits-8a)"] = function()
+		-- the owner: "an awkward windup between the dash and the final punch, where the arm rotates" (kits-7m: a 0.86 s
+		-- coil spread over the rise, then a 158 deg swing). The arm's aim at its hold point and at the contact.
+		local Rig = require("./support/Rig")
+		local UltimateClips = require("../src/shared/Config/AnimClipsUltimate")
+		local clip = (UltimateClips :: any).HaymakerUp
+		local root = Rig.CFrame.new()
+		local _, loaded = Rig.fist(Rig.parts(root, Rig.sample(clip, clip.hold))["Right Arm"])
+		local _, struck = Rig.fist(Rig.parts(root, Rig.sample(clip, clip.strike))["Right Arm"])
+		local turned = math.deg(math.acos(math.clamp(loaded:Dot(struck), -1, 1)))
+		assert(turned < 10, `the arm turns {turned} deg on the strike`)
+		-- and the timeline holds it there through the dash
+		local line = Ultimates.TIMELINES.Base
+		local held = false
+		for _, swing in line.swings do
+			if swing.side == "HaymakerUp" and swing.loaded and swing.release then
+				held = swing.release - swing.loaded >= 0.4
+					and swing.t + swing.windup - swing.release <= 0.15
+			end
+		end
+		assert(held, "loaded by the take-off, held through the dash, released in the last 0.15 s")
+	end,
+
+	["the knockback starts on the hit and never stops into the flight (kits-8a)"] = function()
+		-- the owner: "knockback still appears delayed". Measured on kits-7m: 0.75 s at 0.5 studs/s after the contact, then
+		-- an ease-out to 4 studs/s and a jump to 56-101 as the flight took over, and a 46 deg snap in its turn.
+		local line = Ultimates.TIMELINES.Base
+		local start = Vector3.new(0, 0, 12)
+		local haymaker = 0
+		for _, cue in line.cues do
+			if cue.name == "haymaker" then
+				haymaker = cue.t
+			end
+		end
+		local step = 1 / 60
+		local t = haymaker + step
+		while t < line.cinematic do
+			local _, a = Ultimates.pose(line, t - step, start)
+			local _, b = Ultimates.pose(line, t, start)
+			local speed = (b - a).Magnitude / step
+			assert(speed > 2, `the target stalls at {t} ({speed} studs/s)`)
+			t += step
+		end
+		-- the flight leaves at the speed the knockback reached, and its turn goes on from the last pose
+		local anchor = CFrame.new(0, 0, 0)
+		local _, last = Ultimates.pose(line, line.cinematic, start)
+		local _, before = Ultimates.pose(line, line.cinematic - step, start)
+		local carried = (last - before) / step
+		local flightEnd = Vector3.new(0, -60, -120)
+		local first, velocity =
+			Ultimates.flight(line, anchor, last, flightEnd, CFG.FlightSeconds, 18, line.cinematic)
+		assert((first.Position - last).Magnitude < 1e-3, "the flight starts where the knockback is")
+		assert(
+			math.abs(velocity.Magnitude - carried.Magnitude) < carried.Magnitude * 0.35,
+			`speed jumps from {carried.Magnitude} to {velocity.Magnitude}`
+		)
+		local posed = Ultimates.targetCFrame(
+			last,
+			last + Vector3.new(0, 0, 1),
+			Ultimates.tilt(line, line.cinematic)
+		)
+		local _, snap = (posed.Rotation:Inverse() * first.Rotation):ToAxisAngle()
+		assert(math.deg(snap) < 2, `the turn snaps {math.deg(snap)} deg`)
 	end,
 
 	["the anchor faces outward from the arena's middle"] = function()

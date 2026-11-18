@@ -855,58 +855,113 @@ end
 -- back to the first chamber, so the loop joins
 table.insert(BARRAGE_UP_KEYS, flurryChamber(1, #FLURRY_PUNCHES * FLURRY_STEP))
 
--- HaymakerUp: wound up deep (held at 0.25: the right fist low behind the hip, crouched, twisted away, the left
--- hand out in front), then a rising straight right up and away at 55 degrees (strikes at 0.32, 0.07 s after the
--- hold, as the timeline lets it go), the body uncoiling and leaning back into it, then settling.
--- kits-7j (stage B pass 3, the gap study B9-B11): the coil pushed deeper (turn -42 -> -70, leaning in, crouched,
--- looking up at them) and a DRIVEN follow-through, the arm held out up and away with the body leaning back into it
--- for 0.3 s (Tanktop 22.25-22.67) before it settles. It is thrown in the air, so the legs are an air pose (lead knee
--- up, the other trailing), not feet locked as if standing.
+-- HaymakerUp (kits-8a, rebuilt from the 10-reference cutscene study, design/cutscene-study): the leap AND the
+-- haymaker in one clip, so nothing else fights it for the body. The owner on kits-7m: "the awkward windup between the
+-- dash and the final punch, where the arm rotates". Every reference loads the strike BEFORE the travel, holds it
+-- through the travel and lets it go in 1-3 frames (Azure 4.83-5.27, Human Battery F3 17.80-18.43, Garou vs Stinger
+-- 11.38-11.88, Mumen 3.10-3.52, Tanktop); the R6 punch is the TORSO turning and the body leaning in behind an arm that
+-- is already aimed, never the arm swinging round (Mumen Rider, 06 F4).
+--   0.00-0.12  the load, in the crouch: the right fist pulled back at the chest (aimed at them, the arm drawn back
+--              along itself), the torso turned away, low, leaning in
+--   0.12-0.18  the take-off: the legs drive out, the load held
+--   0.18-0.25  the travel pose (the hold point): diving in, lead knee up, the other leg trailing, the load held
+--   0.25-0.32  the strike (0.32): the torso turns 65 deg into it and the arm drives out ALONG its aim (its sweep turns
+--              back as the torso turns, so in the world it keeps pointing at them)
+--   0.32-0.75  the driven follow-through (Tanktop 22.25-22.67), then it settles
+-- The timeline (Ultimates swing `loaded`/`release`) plays 0-0.25 over the crouch and take-off, holds 0.25 through the
+-- whole dash, and plays 0.25-0.32 in the last ~0.12 s before contact.
 local AIR_FEET = {
 	["Right Leg"] = { 0.55, -1.9, -1.3 }, -- the lead knee up
 	["Left Leg"] = { -0.55, -2.8, 0.9 }, -- trailing
 }
+local LOAD_FEET = {
+	["Right Leg"] = { 0.6, GROUND, 0.9 }, -- the rear leg, ready to drive
+	["Left Leg"] = { -0.6, GROUND, -0.9 },
+}
+local TAKEOFF_FEET = {
+	["Right Leg"] = { 0.5, GROUND - 0.2, 1.5 }, -- extended back, toes last off the floor
+	["Left Leg"] = { -0.5, -2.2, -0.6 }, -- the lead knee coming up
+}
+-- the load: the right arm aimed AT them (straight ahead in the world, HAY_UP above level) but drawn back along itself,
+-- so only the body has to move. An arm's aim is in the torso's frame: a turn of -45 faces the torso 45 deg to its
+-- right (measured with tests/support/Rig), so the sweep follows the turn to keep the world aim straight ahead, and the
+-- lift adds the lean (leaning in tips the torso's "level" down).
+local HAY_TURN_LOADED = -45
+local HAY_TURN_STRUCK = 20
+local HAY_UP = 28
+local HAY_LEAN_LOADED = 35
+local HAY_LEAN_STRUCK = 22
+local HAY_INWARD = 18 -- a straight right aims at their middle: the fist crosses to the centreline at full reach
+local LOADED = { sweep = HAY_TURN_LOADED - HAY_INWARD, lift = HAY_UP + HAY_LEAN_LOADED, reach = 0.55 }
+local STRUCK = { sweep = HAY_TURN_STRUCK - HAY_INWARD, lift = HAY_UP + HAY_LEAN_STRUCK, reach = 1.45 }
+local SIGHT = { sweep = -HAY_TURN_LOADED, lift = 25 + HAY_LEAN_LOADED, reach = 1.15 } -- the left hand out ahead at them
 local HAYMAKER_UP_KEYS = {
-	{ t = 0, right = GUARDED, left = GUARDED, lean = STANCE_DIP, turn = STANCE_TURN },
+	{ t = 0, right = GUARDED, left = GUARDED, lean = STANCE_DIP, turn = STANCE_TURN, feet = STANCE_FEET },
+	{
+		t = 0.12,
+		ease = "out",
+		right = LOADED,
+		left = SIGHT,
+		lean = HAY_LEAN_LOADED,
+		turn = HAY_TURN_LOADED,
+		crouch = -0.6,
+		look = -10,
+		feet = LOAD_FEET,
+	},
+	{
+		t = 0.18,
+		ease = "snap",
+		right = LOADED,
+		left = SIGHT,
+		lean = HAY_LEAN_LOADED,
+		turn = HAY_TURN_LOADED,
+		crouch = 0.1,
+		look = -15,
+		feet = TAKEOFF_FEET,
+	},
 	{
 		t = 0.25,
-		ease = "smooth",
-		right = { sweep = 150, lift = -40, reach = 1.0 },
-		left = { sweep = -10, lift = 30, reach = 1.1 },
-		lean = 15,
-		turn = -70,
-		crouch = -0.5,
-		look = 20,
+		ease = "out",
+		right = LOADED,
+		left = SIGHT,
+		lean = HAY_LEAN_LOADED,
+		turn = HAY_TURN_LOADED,
+		crouch = 0,
+		look = -15,
+		feet = AIR_FEET,
 	},
 	{
 		t = 0.32,
 		ease = "snap",
-		right = { sweep = -8, lift = 55, reach = 1.35 },
-		left = GUARDED,
-		lean = -14,
-		turn = 30,
-		crouch = -0.05,
-		look = 14,
+		right = STRUCK,
+		left = { sweep = 160, lift = -30, reach = 0.9 }, -- yanked back by the side as the right goes
+		lean = HAY_LEAN_STRUCK,
+		turn = HAY_TURN_STRUCK,
+		crouch = 0,
+		look = -8,
+		feet = AIR_FEET,
 	},
 	{
 		t = 0.45,
 		ease = "outHard",
-		right = { sweep = -10, lift = 68, reach = 1.35 },
-		left = { sweep = 40, lift = -20, reach = 1.0 },
-		lean = -24,
-		turn = 45,
+		right = { sweep = 30 - HAY_INWARD, lift = HAY_UP + 4 + 18, reach = 1.5 },
+		left = { sweep = 160, lift = -32, reach = 0.9 },
+		lean = 18,
+		turn = 30,
 		crouch = 0,
-		look = 16,
+		look = -6,
+		feet = AIR_FEET,
 	},
 	{
 		t = 0.75,
 		ease = "smooth",
-		right = { sweep = -10, lift = 70, reach = 1.35 },
-		left = { sweep = 45, lift = -25, reach = 1.0 },
-		lean = -30,
-		turn = 50,
+		right = { sweep = 32 - HAY_INWARD, lift = HAY_UP + 6 + 15, reach = 1.5 },
+		left = { sweep = 160, lift = -32, reach = 0.9 },
+		lean = 15,
+		turn = 32,
 		crouch = 0,
-		look = 18,
+		look = -4,
+		feet = AIR_FEET,
 	},
 	{
 		t = 1.0,
@@ -915,23 +970,26 @@ local HAYMAKER_UP_KEYS = {
 		left = GUARDED,
 		lean = STANCE_DIP,
 		turn = STANCE_TURN,
+		feet = AIR_FEET,
 	},
 }
 
--- RushIn (kits-7j, B8 + B13): the lock-in, then the rush. The gap study: no reference shows a run cycle; speed comes
--- from a launch pose and a held, stretched stride (Acheron, Azure, Human Battery), and ours rose upright for 3
--- frames and ran a cycle. 0-0.36 the lock-in: right fist cocked at the shoulder, body turned away; 0.40-0.48 the
--- LAUNCH CROUCH (low, leaning in, rear leg driving back); then one stretched stride, held, the arms pumped; the
--- hook (a swing on top) takes the arms over at 0.98 and the legs plant at 1.14.
-local RUSH_STRIDE_FEET = {
-	["Right Leg"] = { 0.5, GROUND + 0.6, 2.0 }, -- driving back
-	["Left Leg"] = { -0.5, GROUND + 0.5, -1.7 }, -- reaching forward
-}
+-- RushIn (kits-7j, B8 + B13): the lock-in, then the launch. 0-0.36 the lock-in: right fist cocked at the shoulder,
+-- body turned away; 0.40-0.48 the LAUNCH CROUCH (low, leaning in, rear leg driving back). kits-7j's held stride
+-- (the gap study's "no reference shows a run cycle") read as a statue sliding at 0.58 s of travel; the 10-reference
+-- study found the held pose works only for 4-6 frame dashes (Azure, Garou vs Stinger, Acheron), and Human Battery F3's
+-- 40-frame dash strides. So the travel is RushRun over the Sprint cycle (below).
 local RUSH_LAUNCH_FEET = {
 	["Right Leg"] = { 0.55, GROUND, 1.9 },
 	["Left Leg"] = { -0.55, GROUND, -0.5 },
 }
 local COCKED = { sweep = 120, lift = 15, reach = 0.85 }
+-- kits-8a (the owner: "the opening rush animation looks strange and does not read clearly as a rush"; measured: one
+-- held stride slid ~10 studs with the feet still, a statue skating, filmed from straight behind so the lean was lost):
+-- RushIn is now only the lock-in and the launch crouch (the fist stays cocked, no arm swing), and RushRun takes the
+-- travel: ARMS AND HEAD ONLY (the way the hooks' Run variants are), so the real Sprint cycle shows under it, legs
+-- striding and the torso pitched 40 deg, the right fist loaded at the shoulder for the hook (Human Battery F3
+-- 17.43-18.10: "torso pitched forward, legs striding, fist cocked at the chest") and the left hand reaching ahead.
 local RUSH_IN_KEYS = {
 	{ t = 0, right = COCKED, left = GUARDED, lean = 6, turn = -30, crouch = -0.15, look = 4 },
 	{
@@ -947,45 +1005,45 @@ local RUSH_IN_KEYS = {
 	{
 		t = 0.48,
 		ease = "out",
-		right = { sweep = 40, lift = -35, reach = 1.0 },
-		left = { sweep = -15, lift = -15, reach = 1.0 },
-		lean = 50,
-		turn = -10,
+		right = { sweep = 158, lift = -65, reach = 0.8 }, -- drawn back, as RushRun carries it
+		left = { sweep = -15, lift = 10, reach = 1.05 },
+		lean = 45,
+		turn = -20,
 		crouch = -0.55,
-		look = -20,
+		look = 8, -- the head comes up: eyes on the target over the low lean
 		feet = RUSH_LAUNCH_FEET,
 	},
+}
+-- the right fist drawn back by the hip, the arm along the leaning body (kits-8a recording: sweep 120, lift 25 stuck the
+-- arm out sideways and up over the Sprint torso, which read as waving; solved with tests/support/Rig: this points back
+-- and a little down in the world)
+local RUN_COCKED = { sweep = 158, lift = -67, reach = 0.8 }
+local RUSH_RUN_KEYS = {
+	{ t = 0, right = RUN_COCKED, left = { sweep = -15, lift = 35, reach = 1.05 }, lean = 40, look = 6 },
 	{
-		t = 0.58,
-		ease = "outHard",
-		right = { sweep = 30, lift = -45, reach = 1.0 },
-		left = { sweep = -10, lift = 15, reach = 1.0 },
-		lean = 38,
-		turn = 8,
-		crouch = -0.3,
-		look = -15,
-		feet = RUSH_STRIDE_FEET,
-	},
-	{
-		t = 0.98,
+		t = 0.16,
 		ease = "smooth",
-		right = { sweep = 30, lift = -40, reach = 1.0 },
-		left = { sweep = -10, lift = 20, reach = 1.0 },
-		lean = 34,
-		turn = 10,
-		crouch = -0.3,
-		look = -12,
-		feet = RUSH_STRIDE_FEET,
+		right = { sweep = 155, lift = -62, reach = 0.8 },
+		left = { sweep = -12, lift = 45, reach = 1.1 },
+		lean = 40,
+		look = 6,
 	},
 	{
-		t = 1.14,
-		ease = "out",
-		right = GUARDED,
-		left = GUARDED,
-		lean = 15,
-		turn = 0,
-		crouch = -0.3,
-		look = 0,
+		t = 0.32,
+		ease = "smooth",
+		right = RUN_COCKED,
+		left = { sweep = -18, lift = 32, reach = 1.05 },
+		lean = 40,
+		look = 6,
+	},
+	{
+		t = 0.5,
+		ease = "smooth",
+		-- into the hook's cocked shape (HOOK.cocked), so the swing taking the arm over at 0.5 doesn't pop
+		right = { sweep = 112, lift = 6, reach = 1.0 },
+		left = { sweep = -12, lift = 42, reach = 1.1 },
+		lean = 40,
+		look = 6,
 	},
 }
 
@@ -1063,46 +1121,54 @@ local DANGLE_KEYS = {
 	},
 }
 
--- LeapUp (kits-7j, B10): the leap after them: a crouch, a 2-frame extension, then a tuck (knees up) in the air.
-local LEAP_UP_KEYS = {
-	{ t = 0, right = GUARDED, left = GUARDED, lean = 25, turn = 0, crouch = -0.6, look = 30 },
+-- Fold (kits-8a): the TARGET's pose on the uppercut and the haymaker, from the contact on. The owner: "the target's
+-- torso still does not face the player's fist at the moment of impact" (measured: the heavy flinch turned the chest
+-- ~30 deg away and up on the contact frame). Every reference folds the one hit ONTO the fist, belly to it, limbs
+-- thrown forward past it: Garou vs Stinger 7.27-8.95 ("folded around them"), Mumen Rider hit 1 ("doubles forward over
+-- the fist"), Tanktop at the wall ("folded forward over the attacker's arm"). The torso pitched forward over the hips,
+-- the legs and arms flung forward, the head dropped; the timeline's tilt then aims the whole C at the fist. A pose
+-- clip on the target also keeps AnimController's flinch off it (kits-7m rule), so nothing turns it on the hit.
+local FOLD_FEET = {
+	["Right Leg"] = { 0.5, -2.3, -1.5 },
+	["Left Leg"] = { -0.5, -2.4, -1.3 },
+}
+local FOLD_KEYS = {
 	{
-		t = 0.08,
-		ease = "snap",
-		right = { sweep = -10, lift = 70, reach = 1.2 },
-		left = { sweep = -10, lift = 60, reach = 1.1 },
-		lean = -8,
-		turn = 10,
-		crouch = 0.1,
-		look = 35,
+		t = 0,
+		right = { sweep = 22, lift = -25, reach = 1.0 },
+		left = { sweep = 18, lift = -30, reach = 1.0 },
+		lean = 28,
+		turn = 0,
+		crouch = 0,
+		look = -30,
+		feet = FOLD_FEET,
+	},
+	{
+		-- the C closes round the fist a little more as it drives in
+		t = 0.25,
+		ease = "out",
+		right = { sweep = 26, lift = -35, reach = 1.0 },
+		left = { sweep = 22, lift = -38, reach = 1.0 },
+		lean = 34,
+		turn = 2,
+		crouch = 0,
+		look = -34,
 		feet = {
-			["Right Leg"] = { 0.5, GROUND - 0.1, 0.4 },
-			["Left Leg"] = { -0.5, GROUND - 0.1, 0.6 },
+			["Right Leg"] = { 0.5, -2.2, -1.7 },
+			["Left Leg"] = { -0.5, -2.3, -1.5 },
 		},
 	},
-	{
-		t = 0.22,
-		ease = "out",
-		right = GUARDED,
-		left = { sweep = -10, lift = 30, reach = 1.1 },
-		lean = 10,
-		turn = -20,
-		crouch = 0,
-		look = 30,
-		feet = { ["Right Leg"] = { 0.55, -1.7, -1.5 }, ["Left Leg"] = { -0.55, -2.0, -1.0 } },
-	},
-	{
-		t = 0.3,
-		ease = "smooth",
-		right = GUARDED,
-		left = { sweep = -10, lift = 30, reach = 1.1 },
-		lean = 10,
-		turn = -22,
-		crouch = 0,
-		look = 30,
-		feet = { ["Right Leg"] = { 0.55, -1.7, -1.5 }, ["Left Leg"] = { -0.55, -2.0, -1.0 } },
-	},
 }
+
+-- arms and head only (the hooks' Run variants do the same): the Sprint cycle under it keeps the legs and torso
+local function armsAndHead(clip)
+	for _, frame in clip.frames do
+		frame.pose.Torso = nil
+		frame.pose["Right Leg"] = nil
+		frame.pose["Left Leg"] = nil
+	end
+	return clip
+end
 
 local ULTIMATE_CLIPS = {
 	BarrageUp = simplify(
@@ -1124,17 +1190,20 @@ local ULTIMATE_CLIPS = {
 	-- the attacker's whole-body poses on the ultimate's timeline (Ultimates `clips`, AnimController.PlayClip): each
 	-- plays once and holds its last frame until the next one
 	RushIn = simplify(
-		bakeKeyed(RUSH_IN_KEYS, 1.14, { loop = false, priority = "Action" }, STANCE_FEET)
+		bakeKeyed(RUSH_IN_KEYS, 0.5, { loop = false, priority = "Action" }, STANCE_FEET)
+	),
+	RushRun = simplify(
+		armsAndHead(
+			bakeKeyed(RUSH_RUN_KEYS, 0.66, { loop = false, priority = "Action" }, STANCE_FEET)
+		)
 	),
 	UpperSet = simplify(
 		bakeKeyed(UPPER_SET_KEYS, 0.3, { loop = false, priority = "Action" }, WIDE_FEET)
 	),
-	LeapUp = simplify(
-		bakeKeyed(LEAP_UP_KEYS, 0.3, { loop = false, priority = "Action" }, STANCE_FEET)
-	),
 	Dangle = simplify(
 		bakeKeyed(DANGLE_KEYS, 0.6, { loop = true, priority = "Action" }, DANGLE_FEET)
 	),
+	Fold = simplify(bakeKeyed(FOLD_KEYS, 0.4, { loop = false, priority = "Action" }, FOLD_FEET)),
 }
 
 local CLIPS = {

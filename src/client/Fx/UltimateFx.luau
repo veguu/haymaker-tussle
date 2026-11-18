@@ -326,14 +326,15 @@ local function leap(ctx: Context, state: State)
 	foreground(ctx, state, "dash", { volume = 0.6, pitch = 1.2, cut = 0.3 })
 end
 
--- The wind-up (kits-6b): the haymaker drawn back and held in close-up, a bigger glint on the fist, the rumble
--- building under it toward the silence (Serious Punch's long build).
+-- The wind-up (kits-6b): the haymaker drawn back and held, a bigger glint on the fist, the rumble building under it
+-- toward the silence (Serious Punch's long build). kits-8a: it is the LOAD in the crouch, and the glint stays on the held
+-- fist through the whole dash (the owner's "charging his punch while the leap", with no arm turning to show it).
 local function windup(ctx: Context, state: State)
 	-- the impact frames' silhouettes, cloned now so nothing heavy happens on the hit (kits-7f, the gap study)
 	if ctx.mine then
 		state.impact = ImpactFrame.prepare({ ctx.attacker, ctx.target })
 	end
-	fistGlint(ctx, 0.6, 1.6)
+	fistGlint(ctx, 0.95, 1.6)
 	if state.bed and state.bed.Parent then
 		tween(state.bed, 0.6, { Volume = BED_VOLUME * 1.8 }, Enum.EasingStyle.Sine)
 	end

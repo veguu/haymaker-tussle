@@ -205,9 +205,36 @@ function UltimateController:KnitStart()
 						end
 						local releaseAt = hitAt + freeze
 						if t >= swing.t and t < releaseAt then
+							-- how far through the lead-in to contact: straight through, or (kits-8a, the haymaker) in
+							-- three parts: up to its hold point by `loaded`, held there until `release`, then driven
+							-- to the contact at the hit, so the fist stays loaded through the whole dash
+							local lead =
+								math.clamp((t - swing.t) / math.max(swing.windup, 1e-3), 0, 1)
+							local loaded, release, holdShare =
+								swing.loaded, swing.release, swing.holdShare
+							if loaded and release and holdShare then
+								if t < loaded then
+									lead = holdShare
+										* math.clamp(
+											(t - swing.t) / math.max(loaded - swing.t, 1e-3),
+											0,
+											1
+										)
+								elseif t < release then
+									lead = holdShare
+								else
+									lead = holdShare
+										+ (1 - holdShare)
+											* math.clamp(
+												(t - release) / math.max(hitAt - release, 1e-3),
+												0,
+												1
+											)
+								end
+							end
 							anim:SyncSwing(
 								attacker,
-								math.clamp((t - swing.t) / math.max(swing.windup, 1e-3), 0, 1),
+								lead,
 								math.max(t - hitAt, 0) * slow,
 								swing.contact
 							)
@@ -301,10 +328,18 @@ function UltimateController:KnitStart()
 						myRoot.CFrame = Ultimates.targetCFrame(at, faces, Ultimates.tilt(line, t))
 						myRoot.AssemblyLinearVelocity = Vector3.zero
 					elseif t < ending then
-						local share = (t - line.cinematic) / cfg.FlightSeconds
-						local at = Ultimates.flightPoint(flightFrom, flightEnd, share, FLIGHT_RISE)
-						myRoot.CFrame = CFrame.new(at) * CFrame.Angles(share * 14, share * 6, 0)
-						myRoot.AssemblyLinearVelocity = (flightEnd - flightFrom) / cfg.FlightSeconds
+						-- on from the knockback at its speed and turn (kits-8a: no stall, no snap)
+						local flying, velocity = Ultimates.flight(
+							line,
+							anchor,
+							flightFrom,
+							flightEnd,
+							cfg.FlightSeconds,
+							FLIGHT_RISE,
+							t
+						)
+						myRoot.CFrame = flying
+						myRoot.AssemblyLinearVelocity = velocity
 					end
 				end
 				-- The OTHER bodies, posed here too, every frame, from the same timeline (kits-7e, measured: the other
@@ -326,9 +361,15 @@ function UltimateController:KnitStart()
 						local faces = anchor:PointToWorldSpace(targetAt + Vector3.new(0, 0, 1))
 						root.CFrame = Ultimates.targetCFrame(at, faces, Ultimates.tilt(line, t))
 					elseif root and t < ending then
-						local share = (t - line.cinematic) / cfg.FlightSeconds
-						local at = Ultimates.flightPoint(flightFrom, flightEnd, share, FLIGHT_RISE)
-						root.CFrame = CFrame.new(at) * CFrame.Angles(share * 14, share * 6, 0)
+						root.CFrame = Ultimates.flight(
+							line,
+							anchor,
+							flightFrom,
+							flightEnd,
+							cfg.FlightSeconds,
+							FLIGHT_RISE,
+							t
+						)
 					end
 				end
 				-- The cinematic camera on both their screens: the timeline's shots (cuts, moves, field of view,
