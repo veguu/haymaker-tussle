@@ -135,6 +135,11 @@ type Fighter = {
 	spinSeconds: number,
 	barrageClip: string?, -- the barrage loop playing now (SetBarrage)
 	dashing: boolean, -- a scripted sprint (SetDash): the run shows though the body is set, not moving
+	-- in an ultimate's cutscene (SetCutscene, kits-7i): the timeline poses the body, so the knocked-about blends
+	-- (AirTumble, Slammed, HitSkid) stay off and the flinches show (the gap study: AirTumble averaged them away)
+	cutscene: boolean,
+	clipName: string?, -- the whole-body pose clip the ultimate's timeline is driving (SyncClip)
+	stretched: { part: BasePart, size: Vector3, joint: Motor6D?, c1: CFrame }?, -- an arm mid-smear (StretchArm)
 }
 
 local animations: { [string]: Animation } = {}
@@ -183,6 +188,7 @@ local function setUpFighter(model: Model): Fighter?
 		spinAt = -math.huge,
 		spinSeconds = 1,
 		dashing = false,
+		cutscene = false,
 	}
 	for name, animation in animations do
 		local track = (animator :: Animator):LoadAnimation(animation)
@@ -456,7 +462,7 @@ local function updateFighter(model: Model, dt: number)
 	local knocked = air ~= nil
 		or model:GetAttribute("HT_Stunned") ~= nil
 		or (airborne and now - fighter.hitAt < cfg.RecentHitSeconds)
-	knocked = knocked and fighter.skill == nil
+	knocked = knocked and fighter.skill == nil and not fighter.cutscene
 	local slammed = knocked and air == nil and velocity.Y < -cfg.SlammedFallSpeed
 	local onFloorHit = now - fighter.floorHitAt < 0.26
 	setWeight(
@@ -476,7 +482,7 @@ local function updateFighter(model: Model, dt: number)
 		and now - fighter.hitAt < cfg.SkidHoldSeconds
 		and sliding < -cfg.SkidMinSpeed
 		and fighter.skill == nil
-	setWeight(fighter.tracks.HitSkid, if skidding then 1 else 0, FAST_FADE)
+	setWeight(fighter.tracks.HitSkid, if skidding and not fighter.cutscene then 1 else 0, FAST_FADE)
 	if fighter.skidding and not skidding and not airborne and fighter.tracks.BrakeSettle then
 		fighter.tracks.BrakeSettle:Play(FAST_FADE, 0.8, 1)
 	end
@@ -769,6 +775,94 @@ function AnimController:ReleaseSwing(model: Model?)
 	end
 end
 
+--- Drives a whole-body pose clip (Config/AnimClipsUltimate: RushIn, UpperSet, LeapUp) on the shared clock:
+--- `seconds` into it, held on its last frame past its end (kits-7j). Switching to another clip cross-fades.
+function AnimController:SyncClip(model: Model?, name: string, seconds: number)
+	local fighter = model and fighters[model]
+	if not fighter then
+		return
+	end
+	if fighter.clipName ~= name then
+		local old = fighter.clipName and fighter.tracks[fighter.clipName]
+		if old and old.IsPlaying then
+			old:Stop(FAST_FADE)
+		end
+		fighter.clipName = name
+	end
+	local track = fighter.tracks[name]
+	if not track then
+		return
+	end
+	if not track.IsPlaying then
+		track:Play(FAST_FADE, 1, 0)
+	end
+	track:AdjustSpeed(0)
+	track.TimePosition = math.clamp(seconds, 0, math.max(track.Length - 0.02, 0))
+end
+
+--- Stops the pose clip SyncClip is driving.
+function AnimController:StopClip(model: Model?)
+	local fighter = model and fighters[model]
+	local track = fighter and fighter.clipName and fighter.tracks[fighter.clipName]
+	if track and track.IsPlaying then
+		track:Stop(SWING_FADE)
+	end
+	if fighter then
+		fighter.clipName = nil
+	end
+end
+
+--- THE SMEAR (kits-7j, the owner's pick from the gap study, B12): the striking arm drawn ~1.4x long for a moment on
+--- the strike, as an anime smear frame; the shoulder stays put (the joint is moved down the longer arm). Only what
+--- this client shows; it springs back after `seconds`.
+function AnimController:StretchArm(model: Model?, armName: string, factor: number, seconds: number)
+	local fighter = model and fighters[model]
+	-- lihfolk-ignore: findfirstchild-chain (nil-checked on the next lines)
+	local arm = model and model:FindFirstChild(armName) :: BasePart?
+	local torso = model and model:FindFirstChild("Torso")
+	if not fighter or not arm or not arm:IsA("BasePart") then
+		return
+	end
+	local function restore()
+		local was = fighter.stretched
+		if was then
+			fighter.stretched = nil
+			if was.part.Parent then
+				was.part.Size = was.size
+			end
+			if was.joint and was.joint.Parent then
+				was.joint.C1 = was.c1
+			end
+		end
+	end
+	restore()
+	local jointName = if armName == "Right Arm" then "Right Shoulder" else "Left Shoulder"
+	local found = if torso then torso:FindFirstChild(jointName) else nil
+	local joint: Motor6D? = if found and found:IsA("Motor6D") then found else nil
+	local size = arm.Size
+	fighter.stretched =
+		{ part = arm, size = size, joint = joint, c1 = if joint then joint.C1 else CFrame.identity }
+	local grow = size.Y * (factor - 1)
+	arm.Size = Vector3.new(size.X, size.Y + grow, size.Z)
+	if joint then
+		-- the arm's top moved up by half the growth in its own space: move the joint with it
+		joint.C1 = joint.C1 + Vector3.new(0, grow / 2, 0)
+	end
+	task.delay(seconds, function()
+		if fighter.stretched and fighter.stretched.part == arm then
+			restore()
+		end
+	end)
+end
+
+--- Marks a fighter as posed by an ultimate's cutscene (or not): its knocked-about blends stay off meanwhile.
+function AnimController:SetCutscene(model: Model?, on: boolean)
+	local fighter = model and fighters[model]
+	if fighter then
+		fighter.cutscene = on
+	end
+end
+
 --- A scripted sprint on a body that is being set, not moved (the ultimate's rush): the run plays at its top
 --- stride while `on`, and a swing thrown meanwhile is its running variant.
 function AnimController:SetDash(model: Model?, on: boolean)
@@ -854,7 +948,11 @@ function AnimController:HitLanded(
 			fighter.tiltAngle = 0
 			-- A kick of speed rather than a set angle, so it swings over and back on its own.
 			local peak = math.rad(cfg.HitTiltDegrees) * (0.35 + 0.65 * share)
-			fighter.tiltSpeed = peak * math.sqrt(cfg.HitTiltStiffness)
+			-- not in an ultimate's cutscene (kits-7k): the timeline turns the body there, and 16 flurry hits of this
+			-- spring stacked up and laid the target flat over the striker's head
+			fighter.tiltSpeed = if fighter.cutscene
+				then 0
+				else peak * math.sqrt(cfg.HitTiltStiffness)
 		end
 	end
 
@@ -873,7 +971,9 @@ function AnimController:HitLanded(
 			track:Stop(cfg.FlinchFade)
 		end
 	end
-	local flinch = fighter.tracks[name]
+	-- no flinch while a cutscene's pose clip holds the body (kits-7m: the target limp and dangling in the juggle; the
+	-- flinches stiffened it), only the shake
+	local flinch = if fighter.cutscene and fighter.clipName then nil else fighter.tracks[name]
 	if flinch then
 		flinch:Play(cfg.FlinchFade, 1, cfg.HitStopCreep)
 		fighter.stopUntil = math.max(fighter.stopUntil, os.clock() + stop)

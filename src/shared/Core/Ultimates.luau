@@ -31,6 +31,11 @@ export type Key = {
 	attacker: Vector3?, -- nil on the first key: where they really were
 	target: Vector3,
 	ease: string?, -- how to reach this key: "linear" (default), "out", "in"
+	-- kits-7i (the gap study, B4-B6: "both roots are forced upright, so neither body can lean, roll or spin as a
+	-- whole"): the TARGET's whole-body turn at this key, degrees (X pitch, plus leans the head BACK, away from the
+	-- attacker; Y yaw; Z roll), applied on top of its facing; nil is upright. Interpolated like the positions, so
+	-- 360 is a full backflip.
+	targetTilt: Vector3?,
 }
 
 -- A camera SHOT (2026-11-15, the user: "I don't like how it just rotates around, should be more
@@ -75,7 +80,16 @@ export type Swing = {
 -- The blows that land: `step` alternates the light and heavy flinch on the target (AnimController.HitLanded);
 -- `heavy` is a launching blow.
 -- `freeze` (kits-7e): a big hit holds the scene this long; its hit-stop runs as long (the keys hold the bodies).
-export type Blow = { t: number, step: number, heavy: boolean?, freeze: number? }
+-- `arm` (kits-7j): the striking arm, drawn long for a moment on the hit (the smear, AnimController.StretchArm).
+-- `slow` (kits-7m): through the freeze the swing plays on at this share of its speed (slow motion) instead of holding.
+export type Blow = {
+	t: number,
+	step: number,
+	heavy: boolean?,
+	freeze: number?,
+	arm: string?,
+	slow: number?,
+}
 
 export type Timeline = {
 	name: string,
@@ -98,6 +112,9 @@ export type Timeline = {
 	-- `t` the view narrows by `fov` degrees (a punch-in) and shakes `shake` studs more, both fading to nothing
 	-- over `seconds`, on top of whatever the shot is doing.
 	kicks: { { t: number, fov: number, shake: number, seconds: number } }?,
+	-- the attacker's whole-body pose clips by time (kits-7j); name "" ends the last one
+	clips: { { t: number, name: string } }?,
+	targetClips: { { t: number, name: string } }?,
 	-- kits-7e, the camera study: a constant small JITTER (studs) between these times, a new set direction every
 	-- 1/30 s; and JOLTS, one directional push (screen right `x`, up `y`) that springs back within `seconds`
 	jitter: { { from: number, to: number, studs: number } }?,
@@ -141,32 +158,47 @@ export type Timeline = {
 --
 -- Space: the target starts at the origin facing +Z, the attacker comes in at +Z. y = 0 is root height.
 local DASH = 0.4 -- the rush in starts
+local RUSH_LAUNCH = 0.08 -- the launch crouch before the body moves (RushIn)
 local BLOW = 1.14 -- the running right hook lands
 local BLOW_FREEZE = 0.2
 local FLURRY_FROM = 1.7 -- the first rising punch lands
 local FLURRY_STEP = 0.125 -- ~8 a second (BarrageUp lands right at 0.0625, left at 0.1875 of its 0.25 s loop)
 local FLURRY_HITS = 16 -- one unbroken flurry up to the uppercut's step in
-local BARRAGE_STRIKE = 0.0625 -- AnimClipsUltimate BarrageUp `strike`
+local BARRAGE_STRIKE = 0.03 -- AnimClipsUltimate BarrageUp `strike` (kits-7h: chamber to contact, 0.03 s)
 local UPPERCUT = 3.84
 local UPPER_FREEZE = 0.25
-local LEAP = 4.65
-local WINDUP = 4.95
-local DIP = 5.55
-local HAYMAKER = 5.7
-local HAY_FREEZE = 0.15
-local BLAST = 6.15
-local THROWN = 6.7 -- the flight takes over
+-- THE ENDING (kits-7m, the owner: "from right after the uppercut to only show the player, showing him leap (give some
+-- vfx, like a dust cloud ring and wind) and then he should be charging his punch while the leap and then bring his
+-- fist forward when they are facing each other, showing both target, and then there will be a zoom in onto the fist
+-- and the targets torso. the moment of the fist connecting should have a impact frame, and it should be slowed down
+-- so you can feel the weight", and "the knockback from the last punch is delayed").
+local PLAYER_SHOT = 4.15 -- the cut to the player alone, after the uppercut's freeze
+local LEAP = 4.26 -- the take-off (LeapUp's extension; it crouches from LEAP - 0.08)
+local CHARGE = 4.4 -- the haymaker starts coiling, on the way up (a synced swing all the way to the hit)
+local FACE = 5.05 -- facing each other: the cut to both, the fist about to come forward
+local HAYMAKER = 5.5 -- the contact
+local DIP = HAYMAKER - 0.15 -- every sound cut
+local HAY_FREEZE = 0.75 -- the impact frames (0.29 s), then the fist driving through in slow motion
+local HAY_SLOW = 0.18 -- how fast the drive-through plays meanwhile (of real speed)
+local BLAST = HAYMAKER + HAY_FREEZE -- the knockback, AT ONCE as the slow drive-through ends
+local THROWN = BLAST + 0.35 -- the flight takes over
 local HOOK_STRIKE = 0.16 -- AnimClips HookLeft/HookRight `strike`
-local HAYMAKER_STRIKE = 0.07 -- AnimClipsUltimate HaymakerUp: from its hold (0.25) to its strike (0.32)
 -- root to root when the running hook lands on a standing target. Measured in play (kits-7f): at 3.0 the hook's fist
 -- stopped 2.3 studs short; its arc closes about 0.7 studs in front of the attacker (anime blows land at zero distance)
 local REACH = 1.5
--- The juggle: BarrageUp's fist meets the torso of someone this far ahead and this high (root to root). The fist
--- is 2.3 studs out from the shoulder at 50 degrees up (animations/build_strikes.luau UP_PUNCH).
-local UP_REACH = 2.0
-local JUGGLE_Y = 2.2
-local JUGGLE_BOB = 0.2 -- each punch knocks them up this much; they sink back into the next
+-- The juggle (kits-7k, the owner: "i dont think the positioning is right, reference the garou fight"). Garou vs
+-- Stinger 7.5-9.4 s (design/references/garou-stinger/sheet1): the one in the air stays UPRIGHT, legs hanging, the
+-- torso floating just above and in front of the striker's head (they overlap on screen), the striker punching up
+-- from a wide low stance. So: 2.6 ahead and 3.2 up (about a body height root to root, the B7 pick), the body
+-- upright with only small head-snap tilts (kits-7i's big pitch-back laid them flat over the striker's head).
+local UP_REACH = 2.6
+local JUGGLE_Y = 3.2
+-- each punch knocks them up this much and they sink back into the next (kits-7k: Garou vs Stinger holds the one in the
+-- air at ONE height for the whole 1.5 s, measured; 0.45 read as twitching)
+local JUGGLE_BOB = 0.12
 local JUGGLE_BACK = 0.04 -- and drives them back this far
+local SWAY = 0.25 -- the attacker's root shifts this far sideways on alternate punches (B2: the body under the arms)
+local LURCH = 0.3 -- and lurches in this far on every fourth
 -- root to root for the uppercut. Measured in play (kits-7f): at 2.2 the fist ends 0.8-1.3 studs off the torso (past its
 -- side); 2.8 was worse (2-4). Left at 2.2: the uppercut is rebuilt in stage B (design/haymaker-rush-v4-gaps.md B11).
 local UPPER_REACH = 2.2
@@ -174,6 +206,10 @@ local UPPER_REACH = 2.2
 local HAY_GAP = 1.35 -- measured in play (kits-7d): at 1.85 the fist stopped 0.5-0.7 studs short
 local HAY_RISE = 2.4
 local AIR_Y = 6.6 -- the attacker's root at the top of the leap, under the target
+-- through the wind-up and the silence the attacker hangs this far back and below the target (kits-7k), lunging in
+-- on the strike: clear of each other until the contact
+local WIND_GAP = 3.4
+local WIND_RISE = 3.6
 
 local FLURRY: { number } = {}
 for index = 1, FLURRY_HITS do
@@ -188,42 +224,62 @@ local function rushKeys(): { Key }
 		{ t = 0, target = Vector3.new(0, 0, 0) },
 		-- the charge: where they were (no attacker key = their own place)
 		{ t = DASH, target = Vector3.new(0, 0, 0) },
-		-- the rush in, speeding up all the way (eased in): at full speed as the hook lands
+		-- the launch crouch holds them in place 0.08 s (RushIn), then the rush covers the gap at FULL SPEED from the
+		-- next frame (kits-7j, B8: the gap study: no reference eases into a rush; the eased-in start crept ~4 % in its
+		-- first 0.15 s and read as slow)
+		{ t = DASH + RUSH_LAUNCH, target = Vector3.new(0, 0, 0) },
 		{
 			t = BLOW,
 			attacker = Vector3.new(0, 0, REACH),
 			target = Vector3.new(0, 0, 0),
-			ease = "in",
+		},
+		-- the hook's reaction (kits-7i, B5): the head snaps back and the body rolls over, held through the freeze
+		{
+			t = BLOW + 0.03,
+			attacker = Vector3.new(0, 0, REACH),
+			target = Vector3.new(0, 0, 0),
+			targetTilt = Vector3.new(14, 0, 28),
+			ease = "out",
 		},
 		{
 			t = BLOW + BLOW_FREEZE,
 			attacker = Vector3.new(0, 0, REACH),
 			target = Vector3.new(0, 0, 0),
+			targetTilt = Vector3.new(16, 0, 30),
 		},
 	}
-	-- the hook POPS them up over the attacker; the attacker's momentum carries them in under them
-	local z = -0.45
+	-- the hook KNOCKS them up and back to a body height off; the attacker stays planted where the hook landed
+	local z = REACH - UP_REACH
 	table.insert(keys, {
 		t = BLOW + BLOW_FREEZE + 0.24,
-		attacker = Vector3.new(0, 0, z + UP_REACH + 0.25),
-		target = Vector3.new(0, JUGGLE_Y + 0.35, z + 0.05),
+		attacker = Vector3.new(0, 0, REACH),
+		target = Vector3.new(0, JUGGLE_Y + 0.5, z + 0.05),
+		targetTilt = Vector3.new(-24, 0, 8),
 		ease = "out",
 	})
-	-- the flurry: each rising punch catches them as they sink and knocks them up a little (and a hair back, to
-	-- the side the fist came from); the attacker presses after them at a punch's reach
+	-- the flurry: each rising punch catches them as they sink and knocks them up (and a hair back, to the side the
+	-- fist came from); the attacker presses after them, the body swaying under the arms and lurching in every 4th
 	for index, hit in FLURRY do
 		local right = index % 2 == 1 -- right lands first (BarrageUp), then left
+		local sway = if right then SWAY else -SWAY
+		local lurch = if index % 4 == 0 then LURCH else 0
+		-- the reaction (kits-7m, the owner: "the torso should be facing the players fists"): the body pitched FORWARD
+		-- over the fists below (minus is forward), limp (the Dangle pose on top), rocked toward the side each fist came
+		-- from; each catch tips it a little further over, the bob lifts it back
+		local lean = -30
 		table.insert(keys, {
 			t = hit,
-			attacker = Vector3.new(0, 0, z + UP_REACH),
+			attacker = Vector3.new(sway, 0, z + UP_REACH - lurch),
 			target = Vector3.new(0, JUGGLE_Y, z),
+			targetTilt = Vector3.new(lean - 3, if right then -3 else 3, if right then 4 else -4),
 			ease = "in", -- sinking into the catch
 		})
 		z -= JUGGLE_BACK
 		table.insert(keys, {
 			t = hit + FLURRY_STEP * 0.45,
-			attacker = Vector3.new(0, 0, z + UP_REACH),
-			target = Vector3.new(if right then 0.08 else -0.08, JUGGLE_Y + JUGGLE_BOB, z),
+			attacker = Vector3.new(sway * 0.6, 0, z + UP_REACH - lurch * 0.5),
+			target = Vector3.new(if right then 0.15 else -0.15, JUGGLE_Y + JUGGLE_BOB, z),
+			targetTilt = Vector3.new(lean + 2, if right then -5 else 5, if right then 5 else -5),
 			ease = "out",
 		})
 	end
@@ -233,6 +289,7 @@ local function rushKeys(): { Key }
 		t = LAST_PUNCH + 0.14,
 		attacker = Vector3.new(0, 0, z + UP_REACH),
 		target = Vector3.new(0, JUGGLE_Y + JUGGLE_BOB + 0.1, caughtZ),
+		targetTilt = Vector3.new(-12, 0, 0),
 		ease = "out",
 	})
 	local standing = caughtZ + UPPER_REACH
@@ -240,56 +297,73 @@ local function rushKeys(): { Key }
 		t = UPPERCUT,
 		attacker = Vector3.new(0, 0, standing),
 		target = Vector3.new(0, 0.5, caughtZ),
+		targetTilt = Vector3.new(25, 0, 0),
 		ease = "in",
 	})
 	table.insert(keys, {
 		t = UPPERCUT + UPPER_FREEZE,
 		attacker = Vector3.new(0, 0, standing),
 		target = Vector3.new(0, 0.5, caughtZ),
+		-- arched over the fist through the freeze (B5)
+		targetTilt = Vector3.new(40, 0, 0),
 	})
-	-- the uppercut lifts them; they hang at the top
-	table.insert(keys, {
-		t = UPPERCUT + UPPER_FREEZE + 0.46,
-		attacker = Vector3.new(0, 0, standing),
-		target = Vector3.new(0, 8.5, caughtZ - 0.8),
-		ease = "out",
-	})
+	-- THE ENDING (kits-7m). The uppercut sends them up in a backflip, out of the player's shot; the attacker crouches
+	-- (LeapUp) and takes off at LEAP, rising to below them and APART (kits-7k: "hugging"), coiling the haymaker on
+	-- the way up; at FACE they hang a clear gap apart, facing; the fist comes forward and the attacker lunges in for
+	-- the contact; the fist drives through in SLOW MOTION under and after the impact frames; then the knockback
+	-- launches them AT ONCE.
+	local top = caughtZ - 1
+	local hangY = AIR_Y + HAY_RISE + 0.6 -- the target's height from the top of the rise through the hit
 	table.insert(keys, {
 		t = LEAP,
 		attacker = Vector3.new(0, 0, standing),
-		target = Vector3.new(0, 8.8, caughtZ - 0.9),
+		target = Vector3.new(0, 4.5, caughtZ - 0.5),
+		targetTilt = Vector3.new(170, 0, 0),
 		ease = "out",
 	})
-	-- the leap after them, to just UNDER them: the haymaker goes up and away
-	local top = caughtZ - 1
 	table.insert(keys, {
-		t = WINDUP,
-		attacker = Vector3.new(0, AIR_Y - 0.05, top + HAY_GAP + 0.05),
-		target = Vector3.new(0, AIR_Y + HAY_RISE, top),
+		t = FACE,
+		attacker = Vector3.new(0, hangY - WIND_RISE, top + WIND_GAP),
+		target = Vector3.new(0, hangY, top),
+		targetTilt = Vector3.new(345, 0, 0),
 		ease = "out",
 	})
-	-- the wind-up and the silence: both nearly still in the air
+	-- the fist starts forward (the coil ends ~0.24 s before the hit): the lunge
+	table.insert(keys, {
+		t = HAYMAKER - 0.24,
+		attacker = Vector3.new(0, hangY - WIND_RISE + 0.1, top + WIND_GAP - 0.1),
+		target = Vector3.new(0, hangY, top),
+		targetTilt = Vector3.new(342, 0, 0),
+	})
+	-- the contact: the target folds forward over the fist (B5: a "C" around it)
 	table.insert(keys, {
 		t = HAYMAKER,
-		attacker = Vector3.new(0, AIR_Y, top + HAY_GAP),
-		target = Vector3.new(0, AIR_Y + HAY_RISE + 0.05, top - 0.05),
+		attacker = Vector3.new(0, hangY - HAY_RISE, top + HAY_GAP),
+		target = Vector3.new(0, hangY + 0.05, top - 0.05),
+		targetTilt = Vector3.new(328, 0, 0),
+		ease = "in",
 	})
-	-- the freeze on the contact, under the impact frames; then they fly, up and away
+	-- the slow drive-through: the fist sinks in, the body bends round it, barely moving
 	table.insert(keys, {
 		t = HAYMAKER + HAY_FREEZE,
-		attacker = Vector3.new(0, AIR_Y, top + HAY_GAP),
-		target = Vector3.new(0, AIR_Y + HAY_RISE + 0.05, top - 0.05),
+		attacker = Vector3.new(0, hangY - HAY_RISE + 0.25, top + HAY_GAP - 0.3),
+		target = Vector3.new(0, hangY + 0.35, top - 0.45),
+		targetTilt = Vector3.new(322, 0, 0),
 	})
+	-- the knockback, at once (the owner: "the knockback from the last punch is delayed"): up and away hard, the
+	-- attacker carried along the punch (B9)
 	table.insert(keys, {
-		t = BLAST,
-		attacker = Vector3.new(0, AIR_Y + 0.3, top + HAY_GAP - 0.25),
-		target = Vector3.new(0, AIR_Y + HAY_RISE + 1.8, top - 2.4),
+		t = BLAST + 0.12,
+		attacker = Vector3.new(0, hangY - HAY_RISE + 0.9, top + HAY_GAP - 1.2),
+		target = Vector3.new(0, hangY + 2.4, top - 3.4),
+		targetTilt = Vector3.new(500, 0, 0),
 		ease = "out",
 	})
 	table.insert(keys, {
 		t = THROWN,
-		attacker = Vector3.new(0, AIR_Y + 0.3, top + HAY_GAP - 0.15),
-		target = Vector3.new(0, AIR_Y + HAY_RISE + 3, top - 4.5),
+		attacker = Vector3.new(0, hangY - HAY_RISE + 0.8, top + HAY_GAP - 1.4),
+		target = Vector3.new(0, hangY + 3.4, top - 5.5),
+		targetTilt = Vector3.new(720, 0, 0),
 		ease = "out",
 	})
 	return keys
@@ -312,8 +386,8 @@ local function rushCues(): { { t: number, name: string } }
 			{ t = UPPERCUT, name = "flash" },
 			{ t = UPPERCUT, name = "uppercut" },
 			{ t = LEAP, name = "leap" },
-			{ t = WINDUP, name = "windup" },
-			{ t = WINDUP + 0.3, name = "darken" },
+			{ t = CHARGE, name = "windup" },
+			{ t = HAYMAKER - 0.45, name = "darken" },
 			{ t = DIP, name = "dip" },
 			{ t = HAYMAKER, name = "haymaker" },
 			{ t = BLAST, name = "blast" },
@@ -337,24 +411,37 @@ local function rushSwings(): { Swing }
 		{ t = BLOW - HOOK_STRIKE, side = "Right", windup = HOOK_STRIKE, contact = 0.025 },
 		-- the uppercut meets the torso at 0.075 s of its clip, a little before its strike (0.089, measured)
 		{ t = UPPERCUT - 0.1, side = "Uppercut", windup = 0.1, contact = -0.014 },
-		{ t = WINDUP, side = "HaymakerUp", windup = 0, hold = true },
-		{
-			t = HAYMAKER - HAYMAKER_STRIKE,
-			side = "HaymakerUp",
-			windup = HAYMAKER_STRIKE,
-			fromHold = true,
-		},
+		-- the haymaker on the shared clock from the take-off to the hit (kits-7m): its coil (0 to 0.25 of the clip)
+		-- spreads over the rise, so it CHARGES while leaping, and the strike (0.25 to 0.32) is the last ~0.24 s, the
+		-- fist coming forward once they face each other
+		{ t = CHARGE, side = "HaymakerUp", windup = HAYMAKER - CHARGE },
 	}
 end
 
 -- The flinches: light and heavy in turn through the flurry; the big blows heavy, each holding its freeze.
 local function rushBlows(): { Blow }
-	local blows: { Blow } = { { t = BLOW, step = 2, heavy = true, freeze = BLOW_FREEZE } }
+	local blows: { Blow } =
+		{ { t = BLOW, step = 2, heavy = true, freeze = BLOW_FREEZE, arm = "Right Arm" } }
 	for index, hit in FLURRY do
-		table.insert(blows, { t = hit, step = if index % 2 == 0 then 2 else 1 })
+		-- BarrageUp throws right first, then left, in turn
+		table.insert(blows, {
+			t = hit,
+			step = if index % 2 == 0 then 2 else 1,
+			arm = if index % 2 == 1 then "Right Arm" else "Left Arm",
+		})
 	end
-	table.insert(blows, { t = UPPERCUT, step = 2, heavy = true, freeze = UPPER_FREEZE })
-	table.insert(blows, { t = HAYMAKER, step = 2, heavy = true, freeze = HAY_FREEZE })
+	table.insert(
+		blows,
+		{ t = UPPERCUT, step = 2, heavy = true, freeze = UPPER_FREEZE, arm = "Right Arm" }
+	)
+	table.insert(blows, {
+		t = HAYMAKER,
+		step = 2,
+		heavy = true,
+		freeze = HAY_FREEZE,
+		slow = HAY_SLOW,
+		arm = "Right Arm",
+	})
 	return blows
 end
 
@@ -420,25 +507,25 @@ local HAYMAKER_RUSH: Timeline = {
 		-- 1.70-3.58 the flurry: ONE held framing, low, side 3/4, tilted; only a slow drift (the jitter is on top)
 		{
 			t = FLURRY_FROM,
-			cam = Vector3.new(9, -0.4, 1.8),
-			look = Vector3.new(0, 0.5, 0.5),
-			fov = 60,
+			cam = Vector3.new(10.6, -0.4, 1.8),
+			look = Vector3.new(0, 0.7, 0.5),
+			fov = 62,
 			roll = 10,
 			ease = "smooth",
 		},
 		{
 			t = 2.7,
-			cam = Vector3.new(8.8, -0.6, 1),
-			look = Vector3.new(0, 0.5, 0.2),
-			fov = 60,
+			cam = Vector3.new(10.4, -0.6, 1),
+			look = Vector3.new(0, 0.7, 0.2),
+			fov = 62,
 			roll = 12,
 			ease = "smooth",
 		},
 		{
 			t = LAST_PUNCH + 0.14,
-			cam = Vector3.new(8.6, -0.8, 0.3),
-			look = Vector3.new(0, 0.4, -0.1),
-			fov = 61,
+			cam = Vector3.new(10.2, -0.8, 0.3),
+			look = Vector3.new(0, 0.6, -0.1),
+			fov = 62,
 			roll = 12,
 			ease = "smooth",
 		},
@@ -457,58 +544,71 @@ local HAYMAKER_RUSH: Timeline = {
 			look = Vector3.new(0, 1.4, 0.4),
 			fov = 70,
 		},
+		-- THE ENDING'S CAMERA (kits-7m, the owner's beat by beat). After the uppercut's freeze: the PLAYER ALONE, from
+		-- their right and a little in front, riding with them: the crouch, the take-off (dust ring, wind), the rise
+		-- with the haymaker coiling; the target is out of shot above.
 		{
-			t = LEAP - 0.05,
-			cam = Vector3.new(7.4, -2.4, -2.4),
-			look = Vector3.new(0, 5, -0.8),
-			fov = 74,
-			ease = "smooth",
-		},
-		-- 4.65 the leap and the hang: extreme wide from below, still, both small against the sky (Azure 5.33-5.92)
-		{
-			t = LEAP,
-			cam = Vector3.new(9.5, -2.6, 0.6),
-			look = Vector3.new(0, 6, -1),
-			fov = 78,
-			roll = 5,
-			cut = true,
-		},
-		-- 4.95 the wind-up: a close insert on the attacker's face from below and in front, pushing in, then STILL
-		-- through the darkening and the silence (Acheron 6.75-8.92, Serious Punch 2.67-4.75)
-		{
-			t = WINDUP,
-			cam = Vector3.new(2.2, 0.2, -2.6),
-			look = Vector3.new(0, 1.3, 0),
-			fov = 55,
+			t = PLAYER_SHOT,
+			cam = Vector3.new(6.4, 1.2, -2.4),
+			look = Vector3.new(0, 0.3, 0),
+			fov = 56,
 			rel = "attacker",
 			insert = true,
 			cut = true,
 		},
 		{
-			t = WINDUP + 0.3,
-			cam = Vector3.new(1.9, 0.4, -1.65),
-			look = Vector3.new(0, 1.4, 0),
-			fov = 46,
+			t = 4.6,
+			cam = Vector3.new(5.8, -0.6, -1.8),
+			look = Vector3.new(0, 0.9, 0),
+			fov = 54,
 			rel = "attacker",
 			insert = true,
 			ease = "smooth",
 		},
 		{
-			t = HAYMAKER,
-			cam = Vector3.new(1.85, 0.4, -1.6),
-			look = Vector3.new(0, 1.4, 0),
-			fov = 45,
+			t = FACE,
+			cam = Vector3.new(5.7, -0.6, -1.75),
+			look = Vector3.new(0, 0.9, 0),
+			fov = 53,
 			rel = "attacker",
 			insert = true,
 		},
-		-- 5.70 the haymaker, under the impact frames: side profile, so the two silhouettes read
+		-- facing each other: BOTH, from below their right, as the fist starts forward
 		{
-			t = HAYMAKER,
-			cam = Vector3.new(12, 0.4, 0),
-			look = Vector3.new(0, 0, 0),
-			fov = 50,
+			t = FACE,
+			cam = Vector3.new(6.5, -3, 1.2),
+			look = Vector3.new(0, 0.4, -0.2),
+			fov = 62,
 			rel = "pair",
 			cut = true,
+		},
+		-- from here the camera pushes in (a close-up from now on: the crop is the point)
+		{
+			t = HAYMAKER - 0.24,
+			cam = Vector3.new(6.3, -2.9, 1.15),
+			look = Vector3.new(0, 0.4, -0.2),
+			fov = 60,
+			rel = "pair",
+			insert = true,
+		},
+		-- the zoom onto the fist and the target's torso, speeding into the contact; held through the impact frames and
+		-- the slow drive-through (the cards draw their silhouettes from this close view)
+		{
+			t = HAYMAKER,
+			cam = Vector3.new(3, -1.2, 0.4),
+			look = Vector3.new(0, 0.9, -0.5),
+			fov = 40,
+			rel = "pair",
+			insert = true,
+			ease = "in",
+		},
+		{
+			t = HAYMAKER + HAY_FREEZE,
+			cam = Vector3.new(3.1, -1.2, 0.45),
+			look = Vector3.new(0, 0.9, -0.5),
+			fov = 42,
+			rel = "pair",
+			insert = true,
 		},
 		-- 6.15 the result, in line with the throw: low behind them and to the right, the target shooting away and up
 		-- from the lens (Garou vs Stinger 12.67-13.25)
@@ -535,7 +635,7 @@ local HAYMAKER_RUSH: Timeline = {
 	kicks = {},
 	-- the flurry's constant small jitter (Garou vs Stinger 7.5-8.9: 0.8-1.7 % of the frame, a new direction every
 	-- frame): about 0.22 studs at this distance
-	jitter = { { from = FLURRY_FROM - 0.05, to = LAST_PUNCH + 0.1, studs = 0.22 } },
+	jitter = { { from = FLURRY_FROM - 0.05, to = LAST_PUNCH + 0.1, studs = 0.07 } },
 	-- one jolt as each freeze ends, along the hit (screen right is the way every blow travels; up for the
 	-- uppercut): 5-7 % of the frame, gone within ~0.2 s
 	jolts = {
@@ -552,6 +652,19 @@ local HAYMAKER_RUSH: Timeline = {
 	},
 	-- the sprint while the body is carried in
 	dash = { from = DASH, to = BLOW },
+	-- the attacker's whole-body pose clips (kits-7j; AnimController.SyncClip, each held on its last frame until the
+	-- next): the lock-in and rush, the uppercut's set crouch, the leap
+	clips = {
+		{ t = 0, name = "RushIn" },
+		{ t = LAST_PUNCH + 0.14, name = "UpperSet" },
+		{ t = LEAP - 0.08, name = "LeapUp" },
+		{ t = CHARGE + 0.2, name = "" }, -- none: the haymaker takes the body
+	},
+	-- the target's (kits-7m): limp and dangling through the juggle (Garou vs Stinger), until the uppercut's set
+	targetClips = {
+		{ t = BLOW + 0.03, name = "Dangle" },
+		{ t = LAST_PUNCH + 0.14, name = "" },
+	},
 	blows = rushBlows(),
 }
 
@@ -626,6 +739,31 @@ end
 
 --- The attacker's own frame in the anchor's space: at `attackerAt`, local -Z toward `targetAt` (flat), +Y
 --- up. Built from its axes, like `anchor`.
+--- The target's whole-body tilt at `t` (degrees: pitch, yaw, roll), eased between keys like the positions; a key
+--- without `targetTilt` is upright.
+function Ultimates.tilt(line: Timeline, t: number): Vector3
+	local keys = line.keys
+	local zero = Vector3.new(0, 0, 0)
+	if t <= keys[1].t then
+		return keys[1].targetTilt or zero
+	end
+	for index = 2, #keys do
+		local key = keys[index]
+		if t <= key.t then
+			local before = keys[index - 1]
+			local share = eased((t - before.t) / math.max(key.t - before.t, 1e-6), key.ease)
+			return (before.targetTilt or zero):Lerp(key.targetTilt or zero, share)
+		end
+	end
+	return keys[#keys].targetTilt or zero
+end
+
+--- The target's body CFrame (world) for the cinematic: at `at`, facing `faces` flat, turned by `tilt` (degrees).
+function Ultimates.targetCFrame(at: Vector3, faces: Vector3, tilt: Vector3): CFrame
+	local base = CFrame.lookAt(at, Vector3.new(faces.X, at.Y, faces.Z))
+	return base * CFrame.Angles(math.rad(tilt.X), math.rad(tilt.Y), math.rad(tilt.Z))
+end
+
 function Ultimates.attackerFrame(attackerAt: Vector3, targetAt: Vector3): CFrame
 	local toward = Vector3.new(targetAt.X - attackerAt.X, 0, targetAt.Z - attackerAt.Z)
 	if toward.Magnitude < 0.05 then
@@ -753,7 +891,8 @@ function Ultimates.shake(line: Timeline, t: number): (number, number)
 	local x, y = 0, 0
 	for _, window in line.jitter or {} do
 		if t >= window.from and t < window.to then
-			local turn = math.rad(JITTER_TURNS[math.floor(t * 30) % #JITTER_TURNS + 1])
+			-- a new direction 10 times a second (kits-7k, the owner: the camera felt choppy; every 1/30 s was a buzz)
+			local turn = math.rad(JITTER_TURNS[math.floor(t * 10) % #JITTER_TURNS + 1])
 			x += math.cos(turn) * window.studs
 			y += math.sin(turn) * window.studs
 		end

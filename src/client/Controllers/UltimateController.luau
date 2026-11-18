@@ -164,6 +164,9 @@ function UltimateController:KnitStart()
 			-- the cutscene owns the fighters' screens (hideUi): what was switched off, to switch back on
 			local hiddenUi: { [ScreenGui]: boolean } = {}
 			local coreWas = if role then hideCore() else nil
+			-- the timeline poses both bodies: their knocked-about blends stay off so the flinches show (kits-7i)
+			anim:SetCutscene(attacker, true)
+			anim:SetCutscene(target, true)
 
 			local connection: RBXScriptConnection? = nil
 			connection = RunService.RenderStepped:Connect(function()
@@ -191,10 +194,13 @@ function UltimateController:KnitStart()
 				for _, swing in line.swings do
 					if not swing.hold and not swing.fromHold then
 						local hitAt = swing.t + swing.windup
-						local freeze = 0
+						local freeze, slow = 0, 0
 						for _, blow in line.blows do
 							if math.abs(blow.t - hitAt) < 0.011 then
 								freeze = blow.freeze or 0
+								-- past the hit the swing holds, or plays on in slow motion (kits-7m: the haymaker's
+								-- fist driving through, so the weight is felt)
+								slow = blow.slow or 0
 							end
 						end
 						local releaseAt = hitAt + freeze
@@ -202,7 +208,7 @@ function UltimateController:KnitStart()
 							anim:SyncSwing(
 								attacker,
 								math.clamp((t - swing.t) / math.max(swing.windup, 1e-3), 0, 1),
-								0,
+								math.max(t - hitAt, 0) * slow,
 								swing.contact
 							)
 						elseif lastT < releaseAt and t >= releaseAt then
@@ -221,6 +227,40 @@ function UltimateController:KnitStart()
 						blow.step,
 						blow.freeze -- a big hit's freeze (kits-7e): the hit-stop holds the whole of it
 					)
+					-- the smear: the striking arm drawn long for a moment on the hit (kits-7j, the owner's pick)
+					if blow.arm then
+						anim:StretchArm(attacker, blow.arm, 1.4, 1 / 30)
+					end
+				end
+				-- the attacker's whole-body pose clip on the shared clock (kits-7j): the last one started, held
+				local clips = line.clips
+				if clips and t < line.attackerFree then
+					local current
+					for _, clip in clips do
+						if clip.t <= t then
+							current = clip
+						end
+					end
+					if current and current.name ~= "" then
+						anim:SyncClip(attacker, current.name, t - current.t)
+					elseif current then
+						anim:StopClip(attacker)
+					end
+				end
+				-- the target's pose clip the same way (kits-7m: limp, dangling, through the juggle)
+				local targetClips = line.targetClips
+				if targetClips and t < line.cinematic then
+					local current
+					for _, clip in targetClips do
+						if clip.t <= t then
+							current = clip
+						end
+					end
+					if current and current.name ~= "" then
+						anim:SyncClip(target, current.name, t - current.t)
+					elseif current then
+						anim:StopClip(target)
+					end
 				end
 				local barrage = line.barrage
 				if barrage then
@@ -257,7 +297,8 @@ function UltimateController:KnitStart()
 					if t < line.cinematic then
 						local at = anchor:PointToWorldSpace(targetAt)
 						local faces = anchor:PointToWorldSpace(targetAt + Vector3.new(0, 0, 1))
-						myRoot.CFrame = CFrame.lookAt(at, Vector3.new(faces.X, at.Y, faces.Z))
+						-- the whole-body reaction tilt on top (kits-7i)
+						myRoot.CFrame = Ultimates.targetCFrame(at, faces, Ultimates.tilt(line, t))
 						myRoot.AssemblyLinearVelocity = Vector3.zero
 					elseif t < ending then
 						local share = (t - line.cinematic) / cfg.FlightSeconds
@@ -283,7 +324,7 @@ function UltimateController:KnitStart()
 					if root and t < line.cinematic then
 						local at = anchor:PointToWorldSpace(targetAt)
 						local faces = anchor:PointToWorldSpace(targetAt + Vector3.new(0, 0, 1))
-						root.CFrame = CFrame.lookAt(at, Vector3.new(faces.X, at.Y, faces.Z))
+						root.CFrame = Ultimates.targetCFrame(at, faces, Ultimates.tilt(line, t))
 					elseif root and t < ending then
 						local share = (t - line.cinematic) / cfg.FlightSeconds
 						local at = Ultimates.flightPoint(flightFrom, flightEnd, share, FLIGHT_RISE)
@@ -335,6 +376,10 @@ function UltimateController:KnitStart()
 					if dashing then
 						anim:SetDash(attacker, false)
 					end
+					anim:SetCutscene(attacker, false)
+					anim:SetCutscene(target, false)
+					anim:StopClip(attacker)
+					anim:StopClip(target)
 					if removeGrade then
 						removeGrade()
 					end

@@ -714,7 +714,13 @@ local function bakeKeyed(keys, seconds, meta, feet)
 			["Right Arm"] = blendArm("Right Arm", right),
 			["Left Arm"] = blendArm("Left Arm", left),
 		}
-		lockFeet(pose, feet, legs)
+		-- a key may carry its own feet (kits-7j: a stride, a tuck in the air), blended like everything else
+		local feetA, feetB = a.feet or feet, b.feet or feet
+		local blendedFeet = {}
+		for name, at in feetA do
+			blendedFeet[name] = lerp(at, feetB[name] or at, share)
+		end
+		lockFeet(pose, blendedFeet, legs)
 		pose.Torso[6] += mix("crouch")
 		table.insert(frames, { t = t, pose = pose })
 	end
@@ -729,23 +735,137 @@ local WIDE_FEET = {
 	["Right Leg"] = add(STANCE_FEET["Right Leg"], { 0.5, 0, 0 }),
 	["Left Leg"] = add(STANCE_FEET["Left Leg"], { -0.5, 0, 0 }),
 }
+-- The flurry's stance (kits-7k, Garou vs Stinger 7.5-9.4 s: the striker plants a WIDE, LOW horse stance and punches
+-- up from it): each foot a stud further out than the guard, and the body sat lower (FLURRY_SIT).
+local FLURRY_FEET = {
+	["Right Leg"] = add(STANCE_FEET["Right Leg"], { 1.0, 0, 0 }),
+	["Left Leg"] = add(STANCE_FEET["Left Leg"], { -1.0, 0, 0 }),
+}
+local FLURRY_SIT = -0.3
 
 -- BarrageUp: a 0.25 s loop, a punch every 0.125 s. Each arm fires from its guard up and forward at 50 degrees
 -- (aimed a little inward, at the one above them), snaps back; right lands at 0.0625, left at 0.1875. The body
 -- leans back to look up and twists into each punch.
-local UP_PUNCH = { sweep = -8, lift = 50, reach = 1.3 }
 local GUARDED = { guard = true }
-local BARRAGE_UP_KEYS = {
-	{ t = 0, right = GUARDED, left = GUARDED, lean = -8, turn = -4, crouch = -0.05, look = 10 },
-	{ t = 0.0625, ease = "outHard", right = UP_PUNCH, left = GUARDED, lean = -10, turn = 14, crouch = -0.12, look = 12 },
-	{ t = 0.125, ease = "smooth", right = GUARDED, left = GUARDED, lean = -8, turn = 4, crouch = -0.05, look = 10 },
-	{ t = 0.1875, ease = "outHard", right = GUARDED, left = UP_PUNCH, lean = -10, turn = -14, crouch = -0.12, look = 12 },
-	{ t = 0.25, ease = "smooth", right = GUARDED, left = GUARDED, lean = -8, turn = -4, crouch = -0.05, look = 10 },
+-- BarrageUp v2 (kits-7h, stage B of design/haymaker-rush-v4-gaps.md; vault: Anime Fight Animation - What the
+-- References Do and Where Haymaker Rush Falls Short). The gap study: the old loop was ONE punch mirrored (2 poses),
+-- out 0.0625 s and back 0.0625 s, the body almost still (twist +/-14, lean change 2 deg); the references draw 4-17
+-- different pushed poses, the body throwing every blow, the contact HELD and the retract barely shown (Jotaro,
+-- Tanktop, Garou vs Stinger). Now a 1.0 s loop of 8 DIFFERENT punches, still one every 0.125 s: for each, a chamber
+-- key, the contact 0.03 s later (snapped), held 0.04 s, then 0.055 s back into the next punch's chamber. The body
+-- leans, twists and drops into each one; the feet stay planted (Garou vs Stinger: 17 frames, the feet never move).
+-- { arm, chamber spec (nil = from the guard), contact spec, lean, turn, crouch at the chamber, crouch at contact }
+local FLURRY_PUNCHES = {
+	{ "R", nil, { sweep = -8, lift = 52, reach = 1.35 }, -14, 35, -0.3, -0.3 }, -- straight up
+	{
+		"L",
+		{ sweep = 70, lift = 0, reach = 1.0 },
+		{ sweep = -20, lift = 35, reach = 1.2 },
+		-6,
+		-40,
+		-0.2,
+		-0.2,
+	}, -- rising hook
+	{
+		"R",
+		{ sweep = 10, lift = -50, reach = 0.9 },
+		{ sweep = -5, lift = 75, reach = 1.25 },
+		-22,
+		25,
+		-0.45,
+		-0.1,
+	}, -- uppercut
+	{ "L", nil, { sweep = -10, lift = 45, reach = 1.35 }, -10, -35, -0.25, -0.25 }, -- straight
+	{
+		"R",
+		{ sweep = 40, lift = 80, reach = 1.0 },
+		{ sweep = -25, lift = 40, reach = 1.3 },
+		5,
+		45,
+		-0.35,
+		-0.35,
+	}, -- overhand
+	{ "L", nil, { sweep = -5, lift = 30, reach = 1.1 }, -4, -20, -0.15, -0.15 }, -- short jab
+	{
+		"R",
+		{ sweep = 70, lift = 0, reach = 1.0 },
+		{ sweep = -20, lift = 35, reach = 1.2 },
+		-8,
+		40,
+		-0.2,
+		-0.2,
+	}, -- rising hook
+	{
+		"L",
+		{ sweep = 10, lift = -50, reach = 0.9 },
+		{ sweep = -5, lift = 75, reach = 1.25 },
+		-22,
+		-25,
+		-0.45,
+		-0.1,
+	}, -- uppercut
 }
+local FLURRY_STEP = 0.125
+local FLURRY_CONTACT = 0.03 -- the strike: chamber to contact
+local FLURRY_HOLD = 0.04 -- the contact held
+local BARRAGE_UP_KEYS = {}
+local function flurryChamber(index: number, t: number)
+	local punch = FLURRY_PUNCHES[index]
+	local right = if punch[1] == "R" then (punch[2] or GUARDED) else GUARDED
+	local left = if punch[1] == "L" then (punch[2] or GUARDED) else GUARDED
+	-- wound the other way a little before it fires
+	return {
+		t = t,
+		ease = "smooth",
+		right = right,
+		left = left,
+		lean = punch[4] * 0.5,
+		turn = -punch[5] * 0.3,
+		crouch = punch[6] + FLURRY_SIT,
+		look = 10,
+	}
+end
+for index, punch in FLURRY_PUNCHES do
+	local s = (index - 1) * FLURRY_STEP
+	table.insert(BARRAGE_UP_KEYS, flurryChamber(index, s))
+	local right = if punch[1] == "R" then punch[3] else GUARDED
+	local left = if punch[1] == "L" then punch[3] else GUARDED
+	table.insert(BARRAGE_UP_KEYS, {
+		t = s + FLURRY_CONTACT,
+		ease = "outHard",
+		right = right,
+		left = left,
+		lean = punch[4],
+		turn = punch[5],
+		crouch = punch[7] + FLURRY_SIT,
+		look = 14,
+	})
+	-- the held contact: a hair further through
+	table.insert(BARRAGE_UP_KEYS, {
+		t = s + FLURRY_CONTACT + FLURRY_HOLD,
+		ease = "smooth",
+		right = right,
+		left = left,
+		lean = punch[4] - 2,
+		turn = punch[5] * 1.1,
+		crouch = punch[7] + FLURRY_SIT,
+		look = 14,
+	})
+end
+-- back to the first chamber, so the loop joins
+table.insert(BARRAGE_UP_KEYS, flurryChamber(1, #FLURRY_PUNCHES * FLURRY_STEP))
 
 -- HaymakerUp: wound up deep (held at 0.25: the right fist low behind the hip, crouched, twisted away, the left
 -- hand out in front), then a rising straight right up and away at 55 degrees (strikes at 0.32, 0.07 s after the
 -- hold, as the timeline lets it go), the body uncoiling and leaning back into it, then settling.
+-- kits-7j (stage B pass 3, the gap study B9-B11): the coil pushed deeper (turn -42 -> -70, leaning in, crouched,
+-- looking up at them) and a DRIVEN follow-through, the arm held out up and away with the body leaning back into it
+-- for 0.3 s (Tanktop 22.25-22.67) before it settles. It is thrown in the air, so the legs are an air pose (lead knee
+-- up, the other trailing), not feet locked as if standing.
+local AIR_FEET = {
+	["Right Leg"] = { 0.55, -1.9, -1.3 }, -- the lead knee up
+	["Left Leg"] = { -0.55, -2.8, 0.9 }, -- trailing
+}
 local HAYMAKER_UP_KEYS = {
 	{ t = 0, right = GUARDED, left = GUARDED, lean = STANCE_DIP, turn = STANCE_TURN },
 	{
@@ -753,10 +873,10 @@ local HAYMAKER_UP_KEYS = {
 		ease = "smooth",
 		right = { sweep = 150, lift = -40, reach = 1.0 },
 		left = { sweep = -10, lift = 30, reach = 1.1 },
-		lean = 4,
-		turn = -42,
-		crouch = -0.35,
-		look = 8,
+		lean = 15,
+		turn = -70,
+		crouch = -0.5,
+		look = 20,
 	},
 	{
 		t = 0.32,
@@ -771,22 +891,249 @@ local HAYMAKER_UP_KEYS = {
 	{
 		t = 0.45,
 		ease = "outHard",
-		right = { sweep = -10, lift = 66, reach = 1.3 },
-		left = GUARDED,
-		lean = -18,
-		turn = 38,
+		right = { sweep = -10, lift = 68, reach = 1.35 },
+		left = { sweep = 40, lift = -20, reach = 1.0 },
+		lean = -24,
+		turn = 45,
 		crouch = 0,
 		look = 16,
 	},
-	{ t = 0.75, ease = "smooth", right = GUARDED, left = GUARDED, lean = STANCE_DIP, turn = STANCE_TURN },
+	{
+		t = 0.75,
+		ease = "smooth",
+		right = { sweep = -10, lift = 70, reach = 1.35 },
+		left = { sweep = 45, lift = -25, reach = 1.0 },
+		lean = -30,
+		turn = 50,
+		crouch = 0,
+		look = 18,
+	},
+	{
+		t = 1.0,
+		ease = "smooth",
+		right = GUARDED,
+		left = GUARDED,
+		lean = STANCE_DIP,
+		turn = STANCE_TURN,
+	},
+}
+
+-- RushIn (kits-7j, B8 + B13): the lock-in, then the rush. The gap study: no reference shows a run cycle; speed comes
+-- from a launch pose and a held, stretched stride (Acheron, Azure, Human Battery), and ours rose upright for 3
+-- frames and ran a cycle. 0-0.36 the lock-in: right fist cocked at the shoulder, body turned away; 0.40-0.48 the
+-- LAUNCH CROUCH (low, leaning in, rear leg driving back); then one stretched stride, held, the arms pumped; the
+-- hook (a swing on top) takes the arms over at 0.98 and the legs plant at 1.14.
+local RUSH_STRIDE_FEET = {
+	["Right Leg"] = { 0.5, GROUND + 0.6, 2.0 }, -- driving back
+	["Left Leg"] = { -0.5, GROUND + 0.5, -1.7 }, -- reaching forward
+}
+local RUSH_LAUNCH_FEET = {
+	["Right Leg"] = { 0.55, GROUND, 1.9 },
+	["Left Leg"] = { -0.55, GROUND, -0.5 },
+}
+local COCKED = { sweep = 120, lift = 15, reach = 0.85 }
+local RUSH_IN_KEYS = {
+	{ t = 0, right = COCKED, left = GUARDED, lean = 6, turn = -30, crouch = -0.15, look = 4 },
+	{
+		t = 0.36,
+		ease = "smooth",
+		right = COCKED,
+		left = GUARDED,
+		lean = 8,
+		turn = -36,
+		crouch = -0.2,
+		look = 6,
+	},
+	{
+		t = 0.48,
+		ease = "out",
+		right = { sweep = 40, lift = -35, reach = 1.0 },
+		left = { sweep = -15, lift = -15, reach = 1.0 },
+		lean = 50,
+		turn = -10,
+		crouch = -0.55,
+		look = -20,
+		feet = RUSH_LAUNCH_FEET,
+	},
+	{
+		t = 0.58,
+		ease = "outHard",
+		right = { sweep = 30, lift = -45, reach = 1.0 },
+		left = { sweep = -10, lift = 15, reach = 1.0 },
+		lean = 38,
+		turn = 8,
+		crouch = -0.3,
+		look = -15,
+		feet = RUSH_STRIDE_FEET,
+	},
+	{
+		t = 0.98,
+		ease = "smooth",
+		right = { sweep = 30, lift = -40, reach = 1.0 },
+		left = { sweep = -10, lift = 20, reach = 1.0 },
+		lean = 34,
+		turn = 10,
+		crouch = -0.3,
+		look = -12,
+		feet = RUSH_STRIDE_FEET,
+	},
+	{
+		t = 1.14,
+		ease = "out",
+		right = GUARDED,
+		left = GUARDED,
+		lean = 15,
+		turn = 0,
+		crouch = -0.3,
+		look = 0,
+	},
+}
+
+-- UpperSet (kits-7j, B11): the deep crouch in the set before the uppercut: low, leaning in over the front knee, the
+-- right fist dropped to knee height; the Uppercut swing rises out of it.
+local UPPER_SET_KEYS = {
+	{ t = 0, right = GUARDED, left = GUARDED, lean = 10, turn = 0, crouch = -0.2 },
+	{
+		t = 0.12,
+		ease = "out",
+		right = { sweep = 15, lift = -70, reach = 0.95 },
+		left = { sweep = -10, lift = 20, reach = 1.0 },
+		lean = 45,
+		turn = -25,
+		crouch = -0.6,
+		look = 25,
+	},
+	{
+		t = 0.3,
+		ease = "smooth",
+		right = { sweep = 15, lift = -72, reach = 0.95 },
+		left = { sweep = -10, lift = 22, reach = 1.0 },
+		lean = 47,
+		turn = -28,
+		crouch = -0.62,
+		look = 26,
+	},
+}
+
+-- Dangle (kits-7m, the owner: "the torso should be facing the players fists, and the arms and legs and head should be
+-- dangling just like in the garou clip"): the TARGET's limp pose through the juggle. The timeline pitches the body
+-- forward ~32 deg over the fists (targetTilt), so "hanging straight down" is down-and-forward in the body's own
+-- frame: arms and legs aimed 55 deg below level, toward the front, the head dropped; a slow sway, never posed.
+local DANGLE_ARM = { sweep = 12, lift = -55, reach = 1.0 }
+local DANGLE_FEET = {
+	["Right Leg"] = { 0.55, -2.64, -1.15 },
+	["Left Leg"] = { -0.45, -2.6, -1.25 },
+}
+local DANGLE_SWAY_FEET = {
+	["Right Leg"] = { 0.45, -2.6, -1.25 },
+	["Left Leg"] = { -0.55, -2.64, -1.1 },
+}
+local DANGLE_KEYS = {
+	{
+		t = 0,
+		right = DANGLE_ARM,
+		left = DANGLE_ARM,
+		lean = 0,
+		turn = 0,
+		crouch = 0,
+		look = -25,
+		feet = DANGLE_FEET,
+	},
+	{
+		t = 0.3,
+		ease = "smooth",
+		right = { sweep = 18, lift = -62, reach = 1.0 },
+		left = { sweep = 6, lift = -50, reach = 1.0 },
+		lean = 0,
+		turn = 4,
+		crouch = 0,
+		look = -30,
+		feet = DANGLE_SWAY_FEET,
+	},
+	{
+		t = 0.6,
+		ease = "smooth",
+		right = DANGLE_ARM,
+		left = DANGLE_ARM,
+		lean = 0,
+		turn = 0,
+		crouch = 0,
+		look = -25,
+		feet = DANGLE_FEET,
+	},
+}
+
+-- LeapUp (kits-7j, B10): the leap after them: a crouch, a 2-frame extension, then a tuck (knees up) in the air.
+local LEAP_UP_KEYS = {
+	{ t = 0, right = GUARDED, left = GUARDED, lean = 25, turn = 0, crouch = -0.6, look = 30 },
+	{
+		t = 0.08,
+		ease = "snap",
+		right = { sweep = -10, lift = 70, reach = 1.2 },
+		left = { sweep = -10, lift = 60, reach = 1.1 },
+		lean = -8,
+		turn = 10,
+		crouch = 0.1,
+		look = 35,
+		feet = {
+			["Right Leg"] = { 0.5, GROUND - 0.1, 0.4 },
+			["Left Leg"] = { -0.5, GROUND - 0.1, 0.6 },
+		},
+	},
+	{
+		t = 0.22,
+		ease = "out",
+		right = GUARDED,
+		left = { sweep = -10, lift = 30, reach = 1.1 },
+		lean = 10,
+		turn = -20,
+		crouch = 0,
+		look = 30,
+		feet = { ["Right Leg"] = { 0.55, -1.7, -1.5 }, ["Left Leg"] = { -0.55, -2.0, -1.0 } },
+	},
+	{
+		t = 0.3,
+		ease = "smooth",
+		right = GUARDED,
+		left = { sweep = -10, lift = 30, reach = 1.1 },
+		lean = 10,
+		turn = -22,
+		crouch = 0,
+		look = 30,
+		feet = { ["Right Leg"] = { 0.55, -1.7, -1.5 }, ["Left Leg"] = { -0.55, -2.0, -1.0 } },
+	},
 }
 
 local ULTIMATE_CLIPS = {
 	BarrageUp = simplify(
-		bakeKeyed(BARRAGE_UP_KEYS, 0.25, { loop = true, priority = "Action2", strike = 0.0625 }, WIDE_FEET)
+		bakeKeyed(
+			BARRAGE_UP_KEYS,
+			#FLURRY_PUNCHES * FLURRY_STEP,
+			{ loop = true, priority = "Action2", strike = FLURRY_CONTACT },
+			FLURRY_FEET
+		)
 	),
 	HaymakerUp = simplify(
-		bakeKeyed(HAYMAKER_UP_KEYS, 0.75, { loop = false, priority = "Action2", strike = 0.32, hold = 0.25 }, WIDE_FEET)
+		bakeKeyed(
+			HAYMAKER_UP_KEYS,
+			1.0,
+			{ loop = false, priority = "Action2", strike = 0.32, hold = 0.25 },
+			AIR_FEET
+		)
+	),
+	-- the attacker's whole-body poses on the ultimate's timeline (Ultimates `clips`, AnimController.PlayClip): each
+	-- plays once and holds its last frame until the next one
+	RushIn = simplify(
+		bakeKeyed(RUSH_IN_KEYS, 1.14, { loop = false, priority = "Action" }, STANCE_FEET)
+	),
+	UpperSet = simplify(
+		bakeKeyed(UPPER_SET_KEYS, 0.3, { loop = false, priority = "Action" }, WIDE_FEET)
+	),
+	LeapUp = simplify(
+		bakeKeyed(LEAP_UP_KEYS, 0.3, { loop = false, priority = "Action" }, STANCE_FEET)
+	),
+	Dangle = simplify(
+		bakeKeyed(DANGLE_KEYS, 0.6, { loop = true, priority = "Action" }, DANGLE_FEET)
 	),
 }
 

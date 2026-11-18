@@ -196,23 +196,28 @@ return {
 			local freeze = blow.freeze
 			if freeze then
 				frozen += 1
+				-- a SLOWED hit (kits-7m, the haymaker: the owner asked for slow motion "so you can feel the weight")
+				-- runs longer, its bodies creep on, and the camera zooms in instead of snapping
+				local slowed = blow.slow ~= nil
 				assert(
-					freeze >= 0.15 - 1e-6 and freeze <= 0.4,
+					freeze >= 0.15 - 1e-6 and freeze <= (if slowed then 1 else 0.4),
 					`freeze at {blow.t} out of the measured range`
 				)
-				local a1, t1 = Ultimates.pose(line, blow.t + 0.01, start)
-				local a2, t2 = Ultimates.pose(line, blow.t + freeze - 0.01, start)
-				assert(
-					(a1 - a2).Magnitude < 1e-3 and (t1 - t2).Magnitude < 1e-3,
-					`bodies move in the freeze at {blow.t}`
-				)
-				local cut = false
-				for _, shot in line.shots do
-					if shot.cut and math.abs(shot.t - blow.t) < 1e-6 then
-						cut = true
+				if not slowed then
+					local a1, t1 = Ultimates.pose(line, blow.t + 0.01, start)
+					local a2, t2 = Ultimates.pose(line, blow.t + freeze - 0.01, start)
+					assert(
+						(a1 - a2).Magnitude < 1e-3 and (t1 - t2).Magnitude < 1e-3,
+						`bodies move in the freeze at {blow.t}`
+					)
+					local cut = false
+					for _, shot in line.shots do
+						if shot.cut and math.abs(shot.t - blow.t) < 1e-6 then
+							cut = true
+						end
 					end
+					assert(cut, `no snap on the hit at {blow.t}`)
 				end
-				assert(cut, `no snap on the hit at {blow.t}`)
 				local jolted = false
 				for _, jolt in line.jolts or {} do
 					if math.abs(jolt.t - (blow.t + freeze)) < 1e-6 then
@@ -230,11 +235,41 @@ return {
 		local barrage = line.barrage :: any
 		local mid = (barrage.from + barrage.to) / 2
 		local x1, y1 = Ultimates.shake(line, mid)
-		local x2, y2 = Ultimates.shake(line, mid + 1 / 30)
-		assert(math.sqrt(x1 * x1 + y1 * y1) > 0.1, "the flurry jitters")
-		assert(math.abs(x1 - x2) + math.abs(y1 - y2) > 0.1, "a new direction each frame")
+		local x2, y2 = Ultimates.shake(line, mid + 0.1)
+		assert(math.sqrt(x1 * x1 + y1 * y1) > 0.03, "the flurry jitters")
+		assert(math.abs(x1 - x2) + math.abs(y1 - y2) > 0.03, "a new direction ten times a second")
 		local xs, ys = Ultimates.shake(line, 0.2)
 		assert(xs == 0 and ys == 0, "still before anything lands")
+	end,
+
+	["the target's whole body reacts: it tips back through the flurry, arches and flips (kits-7i)"] = function()
+		-- the gap study: the target hung in one upright T for every hit; now the timeline turns the whole body
+		local line = Ultimates.TIMELINES.Base
+		local barrage = line.barrage :: any
+		-- kits-7m, the owner: "the torso should be facing the players fists": pitched FORWARD over the fists below
+		-- through the whole flurry (minus is forward)
+		for _, at in { barrage.from + 0.2, (barrage.from + barrage.to) / 2, barrage.to - 0.2 } do
+			local tilt = Ultimates.tilt(line, at)
+			assert(tilt.X < -20 and tilt.X > -45, `facing the fists at {at} (pitch {tilt.X})`)
+		end
+		-- the side they rock to changes hit to hit
+		local a = Ultimates.tilt(line, barrage.from + 0.3)
+		local b = Ultimates.tilt(line, barrage.from + 0.3 + 0.125)
+		assert(a.Z * b.Z < 0, "rocked to alternate sides")
+		-- the hook snaps them over during its freeze; upright before it
+		local blow = line.blows[1]
+		assert(Ultimates.tilt(line, blow.t - 0.05).Magnitude < 1, "upright before the hook lands")
+		assert(Ultimates.tilt(line, blow.t + 0.1).Z > 20, "rolled over by the hook")
+		-- a backflip on the uppercut's rise, and a whole number of turns when the flight takes over
+		local finish = Ultimates.tilt(line, line.cinematic)
+		assert(math.abs(finish.X % 360) < 1e-3, "upright (whole turns) when the flight starts")
+		local most = 0
+		for _, key in line.keys do
+			if key.targetTilt then
+				most = math.max(most, key.targetTilt.X)
+			end
+		end
+		assert(most >= 180, "a flip somewhere")
 	end,
 
 	["the rush in is a real run: it speeds up all the way, seen from behind"] = function()

@@ -179,17 +179,43 @@ end
 --- Plays `spec` on this screen, centred on `at` in the world, with `models` as the silhouettes. Returns
 --- once it is over (it yields for its length). `prepared` (ImpactFrame.prepare, made ahead of time) avoids
 --- cloning the fighters at the moment of the hit.
-function ImpactFrame.play(spec: Spec, at: Vector3, models: { Model }, prepared: Prepared?)
-	local camera = workspace.CurrentCamera
+function ImpactFrame.play(
+	spec: Spec,
+	at: Vector3,
+	models: { Model },
+	prepared: Prepared?,
+	view: CFrame?,
+	viewFov: number?
+)
+	local liveCamera = workspace.CurrentCamera
 	local player = Players.LocalPlayer
-	if not camera or not player then
+	if not liveCamera or not player then
 		return
 	end
-	local screen, onScreen = camera:WorldToViewportPoint(at)
-	local size = camera.ViewportSize
-	local centre = if onScreen and screen.Z > 0
-		then Vector2.new(screen.X, screen.Y)
-		else Vector2.new(size.X / 2, size.Y / 2)
+	local size = liveCamera.ViewportSize
+	-- `view` (kits-7m): the cards draw from their own camera, so a close-up live shot (the haymaker's zoom onto the
+	-- fist) still gets readable whole-body silhouettes; without it they draw from the live camera, as before
+	local camera: Camera = liveCamera
+	local centre = Vector2.new(size.X / 2, size.Y / 2)
+	if view then
+		local made = Instance.new("Camera")
+		made.Name = "HT_ImpactView"
+		made.CFrame = view
+		made.FieldOfView = viewFov or 50
+		camera = made
+		local rel = view:PointToObjectSpace(at)
+		if rel.Z < 0 then
+			local half = math.tan(math.rad(made.FieldOfView) / 2)
+			local x = rel.X / -rel.Z / (half * size.X / size.Y)
+			local y = rel.Y / -rel.Z / half
+			centre = Vector2.new((x + 1) / 2 * size.X, (1 - (y + 1) / 2) * size.Y)
+		end
+	else
+		local screen, onScreen = liveCamera:WorldToViewportPoint(at)
+		if onScreen and screen.Z > 0 then
+			centre = Vector2.new(screen.X, screen.Y)
+		end
+	end
 	local reach = math.max(size.X, size.Y) * 1.2
 
 	local gui = Instance.new("ScreenGui")
@@ -281,6 +307,9 @@ function ImpactFrame.play(spec: Spec, at: Vector3, models: { Model }, prepared: 
 	local splitCyan = viewportFor(stage, camera, 5)
 	splitCyan.Position = UDim2.fromOffset(size.Y * 0.018, -size.Y * 0.006)
 	local viewport = viewportFor(stage, camera, 6)
+	if camera ~= liveCamera then
+		camera.Parent = viewport
+	end
 
 	-- Flares: a big four-point one on the hit and two smaller ones beside it.
 	local flares =

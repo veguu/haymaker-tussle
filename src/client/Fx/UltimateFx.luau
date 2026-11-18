@@ -304,14 +304,24 @@ local function uppercut(ctx: Context, state: State)
 	foreground(ctx, state, "m1_finish")
 end
 
+-- The take-off (kits-7m, the owner: "showing him leap (give some vfx, like a dust cloud ring and wind)"): a ground
+-- burst and a RING of dust thrown out flat from the feet (8 puffs at set angles, never random), an upward gust, and
+-- wind ribbons trailing the body up the whole rise.
+local DUST_RING = 8
 local function leap(ctx: Context, state: State)
 	local root = rootOf(ctx.attacker)
 	if root then
-		AirFx.trail(root, 0.3)
 		local floor = FxKit.floorUnder(root.Position, 8, { ctx.attacker, ctx.target })
 		if floor then
-			StepBurstFx.play(floor, 0.9, false)
+			StepBurstFx.play(floor, 1.5, true)
+			for index = 1, DUST_RING do
+				local angle = (index - 1) / DUST_RING * math.pi * 2
+				local out = Vector3.new(math.cos(angle), 0, math.sin(angle))
+				AirFx.puff(floor + out * 1.2 + Vector3.new(0, 0.4, 0), out * 9)
+			end
 		end
+		AirFx.gust(root.Position - Vector3.new(0, 2, 0), Vector3.new(0, 1, 0))
+		AirFx.ribbon(root, 0.75, 2.2, 0.35)
 	end
 	foreground(ctx, state, "dash", { volume = 0.6, pitch = 1.2, cut = 0.3 })
 end
@@ -349,7 +359,21 @@ end
 local function haymaker(ctx: Context, state: State)
 	local at = chest(ctx)
 	if ctx.mine then
-		task.spawn(ImpactFrame.play, HAYMAKER_FRAME, at, { ctx.attacker, ctx.target }, state.impact)
+		-- the cards draw from a side profile of the pair (kits-7m: the live shot is a close-up on the fist now, and
+		-- silhouettes drawn from it filled the whole screen); 12 studs off on the attacker's right, as before
+		local a, b = rootOf(ctx.attacker), rootOf(ctx.target)
+		local middle = if a and b then a.Position:Lerp(b.Position, 0.5) else at
+		local view =
+			CFrame.lookAt(middle + ctx.anchor.RightVector * 12 + Vector3.new(0, 0.4, 0), middle)
+		task.spawn(
+			ImpactFrame.play,
+			HAYMAKER_FRAME,
+			at,
+			{ ctx.attacker, ctx.target },
+			state.impact,
+			view,
+			50
+		)
 	end
 	PunchHitFx.play(at + fistSide(ctx, "Right"), outward(ctx), 2.2, nil, true, nextTurn(state))
 	sound("ult_haymaker", ctx, state, { volume = 1 })

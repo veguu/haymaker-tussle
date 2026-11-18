@@ -3234,3 +3234,39 @@ Report.md` (plus four area notes).
   - Play-test stage A at 16:9, after the teammate pulls and stops or restarts their Rojo.
   - A4: measure the hook's real contact time and start its freeze there.
   - Then stage B (animation) and stage C (camera), per `design/haymaker-rush-v4-gaps.md`.
+
+## kits-7h..7m (2026-11-17): stage B (animation) and the owner's ending rework (NOT COMMITTED; synced, seen in Studio)
+Build stamp `kits-7m+lobby-4+ui-14a` (the place has it). The last commit is 130a10e (kits-7g). Recordings of each build are in
+`design/references/ours-kits-7h.mp4` .. `ours-kits-7m.mp4` (16:9, from Studio via ffmpeg gdigrab; untracked).
+- 7h, flurry:
+  - BarrageUp is now a 1.0 s loop of 8 different punches (FLURRY_PUNCHES in animations/build_strikes.luau), each out 0.03 s, held
+    0.04 s, back 0.055 s.
+  - The attacker sways and lurches.
+- 7i, target reactions:
+  - Key.targetTilt plus Ultimates.tilt / targetCFrame.
+  - AnimController.SetCutscene keeps AirTumble, Slammed and HitSkid off during the cutscene.
+- 7j, pose clips on the clock (Timeline.clips, AnimController.SyncClip):
+  - RushIn (cocked lock-in, launch crouch, held stride; the rush is linear after a 0.08 s hold), UpperSet, LeapUp.
+  - HaymakerUp has a deeper coil, a follow-through and air legs.
+  - The 1-frame arm-stretch smear (AnimController.StretchArm, Blow.arm).
+- 7k, from the owner: "positioning not right, reference the garou fight", "hugging", "pause should focus on the player":
+  - The juggle is upright, 2.6 ahead and 3.2 up, from a wide low stance (FLURRY_FEET).
+  - The haymaker wind-up holds them apart (WIND_GAP 3.4, WIND_RISE 3.6) and lunges in on the strike.
+- 7l, "camera choppy", "target positioned weirdly":
+  - The hit tilt spring is off in cutscenes (16 hits stacked it and laid the target flat).
+  - Jitter is 0.07 studs at 10 Hz.
+  - The cut into the leap is now a glide.
+- 7m, the owner's ending beat by beat:
+  - After the uppercut, the PLAYER ALONE: LeapUp with a dust ring of 8 puffs, a gust and ribbons; HaymakerUp synced from CHARGE,
+    so it charges while rising.
+  - FACE: both, then a zoom onto the fist and torso, then the impact frames, drawn from their own side-profile camera
+    (ImpactFrame.play `view`).
+  - A SLOW drive-through (Blow.slow 0.18 over HAY_FREEZE 0.75), then the knockback AT ONCE (BLAST = HAYMAKER + HAY_FREEZE).
+  - The flurry target is pitched forward about 30 deg toward the fists and plays the limp Dangle clip (Timeline.targetClips;
+    no flinch while a pose clip holds the body).
+- Gates: build OK, 540 tests, selene 0, stylua clean.
+- NOT DONE:
+  - The uppercut fist is still ~1 stud off.
+  - The target-like hit rings and the plain white flash (stages E and D of design/haymaker-rush-v4-gaps.md).
+  - The sun in the flurry shot (stage C).
+  - The teammate's Rojo overwrote the place 3 times this day: compare the stamp before every test.
