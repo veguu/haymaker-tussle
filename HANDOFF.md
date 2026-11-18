@@ -3430,6 +3430,171 @@ a play test of his own the moment mine stopped. Save it when Studio is back in E
   pushed 7g, put the 7f files back over it. Synced again after the pull (182 scripts match): the place now has
   kits-7g and everything of mine. Place saved v466. `rojo_push.py --check` compares place and files and writes
   nothing: run it BEFORE a sync when he is working, to see what the place has that the files do not.
+## ui-15a (2026-11-18): the fighters' row (profile pictures in place of the standing count): SYNCED, SEEN RUNNING (NOT COMMITTED)
+948bf93 (the sound sources, the class-reset specs, the notes up to ui-14a) is committed and pushed; nothing older is
+uncommitted. Stamp on disk `kits-7g+lobby-4+ui-15a`; 548 tests (7 new), selene 0, stylua clean, build OK.
+- NOT SYNCED ON PURPOSE. `rojo_push.py --check` before the sync showed the PLACE holding work of spicycaik's that
+  is not on GitHub: `Config/AnimClipsUltimate` (74685 characters there, 24711 in the files), `Core/Ultimates`,
+  `AnimController`, `UltimateController`. A sync replaces every mapped script, so it would have put his four back
+  to kits-7g. The tool cannot push a few scripts only, and CLAUDE.md forbids ad hoc script writes into the place.
+  WAIT for him to push, pull, run `--check` again (only the row's own scripts and the stamps should differ), sync.
+- THE OWNER'S BRIEF: instead of "5 / 20 players left", every player's Roblox profile picture in a row across the
+  top (a reference picture, "don't make it look identical"); a border in the player's CLASS colour; the one with
+  the most kills stands out ("a glow, a crown, or a colour change. Use your own judgment"); on a death a red X
+  DRAWN over the picture, the box fading DOWNWARD, the rest moving to the centre; "animations NEED to be smooth".
+- NEW `shared/Core/RosterLogic.luau` (pure, 7 specs): `fit` (tile side for a count and a width: 40 at most, 22 at
+  least, gap 4), `slot` (centred places), `leader` (most ring-outs, at least one; a tie goes to whoever got there
+  first), `badge` (a bot's number or a name's first letter, for a fighter with no picture), `approach` (one frame
+  of an eased move, the same at any frame rate).
+- NEW `client/Ui/Roster.luau`: a tile is the poster's rough-cut quad in the CLASS colour on a hard ink shadow, the
+  head shot inside (`rbxthumb://type=AvatarHeadShot`, 150 px; no yield, no upload), a small plate bottom right
+  with the fighter's ring-outs from the first one; your own picture has a cream line round it. THE CROWN: a bar
+  and three diamonds made of Frames (no image), on the leader, who also stands 1.14 times as big with a yellow
+  plate. OUT: two red strokes drawn corner to corner (0.14 s each), one small kick, the picture goes grey, 0.5 s
+  later the tile sinks 30 units and fades over 0.45 s while the others close the gap. Every tile's place and size
+  is eased each frame toward its target (rate 11), on one RenderStepped connection that exists only while
+  something moves; no CanvasGroup; Reduced Motion snaps.
+- `HudController`: the row is built beside the strip and laid out in `layout()` (the strip's place; it keeps the
+  feed's width clear on both sides). `rosterRefresh` in `refreshStrip`: while the phase is Fighting the row holds
+  every body tagged `HT_Fighter` and the strip's own panel is hidden (its ARENA CLOSING chip stays). The RingOut
+  event crosses the victim out (no X for "left") and credits the attacker of a "knocked"; ring-outs are counted
+  on the client from those events, so a late joiner sees only the ones since. A tag lost with no ring-out
+  behind it sinks without the X after 0.6 s. A player's colour is their `HT_Kit` attribute; a bot has none and
+  is drawn in Base's yellow.
+- TO CHECK WHEN IT RUNS (none of this has been seen): 25 tiles against the cog, the feed and the SOUNDS (P) button;
+  the row against the ARENA CLOSING chip and the announcements under it; the head shots loading; the crown's
+  size; whether the leader's 1.14 touches its neighbours at the smallest tile; the frame cost while closing; a
+  phone; whether the last-players popup still reads now that its count no longer flies into a visible strip.
+- LATER THE SAME DAY, SYNCED AND RUN. spicycaik pushed (91b91fd and 6776730, kits-7h..7m); pulled as before
+  (backup `work/pre-pull-backup-20261118c/`); `--check` then showed only the row's scripts and the stamp
+  differing, so it was safe. Build `kits-7m+lobby-4+ui-15a`, 552 tests (10 for the row), gates green, 184 scripts
+  match, place saved v476.
+- CHANGED AFTER SEEING IT RUN:
+  - Too small at first (it kept the feed's width clear on both sides: about 18 px a tile in a 926 px view). The
+    tile is 48 at most now and the row runs nearly the screen's width (110 units clear each side in a round, for
+    the settings button; 170 out of one, for the Coins). The FEED moves under the row while the row is up
+    (`rosterShown`, read in `layout()`), and the ARENA CLOSING chip moves down to stand under it.
+  - My own tile's cream line was a stroke round the OUTSIDE of the picture and hid the class colour; it is a line
+    just inside the picture's edge now.
+  - The slide was `approach` (it sets off at full speed). It rides `RosterLogic.spring` now (critically damped,
+    stiffness 14: sets off gently, never overshoots, carries its speed when the target changes; 3 specs). The
+    others start to close the gap at 0.72 s, once the sinking tile is half gone (at 0.58 it was drawn over them).
+- SEEN in my own play tests (25 bots and me): the row at the start of a fight, 25 tiles, bots as their numbers
+  on Base's yellow, my head shot with its cream line; two ring-outs at once with both red X's drawn; the crown
+  on the first fighter with a ring-out and its yellow plate, another fighter's ink plate; the feed under the
+  row; in the lobby after my own ring-out, the row centred between the menu and the Coins with two gaps closing.
+- MEASURED (Studio, 1190 x 536): a frame while tiles were moving 14.5 ms, while still 14.2 ms (noise); the row's
+  own writes for 19 tiles 0.03 ms a frame; top speed 244 px/s; the largest change of speed between two frames
+  39 to 186 px/s, in a 27 ms frame.
+- NOT SEEN: the motion by eye (stills and numbers only); a real second player's picture and class colour (every
+  other fighter was a bot); the ARENA CLOSING chip under the row; an announcement or the last-players popup
+  with the row above it; the crown changing hands; a leaver; Reduced Motion; a phone; the published game.
+- KNOWN: spicycaik's Studio-only SOUNDS (P) button lies over the row's left end in a round (it never ships).
+## ui-15b (2026-11-18): the row's kill counter from 0, a thicker frame as a STYLE, the pixel crown: SYNCED, SEEN (NOT COMMITTED)
+Build `kits-7m+lobby-4+ui-15b`, 551 tests, gates green, 185 scripts match, place saved v477.
+ui-15a and ui-15b are NOT committed. `--check` before the sync showed only my own scripts differing.
+- THE OWNER, after seeing ui-15a: "maybe there can be a kill counter instead, so everybody starts off at 0 ...
+  MAKE the borders of the pfp look BETTER and slightly bigger so it can be customizable in the future ... there
+  will be different styles, also make the crown look better too" (with a reference: a three-point pixel crown).
+- KILL COUNTER: the plate is on every tile from the start and reads 0 (19 x 18, a thin cream line, 13 px
+  figures); it only appeared with the first ring-out before. A bot's stand-in is no longer its NUMBER (it read
+  as a count): a plain head and shoulders, two rounded Frames a shade lighter than the backdrop.
+  `RosterLogic.badge` and its spec are gone.
+- THE FRAME IS A STYLE: NEW `shared/Config/RosterFrames.luau` (`Styles`, `Default`, `get`). A style is a shape
+  (a name in `Shapes.ids`), a shadow, an outline, a band (`bandTone = nil` means the fighter's CLASS colour), an
+  inner line and how far the picture's backdrop is mixed toward the band. `Roster.build` draws whichever style
+  `entry.frame` names. ONE style today, "Poster": ink outline 2.5, band 5.5, ink inner line 1.5 (4 units of flat
+  class colour before). Nothing chooses a style yet: no setting, no product, nothing saved; `HudController`
+  passes none. The tile is 52 at most (was 48), 24 at least, 5 apart; 18 units of room over it for the crown.
+- THE CROWN: NEW `design/ui/make_crown.py` draws OUR OWN pixel crown in the reference's manner (three points, ink
+  outline, coin yellow with Bruiser's orange as the shaded side, a pale stripe, a darker band; 21 x 15 cells at
+  16 px; the shape is computed from three peaks and two valleys). The reference picture itself is not used.
+  `assets/icons/poster/crown_pixel.png` (928 bytes) UPLOADED as Image to group 2970443 after the owner's yes:
+  112758624871088 ("Reviewing" at upload). `Shapes.ids.crownPixel`; `Roster` shows it with ResampleMode
+  Pixelated (28 x 20 units) and falls back to the old bar-and-diamonds crown if that id is ever taken out.
+- SEEN in my own play test: 25 tiles with the three-layer frame, silhouettes, every plate at 0 and my head shot;
+  later 16 left with the crown image loaded on the leader (4 ring-outs, yellow plate), a plate reading 3 on a
+  fighter being crossed out, two X's drawn at once. NOT seen: a real second player, another class's colour on a
+  frame, the crown changing hands, a phone.
+- THE OWNER'S NEW RULE (2026-11-18): I may stop a running Studio play test myself, without asking ("from now on
+  you're free to just stop the playtest by yourself. don't ask me anymore"). It replaces "never stop a Play
+  session you did not start". Saved in memory (`haymaker-may-stop-playtests`).
+## ui-15c (2026-11-18): the row's tiles drawn bigger, the counter off the picture, a Settings switch to hide the row: SYNCED, SEEN (NOT COMMITTED)
+Build `kits-7m+lobby-4+ui-15c`, 551 tests, gates green, 185 scripts match, place saved v479.
+ui-15a, ui-15b and ui-15c are NOT committed. `--check` before each sync showed only my own scripts differing.
+- THE OWNER: "the profiles are TOO small, I don't want it big to the point it takes up the entire screen ... make
+  the profile more visible", and "in settings add a toggle button to hide this".
+- BIGGER: `Roster` builds a tile at 52 (`SIZE.Tile`, what every part inside is measured against) and DRAWS it as
+  big as the row's room allows, up to `SIZE.Most` 72 (least 28, gap 6). A full round of 25 is held down by the
+  screen's WIDTH (one row, about 4 % of the width a tile); from about 18 standing the tiles are at 72. The room
+  over the tiles for the crown grows with them. `row.tall` is the height at the LARGEST size, so the feed and the
+  ARENA CLOSING chip under the row keep one place.
+  MEASURED in Studio at 1190 x 536: 36.5 px a tile with 25 standing (it was about 32 at most before), 53.6 px
+  with 10. At 1920 x 1080 the sums give about 62 px with 25 and 72 with 18 or fewer. NOT measured there.
+- MORE OF THE FACE: the head shot is cropped to its middle (`ImageRectOffset` 14, 6, `ImageRectSize` 122 of
+  150), about a fifth larger. The KILL COUNTER hangs on the middle of the frame's bottom edge (22 x 17, 8 under
+  it) and no longer covers a corner of the picture.
+- OUT OF A ROUND the row keeps the feed's whole column clear on both sides and the feed stays under the Coins:
+  moved under the row there, the feed ran down into the SETTINGS tile (seen). So the row is NARROWER in the
+  lobby than in a fight (about 27 px a tile with 21 standing at 1190 wide). In a fight the feed stands under it.
+- THE ROW GIVES WAY TO THE OPEN MENU WINDOW, like the feed (the window is laid out to clear the strip, and the
+  taller row ran under its top edge; seen): the strip's count shows while a window is open.
+- THE SWITCH: `MenuController` has a fourth Settings row, FIRST in the list, "Fighter row" ("Shows everyone still
+  standing across the top in a fight."), and it is the only one that DOES something: new signal
+  `MenuController.SettingChanged` (id, on) and `MenuController:GetSetting(id)`; `HudController` (`rosterWanted`)
+  shows the old strip count instead while it is off. The page's line now reads "FIGHTER ROW WORKS  .  THE OTHER
+  THREE DON'T CHANGE ANYTHING YET". NOT SAVED: like every switch there, it is back on in a new session.
+- SEEN in my own play tests: 25 tiles at 36.5 px with the counter under each; 10 left at 53.6 px with the crown;
+  the Settings page with the new row on, then OFF with the row gone and "17 / 25 STANDING" back; the window open
+  with the row hidden and nothing overlapping; the row back when the window closed; the lobby with the row
+  between the menu and the feed's column, the feed clear of the tool tiles.
+- NOT SEEN: a full-size screen; a phone; a second real player.
+- OFFERED TO THE OWNER, NOT BUILT: two rows while more than about 13 are standing (bigger tiles with a full
+  round, at about twice the height).
+## ui-16a (2026-11-18): the round-start countdown, 3, 2, 1, TUSSLE!: IN THE LOCAL MOCKUP FILE ONLY, NOT PUBLISHED, NOTHING IN ROBLOX
+ui-15a to ui-15c (the fighters' row) were committed with this section; the place is ui-15c (v479) and was not
+touched for this piece. The owner stopped the work here to carry on in a new chat.
+- THE OWNER'S BRIEF (with a picture of the "GET READY  ROUND 1" strip): "when a round starts, don't have that
+  thing at the top ... just remove that completely. Now instead, 3 seconds before the round starts there should be
+  a countdown on the screen that goes 3.... 2.... 1.... TUSSLE! With bouncy vfx, sfx, and animations. Keep the
+  style similar to everything else", then: "do it on the website first before you import it into roblox so I can
+  see it".
+- WHAT THE GAME HAS NOW: `RoundService` sets the phase "Starting" for `GameConfig.Round.StartingSeconds` = 4 and
+  publishes `CountdownEnd` (server time) on `ReplicatedStorage.HT_RoundState`; `HudLogic.strip` returns
+  "GET READY" with that countdown, and `tests/HudLogic.spec.luau` asserts it shows. The countdown must run from
+  `CountdownEnd - 3`, so the first second of Starting shows nothing. `GameConfig.luau` is GENERATED: change
+  `design/game.json` and run `python tools/gen_config.py` if the 4 has to change (it need not).
+- DONE, IN `UI Research/fight-poster-prototype.html` ON DISK (NOT published to the artifact; the copy from before
+  is `scratchpad/prototype_before_countdown.html` of the old session, which may be gone):
+  - a "Start a round" button in the Try it row (`startRound()`): `cdBeat(3)`, `cdBeat(2)`, `cdBeat(1)` a second
+    apart, then `cdGo()`, cleared 1.35 s later.
+  - a beat: a slanted ink bar wipes in (class `cbar`, its edges in the beat's colour), the number slams in from
+    3.6 times its size, turned, on the spring (0.62 s), a small shake of the whole group, eight pieces thrown
+    out; at 0.78 s the number is knocked down and away (0.2 s) before the next lands. 3 is cream, 2 yellow, 1
+    pink; odd beats come in turned one way, even ones the other. 250 px slanted Oswald with the ink outline and
+    hard shadow, like the last-players number.
+  - TUSSLE!: seven cut-out letters in boxes (cream, the class colour, yellow, the "!" pink and tipped), landing
+    0.04 s apart on the spring over a taller bar; 22 pieces; the edge bars pulse; after 0.96 s the word swells to
+    1.7 times and fades.
+  - sounds in `punch()`: `cd` (a click, a low thump and one note: 392, 440, 523 Hz for 3, 2, 1) and `go` (a rising
+    rush, a bigger thump, the chord 523 / 659 / 784 and a high sine). They always use the punchy master.
+  - a line in "How to use it"; and a FIX: two `@keyframes cf` (the confetti's and the cinematic flash's) shared
+    a name, so the later one hid the confetti of the ULTIMATE notice and FINAL TWO in the mockup; the flash's is
+    `cfl` now.
+- CHECKED: the script parses; `cd` and `go` build (4 and 7 voices) against a stub audio engine; in the browser
+  pane the settled frames of 3, 2, 1 and TUSSLE! draw as meant, no console errors. NOT CHECKED: the motion (the
+  pane's screenshots do not land on a chosen moment, and the pane asks for reduced motion, so the page starts with
+  Motion OFF there: call `setMotion(true)` first); whether the pieces show; the sounds by ear.
+- NEXT, IN ORDER: (1) finish checking the mockup, publish it to the SAME artifact
+  (https://claude.ai/artifact/ScFqVNZYHhvufmBUMdwwa3, read it first), tell the owner to press Fight, then Start a
+  round; (2) on his yes, in Roblox: take "GET READY" out of `HudLogic.strip` (the strip hidden in Starting; fix the
+  two spec lines), add the countdown to `Ui/Callouts.luau` beside `last()` (it already has `band`, `confetti`,
+  `stamp`, the big-number sheet `Shapes.last` with only 5, 4, 3, 2, so a "1" and the TUSSLE! letters need new
+  lettering images: `design/ui/make_lettering.py`, then an upload he must approve), drive it from `CountdownEnd`
+  in `HudController`, add the two sound recipes to `design/ui/make_ui_sounds.py` (4 files: cd_3, cd_2, cd_1,
+  round_go; an upload he must approve) and roles in `Config/SoundBank.luau`; (3) the row must not appear until
+  the fight starts (it already waits for the phase Fighting).
+- A local preview server I started for the mockup (python http.server, port 8765) is STOPPED.
 
 ## kits-7d..7f (2026-11-17): Haymaker Rush rush-in, flurry, camera study, gap study, stage A (NOT PLAY-TESTED: the place kept being overwritten)
 Build stamp `kits-7f+lobby-4+ui-13c`. Spec chain: `design/haymaker-rush-v3-beats.md` (camera study and the owner's picks), then
