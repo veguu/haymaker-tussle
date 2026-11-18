@@ -3196,6 +3196,241 @@ start. 537 tests, gates green. ui-10a to ui-12b are NOT committed.
   fight button (33 px at 1190 x 536, ink on the cream tile, no word), loaded; the lobby tile's icon is the same
   asset and loaded, NOT looked at by eye. Not tested: phones, the published game.
 
+## ui-12c (2026-11-18): two placeholder class pages, so the page arrows show: SYNCED, SEEN (NOT COMMITTED)
+ui-10a to ui-12b were approved and committed as 4c07951 ("its good, you can commit"). Stamp on disk
+`kits-7c+lobby-4+ui-12c`; the PLACE is still ui-12b (v451): Studio was in a Play session I did not start. 537 tests.
+- The owner asked where the Classes page's arrow was: with 8 classes there is one page and no arrow. He asked for
+  "2 more pages with like 8 placeholders for both". `MenuController`: `PLACEHOLDER_CLASSES = 16` appends 16
+  placeholder slots after the real classes in `drawClasses`: dark striped tiles with a faint "?", SOON and a
+  PLANNED badge, no press, no drift. They are UI only (nothing in Abilities, the Shop or saved data); 0 removes
+  them. With them the page is 1 OF 3 and the right arrow shows; pages 2 and 3 show the left arrow too.
+- SYNCED later the same day (182 scripts match), place saved v452. SEEN in my own play test: the page opened on
+  3 OF 3 with a left arrow; pressing it gave "PAGE 2 OF 3", eight SOON / PLANNED tiles and an arrow on each side
+  of them, the figure behind the right-hand tiles. Page 1 was not looked at this time.
+- OPEN: the owner asked to take the classes away from EVERYONE, the second developer included ("maybe let him
+  keep some"), so he sees the changes. NOT DONE: it changes other people's saved data; asked the owner how.
+
+## ui-12d (2026-11-18): one-time class reset for everyone with a refund; toast lower and bigger: SYNCED, NOT PROVEN (NOT COMMITTED)
+Build `kits-7c+lobby-4+ui-12d`, 539 tests, gates green, synced (182 scripts match), place saved v453. ui-12c
+(placeholder class pages) and ui-12d are NOT committed; everything before is (4c07951).
+- CLASS RESET. The owner: "make it so EVERYONE, including spicycaik, doesn't have characters anymore, maybe let
+  him keep some, I want him to see all the changes himself". Asked how (it changes other people's saved data and
+  cannot be undone); he chose "Everyone, with refund". So:
+  - `Config/Abilities.ClassReset = { Version = 1, Keep = { "Bruiser", "Inferno" } }`.
+  - `Core/AbilityKit`: `Profile.reset` (0 = never; kept by `sanitize` and `copy`), and `classReset(book, profile,
+    reset)`: a profile not yet at this version keeps the starter and whichever Keep kits it owns, loses the rest,
+    gets back each lost kit's current price in Coins, unequips a lost kit, and is marked. 2 new specs.
+  - `PlayerDataService`: applied once on join, before the builders' test top-up, and saved (dirty).
+  - It runs ONCE for each player for each Version. Raise Version to run it again; 0 stops it for players not yet
+    reset. A profile it has already run for cannot be put back.
+- NOT PROVEN ON A SAVED PROFILE. Three play tests: the first and the third were stopped from Studio before the
+  attributes could be read; the second fell back to a TEMPORARY profile (`HT_DataTemp` true: the lock of the
+  session stopped just before was still held; LEASE is 90 s), which showed owned = Base, coins 20000 and proves
+  nothing. The pure rule is covered by its specs. FIRST THING NEXT TIME: one clean play test (no session stopped
+  in the 90 s before it), read `HT_OwnedKits` / `HT_Coins` on the server: the owner's account should own Base,
+  Bruiser and Inferno only (whichever of the two it owned) with the Coins of the others added, and a second join
+  must change nothing.
+- TOAST (the owner: small on his PC and under Roblox's performance bar): `MenuController` `TOAST = { Lower = 44,
+  Bigger = 1.3 }`: it stands 44 px lower, beside where the 68-unit button is, and is drawn 1.3 times as big.
+  NOT looked at.
+- OTHER LOOSE ENDS: Blender was never running, so the class idles were never shown in Blender
+  (`animations/preview_class_idles.py` is ready); the mockup page lacks the class figure, the pages, the smaller
+  strip, the Q / R layout and the CONTROLS panel; `assets/ui` was never approved for uploads (the MENU title
+  images are unused now); "Allow HTTP Requests" is needed for the server region on live servers; phones,
+  gamepad and Reduced Motion are untested throughout; the class-name band on an ultimate is not built.
+
+## ui-13a (2026-11-18): class reset PROVEN; first pass of the owner's full UI review: SYNCED, SEEN (NOT COMMITTED)
+Build `kits-7c+lobby-4+ui-13a`, 539 tests, gates green, synced (182 scripts match), place saved v456. ui-12c,
+ui-12d and ui-13a are NOT committed; everything before is (4c07951).
+- CLASS RESET, PROVEN BY ARITHMETIC. A LIVE server (job ea5d57be...) held the owner's profile through two of my
+  play tests, so they ran on temporary profiles. Read before: 6 classes (Base, Bruiser, Inferno, Beast,
+  Trickster, Dragon), 21028 Coins, no `reset`. The owner's own Studio session then loaded it: `reset = 1`
+  saved, `HT_DataTemp` false, all 8 owned, 20128 Coins = 21028 + 2550 refund (800 + 750 + 1000) - 3450 (he bought
+  five back: 800, 750, 1000, 600, 300). Three later joins of mine: the same 8 classes and 20128 each time, so it
+  does not run twice. The in-between state (3 classes, 23578) was not seen by me.
+  OPEN: the published game is an OLDER build. If it saves a profile without `reset`, the reset would run again
+  on the next join of a new build. Not checked.
+- THE OWNER'S REVIEW BRIEF: "a FULL review of all the UIs ... find any inconsistency"; he circled the window's
+  top-left, top-right and bottom-left corners and named the gap along the top of the Shop; motion too ("it'll
+  move the frame and expose what's behind it").
+- HOW TO LOOK CLOSELY (new): Studio's screen capture is at native pixels. Crop and enlarge it without smoothing
+  (PIL, `Image.NEAREST`, x4 to x10) to judge seams and hairlines. Enlarging a piece with a UIScale shows its
+  build, but NOT hairlines (they depend on where the pixels fall at the real size).
+- FOUND AND FIXED, `MenuController` (the window):
+  - The dots and the repeated word stood straight, 12 in from a leaning border: a plain band all round, widest
+    along the top, and at the page change's 4-degree kick the pattern stuck out past the border. `Back` (the
+    CanvasGroup) is now the paper's child, sized to the field exactly.
+  - The ink line beside the cream slash was a turned bar with square ends (short of the border or past it). The
+    slash and its line now live inside `Back`, the line runs long and the group cuts both ends flush; the line
+    sits 1.5 units onto the cream (its edge on the wedge's edge showed a pale hairline). `PaperFront` is gone.
+  - The shadow's open corners (top-right, bottom-left) read as a border that did not meet: two turned bars
+    close them, and the shadow is solid ink now (see-through, the overlap showed darker).
+  - The X stood still while the paper leaned, so at the kick its corner stuck out: `tiltFollowers` moves it
+    with the paper's corner (it stays upright).
+  - The toast reached about 25 px over the open window's left edge: it is drawn just small enough to end short
+    of it (never under 0.9 of the lobby's scale).
+  - Moves page: Punch's three-line detail lost its last word ("away."). `drawList` gives a row 26 units for
+    every line its detail needs (about 36 letters a line).
+- FOUND AND FIXED, `HudController`:
+  - A yellow hairline up the top strip's right side: the colour edge was the whole slanted shape with the ink
+    over it, and two soft edges on one line let the under colour through. The edge is now only the band under
+    the plate. The same for a feed row about you (its edge is only the right end now; that one NOT seen).
+  - Jump and Punch: the key cap ("Space", "Click") covered the top of the icon. A small tile's cap is 24 tall
+    at 6, 6 and its icon 26 at 0.545 of the height (seen at 0.518, where it still touched; 0.545 NOT looked at).
+  - A stray white dash at the dial's foot when standing still: the top-speed mark at rest, half under the
+    stagger strip. It shows only while it is more than half a tick above the reading (`peakAllowed`).
+- FOUND, NOT FIXED (the owner's call):
+  - Classes page: the Q row shows its description, the R row never does (there is not room for two long ones
+    without scrolling). Inconsistent.
+  - The class figure stands behind the page arrow and the right-hand tiles.
+  - The SPECTATING chip and the feed show in the lobby after you are knocked out.
+  - The tool tiles' labels (SETTINGS, SPECTATE) are spaced unevenly at small sizes (the font at about 9 px).
+  - `Shapes.slant`: the body's half-unit overlap under each wedge measured 0 on several plates; no seam was
+    visible at native pixels on the strip, Coins or the SPECTATING chip, so nothing was changed.
+- SEEN AT NATIVE PIXELS AND CLEAN: lobby strips, tool tiles, Coins, the SPECTATING chip, the dial, Q and R,
+  the CONTROLS chip and panel, the cog, the window's four corners, the Classes, Moves, Ranked, Shop and
+  Settings pages.
+- NOT REVIEWED YET: the announcements and last-players popups, the ULTIMATE notice and badge, the spectate
+  panel, the More page, the feed in motion, every hover / press / pop motion frame by frame, the KickMeter and
+  clash bars, phones, gamepad, Reduced Motion, the published game.
+
+## ui-13b (2026-11-18): the review's "found, not fixed" list, after the owner's "Yes fix it": SYNCED, SEEN (NOT COMMITTED)
+Build `kits-7c+lobby-4+ui-13b`, 539 tests, gates green, synced (182 scripts match), place saved (see the UI Map
+for the version). ui-12c, ui-12d, ui-13a and ui-13b are NOT committed.
+- FIXED:
+  - Classes page: BOTH skill rows show their description (only Q did). `drawClasses`: the class line stands at
+    374, the rows start at 400 and stand 4 apart, a row is 68 (one line) or 88 (two): two two-line rows end
+    exactly at the page's foot, so nothing scrolls. `PosterKit.row`: the detail stands at 34 and is
+    `height - 36` tall (a line of that text is 26 units, and Roblox DROPS a wrapped line that does not wholly
+    fit: at `height - 46` an 88-unit row showed one line of two). SEEN on Inferno (the longest pair): both rows
+    whole, inside the border. This also moves the Moves page's details 4 up (not looked at again).
+  - The SPECTATING chip showed whenever you were out, also standing in the lobby. `HudController`: it shows
+    only while your character carries `HT_Spectating` (set by SpectateController in FIGHTER POV), whether or
+    not you fought that round. SEEN: gone in the lobby after a knockout. NOT seen: showing in FIGHTER POV.
+  - NEW FIND: the skill flag hung from the tile's right edge and grew left, so CAN'T USE and STUNNED lay over
+    the Q and R key caps (READY cleared them). It now starts just right of the cap (`seatFlag`, from the cap's
+    real width) and grows right, past the tile's edge. SEEN with STUNNED: both keys show, and the Q tile's flag
+    ends short of the dial.
+- LEFT AS THEY ARE, ON PURPOSE:
+  - The class figure behind the tiles and the page arrow: the owner asked for exactly that in ui-12a ("further
+    in, with the tiles, the rows and the button drawn over it where they meet"). Moving the figure clear would
+    push it about 66 units past the window's side; moving the arrow to the class line would cut the longer
+    class lines. Offered to the owner as a choice.
+  - The feed in the lobby: built on purpose ("the feed stands under the Coins out of a round").
+  - The tool tiles' uneven letter spacing: the label is 15 units, about 9 px in my 1188 x 536 Studio window,
+    where any font hints unevenly; the owner's rule is not to judge sharpness there. Not changed.
+- ALSO SEEN, NOT FIXED: while the saved profile is still loading (a held lock can take up to 104 s), the
+  window shows 0 Coins and every class NOT OWNED, with nothing saying it is loading. The data itself was fine
+  (8 classes, 20128 Coins once loaded). Stopping a Studio play session does NOT let go of the profile's lock
+  (the next session waited about 95 s for it).
+- STILL NOT REVIEWED: announcements and last-players popups, the ULTIMATE notice and badge, the spectate panel,
+  the More page, the feed in motion, hover / press / pop frame by frame, the kick meter and clash bars, phones,
+  gamepad, Reduced Motion, the published game.
+
+## ui-13c (2026-11-18): the review, third pass (motion, More, spectate, popups); unequip transition: SYNCED (NOT COMMITTED)
+Build `kits-7c+lobby-4+ui-13c`, 539 tests, gates green, synced (182 scripts match), place saved (version in the
+UI Map). ui-12c, ui-12d, ui-13a, ui-13b and ui-13c are NOT committed.
+- THE CLASS FIGURE: moved clear of the arrow and tiles on the owner's word (0.82 of its size, at 618, 121), he
+  looked and said "revert it": it is back at 525, 44, 400 x 430. Do not move it again unasked.
+- UNEQUIP SNAPPED (the owner): unequipping drops you to the starting class, and the page changed in one frame.
+  `MenuController` `ability.KitChanged`: when the equipped class changes what the Classes page shows, `hit()`
+  runs first (the sweep and the paper's kick, as when a tile is picked). SEEN: caught mid-kick after pressing
+  UNEQUIP on Inferno; the X followed the paper's corner, the pattern stayed inside the border.
+- THE WINDOW OVERSHOT ONTO THE MENU STRIPS when opening: place AND turn were on the spring, which overshoots by
+  a sixth; over the slide's long run that was about 170 units too far left for a moment (caught in a capture,
+  the window lying over SHOP / CLASSES / RANKED / MOVES). The place now runs on `slideIn`
+  (`PosterEase.bezier(0.22, 1.06, 0.36, 1)`); the turn stays on the spring. NOT seen mid-slide since.
+- MOTION FAULTS FOUND BY READING (none seen before or after; they need a pointer at the right moment):
+  - `NavController.enter`: a strip's entrance and its answer to the pointer ran under the same `Poster.run` key,
+    so a pointer crossing a strip in flight replaced the entrance and left it short of its place, tipped. A
+    strip's or tool's button is hidden until it has landed (`entering`).
+  - `PosterKit.pressable` / `pressRow`: the entrance pop and the hover wrote the same scale under two keys (a
+    shiver); the pointer now ends the pop. Letting go of a press with the pointer still on it went to REST
+    size; it goes back to the hover size.
+  - `NavController.setCurrent`: the open page's strip jumped its 18 units in one frame; it slides (0.25 s).
+- LAST-PLAYERS POPUP UNDER THE OPEN WINDOW: it stands where the window's top is and slid along half hidden
+  behind it. `HudController`: no popup while the window is open (`menuOpen`, now declared at the top of
+  KnitStart); the count still bumps and the knock still plays. NOT seen after the fix.
+- SMALL ONES: More page says PLANNED in capitals like the Shop and Ranked badges; a skill detail takes a second
+  line from 58 letters, not 55 (Uppercut's 55 fit one line and its row stood taller than Dash's for nothing);
+  the spectate panel is 320 wide, not 280 ("FIGHTER POV  ON" touched its tab's sides; NOT looked at since).
+- SEEN AND CLEAN: the More page, the spectate panel (both tabs, arrows, who-plate), the SPECTATING chip in
+  FIGHTER POV for a player sitting out (AFK), the small tiles' icons clear of their caps.
+- HOW TO SEE A POPUP ON DEMAND (my own play test only): `require` the client's `Ui/Callouts` from the MCP's
+  client context and call `last(3, false)`; it is a second copy of the module with its own ScreenGui.
+- NOT REVIEWED: the popups and the ULTIMATE notice in motion (only that they are hidden by the window), the
+  badge beside the open CONTROLS panel, the kick meter and clash bars, phones, gamepad, Reduced Motion, the
+  published game. The owner asked next for LOUDER, LESS SOFT UI sounds, on the website mockup first.
+- STUDIO: stopping a play test does not release the profile lock; the next one waits 20 to 100 s for the data.
+  The owner resized Studio's viewport mid-session (926 x 536): click by instance path, not by coordinates.
+
+## ui-13d (2026-11-18): CONTROLS panel gap, placeholder skill text: WRITTEN, GATES GREEN, NOT SYNCED; punchy sounds ON THE WEBSITE ONLY
+Stamp on disk still `ui-13c`; the PLACE is ui-13c (v462): Studio was in a Play session I did not start. 539 tests.
+- CONTROLS PANEL (the owner, with a picture): it always stood high, leaving an empty gap over the chip for the
+  ULT READY badge. `NavController`: `panelLift()` is 77 + 30 + 8 HUD units (just over the chip) and 200 only
+  while the player has `HT_UltReady`; it slides between the two in 0.25 s when the attribute changes. NOT SEEN.
+  To check: the result word (HIT / MISS) over Jump and Punch now lies under the open panel.
+- SKILL DESCRIPTIONS ON THE CLASSES PAGE (the owner: "just add placeholder text, not all the moves are
+  finalized"): `MenuController` `SKILL_DETAIL_PLACEHOLDER`; every skill row says it. The real ones stay in
+  `Config/Abilities` (`blurb`); set the constant to "" to show them again. The class's own line is unchanged.
+- LOUDER, LESS SOFT UI SOUNDS (the owner: "really feel like you're interacting ... put it on the website so I
+  can hear it myself before you add it into roblox ... don't overdo it"). ONLY the mockup so far
+  (`UI Research/fight-poster-prototype.html`, published, version 24): a `punch()` set for hover, press, open,
+  close, page change, equip, buy and not-allowed; each is a 16 to 50 ms band-passed noise CLICK with a 1 ms
+  attack, a low BODY tone that drops, and its notes, through its own master (gain .85, lowpass 9000; the soft
+  set is .6 and 4600). A "Sound set" switch (Punchy / Soft) and a "Hear" row play them. Checked only that every
+  sound builds without an error (stub audio, `sfx_check.js` in the scratchpad): NOBODY HAS HEARD THEM.
+  WHEN HE APPROVES: port the recipes to `design/ui/make_ui_sounds.py` (it needs an attack argument, a band-pass
+  filter and the second master), render the 8 WAVs, ASK before uploading (8 files, names, sizes; folder
+  `assets/sfx/ui` is approved), then new ids and volumes in `Config/SoundBank.luau`.
+- LATER THE SAME DAY: spicycaik's 7429d6e (kits-7d..7f, and my ui-12c to ui-13c "saved from the place") PULLED
+  with no stash: a copy of every changed file is in `work/pre-pull-backup-20261118/`. Build
+  `kits-7f+lobby-4+ui-13d`, 541 tests (his 539 plus my two class-reset specs, which are still only local), gates
+  green, SYNCED (182 scripts match), place saved v463. Local and NOT committed: ui-13d, the specs, this file.
+- SEEN in my own play test: with no ultimate the open panel sits right on the chip; with `HT_UltReady` set (by
+  hand, on the server, in the test only) it stood higher and the ULT READY badge sat between it and the chip,
+  touching neither. NOT seen: the slide itself, and coming back down. The HIT word shows faintly under the
+  panel's corner. Classes page: both rows show the placeholder line, one line each.
+- NEW ON SCREEN, his: a dark "SOUNDS (P)" button top-left, beside the cog, where the toast stands. A dev tool by
+  the look of it; if it ships it breaks the no-overlap rule with the toast. Not touched.
+## ui-14a (2026-11-18): the PUNCHY interface sounds uploaded and wired: SYNCED, LOADED, NOT HEARD BY ANYONE IN THE GAME (NOT COMMITTED)
+Build `kits-7f+lobby-4+ui-14a`, 541 tests, gates green, synced (182 scripts match). The place is NOT SAVED since v463: the owner started
+a play test of his own the moment mine stopped. Save it when Studio is back in Edit mode. origin/main had nothing new at the push. NOT committed: ui-13d, ui-14a, the two class-reset specs.
+- The owner heard the punchy set on the mockup page ("Yes, add them"), then: "upload all 8 then and replace all
+  the sfx".
+- `design/ui/make_ui_sounds.py`: `osc` takes an attack; new `bandpass_swept` and `click` (the mockup's `nz()` with
+  its attack and Q); `mix` takes a gain and a cutoff; `PUNCHY` holds the eight recipes (the mockup's `punch()` at
+  v = 1) and its own master (`PUNCH_GAIN` 0.85, `PUNCH_CUT` 9000). They are rendered INSTEAD of the soft recipes
+  of the same names; `--soft` renders the old ones. The soft WAVs are kept in `work/soft-ui-sfx-20261118/`.
+- UPLOADED to group 2970443 with `open_cloud_invoke` (POST /assets/v1/assets, Audio, one file a call, from the
+  approved `assets/sfx/ui`); all "Reviewing" at upload (NOT re-checked):
+  ui_press 91500867807243 (0.10 s), ui_hover 97267587317411 (0.07), ui_open 73226715728690 (0.32),
+  ui_close 112607708993860 (0.17), ui_page 118179764499470 (0.10), ui_equip 102801942993328 (0.33),
+  ui_buy 94696095664151 (0.38), ui_deny 101128195701132 (0.23).
+- `Config/SoundBank.luau`: the eight roles point at them. VOLUME = their mockup peak x 2.2 (the soft set's rule
+  was x 4.3, which would put a press at 1.03, as loud as a punch landing): ui_press 0.53 (was 0.15), ui_open 0.54
+  (0.28), ui_close 0.42 (0.17), ui_page 0.41 (0.25), ui_equip 0.53 (0.25), ui_buy 0.53 (0.2), ui_deny 0.37
+  (0.25), ui_hover 0.12 (0.1). MY JUDGEMENT, not the owner's ear: on the mockup they are louder still, relative
+  to the soft set. The old ids and volumes are in a comment there, to go back.
+- NOT changed: skill_ready, ring_out, last_5 to last_2 (not interaction sounds; they are the soft ones still), and
+  `UiSound` (same roles, same rules). The fight sounds were never part of this.
+- VERIFIED in my own play test: all eight load (IsLoaded, TimeLength = the file lengths); from real key presses
+  the game made Sounds with the NEW ui_open and ui_close ids at 0.54 and 0.42. NOT verified: the other six from
+  real events; how any of it SOUNDS in the game, against the fight sounds; phones.
+- THE OWNER ASKED whether I warn him when a commit is unsafe with spicycaik working: a commit or push cannot
+  overwrite his work (Git refuses a push that is behind, and I never force); the real risk is the shared PLACE,
+  where a Rojo push replaces every script with my files. I fetch before each push and stop if origin moved, but
+  work he has synced to the place and NOT pushed is invisible to me.
+- LATER (the owner asked "did we get overwritten?"): spicycaik's 130a10e (kits-7g, and my ui-13d and ui-14a
+  "saved from the place") pulled the same way (backup in `work/pre-pull-backup-20261118b/`). CHECKED: every UI
+  file of mine is in the repo exactly as I wrote it (byte for byte against both backups; only the build stamp,
+  now his `kits-7g+lobby-4+ui-14a`, and the uncommitted specs differ). The PLACE, though, held his kits-7f
+  versions of `Core/Ultimates`, `AnimController` and `UltimateController` (the sizes matched 7429d6e, not
+  130a10e): his kits-7g was not in the place. Either he never synced it there, or my ui-14a sync, made before he
+  pushed 7g, put the 7f files back over it. Synced again after the pull (182 scripts match): the place now has
+  kits-7g and everything of mine. Place saved v466. `rojo_push.py --check` compares place and files and writes
+  nothing: run it BEFORE a sync when he is working, to see what the place has that the files do not.
+
 ## kits-7d..7f (2026-11-17): Haymaker Rush rush-in, flurry, camera study, gap study, stage A (NOT PLAY-TESTED: the place kept being overwritten)
 Build stamp `kits-7f+lobby-4+ui-13c`. Spec chain: `design/haymaker-rush-v3-beats.md` (camera study and the owner's picks), then
 `design/haymaker-rush-gap-study-prompt.md` (the study brief) and `design/haymaker-rush-v4-gaps.md` (the ranked fix list, owner picks
