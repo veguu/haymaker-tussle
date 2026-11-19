@@ -409,24 +409,24 @@
    "CenterX": 3000,
    "FloorY": 120,
    "ViewEdgeZ": 250,
-   "Width": 132,
-   "Depth": 150,
-   "TrainingDepth": 48,
+   "Width": 150,
+   "Depth": 216,
+   "TrainingDepth": 96,
    "Terraces": [
     {
-     "Start": 28,
-     "Rise": 3
+     "Start": 30,
+     "Rise": 4
     },
     {
-     "Start": 102,
-     "Rise": 6
+     "Start": 120,
+     "Rise": 8
     }
    ],
-   "StairRun": 6,
+   "StairRun": 8,
    "StairLead": 1,
-   "StripWidth": 24,
+   "StripWidth": 26,
    "StripSide": 1,
-   "SpawnZ": 296,
+   "SpawnZ": 312,
    "SpawnSpread": 10,
    "WallHeight": 240,
    "WallThickness": 6,
@@ -436,13 +436,33 @@
    "DummyResetSeconds": 4,
    "Dummies": [
     {
-     "Name": "Practice Dummy 1",
-     "X": -26,
+     "Name": "Punching Dummy 1",
+     "X": -48,
+     "FromBack": 66
+    },
+    {
+     "Name": "Punching Dummy 2",
+     "X": -48,
      "FromBack": 24
     },
     {
-     "Name": "Practice Dummy 2",
-     "X": 26,
+     "Name": "Combo Dummy",
+     "X": 0,
+     "FromBack": 66
+    },
+    {
+     "Name": "Sparring Dummy",
+     "X": 0,
+     "FromBack": 24
+    },
+    {
+     "Name": "Kicking Dummy 1",
+     "X": 48,
+     "FromBack": 66
+    },
+    {
+     "Name": "Kicking Dummy 2",
+     "X": 48,
      "FromBack": 24
     }
    ],
@@ -452,7 +472,101 @@
     "LookAhead": 16,
     "Smooth": 9
    },
-   "Model": "Cliffside"
+   "Model": "Village",
+   "TrainingFree": {
+    "Enabled": true,
+    "NoCooldowns": true,
+    "UltimateReady": true,
+    "Private": true,
+    "Inset": 6.8,
+    "EnterHeight": 8
+   },
+   "Npcs": [
+    {
+     "Name": "Outfitter",
+     "Page": "more",
+     "Action": "Browse",
+     "X": -47.4,
+     "Back": 49.0,
+     "FaceX": 1,
+     "FaceZ": 0
+    },
+    {
+     "Name": "Coin Exchange",
+     "Page": "shop",
+     "Action": "Get coins",
+     "X": 47.4,
+     "Back": 49.0,
+     "FaceX": -1,
+     "FaceZ": 0
+    },
+    {
+     "Name": "Ranked Herald",
+     "Page": "ranked",
+     "Action": "Ranked",
+     "X": -47.4,
+     "Back": 73.0,
+     "FaceX": 1,
+     "FaceZ": 0
+    },
+    {
+     "Name": "Gamepass Merchant",
+     "Page": "shop",
+     "Action": "Open the shop",
+     "X": 47.4,
+     "Back": 73.0,
+     "FaceX": -1,
+     "FaceZ": 0
+    },
+    {
+     "Name": "Moves Master",
+     "Page": "moves",
+     "Action": "Learn moves",
+     "X": -47.4,
+     "Back": 97.0,
+     "FaceX": 1,
+     "FaceZ": 0
+    },
+    {
+     "Name": "Class Master",
+     "Page": "classes",
+     "Action": "Choose a class",
+     "X": 47.4,
+     "Back": 97.0,
+     "FaceX": -1,
+     "FaceZ": 0
+    }
+   ],
+   "NpcReach": 13,
+   "Boards": [
+    {
+     "Title": "MOST KILLS",
+     "Stat": "Kills",
+     "X": 71.8,
+     "Back": 150,
+     "Up": 14.3,
+     "FaceX": -1,
+     "FaceZ": 0
+    },
+    {
+     "Title": "MOST WINS",
+     "Stat": "Wins",
+     "X": 71.8,
+     "Back": 171,
+     "Up": 14.3,
+     "FaceX": -1,
+     "FaceZ": 0
+    },
+    {
+     "Title": "MOST PLAYTIME",
+     "Stat": "Playtime",
+     "X": 71.8,
+     "Back": 192,
+     "Up": 14.3,
+     "FaceX": -1,
+     "FaceZ": 0
+    }
+   ]
   },
   "Maps": {
    "Enabled": true,
@@ -1109,8 +1223,8 @@
   },
   "Barrier": {
    "Enabled": true,
-   "Height": 26,
-   "TopFade": 9,
+   "Height": 72,
+   "TopFade": 22,
    "Transparency": 0.975,
    "LineTransparency": 0.86,
    "FillColor": "3CC4FF",
@@ -1138,9 +1252,9 @@
    "SparkSeconds": 0.4,
    "SparkChance": 0.12,
    "MaxGlowPlayers": 6,
-   "PixelsPerStud": 20,
+   "PixelsPerStud": 14,
    "MaxViewDistance": 420,
-   "PhonePixelsPerStud": 12,
+   "PhonePixelsPerStud": 10,
    "PhoneMaxGlowPlayers": 2,
    "PhoneGlowEveryFrames": 2,
    "PhoneSweep": true,

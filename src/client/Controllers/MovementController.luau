@@ -900,6 +900,9 @@ function MovementController:_bind(
 		local hud = self.Hud
 		local flatVelocity = root.AssemblyLinearVelocity
 		hud.speed = Vector3.new(flatVelocity.X, 0, flatVelocity.Z).Magnitude
+		if Players.LocalPlayer:GetAttribute("HT_TrainingFree") == true then
+			state.propelCooldownLeft = 0 -- free practice on the training grounds: no dash cooldown
+		end
 		hud.propelLeft = state.propelCooldownLeft or 0
 		hud.kickReadyAt = kickReadyAt
 		hud.jumpReadyAt = jumpReadyAt
@@ -1154,7 +1157,10 @@ function MovementController:_bind(
 			hud.kickTarget = target ~= nil
 			if target then
 				if pressed then
-					kickReadyAt = now + kickCfg.Cooldown
+					kickReadyAt = if Players.LocalPlayer:GetAttribute("HT_TrainingFree")
+							== true
+						then now -- free practice: no kick cooldown
+						else now + kickCfg.Cooldown
 					-- Only a guess until the server says which target it picked.
 					kickTarget = target
 					kickAccepted = false

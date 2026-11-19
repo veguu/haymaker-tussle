@@ -830,7 +830,11 @@ function KickService:KnitStart()
 			return
 		end
 		local last = lastUse[player]
-		if last and now - last < cfg.Cooldown - GameConfig.Punch.CooldownTolerance then
+		if
+			last
+			and now - last < cfg.Cooldown - GameConfig.Punch.CooldownTolerance
+			and player:GetAttribute("HT_TrainingFree") ~= true -- free practice: no cooldown
+		then
 			return
 		end
 		lastUse[player] = now
@@ -885,7 +889,11 @@ function KickService:KnitStart()
 		end
 		-- One per jump, and a jump has a cooldown.
 		local last = lastDive[player]
-		if last and now - last < GameConfig.Jump.Cooldown - GameConfig.Punch.CooldownTolerance then
+		if
+			last
+			and now - last < GameConfig.Jump.Cooldown - GameConfig.Punch.CooldownTolerance
+			and player:GetAttribute("HT_TrainingFree") ~= true
+		then
 			return
 		end
 		lastDive[player] = now

@@ -193,7 +193,13 @@ function AbilityService:KnitStart()
 		end
 		local now = os.clock()
 		if
-			not Blink.ready(book.Blink, now, lastBlink[player], GameConfig.Punch.CooldownTolerance)
+			player:GetAttribute("HT_TrainingFree") ~= true -- free practice: no cooldown
+			and not Blink.ready(
+				book.Blink,
+				now,
+				lastBlink[player],
+				GameConfig.Punch.CooldownTolerance
+			)
 		then
 			return
 		end
@@ -233,7 +239,10 @@ function AbilityService:KnitStart()
 			return
 		end
 		local now = os.clock()
-		if not SkillMove.ready(move, now, lastMove[player], GameConfig.Punch.CooldownTolerance) then
+		if
+			player:GetAttribute("HT_TrainingFree") ~= true
+			and not SkillMove.ready(move, now, lastMove[player], GameConfig.Punch.CooldownTolerance)
+		then
 			return
 		end
 		local character = player.Character

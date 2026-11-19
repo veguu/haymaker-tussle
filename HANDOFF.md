@@ -3998,7 +3998,11 @@ This REPLACES ui-19a's three looks, which are gone from the mockup (the Small te
      Right: gold.400 text, an ink `UIStroke` of about 1.5 units on 17-px text, an ink copy 1.5 right and down as
      the shadow, Bold; give `row` an optional tone argument for the yellow pages), `MenuController` (`sub`, the
      class's tag line). Vault: "UIStroke on Text - Glyph Counters and the Stroke Ratio" (stroke under 7 %).
-## ui-19d BUILT (2026-11-18): coach's notes, cooldown counter, NO slanted plates, loud feed, TUSSLE! pop, no lobby jump cooldown: SYNCED, place v513, NOT COMMITTED. START HERE.
+## ui-19d BUILT (2026-11-18): coach's notes, cooldown counter, NO slanted plates, loud feed, TUSSLE! pop, no lobby jump cooldown: SYNCED, place v513, COMMITTED as 95c3620. START HERE.
+COMMITTED AND PUSHED as 95c3620 on his "Yes, commit mine" (20 files: my UI files whole, my ONE hunk of
+MovementController and my hunks of this file, staged with `git apply --cached`; the other session's free-practice
+and village work stayed uncommitted in the checkout; the staged tree alone passed stylua, selene and 558 tests).
+Where a line below says NOT COMMITTED, that was before it. Only this note was added afterwards.
 Build stamp `kits-8d+lobby-4+ui-19d`. The owner said "Yes, build it" to mockup version 44, then sent four more
 asks while it was being built. Gates: stylua clean, selene 0, 558 tests, rojo build OK.
 - UPLOADED on his yes (group 2970443, all Approved; `design/ui/make_note_marks.py` draws them into
@@ -4049,6 +4053,13 @@ asks while it was being built. Gates: stylua clean, selene 0, 558 tests, rojo bu
 - NOT SEEN OR TESTED: TUSSLE!'s new motion (only code), the lobby jump, ROUND OVER, ARENA CLOSING, SPECTATING,
   the spectate who-line, Ranked, More and Settings pages, a phone, a gamepad, Reduced Motion. After the last fix
   (tools column) no new picture was taken.
+- AFTER THE COMMIT (2026-11-19, place v515, NOT COMMITTED): the cooldown counter says what it is. His words:
+  "when u hover over the clock on the moves section in classes, it should just give u a frame that says
+  cooldown on it, just incase some people dont know". `PosterKit.row`: a cream card COOLDOWN (`PosterKit.chip`,
+  Oswald 17, 32 tall) left of the counter while the pointer is on it (`MouseEnter` / `MouseLeave` on the
+  counter); a tap shows it for 1.8 s on a touch screen. Patched into Studio by `execute_luau` (the other
+  session's work is still uncommitted in src, so no full push). SEEN: the hover in a play test, on both of
+  Base's rows. NOT TESTED: the tap on a touch screen; a gamepad has no way to see it.
 - THE STRIP IS ONE CARD (place v513; this is the CURRENT strip, the two strip bullets around it are history).
   His words on a yellow number beside a separate "/ 25 STANDING" card: "bro what the fuck is this, why is
   seperate like this ... just make it the same frame, for both this and the lobby countdown". So number and
@@ -4262,3 +4273,195 @@ drawing-technique study. Nothing here is uploaded to Roblox or wired into `Impac
   - run `bash design/vfx/impact/make_previews.sh` and show the owner.
 - **Outputs:** `design/vfx/study/out` and `design/vfx/impact/out` are ignored except the final sheets and previews. The
   `ours-kits-*` recordings stay local (ignored).
+
+## village-1 (2026-11-18): the lobby rebuilt as a fighting village: BUILT IN BLENDER, STAGED, NOTHING LIVE
+Owner's brief: the lobby 2.5x wider and deeper as a bustling village in the same kit and palette, a training compound
+of five stations, an obby woven through it. Everything is under `design/lobby/`. **Nothing under `src/` changed and
+nothing was uploaded or synced**, because Rojo serves this folder into the shared place (port 34872): changing
+`GameConfig.Lobby` or `LobbyLayout` would move the live collision under the old Cliffside model.
+
+- **Files:**
+  - `village.py`: the Blender build. It exec's `cliffside.py` without its `main()` and reuses its helpers and paint.
+    `--dry` is geometry only (20 s). Out: `out/village/` (blend, textures, `export/village_<n>.glb`, `manifest.json`,
+    `collision.json`, `placements.json`, `obby.json`, renders `village_*.png`, `dry_*.png`).
+  - `village_config.json`: the staged `config.Lobby` block. `go_live_village.py` is the one switch (dry run by
+    default, `--apply` writes `game.json`, repoints `gen_layout.py`, regenerates GameConfig and LobbyLayout).
+  - `studio_lobby.py village Village` writes `out/village/studio_lobby.luau` (imports named `VillageImport_<n>`,
+    builds `ServerStorage.HT_Lobby.Village`, leaves Cliffside alone).
+  - `prove/check_obby.py` (every hop against the real moves), `prove/make_village_spec.py` (the map prover).
+  - `out/village/staged/*.txt`: what GameConfig and LobbyLayout become, for reading.
+- **Layout (u across, d back from the view, h above FloorY), 330 x 375:**
+  - d 0..23, h 0: the viewing balcony, clear; benches at its back; the Champion's Perch tower in the right corner.
+  - d 32..216, h 4: the square. Spawn medallion at d 88; kiosks either side; great tree at (-58, 120), 2.2x the old
+    one; show-off circle before the village gate (d 204..212); three stalls down the left; four market stalls on
+    the right, which is the gamepass strip (40 wide); a well, beds, tree planters, benches, bunting, 22 banners.
+  - d 225..375, h 8: training. Punching row (coral, 3 dummies), combo ring (teal, 1), kicking yard (gold, 2, three
+    padded walls), rebound court (coral, 1, four pillars), movement runway (cream, 196 studs, marks every 20, 1).
+- **Two things in the brief did not match the game, so the obby is built on the real moves:**
+  - The brief says no jumping. Stock jump is off, but Space is the running jump (move-14): measured 10.7 high and
+    40 long from 60 studs/s, 3 s cooldown.
+  - The brief asks for kick rebounds off walls and pillars. The kick only rebounds after it hits a fighter or a
+    dummy (`DiveKick.planRebound`, onto the lobby disc). No wall rebound exists, and none was added. The rebound
+    court is a dummy among pillars.
+- **The obby (19 hops, plus a 4-hop re-entry stair at the gate), in order:** start crate, crate stack, stall roof A,
+  stall roof B, three stone pillars, the tree deck, three hop decks, the gate deck, the long beam, market roofs 1
+  to 4, the lantern deck, the Champion's Perch (h 30, the end). Most gaps are 10 to 14 studs with 1 to 4 up. The one
+  skill gap is long beam to market roof 1: 39 studs, 4 down, meant for dash then jump. `check_obby.py`: 23 hops, 0
+  failing, 3 studs to spare on each.
+- **Rules kept from `tests/Lobby.spec.luau`** (the first layout broke them, so it was changed): the square's front
+  edge sees the arena's near edge (Start 32, Rise 4), spawn sees the arena's middle (spawn 88 back), dummies have
+  3 punch ranges of room and stand 6 ranges apart. Two tests were widened so they hold for both lobbies: training
+  share up to 0.42 (was 0.36), and any number of dummies from 2, checked pair by pair (was exactly 2).
+- **Checked:**
+  - Full build (painted, exported): 126,507 triangles, 93 meshes, none over 20,000, 359 colliders, 208 kit
+    placements. `village_1.glb` 11.95 MB (55 meshes), `village_2.glb` 12.37 MB (38 meshes). Painted renders
+    `out/village/village_*.png` were looked at: the layout, stalls, bunting, decks and tree read as intended; the
+    paving renders pale blue-white under Blender's sky, to be judged in Studio's golden hour instead.
+  - Map prover on the staged colliders: enclosure sealed, no recovery traps, nothing unreachable that should be
+    reachable except one ruin column top. Its overlap and symmetry failures are the on-purpose sunk boxes and do
+    not apply to a lobby.
+  - A scratch copy of the project with the village settings applied: 558 tests pass, selene 0, GameConfig check
+    OK, LobbyLayout format-clean. The real project still passes 558 with the two widened tests.
+- **NOT DONE / NOT VERIFIED:**
+  - Nothing is in Roblox. Upload needs the owner to approve `design/lobby/out/village/export` as an upload folder,
+    as for cliffside.
+  - Not played. Dash-then-jump carrying 84 studs/s is read from `Jump.launch`, never measured. The 39-stud gap
+    rests on it.
+  - Frame cost with the village in, on a PC or a phone. The old lobby was 76k triangles in 32 meshes; this is 1.7x
+    the triangles and 3x the meshes, and it is in view during fights.
+  - The kit dressing (trees, bushes, flowers) is placed by the Studio script, so no Blender render shows it.
+  - Dummies all stand at terrace height: "various heights" from the brief needs code, not done.
+  - `Lobby.disc` (the kick's rebound platform) becomes a 165-radius disc; not looked at in play.
+- **TO GO LIVE, in order:** approve the folder; upload each `export/village_<n>.glb` as a Model under group 2970443;
+  insert as `ServerStorage.VillageImport_<n>`; `python design/lobby/studio_lobby.py village Village` and run its
+  `studio_lobby.luau` in Edit; agree with spicy who syncs; `python design/lobby/go_live_village.py --apply`; gates;
+  play the lobby and the obby; save the place; commit.
+
+## village-2 (2026-11-18): the village lobby is IN THE PLACE AND LIVE (saved v506; NOT COMMITTED)
+Owner: "build it in to roblox studios. we can do changes later if i wanna remove something".
+
+- **Uploaded** (Open Cloud Model, group 2970443, both Approved): `village_1.glb` = 137861207721066 (55 meshes),
+  `village_2.glb` = 81195930148057 (38 meshes). The export folder was already allowed.
+- **Assembled** `ServerStorage.HT_Lobby.Village` with `out/village/studio_lobby.luau`: 93 of 93 meshes, worst 0.002
+  studs off their expected centres, 208 of 208 kit pieces. `HT_Lobby.Cliffside` is still there, untouched.
+- **Settings live:** `go_live_village.py --apply` (game.json Lobby block, gen_layout repointed, GameConfig and
+  LobbyLayout regenerated). Gates: rojo build OK, 558 tests, selene 0, gen_config and gen_layout checks OK, StyLua
+  clean on the changed files.
+- **CORRECTION to village-1:** a running `rojo serve` does NOT push edits into the place by itself. Nothing reaches
+  Studio until `rojo_push.py` runs or the plugin is connected. Staging outside `src/` was still the safe order.
+- **How the two scripts got into the place:** NOT with `rojo_push.py`, which replaces every mapped script, and `src/`
+  held someone else's uncommitted UI work (HudController, MenuController, NavController, SpectateController, Poster,
+  PosterKit, Shapes, Tokens, both init files). Only `Shared.Config.GameConfig` and `Shared.Config.LobbyLayout` were
+  written, from the files, over a localhost file server through the AIBridge connector. Lengths match the files
+  (21,664 and 26,485 characters). The long assembly script went in the same way.
+- **Seen in Play (Studio PC):** config reads Village 330 x 375; the model is cloned to (3000, 120, 250), 449 parts,
+  0 colliding; 368 invisible collision parts; all 8 dummies stand where designed; raycasts onto 25 surfaces
+  (balcony, square, training, every obby top, the re-entry stair) all land within 0.15 of the designed height. One
+  capture from the square: bunting, banners, kit trees and bushes, fill bots standing about; a bright sun patch on
+  the paving.
+- **Frame time:** 65 fps average, 32.6 ms worst over 4 s, measured mid-round with the Studio window in the
+  background. Not a fair number and there is no before-number from the same session: a proper lobby-only
+  measurement, and a phone, are still owed.
+- **A play test kept restarting** while this was done (three times); each was stopped and Edit mode confirmed.
+  A duplicate `VillageImport_1` left by a retried insert was removed.
+- **NOT DONE:** nobody has run the obby by hand, so the dash-then-jump gap is still unplayed; the lobby by eye from
+  more than one spot; the hex barrier, spectate cameras and the rebound disc on the bigger floor; phones; the
+  independent quality review; the vault record (waits for the owner to accept it); commit and push.
+
+## village-3 (2026-11-18): the village made COMPACT, stations with keepers, training as a free-practice zone, the obby spaced for running (IN THE PLACE; NOT COMMITTED)
+Four things from the owner after seeing village-2, in his words: the props were "RANDOM, they should at least be of
+use" (he plans NPCs you talk to that open the UI, and left the choice of NPCs to me); "the training section should
+be its own ZONE ... they should give you ult, no cooldowns"; "the obby NEEDS to be spaced out so it can match the
+speed of the running"; and the lobby is "WAYYY to big, the stalls should just be posted up right near a player like
+how it was originally", training "only ... big if its necessary". village-2's 330 x 375 layout is SUPERSEDED.
+
+- **Size now:** 150 x 216 (the first lobby was 132 x 150). Balcony d 0..21, square d 30..111 (h 4), training
+  d 120..216 (h 8). 69,600 triangles in 80 meshes (the first lobby: 76,124 in 32), 146 colliders, 97 kit pieces.
+  Assets 118311016786144 + 140510882082238 (group 2970443). The big build's outputs are in
+  `design/lobby/out/village_big_archive/`; its assets (137861207721066, 81195930148057) are unused.
+- **Stations (`GameConfig.Lobby.Npcs`, written from `out/village/stations.json`):** a keeper behind each stall's
+  counter, 66 studs from spawn: Ranked Herald (ranked), Outfitter (more), Gamepass Merchant (shop), Coin Exchange
+  (shop). Two at signposts at the foot of the training steps: Moves Master (moves), Class Master (classes). Each
+  stall has a signboard in its colour and a tiled rug where the customer stands. No kiosks, no loose crate piles.
+  - `LobbyService.spawnNpcs`: seven anchored parts a keeper, no Humanoid, a name tag, a ProximityPrompt (key F,
+    reach `Lobby.NpcReach` 13) carrying attribute `HT_Page`.
+  - NEW `src/client/Controllers/NpcController.luau`: a triggered prompt with `HT_Page` calls
+    `MenuController:Open(page)`.
+  - Coin Exchange and Gamepass Merchant both open "shop": there is no separate coins page to open yet.
+- **Training zone:** a clay wall across the top of the steps with three gates (punching, main, kicking), sand paving
+  inside, the main gate the tallest frame. Stations: punching (2 dummies), combo ring (1), rebound court (1),
+  kicking (2, three padded walls), a 140-stud runway across the back. Sized by the dummies' launch-room rule.
+  - FREE PRACTICE: `LobbyService` marks a player in the zone `HT_TrainingFree` (`Lobby.TrainingFree.Enabled`).
+    Server: kick, dive, dash, heavy hits, blink and kit moves skip their cooldown check; `UltimateService` keeps the
+    meter full and stops its drain. Client mirrors: `CombatController`, `AbilityController`, `MovementController`
+    (dash and kick). The 0.32 s punch rhythm and endlag are NOT lifted.
+- **Obby:** one loop of 7 running jumps: ramp (balcony's left corner) -> left roof 1 -> left roof 2 -> two hop
+  decks across the back -> right roof 2 -> right roof 1 -> the Champion's Perch (h 25). `prove/check_obby.py` now
+  checks the owner's rule: a full-speed running jump from the edge must land at least 3 studs inside both ends of
+  the landing. 0 failing. Fewer obstacles than the 10 to 15 first asked for: a smaller square at running spacing.
+- **Gates:** rojo build OK, 560 tests (two new lobby tests: keepers, free practice; training share now up to 0.5),
+  selene 0, StyLua clean on every file I changed, gen_config and gen_layout checks OK.
+- **Into the place:** only my scripts, through the localhost + AIBridge route: GameConfig, LobbyLayout, LobbyService,
+  KickService, PropelService, CombatService, AbilityService, UltimateService, CombatController, AbilityController,
+  NpcController (new). `MovementController` in the place got ONLY my two edits applied to the place's own text,
+  because the file also holds another session's uncommitted work. Studio reported no unsaved changes after the
+  play test (Team Create had already kept them).
+- **Seen in Play:** config 150 x 216; model 240 parts, 0 colliding; 6 keepers with the right pages at the right
+  spots; 6 dummies in place; 15 surfaces at designed heights (every obby top, the wall top, all three gates open);
+  in the zone `HT_TrainingFree` true and the ultimate stayed 100 for 10 s, on the square it drained to 0; one
+  capture of the square (textured, bunting, tree, decks; the game's own readout showed 100 fps).
+- **NOT DONE / NOT VERIFIED:** nobody pressed F at a keeper, so the menu opening from a prompt is unseen; no cooldown
+  was timed by hand in the zone (dash, kick, heavy, skills); the obby is unrun by hand; the paving looks very bright
+  in the capture; the output log has many "No asset content representation" lines whose owner I did not trace;
+  phones; the quality review; commit.
+
+## village-4 (2026-11-18): shop buildings, 11-jump obby, private training, leaderboards, taller barrier: BUILT AND CHECKED IN THE FILES, NOT IN THE PLACE (stopped at a usage limit)
+The place still runs village-3. Owner's asks after seeing it: nothing in front of the stands and a real roof ("the
+stand should be actual buildings"); the obby longer, extended toward training; bunting must hang from something;
+the three yellow pads become wooden leaderboards (most kills, most wins, most playtime); the two keepers in the
+middle moved; training exclusive to one person (everyone else disappears); the barrier "hella high".
+
+- **Model (`design/lobby/village.py`, full build done):** 71,639 triangles, 78 meshes, 121 colliders, 80 kit pieces.
+  `out/village/export/village_1.glb` (12.41 MB, 67 meshes), `village_2.glb` (2.26 MB, 11). NOT UPLOADED.
+  - Six shop houses (walls, tile roof, open front, awning above head height, sign off the corner), three a side
+    at u 44..56, 44 studs from spawn; one keeper inside each. Moves Master and Class Master have the back pair.
+  - Obby on its own decks: ramp, Deck 1..9, the long deck, the Champion's Perch (h 29): 11 running jumps, round
+    the outside, over the wall and across the back of training. `check_obby.py`: 0 failing.
+  - Garlands hang under the obby's line from deck to deck; every other bunting end is on a pole, ridge, tree or gate.
+  - Three timber leaderboards on training's right wall; the rebound court, pads and ruin columns are gone.
+  - Great tree at (0, 95). Side gates at u 38..54. `STEP_HALF` 56 so no planter stands in a gate.
+- **Code (in `src/`, NOT pushed to the place):**
+  - `LobbyService`: the zone starts `TrainingFree.Inset` 6.8 behind the line and is entered on foot (within
+    `EnterHeight` 8 of the floor), so obby runners overhead are not in it; `spawnBoards` + `SetBoard(stat, rows)`.
+  - NEW `TrainingPrivacyController`: in the zone you see nobody else; outside it, anyone in it is hidden. Reading
+    taken of "exclusive to one person": private per player, nobody is locked out. Dummies stay shared.
+  - `GameConfig`: `Lobby.Npcs` (6), `Lobby.Boards` (3), `Lobby.TrainingFree`, 6 dummies; `Barrier.Height` 72 (was
+    26), `TopFade` 22, `PixelsPerStud` 14 (was 20), phone 10 (was 12).
+  - Gates: rojo build OK, 560 tests, selene 0, gen_config and gen_layout OK, StyLua clean on my files.
+- **TO FINISH:** upload the two GLBs (Open Cloud Model, group 2970443); Edit mode; insert as
+  `ServerStorage.VillageImport_1/_2`; run `out/village/studio_lobby.luau`; push GameConfig, LobbyLayout,
+  LobbyService and the new TrainingPrivacyController (localhost + AIBridge route, see memory); play-test shops,
+  prompts, the obby heights, privacy with two players, the barrier's look and frame cost; save.
+- **NOT DONE:** the leaderboards show "No scores yet": kills, wins and playtime are not saved anywhere, and saving
+  them means new fields in the locked player profile plus ordered data stores. Nothing committed.
+
+## village-4 IN THE PLACE (2026-11-19; NOT COMMITTED)
+- Uploaded (Open Cloud Model, group 2970443, Approved): `village_1.glb` = 136660718604805 (67 meshes),
+  `village_2.glb` = 80221718782811 (11). Assembled `ServerStorage.HT_Lobby.Village`: 78 of 78 meshes, worst 0.001
+  studs off, 80 of 80 kit pieces. village-3's assets (118311016786144, 140510882082238) are now unused.
+- Before pushing, every script of mine was compared in the place against the last commit (95c3620) and my file: nine
+  already matched my file; only GameConfig, LobbyLayout and LobbyService differed (the place had village-3's), and
+  TrainingPrivacyController was new. Those four were pushed (localhost + AIBridge).
+- **Seen in Play (Studio PC):** config 150 x 216, barrier height 72; model 201 parts, 0 colliding; six keepers inside
+  their shops with the right pages; three boards on the right wall; six dummies; 20 surfaces at designed heights
+  (every obby deck, the Perch, the wall top, the three gates open, the walk in front of a shop clear).
+  Zone rule, by moving the player: square and top of the steps = not in the zone; standing on obby Deck 5 above
+  training = not in it; walked in through the main gate = `HT_TrainingFree` and ultimate ready; lifted onto Deck 5
+  from inside = still in it; back on the square = out.
+- **NOT VERIFIED:** hiding other players (needs two real players; one was in the test); pressing F at a keeper; the
+  shops, the leaderboards' faces and the 72-stud barrier by eye (the one capture caught the owner's Settings menu
+  open over a blurred view, with tile roofs and bunting behind it); the barrier's frame cost at its new height;
+  cooldowns timed by hand; the obby run by hand; phones. The play test was left running because the owner was in it, so
+  `save_place` answered Busy: THE PLACE WAS NOT SAVED BY ME after this round (Team Create holds the edits).
+- **STILL OPEN:** leaderboards read "No scores yet" until kills, wins and playtime are saved (new profile fields
+  plus ordered data stores: a player-data change that needs the vault's DataStore safety sections read first).

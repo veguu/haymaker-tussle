@@ -222,7 +222,21 @@ function UltimateService:KnitStart()
 		local step = acc
 		acc = 0
 		local now = os.clock()
+		-- Free practice (LobbyService marks HT_TrainingFree in the training zone): the meter is kept full, so the
+		-- ultimate is there to practise as often as you like, and it never drains while you stand there.
+		for _, player in Players:GetPlayers() do
+			if player:GetAttribute("HT_TrainingFree") == true then
+				local state = meters[player] or UltimateMeter.new()
+				if not UltimateMeter.ready(cfg :: any, state) then
+					meters[player] = UltimateMeter.gain(cfg :: any, state, (cfg :: any).Max, now)
+					publish(player)
+				end
+			end
+		end
 		for player, state in meters do
+			if player:GetAttribute("HT_TrainingFree") == true then
+				continue
+			end
 			local nextState = UltimateMeter.step(cfg :: any, state, now, step)
 			if nextState ~= state then
 				meters[player] = nextState

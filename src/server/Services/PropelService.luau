@@ -53,7 +53,11 @@ function PropelService:KnitStart()
 		end
 		local now = os.clock()
 		local last = lastPropel[player]
-		if last and now - last < cfg.PropelCooldown - GameConfig.Punch.CooldownTolerance then
+		if
+			last
+			and now - last < cfg.PropelCooldown - GameConfig.Punch.CooldownTolerance
+			and player:GetAttribute("HT_TrainingFree") ~= true -- free practice: no cooldown
+		then
 			return
 		end
 		local character = player.Character

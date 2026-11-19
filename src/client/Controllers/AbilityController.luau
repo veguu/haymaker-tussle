@@ -82,7 +82,10 @@ local function blink(): boolean
 		or not root
 		or not root:IsA("BasePart")
 		or not canAct(character)
-		or not Blink.ready(blinkCfg, now, lastBlink)
+		or (
+			not (Players.LocalPlayer:GetAttribute("HT_TrainingFree") == true)
+			and not Blink.ready(blinkCfg, now, lastBlink)
+		)
 	then
 		return false
 	end
@@ -140,7 +143,9 @@ local HANDLERS: { [string]: () -> boolean } = {
 local TIMINGS: { [string]: () -> (number, number, boolean) } = {
 	Blink = function()
 		local character = Players.LocalPlayer.Character
-		return lastBlink + blinkCfg.Cooldown,
+		return lastBlink + (if Players.LocalPlayer:GetAttribute("HT_TrainingFree") == true
+			then 0
+			else blinkCfg.Cooldown),
 			blinkCfg.Cooldown,
 			character ~= nil and canAct(character)
 	end,
@@ -162,7 +167,11 @@ local function kitMove(skillId: string): boolean
 		not move
 		or not character
 		or not canAct(character)
-		or not SkillMove.ready(move, now, lastKitMove[skillId])
+		or (not (Players.LocalPlayer:GetAttribute("HT_TrainingFree") == true) and not SkillMove.ready(
+			move,
+			now,
+			lastKitMove[skillId]
+		))
 		or not Knit.GetController("MovementController"):SkillMove(skillId, move)
 	then
 		return false
@@ -177,7 +186,11 @@ for skillId, move in book.KitMoves :: { [string]: any } do
 	end
 	TIMINGS[skillId] = function()
 		local character = Players.LocalPlayer.Character
-		return (lastKitMove[skillId] or -math.huge) + move.Cooldown,
+		return (lastKitMove[skillId] or -math.huge) + (if Players.LocalPlayer:GetAttribute(
+				"HT_TrainingFree"
+			) == true
+			then 0
+			else move.Cooldown),
 			move.Cooldown,
 			character ~= nil and canAct(character)
 	end

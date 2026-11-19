@@ -1,0 +1,68 @@
+[
+ {
+  "name": "Outfitter",
+  "role": "more",
+  "page": "more",
+  "action": "Browse",
+  "u": -47.4,
+  "d": 49.0,
+  "h": 4.0,
+  "fx": 1,
+  "fz": 0
+ },
+ {
+  "name": "Coin Exchange",
+  "role": "coins",
+  "page": "shop",
+  "action": "Get coins",
+  "u": 47.4,
+  "d": 49.0,
+  "h": 4.0,
+  "fx": -1,
+  "fz": 0
+ },
+ {
+  "name": "Ranked Herald",
+  "role": "ranked",
+  "page": "ranked",
+  "action": "Ranked",
+  "u": -47.4,
+  "d": 73.0,
+  "h": 4.0,
+  "fx": 1,
+  "fz": 0
+ },
+ {
+  "name": "Gamepass Merchant",
+  "role": "gamepasses",
+  "page": "shop",
+  "action": "Open the shop",
+  "u": 47.4,
+  "d": 73.0,
+  "h": 4.0,
+  "fx": -1,
+  "fz": 0
+ },
+ {
+  "name": "Moves Master",
+  "role": "moves",
+  "page": "moves",
+  "action": "Learn moves",
+  "u": -47.4,
+  "d": 97.0,
+  "h": 4.0,
+  "fx": 1,
+  "fz": 0
+ },
+ {
+  "name": "Class Master",
+  "role": "classes",
+  "page": "classes",
+  "action": "Choose a class",
+  "u": 47.4,
+  "d": 97.0,
+  "h": 4.0,
+  "fx": -1,
+  "fz": 0
+ }
+]

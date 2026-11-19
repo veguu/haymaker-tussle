@@ -31,6 +31,9 @@ local Combatants = require(script.Parent.Parent.Combatants)
 
 local cfg: any = GameConfig.Lobby
 local IN_LOBBY = "HT_InLobby"
+-- FREE PRACTICE (owner, 2026-11-18): past the training wall the fight's limits are off. The server marks a
+-- player standing in the training zone HT_TrainingFree; every cooldown check and the ultimate meter read it.
+local FREE = "HT_TrainingFree"
 local FLOOR_THICKNESS = 8
 local STAND_HEIGHT = 3 -- a standing body's root is this far above the floor
 local CHECK_SECONDS = 0.1
@@ -276,6 +279,188 @@ local function spawnDummies()
 	end
 end
 
+-- THE STATION KEEPERS (owner, 2026-11-18: every stall has a use). One blocky figure behind each stall's counter
+-- and at each signpost, from Lobby.Npcs (written by design/lobby/village.py: where the stations are). Each carries a ProximityPrompt
+-- with the attribute HT_Page; the client's NpcController opens that page of the menu. They are scenery: seven
+-- anchored parts, no Humanoid, nothing collides, nothing to hit.
+local NPC_SKIN = Color3.fromRGB(240, 206, 170)
+local NPC_CLOTH = {
+	moves = Color3.fromRGB(236, 112, 86),
+	more = Color3.fromRGB(64, 150, 146),
+	classes = Color3.fromRGB(236, 112, 86),
+	shop = Color3.fromRGB(238, 180, 62),
+	ranked = Color3.fromRGB(64, 150, 146),
+}
+
+local function spawnNpcs()
+	local keepers = Instance.new("Folder")
+	keepers.Name = "Keepers"
+	for _, npc in cfg.Npcs or {} do
+		local z = cfg.ViewEdgeZ + npc.Back
+		local feet = Vector3.new(cfg.CenterX + npc.X, cfg.FloorY + Lobby.heightAt(cfg, z), z)
+		local frame = CFrame.lookAt(feet, feet + Vector3.new(npc.FaceX, 0, npc.FaceZ))
+		local model = Instance.new("Model")
+		model.Name = npc.Name
+		local cloth = NPC_CLOTH[npc.Page] or TIMBER
+		local function piece(
+			name: string,
+			size: Vector3,
+			offset: Vector3,
+			colour: Color3,
+			shape: Enum.PartType?
+		): Part
+			local part = Instance.new("Part")
+			part.Name = name
+			part.Size = size * 1.2
+			part.CFrame = frame * CFrame.new(offset * 1.2)
+			part.Color = colour
+			part.Material = Enum.Material.SmoothPlastic
+			part.Shape = shape or Enum.PartType.Block
+			part.TopSurface = Enum.SurfaceType.Smooth
+			part.BottomSurface = Enum.SurfaceType.Smooth
+			part.Anchored = true
+			part.CanCollide = false
+			part.CanQuery = false
+			part.CanTouch = false
+			part.CastShadow = name == "Torso"
+			part.Parent = model
+			return part
+		end
+		for _, side in { -1, 1 } do
+			piece("Leg", Vector3.new(1, 2, 1), Vector3.new(side * 0.5, 1, 0), TIMBER)
+			piece("Arm", Vector3.new(1, 2, 1), Vector3.new(side * 1.5, 3, 0), cloth)
+		end
+		local torso = piece("Torso", Vector3.new(2, 2, 1), Vector3.new(0, 3, 0), cloth)
+		local head = piece(
+			"Head",
+			Vector3.new(1.3, 1.3, 1.3),
+			Vector3.new(0, 4.65, 0),
+			NPC_SKIN,
+			Enum.PartType.Ball
+		)
+		local hat = piece(
+			"Hat",
+			Vector3.new(0.35, 2.3, 2.3),
+			Vector3.new(0, 5.25, 0),
+			EDGE,
+			Enum.PartType.Cylinder
+		)
+		hat.CFrame = hat.CFrame * CFrame.Angles(0, 0, math.rad(90))
+		model.PrimaryPart = torso
+
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.Name = "Talk"
+		prompt.ObjectText = npc.Name
+		prompt.ActionText = npc.Action
+		prompt.KeyboardKeyCode = Enum.KeyCode.F
+		prompt.HoldDuration = 0
+		prompt.MaxActivationDistance = cfg.NpcReach or 13
+		prompt.RequiresLineOfSight = false
+		prompt:SetAttribute("HT_Page", npc.Page)
+		prompt.Parent = torso
+
+		local tag = Instance.new("BillboardGui")
+		tag.Name = "NameTag"
+		tag.Size = UDim2.fromOffset(180, 26)
+		tag.StudsOffsetWorldSpace = Vector3.new(0, 2.2, 0)
+		tag.MaxDistance = 70
+		tag.AlwaysOnTop = false
+		tag.LightInfluence = 0
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.Text = npc.Name
+		label.TextColor3 = Color3.fromRGB(255, 244, 222)
+		label.TextStrokeColor3 = Color3.fromRGB(40, 28, 24)
+		label.TextStrokeTransparency = 0.2
+		label.FontFace = Font.fromEnum(Enum.Font.BuilderSansBold)
+		label.TextSize = 18
+		label.Parent = tag
+		tag.Parent = head
+		model.Parent = keepers
+	end
+	keepers.Parent = folder
+end
+
+-- THE LEADERBOARDS: three timber boards on the training wall (the Blender model), and on each a face from
+-- Lobby.Boards: a dark, slightly see-through panel with a title and ten rows. `LobbyService:SetBoard` fills one.
+-- Nothing fills them yet: kills, wins and playtime are not saved anywhere, so they read "No scores yet".
+local boardRows: { [string]: { TextLabel } } = {}
+
+local function spawnBoards()
+	local holder = Instance.new("Folder")
+	holder.Name = "Boards"
+	for _, board in cfg.Boards or {} do
+		local z = cfg.ViewEdgeZ + board.Back
+		local at = Vector3.new(cfg.CenterX + board.X, cfg.FloorY + board.Up, z)
+		local part = Instance.new("Part")
+		part.Name = board.Stat
+		part.Size = Vector3.new(12.2, 9, 0.2)
+		part.CFrame = CFrame.lookAt(at, at + Vector3.new(board.FaceX, 0, board.FaceZ))
+		part.Transparency = 1
+		part.Anchored = true
+		part.CanCollide = false
+		part.CanQuery = false
+		part.CanTouch = false
+		part.CastShadow = false
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = Enum.NormalId.Front
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 40
+		gui.LightInfluence = 0
+		gui.Parent = part
+		local back = Instance.new("Frame")
+		back.Size = UDim2.fromScale(1, 1)
+		back.BackgroundColor3 = Color3.new(0, 0, 0)
+		back.BackgroundTransparency = 0.35
+		back.BorderSizePixel = 0
+		back.Parent = gui
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 10)
+		corner.Parent = back
+		local title = Instance.new("TextLabel")
+		title.Size = UDim2.new(1, 0, 0, 56)
+		title.BackgroundTransparency = 1
+		title.Text = board.Title
+		title.TextColor3 = EDGE
+		title.FontFace = Font.fromEnum(Enum.Font.BuilderSansExtraBold)
+		title.TextSize = 40
+		title.Parent = back
+		local rows = {}
+		for index = 1, 10 do
+			local row = Instance.new("TextLabel")
+			row.Position = UDim2.new(0, 22, 0, 56 + (index - 1) * 29)
+			row.Size = UDim2.new(1, -44, 0, 28)
+			row.BackgroundTransparency = 1
+			row.Text = if index == 1 then "No scores yet" else ""
+			row.TextXAlignment = Enum.TextXAlignment.Left
+			row.TextColor3 = Color3.fromRGB(255, 244, 222)
+			row.FontFace = Font.fromEnum(Enum.Font.BuilderSansBold)
+			row.TextSize = 24
+			row.Parent = back
+			rows[index] = row
+		end
+		boardRows[board.Stat] = rows
+		part.Parent = holder
+	end
+	holder.Parent = folder
+end
+
+--- Writes a leaderboard: `rows` is up to ten { name, value } pairs, best first. For "Kills", "Wins", "Playtime".
+function LobbyService:SetBoard(stat: string, rows: { { name: string, value: string } })
+	local labels = boardRows[stat]
+	if not labels then
+		return
+	end
+	for index, label in labels do
+		local row = rows[index]
+		label.Text = if row
+			then `{index}.  {row.name}   {row.value}`
+			elseif index == 1 then "No scores yet"
+			else ""
+	end
+end
+
 function LobbyService:KnitInit()
 	self._bodyReset = Net.server("BodyReset")
 end
@@ -286,6 +471,8 @@ function LobbyService:KnitStart()
 	end
 	build()
 	spawnDummies()
+	spawnNpcs()
+	spawnBoards()
 
 	-- Who's on it. Standing inside the edges is what counts, however they arrived; a fighter in the
 	-- round never is.
@@ -307,6 +494,24 @@ function LobbyService:KnitStart()
 					and not round:IsStanding(character)
 				if inside ~= self:IsIn(player) then
 					player:SetAttribute(IN_LOBBY, if inside then true else nil)
+				end
+				-- The zone starts behind the training wall (Inset past the line) and is ENTERED ON FOOT: you
+				-- become part of it only when you're in its footprint near the floor. So someone running the
+				-- obby's decks overhead is never in it, and someone launched high inside it stays in it until
+				-- they leave its footprint.
+				local zone: any = cfg.TrainingFree
+				local floor = cfg.FloorY + cfg.Terraces[#cfg.Terraces].Rise
+				local inFootprint = inside
+					and zone ~= nil
+					and zone.Enabled == true
+					and Lobby.inTraining(cfg, position.X, position.Z - (zone.Inset or 0))
+				local free = inFootprint
+					and (
+						player:GetAttribute(FREE) == true
+						or position.Y - floor < (zone.EnterHeight or 8) + STAND_HEIGHT
+					)
+				if free ~= (player:GetAttribute(FREE) == true) then
+					player:SetAttribute(FREE, if free then true else nil)
 				end
 			end
 		end

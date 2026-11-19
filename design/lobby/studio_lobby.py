@@ -1,7 +1,9 @@
 """Writes out/cliffside/studio_lobby.luau: the Studio (Edit mode) script that turns the uploaded GLBs into
 ServerStorage.HT_Lobby.Cliffside, the model LobbyService clones into place.
 
-    python design/lobby/studio_lobby.py
+    python design/lobby/studio_lobby.py                    the cliffside lobby (out/cliffside, model Cliffside)
+    python design/lobby/studio_lobby.py village Village    another build: out/<folder>, ServerStorage.HT_Lobby.<Model>,
+                                                           imports named <Model>Import_<n>; other models are left alone
 
 BEFORE RUNNING THE LUAU: upload export/cliffside_<n>.glb as Model assets (Open Cloud, under the group) and insert
 each into ServerStorage as "LobbyImport_<n>". The script then:
@@ -20,9 +22,12 @@ its Dressing folder, drops meshes no longer in manifest.json) without re-uploadi
 """
 import json
 import os
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "out", "cliffside")
+FOLDER = sys.argv[1] if len(sys.argv) > 1 else "cliffside"
+NAME = sys.argv[2] if len(sys.argv) > 2 else "Cliffside"
+OUT = os.path.join(HERE, "out", FOLDER)
 
 
 def num(v):
@@ -159,6 +164,9 @@ local placed, miss = dress(model, meshes, dressing)
 dressing.Parent = model
 return string.format("dropped meshes: %s; kit pieces %d of %d%s", if #dropped > 0 then table.concat(dropped, ", ") else "none", placed, #PLACE, if #miss > 0 then "; kit missing: " .. table.concat(miss, ", ") else "")
 '''
+    if NAME != "Cliffside":
+        lua = lua.replace("Cliffside", NAME).replace("LobbyImport_", NAME + "Import_")
+        redress = redress.replace("Cliffside", NAME)
     open(os.path.join(OUT, "studio_dressing.luau"), "w", encoding="utf-8", newline="\n").write(redress)
     path = os.path.join(OUT, "studio_lobby.luau")
     open(path, "w", encoding="utf-8", newline="\n").write(lua)

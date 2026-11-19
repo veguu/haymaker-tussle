@@ -1070,7 +1070,11 @@ function CombatService:KnitStart()
 		local lastHeavy = record.lastHeavy or {}
 		record.lastHeavy = lastHeavy
 		local last = lastHeavy[side]
-		if last and now - last < move.cfg.Cooldown - punchCfg.CooldownTolerance then
+		if
+			last
+			and now - last < move.cfg.Cooldown - punchCfg.CooldownTolerance
+			and player:GetAttribute("HT_TrainingFree") ~= true -- free practice: no cooldown
+		then
 			record.refused += 1
 			trace(`{player.Name} refused: {side} cooldown`)
 			self._punchResult:FireClient(player, attacker, "refused")

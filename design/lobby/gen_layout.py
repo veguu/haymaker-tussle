@@ -8,7 +8,7 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SRC = os.path.join(HERE, "out", "cliffside", "collision.json")
+SRC = os.path.join(HERE, "out", "village", "collision.json")
 DST = os.path.abspath(os.path.join(HERE, "..", "..", "src", "shared", "Config", "LobbyLayout.luau"))
 
 
@@ -37,7 +37,7 @@ def render():
     out = [
         "--!strict",
         "-- GENERATED FILE - DO NOT EDIT BY HAND.",
-        "-- Source: design/lobby/cliffside.py (Blender) -> design/lobby/out/cliffside/collision.json",
+        "-- Source: design/lobby/village.py (Blender) -> design/lobby/out/village/collision.json",
         "-- Regenerate: python design/lobby/gen_layout.py",
         "-- The lobby's solid pieces, which LobbyService builds invisible: u across from the centre, d back from the",
         "-- viewing edge, h above Lobby.FloorY. box and wedge: u0..u1, d0..d1, h0..h1 (a wedge climbs from h0 at d0",

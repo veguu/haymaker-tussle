@@ -1,0 +1,29 @@
+[
+ {
+  "title": "MOST KILLS",
+  "stat": "Kills",
+  "u": 71.8,
+  "d": 150,
+  "h": 14.3,
+  "fx": -1,
+  "fz": 0
+ },
+ {
+  "title": "MOST WINS",
+  "stat": "Wins",
+  "u": 71.8,
+  "d": 171,
+  "h": 14.3,
+  "fx": -1,
+  "fz": 0
+ },
+ {
+  "title": "MOST PLAYTIME",
+  "stat": "Playtime",
+  "u": 71.8,
+  "d": 192,
+  "h": 14.3,
+  "fx": -1,
+  "fz": 0
+ }
+]

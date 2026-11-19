@@ -20,8 +20,10 @@ return {
 	end,
 
 	["training is about the far third, and the rest is lobby"] = function()
+		-- up to 0.5: in the village lobby (owner, 2026-11-18) the square is back near its first size and
+		-- training is its own zone of five stations, sized by the dummies' launch room
 		local share = CFG.TrainingDepth / CFG.Depth
-		assert(share >= 0.3 and share <= 0.36, `training is {share} of the platform`)
+		assert(share >= 0.3 and share <= 0.5, `training is {share} of the platform`)
 		local _, _, z0, z1 = Lobby.bounds(CFG)
 		assert(Lobby.inTraining(CFG, CFG.CenterX, z1 - 1))
 		assert(not Lobby.inTraining(CFG, CFG.CenterX, z0 + 1))
@@ -118,9 +120,34 @@ return {
 		assert(CFG.CenterX < x0 or CFG.CenterX > x1)
 	end,
 
-	["two dummies, well inside training, with room for a launch on every side"] = function()
+	["every station keeper stands in the lobby, off spawn and out of training, with a page to open"] = function()
+		local pages = { shop = true, classes = true, ranked = true, moves = true, more = true }
+		assert(#CFG.Npcs >= 1)
+		for _, npc in CFG.Npcs do
+			local x, z = CFG.CenterX + npc.X, CFG.ViewEdgeZ + npc.Back
+			assert(Lobby.contains(CFG, x, z), `{npc.Name} is off the lobby`)
+			assert(not Lobby.inTraining(CFG, x, z), `{npc.Name} is in the training zone`)
+			assert(pages[npc.Page], `{npc.Name} opens no known page`)
+			assert(math.abs(npc.FaceX) + math.abs(npc.FaceZ) == 1, `{npc.Name} faces nowhere`)
+			local far = math.sqrt((x - CFG.CenterX) ^ 2 + (z - CFG.SpawnZ) ^ 2)
+			assert(far > CFG.SpawnSpread + 4, `{npc.Name} stands on spawn`)
+			-- "posted up right near a player" (owner): never a long walk from where you arrive
+			assert(far <= 90, `{npc.Name} is {far} studs from spawn`)
+		end
+	end,
+
+	["training is free practice: the zone is marked, and it is the training terrace"] = function()
+		assert(CFG.TrainingFree.Enabled == true)
+		local line = Lobby.trainingLine(CFG)
+		assert(
+			Lobby.inTraining(CFG, CFG.CenterX, line + 1)
+				and not Lobby.inTraining(CFG, CFG.CenterX, line - 1)
+		)
+	end,
+
+	["the dummies are well inside training, with room for a launch on every side"] = function()
 		local dummies = Lobby.dummies(CFG)
-		assert(#dummies == 2)
+		assert(#dummies >= 2)
 		local x0, x1, _, z1 = Lobby.bounds(CFG)
 		local line = Lobby.trainingLine(CFG)
 		local room = PUNCH.Range * 3
@@ -132,10 +159,15 @@ return {
 			)
 			assert(dummy.x - x0 >= room and x1 - dummy.x >= room, `{dummy.name} is too near a side`)
 		end
-		assert(
-			math.abs(dummies[1].x - dummies[2].x) >= room * 2,
-			"the dummies are too close together"
-		)
+		for i, a in dummies do
+			for j = i + 1, #dummies do
+				local b = dummies[j]
+				assert(
+					math.sqrt((a.x - b.x) ^ 2 + (a.z - b.z) ^ 2) >= room * 2,
+					`{a.name} and {b.name} are too close together`
+				)
+			end
+		end
 	end,
 
 	["the invisible walls sit on the floor's edge and close the corners"] = function()

@@ -207,7 +207,10 @@ function CombatController:KnitStart()
 		return character ~= nil
 			and canPunch(character)
 			and now >= readyAt()
-			and now - move.last >= move.cfg.Cooldown
+			and now - move.last >= (if Players.LocalPlayer:GetAttribute("HT_TrainingFree")
+					== true
+				then 0
+				else move.cfg.Cooldown)
 			and move.remote ~= nil
 	end
 
@@ -308,7 +311,10 @@ function CombatController:KnitStart()
 
 	-- For the HUD: when the uppercut can be thrown again, and whether the body can swing at all.
 	self._uppercutTiming = function(): (number, number, boolean)
-		return math.max(heavies.Uppercut.last + upperCfg.Cooldown, readyAt()),
+		local wait = if Players.LocalPlayer:GetAttribute("HT_TrainingFree") == true
+			then 0
+			else upperCfg.Cooldown
+		return math.max(heavies.Uppercut.last + wait, readyAt()),
 			upperCfg.Cooldown,
 			canPunch(player.Character)
 	end
@@ -321,9 +327,10 @@ function CombatController:KnitStart()
 		if not move then
 			return 0, 1, false
 		end
-		return math.max(move.last + move.cfg.Cooldown, readyAt()),
-			move.cfg.Cooldown,
-			canPunch(player.Character)
+		local wait = if Players.LocalPlayer:GetAttribute("HT_TrainingFree") == true
+			then 0
+			else move.cfg.Cooldown
+		return math.max(move.last + wait, readyAt()), move.cfg.Cooldown, canPunch(player.Character)
 	end
 	self._isSkill = function(side: string): boolean
 		return heavies[side] ~= nil
