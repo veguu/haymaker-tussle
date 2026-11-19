@@ -1,6 +1,6 @@
 --!strict
 -- UltimateController - the ultimate on this client (2026-11-15; server UltimateService, choreography
--- Core/Ultimates, looks Fx/UltimateFx and Fx/ImpactFrame, notice and badge Ui/UltimateNotice).
+-- Core/Ultimates, looks Fx/UltimateFx and Fx/DrawnImpact, notice and badge Ui/UltimateNotice).
 --
 -- G (gamepad DPadUp, a touch button) inside the follow-up window asks for it; nothing else does.
 -- When one starts (UltimateStarted), every client plays its cues and the attacker's swings. If this client
@@ -21,7 +21,7 @@ local UltimateNotice = require(script.Parent.Parent.Ui.UltimateNotice)
 local SoundPicker = require(script.Parent.Parent.Ui.SoundPicker)
 local CutsceneScreen = require(script.Parent.Parent.Fx.CutsceneScreen)
 local FxKit = require(script.Parent.Parent.Fx.FxKit)
-local ImpactFrame = require(script.Parent.Parent.Fx.ImpactFrame)
+local DrawnImpact = require(script.Parent.Parent.Fx.DrawnImpact)
 local UltimateFx = require(script.Parent.Parent.Fx.UltimateFx)
 
 local cfg = GameConfig.Ultimate
@@ -43,8 +43,13 @@ local UltimateController = Knit.CreateController({
 -- ScreenGui but the cutscene's own is switched off, AGAIN EVERY FRAME (several HUD pieces switch themselves back
 -- on), and exactly those are switched back on under the end's black dip. The Roblox core UI goes too.
 local StarterGui = game:GetService("StarterGui")
-local CUTSCENE_GUIS: { [string]: boolean } =
-	{ HT_CutsceneBlack = true, HT_ImpactFrame = true, HT_ImpactWarm = true }
+local CUTSCENE_GUIS: { [string]: boolean } = {
+	HT_CutsceneBlack = true,
+	HT_ImpactFrame = true,
+	HT_ImpactWarm = true,
+	HT_DrawnImpact = true,
+	HT_DrawnWarm = true,
+}
 
 local function hideUi(hidden: { [ScreenGui]: boolean })
 	local playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
@@ -478,9 +483,9 @@ function UltimateController:KnitStart()
 				last = now
 				local speed = tonumber(replay:GetAttribute("Scale")) or 1
 				t += step * speed
-				-- the effects and the impact cards run on real time: slow them to the same pace
+				-- the effects and the drawn impact frames run on real time: slow them to the same pace
 				FxKit.studySlow(1 / math.max(speed, 0.05))
-				ImpactFrame.studySlow(1 / math.max(speed, 0.05))
+				DrawnImpact.studySlow(1 / math.max(speed, 0.05))
 				local stopAt = tonumber(replay:GetAttribute("Hold"))
 				if stopAt and t > stopAt then
 					t = stopAt
@@ -496,7 +501,7 @@ function UltimateController:KnitStart()
 				end
 				me:SetAttribute("HT_Ultimate", nil)
 				FxKit.studySlow(1)
-				ImpactFrame.studySlow(1)
+				DrawnImpact.studySlow(1)
 				if theirRoot.Parent then
 					theirRoot.CFrame = theirStart
 				end

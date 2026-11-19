@@ -3773,10 +3773,16 @@ drawing-technique study. Nothing here is uploaded to Roblox or wired into `Impac
   - No scribble loops.
   - The torso's middle is the focus, with the framing as before.
   - The head and arms only peek in at the edges.
-- **IN PROGRESS:** the latest `Plunge.cs` rewrite (shadow-shape hatching, searching lines) rendered one frame that is
-  too faint and has not been shown to the owner. Next steps:
-  - stronger shadow shapes and contact accents;
-  - render all 8 frames;
-  - run `bash design/vfx/impact/make_previews.sh` and show the owner.
+- **The fist impact was ACCEPTED** ("Looks good", 2026-11-18). How it's drawn:
+  - shadow-only row hatching and thin searching edges;
+  - rounded R6 parts;
+  - the head and arms in the Fold pose, peeking in.
+  Previews: `bash design/vfx/impact/make_previews.sh`.
+- **NEXT (needs the owner's go-ahead):**
+  - pack both sequences into flipbook sheets;
+  - upload them (Studio `upload_image`, owner's OK first);
+  - wire them into `ImpactFrame.luau` / `UltimateFx.luau` as the two runs (contact, and fist plunge before the
+    knockback), replacing the three-run structure;
+  - slow the final punch with a longer sink, and update the knockback test.
 - **Outputs:** `design/vfx/study/out` and `design/vfx/impact/out` are ignored except the final sheets and previews. The
   `ours-kits-*` recordings stay local (ignored).

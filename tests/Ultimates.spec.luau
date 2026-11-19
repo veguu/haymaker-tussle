@@ -198,10 +198,11 @@ return {
 			if freeze then
 				frozen += 1
 				-- a SLOWED hit (kits-7m, the haymaker: the owner asked for slow motion "so you can feel the weight")
-				-- runs longer, its bodies creep on, and the camera zooms in instead of snapping
+				-- runs longer, its bodies creep on, and the camera zooms in instead of snapping (kits-8e: up to 1.8 s, the
+				-- owner's "the part where the fist sinks in should be longer")
 				local slowed = blow.slow ~= nil
 				assert(
-					freeze >= 0.15 - 1e-6 and freeze <= (if slowed then 1 else 0.4),
+					freeze >= 0.15 - 1e-6 and freeze <= (if slowed then 1.8 else 0.4),
 					`freeze at {blow.t} out of the measured range`
 				)
 				if not slowed then
@@ -479,21 +480,33 @@ return {
 		-- an ease-out to 4 studs/s and a jump to 56-101 as the flight took over, and a 46 deg snap in its turn.
 		local line = Ultimates.TIMELINES.Base
 		local start = Vector3.new(0, 0, 12)
-		local haymaker = 0
+		-- kits-8e, the owner: "the part where the fist sinks in should be longer". So the sink, from the hit to the blast,
+		-- may be slow, but it never stops; after the blast it is fast at once and speeds up into the flight.
+		local haymaker, blast = 0, 0
 		for _, cue in line.cues do
 			if cue.name == "haymaker" then
 				haymaker = cue.t
+			elseif cue.name == "blast" then
+				blast = cue.t
 			end
 		end
+		assert(blast - haymaker >= 1.2, `the sink lasts {blast - haymaker} s`)
 		local step = 1 / 60
 		local t = haymaker + step
+		local fastest = 0
 		while t < line.cinematic do
 			local _, a = Ultimates.pose(line, t - step, start)
 			local _, b = Ultimates.pose(line, t, start)
 			local speed = (b - a).Magnitude / step
-			assert(speed > 2, `the target stalls at {t} ({speed} studs/s)`)
+			if t <= blast + 1e-6 then
+				assert(speed > 0.6, `the target stalls in the sink at {t} ({speed} studs/s)`)
+			else
+				assert(speed > 2, `the target stalls after the blast at {t} ({speed} studs/s)`)
+				fastest = math.max(fastest, speed)
+			end
 			t += step
 		end
+		assert(fastest > 10, `the knockback only reaches {fastest} studs/s after the blast`)
 		-- the flight leaves at the speed the knockback reached, and its turn goes on from the last pose
 		local anchor = CFrame.new(0, 0, 0)
 		local _, last = Ultimates.pose(line, line.cinematic, start)
@@ -514,6 +527,36 @@ return {
 		)
 		local _, snap = (posed.Rotation:Inverse() * first.Rotation):ToAxisAngle()
 		assert(math.deg(snap) < 2, `the turn snaps {math.deg(snap)} deg`)
+	end,
+
+	["two drawn impact runs: contact on the hit, the plunge ending on the blast (kits-8e)"] = function()
+		-- the owner: "there should only be 2 impact frames, the initial connection and then right before the knockback"
+		local line = Ultimates.TIMELINES.Base
+		local at: { [string]: number } = {}
+		for _, cue in line.cues do
+			assert(
+				cue.name ~= "soak" and cue.name ~= "release",
+				`the old card run "{cue.name}" is still cued`
+			)
+			at[cue.name] = cue.t
+		end
+		assert(at.haymaker and at.plunge and at.blast, "haymaker, plunge and blast are all cued")
+		assert(
+			math.abs(at.plunge + Ultimates.drawnLength("plunge") - at.blast) < 1e-6,
+			"the plunge ends as the knockback goes full speed"
+		)
+		assert(
+			at.plunge - (at.haymaker + Ultimates.drawnLength("contact")) >= 0.8,
+			"the slow sink shows between the two runs"
+		)
+		assert(
+			near(Ultimates.drawnLength("contact"), 10 / 30, 1e-6),
+			"contact: 10 frames at 30 fps"
+		)
+		assert(
+			near(Ultimates.drawnLength("plunge"), 8 / 24 + 0.1, 1e-6),
+			"plunge: 8 at 24 fps, last held 0.1 s"
+		)
 	end,
 
 	["the anchor faces outward from the arena's middle"] = function()

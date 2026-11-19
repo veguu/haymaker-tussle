@@ -211,14 +211,30 @@ local HAYMAKER = TAKEOFF + 0.23 -- the contact, as the dash arrives
 local FACE = HAYMAKER - 0.11 -- the cut to both for the last of the dash, then the zoom onto the fist and torso
 local RELEASE = HAYMAKER - 0.07 -- the cocked fist snaps out (HaymakerUp 0.38-0.45)
 local DIP = HAYMAKER - 0.15 -- every sound cut
--- kits-8c, the owner: "3 impact frame moments, one in the initial contact and then another as the torso soaks the impact
--- of the fist, and then a final one right before the target flies away". The slow part runs 0.8 s with three card runs
--- (UltimateFx CONTACT_FRAME, SOAK_FRAME, RELEASE_FRAME) and the body MOVING under and between them all the while.
-local HAY_CARDS = 0.2 -- the contact cards
-local SOAK = HAYMAKER + 0.38 -- the soak cards (0.15 s): the fist sunk in, the fold deepest
-local SLOW_TO = HAYMAKER + 0.8 -- the slow part: the knockback in slow motion, the body MOVING away all through it
-local RELEASE_CARDS = SLOW_TO - 0.2 -- the release cards (0.2 s), right before they fly
-local HAY_SLOW = 0.3 -- how fast the follow-through plays meanwhile (of real speed)
+-- kits-8e (2026-11-18), the owner: "there should only be 2 impact frames, the initial connection and then right before
+-- the knockback", drawn by hand (design/vfx/impact: the pencil ink burst and the fist plunge, accepted "Looks good"),
+-- played as pre-rendered frames by Fx/DrawnImpact. Their lengths, here so the timeline and the player agree:
+--   contact  10 frames at 30 fps (0.333 s), on the hit
+--   plunge   8 frames at 24 fps and the last held 0.1 s (0.433 s), ending as the knockback goes full speed
+local DRAWN = {
+	contact = { frames = 10, fps = 30, hold = 0 },
+	plunge = { frames = 8, fps = 24, hold = 0.1 },
+}
+local function drawnLength(name: string): number
+	local run = DRAWN[name]
+	return run.frames / run.fps + run.hold
+end
+Ultimates.DRAWN = DRAWN
+Ultimates.drawnLength = drawnLength
+local HAY_CARDS = drawnLength("contact") -- the contact frames
+-- the owner (kits-8e): "the last punch happens too fast", "the part where the fist sinks in should be longer". The slow
+-- part runs 1.62 s (it was 0.8): the same sink, stretched, about 0.85 s of it between the two drawn runs.
+local SOAK = HAYMAKER + 0.38 -- the fist sunk in, the fold deepest (a key only now; no cards)
+local SLOW_TO = HAYMAKER + 1.62 -- the slow part: the knockback in slow motion, the body MOVING away all through it
+local PLUNGE = SLOW_TO - drawnLength("plunge") -- the fist plunge frames, right before they fly
+-- how fast the follow-through plays meanwhile (of real speed): halved with the slow part doubled, so the fist drives
+-- through the same stretch of the clip, only slower
+local HAY_SLOW = 0.15
 local BLAST = SLOW_TO -- full speed: the blast, and the cut to the throw line
 local THROWN = BLAST + 0.3 -- the flight takes over, at the speed the knockback has reached
 local HOOK_STRIKE = 0.16 -- AnimClips HookLeft/HookRight `strike`
@@ -269,7 +285,7 @@ local HAY_FOLD = 360 -- upright: the Fold clip's own 28 deg puts the chest squar
 -- the knockback (kits-8a): along the drive, out and up; the target's root moves this far in each part
 local THROW_DIR = Vector3.new(0, 0.5, -1).Unit
 local THROW_TO_SOAK = 1.05 -- from the contact to the soak (about 2.8 studs a second, never still)
-local THROW_SLOW = 1.15 -- from the soak to full speed (the same pace)
+local THROW_SLOW = 1.15 -- from the soak to full speed (kits-8e: over 1.24 s now, about 0.9 studs a second: the sink)
 local THROW_FAST = 4.5 -- full speed: from there into the flight without a stop (Ultimates.flight)
 
 -- where the dash starts and the launch parks them (anchor space; the same numbers rushKeys builds), for the dash shot
@@ -461,8 +477,7 @@ local function rushCues(): { { t: number, name: string } }
 			{ t = HAYMAKER - 0.45, name = "darken" },
 			{ t = DIP, name = "dip" },
 			{ t = HAYMAKER, name = "haymaker" },
-			{ t = SOAK, name = "soak" },
-			{ t = RELEASE_CARDS, name = "release" },
+			{ t = PLUNGE, name = "plunge" },
 			{ t = BLAST, name = "blast" },
 			{ t = THROWN, name = "launch" },
 		}
@@ -683,7 +698,7 @@ local HAYMAKER_RUSH: Timeline = {
 			insert = true,
 			ease = "whip",
 		},
-		-- held almost still into the contact and under the impact frames (the cards draw from their own side view)
+		-- held almost still into the contact and under the drawn contact frames (they cover the screen)
 		{
 			t = HAYMAKER + HAY_CARDS,
 			cam = Vector3.new(4.3, -0.98, 0.6),
