@@ -3595,6 +3595,488 @@ touched for this piece. The owner stopped the work here to carry on in a new cha
   round_go; an upload he must approve) and roles in `Config/SoundBank.luau`; (3) the row must not appear until
   the fight starts (it already waits for the phase Fighting).
 - A local preview server I started for the mockup (python http.server, port 8765) is STOPPED.
+- 2026-11-17, NEW CHAT: CHECKED AND PUBLISHED (artifact version 25). Step (1) above is done; WAITING FOR THE OWNER'S YES
+  before anything in Roblox.
+  - Changed while checking: the thrown pieces are 10 a beat (were 8), fly further (reach 215, was 150: they stayed on
+    top of the digit), come from BEHIND the number (`.cd .cf{z-index:-1}`) and last 0.85 s on a beat (1.2 s was cut
+    off by the next beat); a line about the countdown's sounds in the Sound note.
+  - How it was checked: every animation of a beat paused and set to a chosen time (`getAnimations({subtree:true})`,
+    `currentTime`), then captured: the slam-in at 90 ms, settled with pieces out at 330 and 700 ms, the knock-away at
+    900 ms, TUSSLE! letters landing at 200 / 700 ms and whole at 1200 ms. A real press of Start a round: 3, 2, 1,
+    TUSSLE! each on its second, cleared at 4.35 s, the audio context running, both sounds built, no console errors.
+  - NOT CHECKED: the motion in real time (the browser pane's animation clock does not advance; stills only), the
+    sounds by ear, the Phone layout, Motion off.
+  - The browser caches the file: reload with `?v=N` after an edit when previewing locally.
+- LATER THE SAME DAY: THE OWNER SAID YES ("everything's fine including the style ... you can build it, just remove
+  the lines part for the countdown and the tussle", with a picture of the slanted ink bar). The bar (`cbar`) is out
+  of the mockup, published as artifact version 26. The thin screen-edge pulse on TUSSLE! is kept (he showed only the bar).
+  STOPPED AT A USAGE LIMIT. NO GAME CODE WRITTEN YET, NOTHING UPLOADED, NOTHING SYNCED, NOTHING COMMITTED.
+  - UPDATE, NEXT TURN: THE OWNER SAID "Yes, upload". ALL 5 UPLOADED to group 2970443 with `open_cloud_invoke`
+    ("Reviewing" at upload): countdown_sheet 101250510173451 (Image), cd_3 94564587273247, cd_2 75392261806381,
+    cd_1 124811278249045, round_go 130821106950645 (Audio). THE CODE BELOW IS WRITTEN as planned (`HudLogic.strip`
+    hides in Starting, `HudLogic.countBeat` / `countLate` with specs; `Shapes.ids.count`, `Shapes.count`;
+    `Callouts.count` / `go` / `countStop`, `confetti` takes seconds, wait and layer; four SoundBank roles;
+    `HudController.countRefresh`). Pulled spicycaik's 45d97b0 / 624e214 (kits-8a..8b) first: HANDOFF.md and the two
+    stamps overlapped, so my copies went to `work/pre-pull-backup-20261118d/`, the three files were put back to
+    HEAD, pulled fast-forward, my HANDOFF notes re-applied as a patch. Stamp on disk `kits-8b+lobby-4+ui-16a`,
+    557 tests, stylua, selene, build and gen_config --check green.
+    NOT SYNCED, NEVER RUN, NOT COMMITTED: Studio was in a play test that `start_stop_play` could not end (it
+    answered "Game Stopped" three times, the mode stayed Play, the play server could not be reached; a fight was
+    on screen). NEXT: with Studio in Edit mode, `rojo_push.py --studio title --check`, sync if only my scripts
+    differ (his kits-8a..8b scripts will differ too if he has not synced them: then they come from the repo,
+    which is right), play test the start of a round, look closely, save the place.
+  - DONE 2026-11-18, AFTER THE OWNER STOPPED THE PLAY TEST: ui-16a IS SYNCED, SEEN RUNNING, PLACE SAVED v495, NOT
+    COMMITTED. Pulled spicycaik's a16338f (kits-8c..8d) the same way first (backup
+    `work/pre-pull-backup-20261118e/`). Build `kits-8d+lobby-4+ui-16a`, 558 tests, gates green, 185 scripts match;
+    `--check` before each of the three syncs showed only my own scripts differing.
+    - THE OWNER, WHILE IT RAN: "remove the effects for the numbers ... keeping the number is fine but just remove
+      the little confetti effects". NO pieces on 3, 2, 1 now (game and mockup, artifact version 27); the word keeps
+      its 22. `Callouts.count(beat, small)` no longer takes a tone.
+    - CHANGED AFTER SEEING IT: the countdown's centre is at 0.38 of the height (at 0.32 the "!" card touched the
+      fighters' row, which comes up as the word lands); the number's fade-in is latched (the spring dips under 1
+      after its overshoot); the sheet is fetched at start (`Callouts.start()` is called when the HUD is built:
+      PreloadAsync, and one all-but-clear dot of it kept on screen as "Warm", because the first number of the
+      first round reported itself unloaded for 0.1 to 0.19 s).
+    - SEEN in my play tests (Studio, 1182 x 536): a real round start logged frame by frame: 3 at -2.98 s, 2 at
+      -1.99, 1 at -0.99, each gone about 0.98 s later, TUSSLE! at +0.01 for 1.31 s, no pieces on the numbers; the
+      four sounds loaded (0.33 / 0.33 / 0.33 / 0.68 s). Frozen pictures: the "3" settled; TUSSLE! whole, sharp at
+      native pixels, clear of the row by about 35 px after the move.
+    - NOT SEEN OR HEARD: the motion by eye and the sounds by ear (numbers and stills only); whether the first
+      number now draws on its first frame (the "Warm" dot loaded; no round start was logged after it); a phone;
+      Reduced Motion; a second real player; the menu open during a start; a start called off half way.
+    - THE OWNER NEXT: "For the numbers, i want less effects compared to the tussle, but make each number unique
+      ... doesn't have to be a big change". WRITTEN, GATES GREEN (558), ON THE WEBSITE (artifact version 28), NOT
+      SYNCED: Studio was in a play test of his that I could not stop again. `COUNT_MOVE` in Callouts (the mockup's
+      `CDM`): 3 slams in from 3.6 times and is knocked down (as before); 2 drops from 260 above at 1.5 times, bumps
+      as it lands (`BUMP`, up and down) and is flicked off to the right; 1 springs up from 0.15 times, no shake,
+      and swells upward into the word. No pieces on any. NEXT: Edit mode, fetch, `--check` (only Callouts should
+      differ), sync, watch one round start, save the place.
+    - THE OWNER NEXT: "change the vfx of it, it should be MORE aggressive, cuz its counting down getting ready to
+      fight, not getting ready to attend a tea party ... still keep the vfx with the same style of the game".
+      REWRITTEN (this replaces the paragraph above: the spring-in moves are gone), GATES GREEN (558), ON THE
+      WEBSITE (artifact version 29, frozen frames of 3, 2, 1 and TUSSLE! looked at), NOT SYNCED (his play test
+      again), NOT COMMITTED. The whole countdown section of `Callouts.luau` was replaced:
+      - A NUMBER COMES FAST AND HITS: 0.13 s in on ease-in (`HIT`) to 0.84 of its size (`HIT_SIZE`), then 0.34 s on
+        the spring back to 1; at the hit a hard shake (`jolt`, `JOLT`, 22 units the way it came) and IMPACT LINES
+        (`slashes`: ink-edged bars 12 thick in the number's colour and ink, alternating, that shoot out from
+        behind it and are drawn away in 0.3 s). `COUNT_MOVE`: 3 slams in from 3.6 times, ten lines all round,
+        knocked down; 2 crashes down from 300 above, six lines kicked out low to both sides (80 under its
+        centre), flicked off right; 1 punches in from 420 to the left, five lines fanned forward to the right,
+        swells up into the word.
+      - THE WORD: each card hits in 0.1 s (from 150 above, twice its size, to 0.88) 0.035 s apart and springs
+        back; when the last lands (0.31 s, `WORD_HIT`) the word punches to 1.12 (`GO_SIZE`), shakes (26, 14),
+        throws 16 lines on an oval (`flat` 0.5) and 20 SHARDS (`shards`: 34 x 10 ink-edged slivers, tumbling,
+        0.55 s) in place of the confetti. The edge bars still pulse. `confetti`'s three optional arguments are
+        now unused.
+      - DONE LATER THE SAME DAY (the owner stopped his play test): SYNCED three times (`--check` each time: only
+        Callouts differed; origin had not moved), SEEN RUNNING, PLACE SAVED v497, NOT COMMITTED.
+        CHANGED AFTER SEEING IT: the word's 16 lines and 20 shards went all round and crossed the fighters' row,
+        which comes up at that moment; they now fan to the sides and DOWN only (lines `fan(16, -8, 188)`, shards
+        0 to 180 degrees; highest box top 164 of 536 px, the row ends about 148). A line on the squashed ring is
+        turned to point straight away from the middle. Lines 14 thick on a number, 16 on the word. The 2's six
+        lines are ordered so the two sides' colours mirror each other. Mockup the same (artifact version 31).
+        SEEN: a real round start logged every frame (3 at -2.99 s, 2 at -1.98, 1 at -0.98, TUSSLE! at +0.01 for
+        1.32 s; 16 lines and 20 shards; the first number's image loaded one frame after it was made); frozen
+        pictures of the 2 just after its hit (lines clean at native pixels) and of TUSSLE! before and after the
+        fan. MEASURED (Studio, 1182 x 536): average frame 14.7 ms over the whole countdown in one run; in
+        another, idle 21.0 and 22.8 ms against 20.3 ms while TUSSLE! played and 18.5 ms on a number: no cost
+        that shows above the noise. NOT SEEN OR HEARD: the motion by eye, the sounds by ear, a phone, Reduced
+        Motion, a full row of 25 with the word under it.
+    - THE OWNER NEXT (2026-11-18): "since you changed the style, can u change it for everything ELSE ... the ones
+      that pop up on ur screen during ur fight in the arena, like 5 4 3 2 players left ... I want it to be
+      different, show me what u can do", ON THE WEBSITE. DONE IN THE MOCKUP ONLY (artifact version 32; the page
+      before it is `UI Research/fight-poster-prototype.before-popups.html`). NOTHING OF THIS IS IN ROBLOX: the
+      game's `Callouts.ultimate` and `Callouts.last` are still the old look (streak, slanted bar, confetti). WAIT
+      FOR HIS WORD before building it.
+      - One way of saying things: WORDS are cut-out letter cards that hit one after another, straight at you
+        (`.kr`, `kcards()`, `khit`: 2.5 times to 0.88, then the spring back; they do NOT drop from above, that
+        crossed the top strip); a NUMBER is a big rough-cut tile that slams in (`.lnw` / `.lnc`, the menu tiles'
+        cut); each hit shakes the pop-up (`cjolt`) and throws impact lines (`fxLines`, `.sl2`); the big moments
+        throw shards (`fxShards`, `.sh2`). Lines and shards fan to the sides and down only. No bars, no streak,
+        no confetti.
+      - LAST PLAYERS (`lastCall`): the number tile in the count's colour (yellow at 5 and 4, pink at 3 and 2), an
+        ink tag FIGHTERS over LEFT in cards; at two the order turns round, FINAL in cards then the 2, tag TWO LEFT
+        (my wording, not the owner's), more lines, shards, a bigger shake. It is knocked off to the RIGHT at the
+        end (`lc2`), no longer up into the strip.
+      - ULTIMATE READY (`gotUlt`): ULTIMATE in cards, lines and shards as the last one lands, READY with the key as
+        a yellow rough-cut tag that hits after (`.rtw` / `.rtag`). It still flies down toward the badge.
+      - USING THE ULTIMATE (`fire`): no band; the class's name in 112 px cards, lines, shards, punched off to the
+        right (`.cband2`, `cb2`).
+      - CHECKED: frozen frames of 5, 2, ULTIMATE (mid and settled) and the class name; the script parses; no
+        console errors. NOT CHECKED: the motion in real time, the Phone layout (`zoom: .72` on the three),
+        Motion off, 4 and 3.
+      - TO BUILD IT IN ROBLOX LATER: the cards, `slashes`, `shards` and `jolt` already exist in `Callouts.luau`
+        (the countdown's); the number tile can use `Shapes.ids.tile` with the big numbers of `Shapes.last`; the
+        letters L E F T F I N A are NOT on any sheet at card size except through `Poster.word("words", "ult:..")`
+        (U L T I M A E only), so new lettering and an upload he must approve. In the game these stand small under
+        the strip and glide left to right (his rule): keep that, change only what is drawn.
+    - To freeze a frame for a picture: in the Client, `require` Callouts and Poster, call `Callouts.go(...)`,
+      wait, then `Poster.stop("go" .. n)` for n = 1..300 (the command's own module copies, its own HT_Callouts
+      layer); `Callouts.countStop()` clears it.
+  - MADE ON DISK (5 files, now uploaded): `assets/icons/poster/countdown_sheet.png` (1024 x 600, 32910
+    bytes; from NEW `design/ui/poster_countdown.html`: cells 256 x 400 in the order 3 2 1, full colour; from y 400
+    cells 128 x 200 in the order T U S L E !, WHITE, drawn at 160 px for the mockup's 128, so shown at 1 / 1.25);
+    `assets/sfx/ui/cd_3.wav`, `cd_2.wav`, `cd_1.wav` (0.33 s, 29150 bytes each), `round_go.wav` (0.68 s, 60020
+    bytes), from `make_ui_sounds.py` (new `beat()`, `go()`, `COUNTDOWN`). Mock peaks 0.378 / 0.318 / 0.350 / 0.366:
+    SoundBank `volume` about 0.75 for the beats, 0.8 for the go (peak x 2.2, the punchy rule).
+  - MEASURED (mockup px): number boxes 3: 129 x 238, 2: 129 x 238, 1: 96 x 238; TUSSLE! letter widths at 128 px
+    T 57.0, U 75.3, S 65.8, L 56.7, E 57.2, ! 32.9 (a card is its letter + 34 wide, 138 tall, 7 apart).
+  - THE PLAN FOR THE CODE:
+    - `HudLogic.strip`: phase "Starting" returns NOT visible (fix the two spec lines at tests/HudLogic.spec 33 and
+      42). New pure `HudLogic.countBeat(now, finish, goSeconds)`: 3 / 2 / 1 in the last three seconds, 0 for the
+      word just after, else nil; with specs.
+    - `Shapes`: `ids.count` and `Shapes.count` (cells and the letter widths above).
+    - `Callouts`: `count(beat, tone, small)`, `go(tone, small)`, `countStop()`. NOT on `stage()` (no glide): one
+      holder at the top centre (about 0.32 of the height, HUD scale x 0.8, x 0.6 on a phone), each beat destroys
+      the one before. Number: 0.62 s spring from 3.6 times, turned -18 (odd) or 16 (even); a 0.34 s shake (`SHAKE`);
+      at 0.78 s knocked away in 0.2 s (down 46, to 0.45, turned, fading). 10 pieces behind it (give `confetti`
+      optional seconds 0.85, wait 0.04, ZIndex 1; reach 215 to 387). Word: 7 cards (shadow 8, 9; ink edge 5; face
+      paper / class / coin, the "!" pink with a cream glyph), 0.55 s drop each 0.04 s apart, row turned -4; the
+      whole word over 1.3 s: rest to 74 %, 0.94 at 82 %, 1.7 and gone at 100 %; 22 pieces (250 to 450);
+      `Callouts.edges(tone)`. NO bar. Reduced Motion: shown still, gone after about 0.9 s.
+    - `UiSound.play("cd_3" / "cd_2" / "cd_1" / "round_go")`, four roles in `Config/SoundBank.luau`.
+    - `HudController.refreshStrip`: on phase "Starting" with a `CountdownEnd`, arm one thread that polls
+      `HudLogic.countBeat` and shows each beat once (skip a number first seen more than 0.5 s late; numbers only
+      while Starting, the word while Starting or Fighting; not under the open menu; not in training); disarm and
+      `countStop()` when the phase is anything else. Update the comment at line 1276 and the build stamp
+      (`init.client.luau`, `init.server.luau`: ui-16a).
+
+## ui-17a (2026-11-18): the fight's pop-ups in the countdown's style: WRITTEN, GATES GREEN, IMAGE UPLOADED, NOT SYNCED, NEVER RUN
+ui-16a (the countdown, place v497) is still NOT committed; this sits on top of it. Stamp on disk
+`kits-8d+lobby-4+ui-17a`, 558 tests, stylua, selene (0 warnings) and the build green. NOT SYNCED: Studio was in a
+play test of the owner's that `start_stop_play` could not end (the fourth time today; see memory
+`haymaker-stop-play-can-fail`). NEXT: Edit mode, fetch, `rojo_push.py --check` (Callouts, Shapes, HudController and
+the two stamps should differ, nothing else), sync, then LOOK at each pop-up (below), save the place.
+- THE OWNER: "Yes, build them" (the restyle he saw on the website, artifact version 32) and "Yes, upload it".
+- UPLOADED to group 2970443 (`open_cloud_invoke`, "Reviewing"): `assets/icons/poster/card_letters.png`, 1024 x 720,
+  35331 bytes, id 103788059570384, from NEW `design/ui/poster_cards.html`: A to Z and "!" in cells of 144 x 180,
+  seven to a row, WHITE, drawn at 144 px for the reference 128. `Shapes.ids.cards`, `Shapes.cards` (cell, perRow,
+  scale, size, each letter's width at 128 px).
+- `Callouts.luau`: the old `band`, `confetti`, `stamp`, the old `ultimate` and `last` are DELETED. New, after the
+  countdown's section (they use its `fan`, `slashes`, `shards`, `JOLT`, `HIT`, `CARD_*`):
+  - `cardRow(key, text, size, alt, wait, gap)`: a word in letter cards that hit one after another, straight at
+    you (2.5 times to 0.88 in 0.1 s, the spring back); returns the row UNPARENTED, its size and when the last
+    card lands. `live(...)`: the pop-up's glide in from the left, drift and leaving to the right, with one hard
+    shake. `slam(...)`: a piece that comes at you and hits. `quad(...)`: a rough-cut shape with edge, fill, shadow.
+  - `Callouts.ultimate(tone, key, done)` (same signature): ULTIMATE in 74 px cards from 0.25 s, lines (14, flat
+    oval) and 16 shards as the last lands, READY and the key on a yellow `badge` quad that slams in 0.16 s later.
+  - `Callouts.last(count, small, done)` (same signature): the number from `Shapes.last` on a `tile` quad in the
+    count's colour (yellow at 5 and 4, pink at 3 and 2) that slams in at 0.3 s; an ink tag (FIGHTERS; straight,
+    not turned: small turned text is drawn soft) over LEFT in 92 px cards; at two FINAL in 104 px cards first and
+    the 2 after, tag TWO LEFT (my wording), 13 lines, 16 shards, a bigger shake. Stage size 0.46 (phone 0.38):
+    a guess, not seen.
+  - NEW `Callouts.className(name, tone, small)`: the class's name in 112 px cards, 18 lines, 24 shards, 1.7 s.
+    `HudController.onCharacter` calls it when your character's `HT_Ultimate` becomes "attacker" (UltimateService
+    sets it) and no menu is open. NOT KNOWN: whether the HUD's layers show during the ultimate's cutscene.
+  - Everything still stands small under the strip and glides left to right (the owner's rule); lines and shards
+    fan to the sides and down only.
+- TO LOOK AT WHEN IT RUNS (none of it has been seen in the game): the tile's number sitting right in its quad
+  (the sheet's numbers carry their own hard shadow); the tag's width and place at two (right-aligned); the cards'
+  letters centred; the READY tag's words and key; sizes against the strip and the row; each at native pixels;
+  the class name during a real ultimate; a frame's cost while FINAL 2 lands.
+- DONE LATER THE SAME DAY (the owner stopped his play test): SYNCED twice (`--check` each time: only my own
+  scripts differed; origin had not moved), SEEN RUNNING, PLACE SAVED v499, NOT COMMITTED (ui-16a and ui-17a both).
+  - SEEN in my play tests (Studio, 1182 x 536), each called by hand from the Client and frozen for a picture:
+    "5" on its yellow tile with FIGHTERS over LEFT (clean at native pixels, clear of a row of 25); FINAL in cards
+    with the pink "2" tile and TWO LEFT right-aligned over it; ULTIMATE with its lines mid-flight and the READY tag
+    mid-hit, then settled with READY and the G key; TEMPEST with lines and shards. The CLASS NAME THROUGH THE REAL
+    HOOK: `HT_Ultimate` set to "attacker" on my character for 0.05 s in a fight, and the game's own HUD showed
+    BASE in cards with shards (my kit attribute was nil: Base).
+  - CHANGED AFTER SEEING IT: with few fighters left the row's tiles are bigger, and ULTIMATE and the class name
+    stood on them. NEW `Callouts.under(pixels)`: `HudController.layout()` tells the pop-ups the row's bottom edge
+    (`SS.Top + roster.tall * scale`) while the row is up, and `stage()` starts 16 px under whichever is lower,
+    that or the strip. Seen after: BASE about 36 px clear of a row of 25. The READY tag slams in from twice its
+    size, not three times (its corner swept over the row).
+  - NOT SEEN OR MEASURED: any of them in motion by eye; 4 and 3; the last-players and ULTIMATE pop-ups after the
+    `under` fix (same `stage()`, so they should sit the same); a row of few (big tiles) after the fix; a real
+    ultimate (whether the HUD shows during its cutscene, and the kit's real name and colour); the frame cost of
+    FINAL 2 (the countdown's TUSSLE!, with more pieces, cost nothing that showed); a phone; Reduced Motion.
+  - THE OWNER SAW "Version mismatch detected. Please restart Roblox Studio." in Studio's Assistant panel and asked
+    me to restart Studio once done (he allowed controlling the PC for it). See the end of this section.
+  - STUDIO RESTARTED (2026-11-18, after the save of v499): closed with a plain `taskkill /PID` (no /F; it took
+    about 20 s and asked nothing), reopened with
+    `cmd /c start "" "roblox-studio:1+launchmode:edit+task:EditPlace+placeId:136102156542862+universeId:10774434705"`.
+    About 45 s later the connector listed it again in Edit mode (a NEW studio id), `--check` passed with 185
+    scripts matching, and the Assistant panel showed no warning (it read ef6b1b3 with the warning before, 9bb6530
+    after). Rojo's server on 34872 was left running throughout.
+- ALSO ON THE WEBSITE ONLY (artifact version 33), the owner: "for the uis that have a frame with words in them
+  ... make it so theres no frames ... especially for the moves section ... just change maybe the moves on the
+  website before we import it". MOVES WITHOUT FRAMES in the mockup (`.mvs`, `.mv`, `.mk`): the key on a small
+  cream rough-cut tile, the name as poster lettering (cream, 4 px ink outline = about 7 % of its size, per the
+  vault note "UIStroke on Text - Glyph Counters and the Stroke Ratio", hard shadow), its line in plain ink on the
+  field; the game's own wording. Checked as one still. NOT in Roblox; waiting for his verdict. The other framed
+  rows (Classes' skill rows, More) are unchanged.
+## ui-18a (2026-11-18): rows without frames, the toast at the top centre: SYNCED, SEEN (NOT COMMITTED)
+Build `kits-8d+lobby-4+ui-18a`, 558 tests, gates green, 185 scripts match, place saved v502.
+ui-16a, ui-17a and ui-18a are ALL uncommitted. `--check` before each of the two syncs showed only my own scripts.
+LATER THE SAME DAY, ON THE OWNER'S "yup go ahead": ui-16a, ui-17a AND ui-18a ARE COMMITTED AND PUSHED as d01e75b
+(20 files; origin had not moved; gates green just before). Only this note was added to HANDOFF.md after it.
+- THE OWNER, after seeing the Moves page without frames on the website: "its GOOD, I LIKE EVERYTHING ... now when
+  you build also fix the popup when stuff happens ... in roblox it makes the white popup on the left side of the
+  screen, i like it how it is in the screenshot, right in the middle on the top of ur screen" (a picture of the
+  mockup's toast under the strip) and "apply that same new style to anything thats applicable".
+- ROWS WITHOUT FRAMES: `PosterKit.row` is rewritten (same arguments, same heights), so Moves, More and the two
+  skill rows on Classes all changed at once. No slanted ink plate (`TAN6` is gone; `row.plate` is an empty box).
+  The key is on a cream `tile` quad with an ink edge and a hard shadow (straight); the name is cream Oswald 24 with
+  a 1.5-unit ink UIStroke and a second ink copy 2 right and 3 down as its shadow (2 units at first: in the small
+  Studio window the letters of YOUR CLASS'S MOVE ran together; vault note "UIStroke on Text - Glyph Counters and
+  the Stroke Ratio"); the detail line is ink, Bold, 17; `right` (a cooldown, PLANNED) is ink Oswald 18.
+- THE TOAST (`MenuController.showToast`): centred, right under the top strip
+  (`HudTheme.Strip.Top + Tall * Shrink * scale`), under the fighters' row or a live pop-up when one is up (NEW
+  `Callouts.taken()`; `stage()` records its holder and how low it reaches). It no longer shrinks to stay clear of
+  the window: it may lie on the window's top edge, as the mockup's does and as he asked. This REPLACES the
+  top-left corner of 2026-11-17.
+- SEEN in my play tests (Studio, 1182 x 536): More (five names, PLANNED in ink), Moves (eight rows with their keys,
+  matching the mockup; enlarged at native pixels), Classes (Q CHARGE 5 s, R SLAM 7 s on Bruiser's orange), the
+  toast "Bruiser equipped." centred under the strip over the window's top edge. Also, by chance, the real TUSSLE!
+  at a round start with its fan and the edge bars. My test click equipped Bruiser on the owner's account; I
+  equipped Tempest again (the toast said "Tempest equipped.").
+- NOT SEEN: the rows after the outline went from 2 to 1.5 (the round started before I could reopen the menu);
+  the toast in a fight, with the row up, or with a pop-up on screen; a phone; a full-size screen.
+- HOW I DROVE THE MENU: `user_mouse_input` with `instance_path` (`LocalPlayer.PlayerGui.HT_Nav.Nav.moves.Press`);
+  plain x, y are the GUI's own coordinates (inside the top inset). The number keys sent by `user_keyboard_input`
+  did not open the page I expected (Four opened Shop): not looked into. To get out of a round for the lobby, the
+  Server moved my root part 400 down. `VirtualInputManager` is not allowed from `execute_luau`.
+- NOT CHANGED, STILL FRAMES WITH WORDS (ask him which he wants next): the feed's ink rows, the CONTROLS panel, the
+  Shop's slabs and the Ranked card, the class tiles' OWNED tags, the Settings page (plain on purpose), the top
+  strip, the SPECTATING chip.
+- THE WEBSITE (artifact, published with this): the mockup's `.sk` rows (Classes' skills, More) are frameless too.
+## ui-19a (2026-11-18): the small text on the field: THREE LOOKS ON THE WEBSITE ONLY, WAITING FOR THE OWNER'S PICK
+Nothing in Roblox for this piece; the game is ui-18a (place v502, committed as d01e75b).
+- THE OWNER, with pictures of Classes and Moves IN THE GAME: "completely revamp the black texts and how they are
+  meant to be read ... currently its super hard to read, and it doesn't really fit the vibe with the rest of the ui
+  style, i want it to match but not be identical ... change it to anything else thats applicable ... do it on the
+  website first". He also said these fixes come BEFORE the open to-do list.
+- WHY IT WAS HARD TO READ (my reading): the ink text is 17 px straight on the field, and the drifting repeated
+  word behind it is lighter than the field, so its letters cut through the text's letters. The vault's
+  Accessibility note: body text needs 4.5:1 "or outlined text on art"; the field with its pattern is art.
+- IN THE MOCKUP (artifact version 35; the page before it is `fight-poster-prototype.before-smalltext.html`): a
+  "Small text" switch in the top row (`setText`, classes `tx1` / `tx2` / `tx3` on the stage) that changes every
+  small line standing on the field: `.sub`, `.detail p` (a class's tag line), `.mv small`, `.sk small`, `.sk em`
+  (cooldown, PLANNED), `.savel`.
+  - STICKER (tx1, the default and my pick): ink letters with a cream edge (5 px stroke under the fill, so 2.5
+    outside), bold, 18.5 px (the tag line 20). The names' look turned inside out; the dark letter itself is
+    untouched, so it stays crisp when small.
+  - BRIGHT (tx2): cream letters with an ink edge and a 2 px hard shadow: the names' look, small, sentence case.
+  - CALM FIELD (tx3): plain ink, bold, bigger; the drifting words at 0.28 and the dots at 0.35 of their strength.
+- CHECKED: stills of Classes in Sticker and Calm field and of Moves in Bright and Sticker; the script parses; no
+  console errors. NOT CHECKED: Phone, the More and Settings pages, motion on.
+- TO BUILD THE PICK IN ROBLOX: `PosterKit.row`'s Detail and Right labels, `MenuController`'s `sub` line and the
+  class tag line. Sticker = `UIStroke` in ivory on the ink TextLabel (about 1.5 units on 17-px text, per the vault's
+  stroke note; check on a phone that the cream edge does not swallow thin strokes). Calm field = lower the word
+  layer's and the dots' transparency in `MenuController` (`setWord`, the dots image). Text on cream slabs (Shop,
+  Ranked, Settings rows) already reads and is not part of this.
+## ui-19b (2026-11-18): the small text, second try: ONE plain dark look ON THE WEBSITE ONLY, WAITING FOR HIS WORD
+This REPLACES ui-19a's three looks, which are gone from the mockup (the Small text switch too).
+- THE OWNER on ui-19a: "nah thats doing too much + it looks identical since its white". So: NO outline, NOTHING
+  white or cream round the small text, and one look, not a choice of three.
+- IN THE MOCKUP (artifact version 36): every small line on the field (`.detail p`, `.mv small`, `.sk small`,
+  `.savel`, `.sub`, `.sk em`) is the same ink, but in the DISPLAY face (Oswald) at weight 500 instead of
+  Titillium: 20 px with 1.22 line height and 0.015 em spacing (the class's tag line 22, the sub line 18 in
+  capitals with 0.07 em, cooldowns and PLANNED 22), sentence case, no outline. The drifting word is at 0.5 and
+  the dots at 0.55 of their strength (`.words`, `.sheet::before`). Names, tiles, buttons and titles untouched.
+- CHECKED: stills of Moves and Classes (Tempest) from `design/ui/mock_capture.py` (the browser pane had stopped
+  drawing: its screenshots timed out); the script parses. NOT CHECKED: Phone, More, Settings' SAVED line.
+- TO BUILD IT IN ROBLOX ON HIS YES: `PosterKit.row` (Detail and Right: `Poster.text(..., "display", ...)` with
+  `FontFace` Oswald Medium, sizes above), `MenuController` (`sub`, the class tag line, the SAVED line), and the
+  field's word layer and dots at about half strength (find where `setWord` and the dots image set their
+  transparency). Check Roblox has Oswald at Medium; if not, Regular or SemiBold, whichever reads better.
+## ui-19c (2026-11-18): the small text, third round: A BOARD OF FOUR IDEAS ON THE WEBSITE, WAITING FOR HIS PICK
+- THE OWNER on ui-19b (plain ink in Oswald, the pattern at half strength): "nope, its just the same thing as
+  previously". So neither an outline in cream (19a) nor a better plain black (19b) is what he means by "completely
+  revamp the black texts and how they are meant to be read". MY READING: he wants a different IDEA, not a tweak.
+  Do not offer another variation of plain dark sentences.
+- IN THE MOCKUP (artifact version 37): a temporary section "Pick a look for the small text" right under the game
+  screen (`#pick`, `.opts`, `.ofield`), the same two Moves rows drawn four ways:
+  - A MARKER (`.oA`): plain dark reading text; the words that matter (`<mark>`) swiped with yellow highlighter.
+  - B TAPE (`.oB`): cream words on strips of ink label tape that hug each line (`box-decoration-break: clone`).
+  - C PUNCHY (`.oC`): no sentences: a few words in Oswald capitals cut by pink diamonds ("4 HITS, 3 STUN, LAST ONE
+    LAUNCHES"). The short wording is MINE, not the game's; every description would need one.
+  - D YELLOW (`.oD`): yellow letters with an ink edge and a small hard shadow.
+  The Moves and Classes pages in the mockup's game screen still show ui-19b's plain look until he picks.
+- CHECKED: one still of the board from `mock_capture.py` (with a `run` that pins `#pick` over the screen); the
+  script parses. NOT CHECKED: on a narrow window, in the light page theme.
+- WHEN HE PICKS: apply it to `.mv small`, `.sk small`, `.detail p`, `.sub`, `.sk em` in the mockup, take the board
+  out, show him the pages, and only then build it in Roblox (A needs RichText marks or a highlight Frame behind
+  measured words; B needs a Frame per wrapped line; C needs new short wording per move and skill, his to approve;
+  D is a UIStroke and a shadow copy, as the names are built).
+## ui-19d (2026-11-18): the small text: THE OWNER PICKED "D, YELLOW". NOT APPLIED YET (he went to sleep). START HERE.
+- HIS WORDS, in order, after the board of four (ui-19c): "i genuinely dont like any of them lmao"; asked what the
+  trouble is, he ticked "The text looks plain" and "Too small or thin", no reference, a clean area behind the list
+  "is fine"; I built a fourth version from that (bold Oswald capitals, 21 px, a pink diamond before each line, the
+  pattern faded out under the list) and he stopped me: "nvm i DONT like that, just go with D. Yellow"; then "we can
+  finish this later though I have to sleep".
+- D, YELLOW, as it was on the board (`.oD`): `font: 700 18px/1.35` in the reading face (Titillium), colour the coin
+  yellow, a 4 px ink stroke drawn under the fill (so 2 px outside), `text-shadow: 2px 2px 0` ink, 0.02 em spacing,
+  sentence case. On the full pattern: NO clean area, NO capitals, NO diamond.
+- WHERE THINGS ARE:
+  - The artifact (version 37) still shows the board of four under the game screen, with ui-19b's plain look on
+    the pages.
+  - `UI Research/fight-poster-prototype.html` ON DISK holds the REJECTED fourth version (the block that starts
+    "/* THE SMALL TEXT ON THE FIELD, FOURTH ROUND", the `.calm` layer in the sheet, `.mvs` widened to 850). It is
+    NOT published. Replace that block with D's rules, take the `<div class="calm"></div>` out again and put `.mvs`
+    back to `max-width:800px; gap:22px 30px`. Moves in that version also overflowed the window's foot.
+  - Roblox: nothing changed for the small text. The game is d01e75b, place v502.
+- MOCKUP DONE, later the same day (artifact version 38, waiting for his yes; the two bullets above are history):
+  - D is on `.sub`, `.detail p`, `.mv small`, `.sk small` and `.sk em` (one rule placed AFTER the row rules, colour
+    from `--small`); the rejected block, `.calm` and the board of four are gone; `.mvs` is back to 800. Moves fits
+    the window. Seen as stills from `mock_capture.py` (Moves, Classes on Frost and Base, Shop), not in a browser.
+  - Yellow pages: `tint()` sets `.yel` on the stage when the field is #FFD426 and `--small` becomes the cyan
+    (`--ready`). MY SUGGESTION, shown in the mockup, NOT his pick yet. Cream was compared and reads as a small copy
+    of the title (he said "identical since its white" once). Settings (`.pale`) keeps its sub line plain ink.
+  - Seen in passing, not touched: the Shop's dashed PLANNED cards draw their words twice (the row's drop shadow).
+- D, YELLOW DROPPED, same day. He saw it on the pages: "ehhhh idk, i kinda want you to kinda revamp the entire
+  desing for like the little text, come up with something creative and unique but make ti still fit the style".
+- NOW IN THE MOCKUP (artifact version 39, waiting for his verdict): "COACH'S NOTES". The small lines are what a
+  coach scribbled on the poster: Kalam Bold 21 px (23 for the class's tag line), ink, no outline, sentence case, on
+  the full pattern; a hooked marker arrow (26 x 24) leads from a name to its note; a cooldown or PLANNED standing
+  alone at the right is circled by hand. Ink shows on the yellow pages, so the `.yel` case is gone (tint() still
+  sets `.yel` and `.pale`; Settings stays plain). Permanent Marker was tried first: thin, wide, capitals only.
+  Seen as stills (Moves, Classes on Frost and Base, More), not in a browser.
+- HIS VERDICT ON THE NOTES: "i like it, BUT u needed change how the cooldown is represented, hard to tell what
+  numbe rit is with that font. ALSO if u didn't already apply this to everything that applicable". Done in the
+  mockup (artifact version 40), waiting for his yes to build:
+  - COOLDOWN: the handwritten word "cooldown", then the number on a small cream tile in Oswald Bold 24 (the "s" at
+    16), ink border 3, hard shadow, like the key tile (`.cdn`, `.cw`, `.cv`, `.cu` in `skillRow`). No ring on it.
+    The ring stays for a word standing alone (PLANNED on More). Rule from this: NUMBERS THAT MATTER ARE PRINT.
+  - EVERYTHING APPLICABLE: also the lines on the Shop's and Ranked's cards (`.slab p`, 19 px) and Settings' sub
+    line and SAVED line (its rows, switches and tips stay plain). Not notes, on purpose: the toast, tags, tile
+    states, HUD labels (they are print: labels and announcements). The mockup has no CONTROLS panel, feed or
+    spectate panel; in the game their small lines are candidates, ask him.
+  - Fixed in passing: the Shop's dashed cards drew their words twice (shadow now on a `.shd` wrap per card).
+- THEN: "i dont want it to be the same style tho". I READ THIS AS the cooldown's tile being the key's tile over
+  again (not confirmed by him). Version 41: the number is coin yellow, Oswald Bold 27 (the "s" at 15), on an INK
+  12-POINT STARBURST 62 px, turned -9 degrees (the figures are not turned); the handwritten word "cooldown" stays
+  beside it. In Roblox the burst is a THIRD new image. If he meant something else by "same style", ask.
+- THE STARBURST WAS WRONG: "NOOO DONT MAKE IT LIKE A COMPELTELY DIFFERENT STYLE, i want u to redo it retianing
+  what the current ui style is, but make it so its obvious that its the cooldown counter, you don't even need to
+  say cooldown next to it". So "same style" had meant: the cream tile read as another key, not as a cooldown.
+  LESSON: a new piece is built from shapes the UI already has; never a new shape language.
+- THE COOLDOWN NOW (version 42, waiting for his verdict): the UI's own counter, as the standing count and the Coins
+  plate: a small ink plate slanted -10 degrees with a coin-yellow line under it, a stopwatch icon in cream (drawn
+  like the tools' icons, 24 px), the number in coin yellow Oswald Bold 27, "SEC" small in cream. No word
+  "cooldown", no burst, no ring. The plate is slanted, the figures and icon are not. In Roblox: the plate is a
+  shape the kit already has (the strip's); the stopwatch is ONE new icon image. The burst is not needed.
+- ON THE PLATE: "prefect, i dont lkike teh frame, like that general style needs to go". Read as: the counter's
+  content is right, its plate must go, and FRAMED PLATES IN GENERAL are to go (it fits "having a frame isn't high
+  quality"). Which other framed pieces, and in what order, is NOT settled: asked him.
+- THE COOLDOWN NOW (version 43): NO PLATE. A stopwatch 34 px (cream face, ink line 2.4, no shadow), the number
+  as poster lettering in coin yellow (Oswald Bold 33, ink outline 4 px drawn under the fill, hard ink shadow 3,3),
+  "SEC" in ink Oswald Bold 16. Nothing slanted. In Roblox: one new icon image (the stopwatch), the number like
+  the names (`Poster` figures or text with a UIStroke), no plate. Supersedes the plate bullet above.
+- THE SLANTED INK PLATE IS BANNED EVERYWHERE. He sent three pictures from the game (the strip "ROUND OVER ROUND
+  17", the strip "NEXT ROUND 1 ROUND 18", the knockout feed) and wrote: "for EVERYTHING btw ... i HATE this
+  style, it doesn't even represent the res of the main ui, so CHANGE THIS TOO make it represent and be similar to
+  the other uis that i didn't complain about". The style: a dark slanted bar, a coloured line under it, small
+  spaced capitals. Build from what he has NOT complained about: poster lettering on the world (cream or coin
+  yellow, ink outline, hard shadow), small rough-cut tiles with a hard shadow, letter cards, the notes.
+- IN THE MOCKUP (version 44, waiting for his verdict), no plate anywhere:
+  - TOP STRIP, three states (chips "Top strip"; `stripMode()`; `#stripS` standing, `#stripR` round): the number in
+    coin yellow Oswald Bold 44 (outline 6, shadow 4,4); the words ("/ 25 STANDING", "ROUND 18") cream Oswald Bold
+    22 (outline 4, shadow 2,3); "NEXT ROUND" on a cream rough-cut tile (ink Oswald 21), "ROUND OVER" on a
+    magenta tile with cream words.
+  - COINS: a coin with an ink edge and hard shadow, the number cream Oswald Bold 28, outlined.
+  - KNOCKOUT FEED (new in the mockup: `.feed`, `feedPush`, shown by Knock one out): top right in a fight, a row is
+    NAME, a yellow rough-cut tile "KNOCKED OUT" (ink Oswald 15), NAME; names cream Oswald Bold 21 outlined, written
+    as they are (no capitals forced); a row hits in from the right, leaves to the right. Only the knockout row is
+    drawn: the fall and leave rows keep the game's own words on a tile, colours not chosen yet.
+  - NOT in the mockup, same ban applies in the game: the SPECTATING chip, the CONTROLS chip and panel, the
+    spectate panel's who-plate. Small ink tags inside tiles and pop-ups (OWNED, PLANNED, FIGHTERS) are a different
+    piece and were left; ask him if they go too.
+- IF HE SAYS YES, in Roblox: `PosterKit.row` Detail and Right in Kalam Bold (`Enum.Font.Kalam` exists; check the
+  bold face in Studio), ink, no stroke; the arrow and the ring are TWO NEW IMAGES (ask before the upload, with
+  names and sizes; the ring wants 9-slice or two sizes); `MenuController` `sub` and the class's tag line. The
+  step 3 plan above (gold text, UIStroke, tone argument) is for D and no longer applies.
+- TO DO NEXT, IN ORDER:
+  1. Mockup: D on every small line on the field (`.mv small`, `.sk small`, `.detail p`; decide `.sub` and `.sk em`
+     with him or by eye), board section already removed on disk. Leave Settings' SAVED line alone (pale grey
+     field, plain on purpose).
+  2. THE YELLOW-ON-YELLOW CASE, not raised with him yet: the Shop page's field and the Base class's field are the
+     same coin yellow, so yellow letters there would show as outlines only. Tell him; my suggestion is cream
+     letters on those two only. In the mockup `tint()` can put a class on the stage when the field is #FFD426.
+  3. Publish, show him the Moves and Classes pages, then build in Roblox on his yes: `PosterKit.row` (Detail and
+     Right: gold.400 text, an ink `UIStroke` of about 1.5 units on 17-px text, an ink copy 1.5 right and down as
+     the shadow, Bold; give `row` an optional tone argument for the yellow pages), `MenuController` (`sub`, the
+     class's tag line). Vault: "UIStroke on Text - Glyph Counters and the Stroke Ratio" (stroke under 7 %).
+## ui-19d BUILT (2026-11-18): coach's notes, cooldown counter, NO slanted plates, loud feed, TUSSLE! pop, no lobby jump cooldown: SYNCED, place v513, NOT COMMITTED. START HERE.
+Build stamp `kits-8d+lobby-4+ui-19d`. The owner said "Yes, build it" to mockup version 44, then sent four more
+asks while it was being built. Gates: stylua clean, selene 0, 558 tests, rojo build OK.
+- UPLOADED on his yes (group 2970443, all Approved; `design/ui/make_note_marks.py` draws them into
+  `assets/icons/poster/`): `note_arrow.png` 208 x 192, id 99511529578400; `note_ring.png` 400 x 160, id
+  89833043727802; `stopwatch.png` 272 x 272, id 130771830611628. `Shapes.ids.noteArrow`, `noteRing`, `stopwatch`.
+- THE KIT:
+  - `Tokens.family.note` = Kalam (Bold exists: checked). `Poster.note(parent, css, props)`: ink Kalam Bold,
+    TextSize 1.58 x the CSS size (measured), LineHeight 0.7. `Poster.noteLines` counts wrapped lines without
+    yielding (regular face, box 6 % narrower: Bold is 3 to 4.5 % wider), `Poster.notePitch`.
+  - `PosterKit.lettering(parent, css, tone, text)` and `setLettering`: outlined Oswald with a hard ink shadow, as
+    wide as its word. `PosterKit.chip(parent, words, css, fill, tone, height)`: a rough-cut card as wide as its
+    words (the key tile's shape).
+  - `PosterKit.row(..., right, cooldown)`: the note at 19 px with the hooked arrow; `right` is a ringed note
+    ("Planned"); `cooldown` (the figure alone, `seconds()` no longer adds " s") is stopwatch + yellow lettering
+    + SEC. `PosterKit.rowHeight(width, key, detail)` gives the height; Classes and the two-column list use it.
+- MENU (`MenuController`): the sub line is a note in SENTENCE CASE (six strings reworded from capitals), the
+  class's tag line, the lines on the Shop's and Ranked's cards, Settings' SAVED line.
+- NO SLANTED INK PLATE IS LEFT (`Shapes.slant` is now used only by the menu's wipe):
+  - the strip (`HudController`): the number is yellow lettering 44; every WORD is on a card made by `stripCard`
+    (NEXT ROUND and "/ 25 STANDING" cyan, ROUND OVER / FINAL TWO / LAST ONE pink with cream words, ROUND n cream);
+    ARENA CLOSING a pink card; SPECTATING a cyan card.
+  - Coins (`NavController`): a coin with an ink edge and shadow, the amount yellow lettering 26.
+  - spectate panel's who-line (`SpectateController`): no plate, an ink outline.
+- THE FEED NOW, SIMPLE (place v510; this REPLACES the loud feed in the next bullet). He sent a picture of the
+  loud rows: "I still don't like this ui, maybe just revert to how it originally was or just make the current one
+  simpler, id prefer the latter". So a row is ONE LINE OF LETTERING, no cards and no tiles: the one who did it in
+  coin yellow (18), the verb smaller (14: KNOCKED OUT pink, FELL orange, LEFT cyan), the other in cream, YOUR
+  name cyan. It slides in from the right, no scale hit. `L.FeedRow` 28, `FeedGap` 4, `FeedWidth` 340 again, and
+  the tools column is back at 32 units a row. SEEN in a play test (four rows fired through `RingOut`).
+  THREE FEEDS REJECTED so far: the slanted plate, cream names with a small yellow tile ("not vibrant enough"),
+  names on bright cards with a loud verb ("make it simpler"). Colour yes, boxes no.
+- THE FEED, LOUD, REJECTED (his words on the first plate-free row: "its not cartoony / vibrant enough. Fix it", "this
+  also applies to anything applicable"): each NAME on a card (the one who did it yellow, the other cream, YOUR
+  name pink with cream letters), the verb as coloured lettering (KNOCKED OUT pink, FELL orange, LEFT cyan), the
+  row hits in from the right from 1.5 times its size. `L.FeedRow` 34, `FeedGap` 6, `FeedWidth` 400; names cut at
+  13 letters; the tools column in `NavController` moved down for the taller feed (40 units a row).
+- TUSSLE! POPS OUT (his words: "more of a POPOUT animation ... it feels like the anims are slow"): in
+  `Callouts.go` all seven cards burst from the word's middle at once (0.09 s, overshoot 1.26, spring back), the
+  shake, lines and shards go off then; the word lives 0.95 s (1.3 before). The numbers 3, 2, 1 are unchanged.
+- TUSSLE!'S EFFECTS ALL ROUND THE WORD (his next ask: "have the effects SURROUNDING the word, like a popup"):
+  a second `slashes` (11 lines, 202 to 338 degrees, flatter oval 0.4, out to 400 only) and a second `shards`
+  (12, thrown 110 to 170) cover the upper half, kept SHORT so they end under the fighters' row (the old rule
+  "nothing goes up" was for that overlap). SEEN in one still: lines above and below the word, clear of the row.
+- NO JUMP COOLDOWN IN THE LOBBY (his ask): `MovementController`, the ordinary jump sets `jumpReadyAt` to now
+  unless the player has `HT_InRound`. The server's kick limit (`KickService`) is untouched.
+- SEEN IN A PLAY TEST (stills): the lobby strip, Coins, the loud feed (fired through `RingOut` from the server),
+  the Moves, Classes (Base) and Shop pages, the fight strip. Rows also seen in Edit mode on a blue field.
+- NOT SEEN OR TESTED: TUSSLE!'s new motion (only code), the lobby jump, ROUND OVER, ARENA CLOSING, SPECTATING,
+  the spectate who-line, Ranked, More and Settings pages, a phone, a gamepad, Reduced Motion. After the last fix
+  (tools column) no new picture was taken.
+- THE STRIP IS ONE CARD (place v513; this is the CURRENT strip, the two strip bullets around it are history).
+  His words on a yellow number beside a separate "/ 25 STANDING" card: "bro what the fuck is this, why is
+  seperate like this ... just make it the same frame, for both this and the lobby countdown". So number and
+  words stand TOGETHER on one cream rough-cut card with ink lettering (number Oswald 34, words 21); pink with
+  cream lettering for ROUND OVER, FINAL TWO, LAST ONE. In a fight "15 / 25 STANDING", counting down "NEXT ROUND
+  8". Code: `stripCardFrame`, `stripSet(count, words, loud, countFirst)`, `stripWide` (the width is worked out),
+  `cardScale` for the final-two pop; `PosterKit.lettering` and `stripCard` are no longer used by the strip.
+  Patched into Studio by line splices (`execute_luau`), `--check` shows HudController matching. SEEN: the lobby
+  countdown card. NOT SEEN: the fight card, the pink states, the count's bump inside the card (the play test
+  was stopped by someone else).
+- THE STRIP BEFORE THAT (place v511; it overrode the strip bullet above): NO ROUND NUMBER and NO BLUE. His words on
+  "NEXT ROUND 8 ROUND 2": "there ARE NO rounds, it doesn't just go up and up, each round is the first round ...
+  this shouldn't be progressing, also i dont like the color blue here". The ROUND n card is gone from every state
+  (the server still counts `Round` in HT_RoundState; nothing shows it), NEXT ROUND and "/ 25 STANDING" are on
+  CREAM cards, SPECTATING is cream too. SEEN in the lobby: a cream NEXT ROUND card and the yellow number.
+- SRC HOLDS ANOTHER SESSION'S UNFINISHED WORK (seen at the last sync): free-practice cooldowns
+  (`HT_TrainingFree`) in MovementController, AbilityController, CombatController, six services, a new
+  NpcController, GameConfig. NOT in the place. So the last sync was NOT `rojo_push.py`: only HudController was
+  written, by a three-span patch through `execute_luau` (localhost HTTP is not on the connector's allowlist),
+  then `--check` showed HudController matching and 11 scripts of theirs still differing. `stylua --check src`
+  fails on THEIR line in MovementController (1160); mine pass. Do NOT run a full push while that holds.
+- WATCH OUT: another session on this machine regenerated `design/game.json`, `GameConfig.luau` and
+  `LobbyLayout.luau` at 16:15 and wrote those two modules into the place itself (they differed from Rojo's copy
+  by a trailing newline only; contents equal, checked block by block). Play tests also ended by themselves
+  three times: the owner was testing in the same Studio.
+- OPEN: the small ink tags (OWNED, PLANNED, FIGHTERS) and the toast were left as they are; the CONTROLS chip and
+  panel are cream already and were not touched; the mockup does not show the loud feed, the word cards or the
+  TUSSLE! pop (it is behind the game now).
 
 ## kits-7d..7f (2026-11-17): Haymaker Rush rush-in, flurry, camera study, gap study, stage A (NOT PLAY-TESTED: the place kept being overwritten)
 Build stamp `kits-7f+lobby-4+ui-13c`. Spec chain: `design/haymaker-rush-v3-beats.md` (camera study and the owner's picks), then

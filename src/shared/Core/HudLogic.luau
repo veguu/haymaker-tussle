@@ -70,12 +70,9 @@ function HudLogic.strip(state: RoundState, now: number): Strip
 			finalTwo = false,
 		}
 	elseif phase == "Starting" then
-		return {
-			visible = true,
-			title = "GET READY",
-			count = countdown(now, state.countdownEnd),
-			finalTwo = false,
-		}
+		-- No GET READY strip (the owner, 2026-11-18: "remove that completely"): the round's start is the big
+		-- 3, 2, 1, TUSSLE! countdown (`countBeat`, drawn by Ui/Callouts).
+		return { visible = false, title = "", finalTwo = false }
 	elseif phase == "RoundOver" then
 		return { visible = true, title = "ROUND OVER", finalTwo = false }
 	end
@@ -88,6 +85,29 @@ function HudLogic.strip(state: RoundState, now: number): Strip
 		total = if state.total then tostring(state.total) else nil,
 		finalTwo = finalTwo,
 	}
+end
+
+--- The round-start countdown's beat at `now`: 3, 2 or 1 through the last three seconds before `finish` (the
+--- fight's start, server time), 0 (the word TUSSLE!) for `goSeconds` from the start itself, nil at any other time.
+function HudLogic.countBeat(now: number, finish: number?, goSeconds: number): number?
+	if finish == nil then
+		return nil
+	end
+	local left = finish - now
+	if left > 3 then
+		return nil
+	elseif left > 0 then
+		return math.ceil(left)
+	elseif left > -goSeconds then
+		return 0
+	end
+	return nil
+end
+
+--- How far into its own second a countdown number is (0 as it lands, towards 1 as the next is due): a number
+--- first seen late is skipped, never shown for a sliver of its second.
+function HudLogic.countLate(now: number, finish: number, beat: number): number
+	return now - (finish - beat)
 end
 
 --- One ring-out feed line. `cause` is "knocked", "fell" or "left".

@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8">
+<!-- The letter cards' letters (ui-17a): A to Z and "!", Oswald 700 upright, WHITE on clear (tinted in the game),
+     for every pop-up that says a word in cut-out cards (LEFT, FINAL, ULTIMATE, a class's name).
+     Cells are 144 x 180, seven to a row, in the order A..Z then "!"; each letter is drawn at 144 px for the
+     mockup's reference 128 (1.125 times) in the middle of its cell.
+     Capture:  python design/ui/mock_capture.py --clear --size 1024,720 --page design/ui/poster_cards.html
+               assets/icons/poster/card_letters.png
+     Widths:   python design/ui/mock_capture.py --dump design/ui/poster_cards.html   (the RECT line: each letter's
+               width at 128 px; they go into Ui/Shapes.cards by hand) -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&display=swap">
+<style>
+html,body{margin:0;background:transparent;overflow:hidden}
+.g{position:absolute;width:144px;height:180px;display:flex;align-items:center;justify-content:center}
+.l{display:inline-block;font:700 144px/1 Oswald;color:#fff}
+.m{position:absolute;left:0;top:800px;font:700 128px/1 Oswald;white-space:nowrap}
+pre{position:absolute;left:0;top:1000px;font:12px monospace}
+</style>
+<body>
+<script>
+const LETTERS=[...'ABCDEFGHIJKLMNOPQRSTUVWXYZ!'];
+LETTERS.forEach((ch,i)=>{const c=document.createElement('div'); c.className='g'; c.style.left=(i%7*144)+'px'; c.style.top=(Math.floor(i/7)*180)+'px';
+  const n=document.createElement('span'); n.className='l'; n.textContent=ch; c.appendChild(n); document.body.appendChild(c);
+  const m=document.createElement('span'); m.className='m'; m.textContent=ch; m.id='m'+i; document.body.appendChild(m);});
+document.fonts.load('700 144px Oswald').then(()=>document.fonts.ready).then(()=>{
+  const pre=document.createElement('pre');
+  pre.textContent='\nRECT letters128 | '+LETTERS.map((ch,i)=>ch+':'+document.getElementById('m'+i).getBoundingClientRect().width.toFixed(1)).join(' ')+'\n';
+  document.body.appendChild(pre);
+});
+</script>

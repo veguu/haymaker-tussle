@@ -28,7 +28,6 @@ local Drift = require(script.Parent.Parent.Ui.Drift)
 local HudTheme = require(script.Parent.Parent.Ui.HudTheme)
 local Poster = require(script.Parent.Parent.Ui.Poster)
 local PosterKit = require(script.Parent.Parent.Ui.PosterKit)
-local Shapes = require(script.Parent.Parent.Ui.Shapes)
 
 local lobbyCfg: any = GameConfig.Lobby
 local camCfg: any = lobbyCfg.Spectate
@@ -127,7 +126,8 @@ function SpectateController:KnitStart()
 	whoPlate.Position = UDim2.fromOffset(S.Tab + S.Gap, rowY)
 	whoPlate.Size = UDim2.fromOffset(S.PanelWidth - (S.Tab + S.Gap) * 2, S.Tab)
 	whoPlate.Parent = panel
-	Shapes.slant(whoPlate, "ink.900", S.Lean, { Name = "Plate" })
+	-- (no plate behind it since ui-19d: the owner wants no slanted ink plate anywhere; an ink outline keeps the
+	-- words readable on the world)
 	local who = Poster.text(whoPlate, "label", 15, "ivory.50", {
 		Position = UDim2.fromOffset(S.Lean + 4, 0),
 		Size = UDim2.new(1, -(S.Lean + 4) * 2, 1, 0),
@@ -135,6 +135,11 @@ function SpectateController:KnitStart()
 		TextXAlignment = Enum.TextXAlignment.Center,
 		ZIndex = 1,
 	})
+	local whoLine = Instance.new("UIStroke")
+	whoLine.Color = colour("ink.900")
+	whoLine.Thickness = 1.5
+	whoLine.LineJoinMode = Enum.LineJoinMode.Round
+	whoLine.Parent = who
 
 	-- State.
 	local view = "mine"

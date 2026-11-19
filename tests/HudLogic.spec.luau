@@ -30,8 +30,30 @@ return {
 		assert(s.finalTwo and s.title == "FINAL TWO", "a two-player match is final two at once")
 		s = HudLogic.strip({ phase = "Intermission", countdownEnd = 10.2 }, 5)
 		assert(s.count == "6")
-		s = HudLogic.strip({ phase = "Starting", countdownEnd = 3 }, 5)
+		s = HudLogic.strip({ phase = "Intermission", countdownEnd = 3 }, 5)
 		assert(s.count == "0", "never negative")
+	end,
+
+	["no GET READY strip: the start of a round is the countdown's"] = function()
+		assert(not HudLogic.strip({ phase = "Starting", countdownEnd = 9 }, 5).visible)
+		assert(not HudLogic.strip({ phase = "Starting" }, 5).visible)
+	end,
+
+	["the round-start countdown: nothing, then 3, 2, 1, then the word, then nothing"] = function()
+		assert(HudLogic.countBeat(0, nil, 1) == nil, "no countdown, no beat")
+		assert(
+			HudLogic.countBeat(6.5, 10, 1) == nil,
+			"the first second of a 4 s start shows nothing"
+		)
+		assert(HudLogic.countBeat(7, 10, 1) == 3, "3 lands exactly three seconds before")
+		assert(HudLogic.countBeat(7.99, 10, 1) == 3)
+		assert(HudLogic.countBeat(8, 10, 1) == 2)
+		assert(HudLogic.countBeat(9.2, 10, 1) == 1)
+		assert(HudLogic.countBeat(10, 10, 1) == 0, "the word lands as the fight starts")
+		assert(HudLogic.countBeat(10.9, 10, 1) == 0)
+		assert(HudLogic.countBeat(11, 10, 1) == nil)
+		assert(math.abs(HudLogic.countLate(8.25, 10, 2) - 0.25) < 1e-9)
+		assert(HudLogic.countLate(7, 10, 3) == 0)
 	end,
 
 	["an intermission with no countdown (too few players ready) hides the strip"] = function()
@@ -39,8 +61,6 @@ return {
 		assert(not s.visible, "no NEXT ROUND 0 while nothing is counting")
 		s = HudLogic.strip({ phase = "Intermission", countdownEnd = 4 }, 5)
 		assert(s.visible and s.count == "0", "a countdown that has just run out still shows")
-		s = HudLogic.strip({ phase = "Starting" }, 5)
-		assert(s.visible, "GET READY shows with or without a time")
 	end,
 
 	["feed lines for a knock, a fall with nobody credited, and a disconnect"] = function()

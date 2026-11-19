@@ -17,6 +17,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TextService = game:GetService("TextService")
 
 local Tokens = require(ReplicatedStorage.Shared.Tokens)
 local Typography = require(ReplicatedStorage.Shared.Typography)
@@ -53,6 +54,56 @@ function Poster.text(
 	label.Text = ""
 	Typography.apply(label, ROLE[face])
 	label.TextSize = Poster.px(css, face)
+	for key, value in props or {} do
+		(label :: any)[key] = value
+	end
+	label.Parent = parent
+	return label
+end
+
+-- THE NOTES --------------------------------------------------------------------------------------------
+-- The coach's notes (the owner, 2026-11-18: "revamp the entire design for the little text, come up with something
+-- creative and unique but make it still fit the style", then "i like it"): the poster is print, and its small
+-- descriptive lines are what the coach wrote on it with a brush pen. Kalam Bold, ink, no outline, sentence case.
+-- Measured the same day: Kalam needs 1.58 x the CSS size (the word "Planned" is 73 px wide at 21 px in the
+-- browser and 220 units at TextSize 100 here). Its own line is tall, so lines are set closer: NOTE_LINE of the
+-- text size, which is the mockup's line height of 1.12.
+local NOTE_FACTOR = 1.58
+local NOTE_LINE = 0.7
+
+--- Roblox's TextSize for a note the mockup sets at `css` pixels.
+function Poster.notePx(css: number): number
+	return math.max(1, math.floor(css * NOTE_FACTOR + 0.5))
+end
+
+--- How far apart a note's lines stand, in units, at `css` pixels.
+function Poster.notePitch(css: number): number
+	return math.ceil(Poster.notePx(css) * NOTE_LINE)
+end
+
+--- How many lines a note takes in a box `width` units wide. Counted on the regular face with the box 6 % narrower
+--- (TextService:GetTextSize takes no weight, and the Bold face is 3 to 4.5 % wider: measured 2026-11-18), so it
+--- errs to one line too many, never one too few: Roblox DROPS a wrapped line that does not wholly fit.
+function Poster.noteLines(text: string, css: number, width: number): number
+	if text == "" then
+		return 0
+	end
+	local size = Poster.notePx(css)
+	local bounds = TextService:GetTextSize(
+		text,
+		size,
+		Enum.Font.Kalam,
+		Vector2.new(math.max(20, width * 0.94), 10000)
+	)
+	return math.max(1, math.floor(bounds.Y / size + 0.5))
+end
+
+--- A line of the coach's notes at the mockup's pixel size: ink, left-aligned, like Poster.text.
+function Poster.note(parent: Instance?, css: number, props: { [string]: any }?): TextLabel
+	local label = Poster.text(nil, "label", css, "ink.900", nil)
+	label.FontFace = Font.new(Tokens.family.note, Enum.FontWeight.Bold)
+	label.TextSize = Poster.notePx(css)
+	label.LineHeight = NOTE_LINE
 	for key, value in props or {} do
 		(label :: any)[key] = value
 	end

@@ -35,6 +35,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TextService = game:GetService("TextService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
@@ -126,7 +127,7 @@ local L = {
 	StripDrop = 10, -- the words sit this far under the number's centre (they share its baseline)
 	Chip = 28,
 	ChipLean = 6,
-	FeedWidth = 300,
+	FeedWidth = 340, -- (300 until ui-19d: lettering is wider than the old small capitals)
 	FeedRow = 28,
 	FeedGap = SP[1], -- 4
 	FeedRows = 4,
@@ -588,39 +589,45 @@ function HudController:KnitStart()
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.fromScale(0.5, 0),
-		Size = UDim2.fromOffset(0, L.Strip.Y),
-		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.fromOffset(200, L.Strip.Y),
 	})
-	local stripLast = false
-	local stripPlateHeight = L.Strip.Y - L.StripEdge
-	-- the plate is the top of the same slanted shape, so it starts a little right of the edge's bottom corner
-	local stripSlip = L.StripLean * L.StripEdge / L.Strip.Y
-	-- The coloured edge is ONLY the band under the plate (one unit of it tucked under the ink), on the same
-	-- slope. It used to be the whole slanted shape with the ink laid over it, and where two soft edges lie on
-	-- one line the under colour shows through: a yellow hairline up the strip's right side (seen 2026-11-18).
-	local stripBand = L.StripEdge + 1
-	local stripBandLean = L.StripLean * stripBand / L.Strip.Y
-	local stripEdge = Shapes.slant(stripPanel, "coral.500", stripBandLean, {
-		Name = "Edge",
-		Position = UDim2.fromOffset(0, L.Strip.Y - stripBand),
-		Size = UDim2.new(1, -(L.StripLean - stripBandLean), 0, stripBand),
+	-- ONE CARD (the owner, 2026-11-18, of the yellow number standing apart from its "/ 25 STANDING" card: "why is
+	-- it separate like this ... just make it the same frame, for both this and the lobby countdown"). The number
+	-- and its words stand TOGETHER on one rough-cut card with an ink edge and a hard shadow: cream with ink
+	-- lettering, or pink with cream lettering for ROUND OVER, FINAL TWO and LAST ONE. In a fight the number comes
+	-- first ("15 / 25 STANDING"), while it counts down the words do ("NEXT ROUND 8").
+	-- What it was before, in order: a slanted ink plate with small capitals ("i HATE this style"); bare lettering
+	-- with a word tile; a blue card beside a bare yellow number ("i dont like the color blue here").
+	-- NO ROUND NUMBER (the owner, of "ROUND 2" beside the countdown: "there are no rounds, it doesn't just go up
+	-- and up, each round is the first round ... this shouldn't be progressing"). The server still counts rounds
+	-- in HT_RoundState's `Round`; nothing shows it.
+	local STRIP_CARD, STRIP_PAD = 50, 18
+	local stripCardFrame = make("Frame", stripPanel, {
+		Name = "Card",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.new(1, 0, 0, STRIP_CARD),
 	})
-	Shapes.slant(stripPanel, SS.Plate, L.StripLean - stripSlip, {
-		Name = "Plate",
-		Position = UDim2.fromOffset(stripSlip, 0),
-		Size = UDim2.new(1, -stripSlip, 0, stripPlateHeight),
-		ZIndex = 1,
+	local cardScale = make("UIScale", stripCardFrame, {})
+	Shapes.image(
+		stripCardFrame,
+		"tile",
+		"ink.900",
+		{ Name = "Shadow", Position = UDim2.fromOffset(3, 4) }
+	)
+	Shapes.image(stripCardFrame, "tile", "ink.900", { Name = "Line", ZIndex = 2 })
+	local stripFill = Shapes.image(stripCardFrame, "tile", SS.Word, {
+		Name = "Fill",
+		Position = UDim2.fromOffset(3, 3),
+		Size = UDim2.new(1, -6, 1, -6),
+		ZIndex = 3,
 	})
-	local stripRow = make("Frame", stripPanel, {
+	local stripRow = make("Frame", stripCardFrame, {
 		Name = "Row",
 		BackgroundTransparency = 1,
-		Size = UDim2.fromOffset(0, stripPlateHeight),
-		AutomaticSize = Enum.AutomaticSize.X,
-		ZIndex = 2,
-	})
-	make("UIPadding", stripRow, {
-		PaddingLeft = UDim.new(0, L.StripPad + L.StripLean / 2),
-		PaddingRight = UDim.new(0, L.StripPad + L.StripLean / 2),
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 4,
 	})
 	make("UIListLayout", stripRow, {
 		FillDirection = Enum.FillDirection.Horizontal,
@@ -631,56 +638,68 @@ function HudController:KnitStart()
 	})
 	-- The count holds its place in the row with a clear copy of itself; the copy that shows sits on top, so its
 	-- bump (2.4 times, turned, settling on the spring) never pushes the words about.
-	local stripCountSlot = Poster.text(stripRow, "display", 34, SS.Count, {
+	local stripCountSlot = Poster.text(stripRow, "display", 34, "ink.900", {
 		Name = "Count",
 		LayoutOrder = 1,
-		Size = UDim2.fromOffset(0, stripPlateHeight),
+		Size = UDim2.fromOffset(0, STRIP_CARD),
 		AutomaticSize = Enum.AutomaticSize.X,
 		TextTransparency = 1,
+		ZIndex = 4,
 	})
-	local stripFigures = Poster.figures(stripCountSlot, 3, 34, SS.Count, {
+	local stripCount = Poster.text(stripCountSlot, "display", 34, "ink.900", {
 		Name = "Shown",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(1, 1),
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 5,
 	})
-	local stripCount = stripFigures.frame
 	local countScale = make("UIScale", stripCount, {})
-	-- words: 15 px, a little see-through, dropped onto the number's baseline
-	local function stripWord(order: number): TextLabel
-		local label = Poster.text(stripRow, "label", 15, SS.Word, {
-			LayoutOrder = order,
-			Size = UDim2.fromOffset(0, stripPlateHeight),
-			AutomaticSize = Enum.AutomaticSize.X,
-			TextTransparency = 0.15,
-		})
-		make("UIPadding", label, { PaddingTop = UDim.new(0, 2 * L.StripDrop) })
-		return label
+	local stripWords = Poster.text(stripRow, "display", 21, "ink.900", {
+		Name = "Words",
+		LayoutOrder = 2,
+		Size = UDim2.fromOffset(0, STRIP_CARD),
+		AutomaticSize = Enum.AutomaticSize.X,
+		ZIndex = 4,
+	})
+	-- (the card's width is worked out from its words: left to AutomaticSize, a shape that fills its box makes
+	-- the box grow without end. Enum.Font.Oswald is the regular face; the Bold one is about a tenth wider.)
+	local function stripWide(phrase: string, css: number): number
+		if phrase == "" then
+			return 0
+		end
+		local size = Poster.px(css, "display")
+		return math.ceil(
+			TextService:GetTextSize(phrase, size, Enum.Font.Oswald, Vector2.new(4000, 400)).X * 1.1
+		)
 	end
-	local stripTitle = stripWord(3) -- "/ 25 STANDING", FINAL TWO, NEXT ROUND ...
-	local titleScale = make("UIScale", stripTitle, {})
-	local stripRound = stripWord(4) -- ROUND 4
-	-- the warning chip: a slanted pink plate with dark lettering, and the "!" so it isn't colour alone
-	local closing = make("Frame", strip.fade, {
-		Name = "Closing",
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, L.Strip.Y + SP[2]),
-		Size = UDim2.fromOffset(0, L.Chip),
-		AutomaticSize = Enum.AutomaticSize.X,
-		Visible = false,
-	})
-	Shapes.slant(closing, SS.Warning, L.ChipLean, { Name = "Plate" })
+	local stripSaid = { words = "", loud = false, countFirst = true }
+	--- What the card says: `count` (or none), its words, pink when `loud`, the number first or last.
+	local function stripSet(count: string?, words: string, loud: boolean, countFirst: boolean)
+		stripSaid.words, stripSaid.loud, stripSaid.countFirst = words, loud, countFirst
+		stripCountSlot.Visible = count ~= nil
+		stripCountSlot.Text = count or ""
+		stripCount.Text = count or ""
+		stripCountSlot.LayoutOrder = if countFirst then 1 else 3
+		stripWords.Text = words
+		local tone = colour(if loud then SS.Word else "ink.900")
+		stripWords.TextColor3 = tone
+		stripCount.TextColor3 = tone
+		stripFill.ImageColor3 = colour(if loud then SS.Warning else SS.Word)
+		local inner = stripWide(words, 21)
+			+ (if count then stripWide(count, 34) + L.StripGap else 0)
+		stripPanel.Size = UDim2.fromOffset(inner + 2 * STRIP_PAD, L.Strip.Y)
+	end
+	-- the warning chip: a small rough-cut pink tile with dark lettering, and the "!" so it isn't colour alone
+	-- (a slanted pink plate until ui-19d)
+	local closing =
+		PosterKit.chip(strip.fade, "!  ARENA CLOSING", 15, SS.Warning, SS.OnWarning, L.Chip, {
+			Name = "Closing",
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, L.Strip.Y + SP[2]),
+			Visible = false,
+		})
 	local closingScale = make("UIScale", closing, {})
-	local closingText = Poster.text(closing, "label", 15, SS.OnWarning, {
-		Size = UDim2.fromScale(0, 1),
-		AutomaticSize = Enum.AutomaticSize.X,
-		Text = "!  ARENA CLOSING",
-		ZIndex = 1,
-	})
-	make("UIPadding", closingText, {
-		PaddingLeft = UDim.new(0, SP[3] + L.ChipLean),
-		PaddingRight = UDim.new(0, SP[3] + L.ChipLean),
-	})
 
 	-- Y: you --------------------------------------------------------------------------------------------
 	-- THE SPEED DIAL (the owner, 2026-11-17: "a speed bar instead of a stagger ... centered at the bottom ... like
@@ -956,7 +975,6 @@ function HudController:KnitStart()
 		local hex = Tokens.hex[`class.{ability:GetKitId()}`]
 		classColour = if hex then Color3.fromHex(hex) else colour("coral.500")
 		paintDial(classColour)
-		Shapes.paint(stripEdge, if stripLast then colour(SS.Last) else classColour)
 		for _, id in ORDER do
 			local tile = tiles[id]
 			if tile.big then
@@ -978,19 +996,16 @@ function HudController:KnitStart()
 	local feed = group(gui, "Feed", Vector2.new(L.FeedWidth, L.FeedRows * (L.FeedRow + L.FeedGap)))
 	feed.holder.AnchorPoint = Vector2.new(1, 0)
 	feed.fade.ClipsDescendants = true -- a row leaves past this edge and is cut off there
-	type FeedRow = { frame: Frame, label: TextLabel, born: number }
+	type FeedRow = { frame: Frame, born: number }
 	local feedRows: { FeedRow } = {}
 
 	-- Spectating: a small strip at the bottom centre while you are out ---------------------------------------
-	-- the SPECTATING chip: a small slanted ink plate, like the top strip's
+	-- the SPECTATING chip: a small cream rough-cut card (a slanted ink plate until ui-19d; cyan for a moment, but the owner does not like blue on these)
 	local spectate = group(gui, "Spectate", HudTheme.Spectate.Chip)
 	spectate.holder.AnchorPoint = Vector2.new(0.5, 1)
-	Shapes.slant(spectate.fade, ST.Plate, L.ChipLean, { Name = "Plate" })
-	Poster.text(spectate.fade, "label", 15, "ivory.50", {
-		Size = UDim2.fromScale(1, 1),
-		TextXAlignment = Enum.TextXAlignment.Center,
-		Text = "SPECTATING",
-		ZIndex = 1,
+	PosterKit.chip(spectate.fade, "SPECTATING", 15, "ivory.50", "ink.900", L.Chip, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
 	})
 
 	-- the target marker: chevron + name, and a thin bar in the other-fighter ramp ----------------------------
@@ -1059,6 +1074,8 @@ function HudController:KnitStart()
 			else 0
 		-- and under the fighters' row while that is up: the row runs nearly the screen's width
 		local underRow = if rosterShown and fighting then SS.Top + (roster.tall + 6) * scale else 0
+		-- the pop-ups (last players, ULTIMATE, a class's name) stand under the row too, in a round or out of one
+		Callouts.under(if rosterShown then SS.Top + roster.tall * scale else nil)
 		feed.holder.Position = UDim2.new(1, -edge, 0, math.max(L.StripTop + underCoins, underRow))
 		spectate.holder.Position = UDim2.new(0.5, 0, 1, -edge)
 		-- the tile row keeps spare room round it inside its group; the tiles themselves stop at the mockup's
@@ -1260,9 +1277,65 @@ function HudController:KnitStart()
 		end)
 	end)
 
+	-- THE ROUND'S START: 3, 2, 1, TUSSLE! (ui-16a; it took the GET READY strip's place). The server holds the
+	-- phase "Starting" until CountdownEnd; the numbers land on the last three whole seconds before it and the
+	-- word as the fight begins. One thread per start, alive only for those few seconds; a number first seen
+	-- more than half a second late is skipped. Not under the open menu window, and never in training.
+	Callouts.start() -- its layers now, so the countdown's sheet is fetched before the first round
+	local countArmed: number? = nil
+	local function countRefresh(round: HudLogic.RoundState)
+		local finish = round.countdownEnd
+		if round.phase ~= "Starting" or finish == nil then
+			if round.phase ~= "Fighting" then
+				-- called off (or no round at all): nothing more lands, and what is up goes
+				if countArmed then
+					countArmed = nil
+					Callouts.countStop()
+				end
+			end
+			return
+		end
+		if countArmed == finish then
+			return
+		end
+		countArmed = finish
+		task.spawn(function()
+			local shown: number? = nil
+			while countArmed == finish do
+				local now = workspace:GetServerTimeNow()
+				local beat = HudLogic.countBeat(now, finish, 0.5)
+				if beat ~= shown then
+					shown = beat
+					local phase = readRound().phase
+					if beat == 0 then
+						if not menuOpen and (phase == "Starting" or phase == "Fighting") then
+							Callouts.go(classColour, device == "touch")
+						end
+						break
+					elseif
+						beat
+						and not menuOpen
+						and phase == "Starting"
+						and HudLogic.countLate(now, finish, beat) < 0.5
+					then
+						Callouts.count(beat, device == "touch")
+					end
+				end
+				if now > finish + 0.5 then
+					break
+				end
+				task.wait()
+			end
+			if countArmed == finish then
+				countArmed = nil
+			end
+		end)
+	end
+
 	local function refreshStrip(fromEvent: boolean)
 		local round = readRound()
 		rosterRefresh(round)
+		countRefresh(round)
 		local now = workspace:GetServerTimeNow()
 		local info = HudLogic.strip(round, now)
 		setGroup(strip, info.visible)
@@ -1270,21 +1343,18 @@ function HudController:KnitStart()
 			lastStrip, lastPhase = info, round.phase
 			return
 		end
-		local roundText = if round.round then `ROUND {round.round}` else ""
 		local fightingNow = round.phase == "Fighting"
 		local counting = round.phase == "Intermission"
-		-- Fighting: [ 18  / 25  STANDING ]; intermission: [ NEXT ROUND  12  ROUND 4 ]; starting: [ GET READY  ROUND 4 ]
-		stripCountSlot.Visible = info.count ~= nil and (fightingNow or counting)
-		stripCountSlot.Text = info.count or ""
-		Poster.setFigures(stripFigures, info.count or "")
-		stripCountSlot.LayoutOrder = if counting then 2 else 1
-		stripTitle.Text = if info.total then `/ {info.total} {info.title}` else info.title
-		stripTitle.LayoutOrder = if counting then 1 else 3
-		stripRound.Visible = roundText ~= "" and not fightingNow
-		stripRound.Text = roundText
-		local last = info.finalTwo or (fightingNow and (round.alive or 0) <= 1)
-		stripLast = last == true
-		Shapes.paint(stripEdge, if stripLast then colour(SS.Last) else classColour)
+		-- Fighting: [ 18  / 25  STANDING ]; intermission: [ NEXT ROUND  12 ]; starting: hidden (the countdown)
+		local loud = info.title == "ROUND OVER"
+			or info.title == "FINAL TWO"
+			or info.title == "LAST ONE"
+		stripSet(
+			if fightingNow or counting then info.count else nil,
+			if info.total then `/ {info.total} {info.title}` else info.title,
+			loud,
+			not counting
+		)
 		local emphasis = fromEvent and HudLogic.emphasize(promptActive, HudMotion.reduced())
 		local before = lastStrip
 		-- Final two: one short emphasis when three became two in a fight, never when it started at two.
@@ -1297,7 +1367,7 @@ function HudController:KnitStart()
 			and fightingNow
 			and emphasis
 		then
-			HudMotion.pop(titleScale, T.EmphasisScale, T.Emphasis)
+			HudMotion.pop(cardScale, T.EmphasisScale, T.Emphasis)
 		end
 		if
 			before
@@ -1383,28 +1453,13 @@ function HudController:KnitStart()
 		end
 	end
 	local function pushFeed(victim: string, attacker: string?, cause: string)
-		local mine = isMe(victim) or isMe(attacker)
-		local function name(n: string): string
-			local tone = if isMe(n) then Tokens.hex["coral.300"] else Tokens.hex["ivory.50"]
-			local short = if utf8.len(n) and (utf8.len(n) :: number) > 16
-				then string.sub(n, 1, 15) .. "…"
-				else n
-			return `<font color="{tone}">{short}</font>`
-		end
-		-- the verb is a word in its own colour: yellow for a knockout, quiet for a fall or a leave
-		local verb = `<font color="{Tokens.hex["gold.400"]}">`
-		local quiet = `<font color="{Tokens.hex["stone.300"]}">`
-		local line = if cause == "left"
-			then `{name(victim)}  {quiet}LEFT</font>`
-			elseif
-				attacker
-				and attacker ~= ""
-				and cause == "knocked"
-			then `{name(attacker)}  {verb}KNOCKED OUT</font>  {name(victim)}`
-			else `{name(victim)}  {quiet}FELL</font>`
-		-- A row in the fight-poster look: a slanted ink plate like the top strip's, the words upright on it. A
-		-- line about you has yellow under the ink, showing as its right edge. `frame` is the row's place in the
-		-- list (relayoutFeed moves it); `slide` is what comes in from the right on the spring and leaves that way.
+		-- A row with NO PLATE, and SIMPLE (the owner, 2026-11-18, in order: "i HATE this style" of the slanted ink
+		-- plate; "not cartoony / vibrant enough" of cream names beside a small yellow tile; then, of names on bright
+		-- cards with a loud pink verb, "i still don't like this ui ... make the current one simpler"). So a row is
+		-- ONE LINE OF POSTER LETTERING and nothing else, told apart by colour alone: the one who did it in coin
+		-- yellow, what happened smaller (KNOCKED OUT pink, FELL orange, LEFT cyan), the one it happened to in
+		-- cream, YOUR name in cyan wherever it stands. No cards, no tiles. It slides in from the right.
+		-- `frame` is the row's place in the list (relayoutFeed moves it); `slide` is what comes in and leaves.
 		local frame = make("Frame", feed.fade, {
 			Name = "Row",
 			BackgroundTransparency = 1,
@@ -1415,44 +1470,48 @@ function HudController:KnitStart()
 		local slide = make("Frame", frame, {
 			Name = "Slide",
 			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.fromScale(1, 0.5),
 			Size = UDim2.fromScale(1, 1),
 		})
-		if mine then
-			-- only the right end, its left side well under the ink (a whole plate under the ink showed as a
-			-- yellow hairline down the row's left side too)
-			Shapes.slant(slide, "coral.500", L.ChipLean, {
-				Name = "Edge",
-				AnchorPoint = Vector2.new(1, 0),
-				Position = UDim2.fromScale(1, 0),
-				Size = UDim2.new(0, 2 * L.ChipLean + L.FeedEdge + 2, 1, 0),
-			})
+		make("UIListLayout", slide, {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Right,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 7),
+		})
+		make("UIPadding", slide, { PaddingRight = UDim.new(0, 6) })
+		local function name(n: string, order: number, tone: string)
+			local short = if utf8.len(n) and (utf8.len(n) :: number) > 13
+				then string.sub(n, 1, 12) .. "…"
+				else n
+			PosterKit.lettering(
+				slide,
+				18,
+				if isMe(n) then "teal.400" else tone,
+				short,
+				{ LayoutOrder = order }
+			)
 		end
-		Shapes.slant(slide, ST.Plate, L.ChipLean, {
-			Name = "Plate",
-			Size = UDim2.new(1, if mine then -L.FeedEdge else 0, 1, 0),
-			ZIndex = 1,
-		})
-		local label = Poster.text(slide, "label", 15, "ivory.50", {
-			Size = UDim2.fromScale(1, 1),
-			RichText = true,
-			Text = line,
-			TextXAlignment = Enum.TextXAlignment.Center,
-			ZIndex = 2,
-		})
-		-- the plate is as wide as its words (measured, not left to AutomaticSize, which made it too wide)
-		-- TextBounds is in screen pixels, so it is taken back to the HUD's own units
-		local pad = SP[3] + L.ChipLean
-		local edge = if mine then L.FeedEdge else 0
-		local width = math.min(
-			L.FeedWidth,
-			math.ceil(label.TextBounds.X / math.max(feed.scale.Scale, 0.01)) + 2 * pad + edge
-		)
-		frame.Size = UDim2.fromOffset(width, L.FeedRow)
-		make("UIPadding", label, { PaddingRight = UDim.new(0, edge) })
+		local function verb(words: string, tone: string)
+			PosterKit.lettering(slide, 14, tone, words, { LayoutOrder = 2 })
+		end
+		if cause == "left" then
+			name(victim, 1, "ivory.50")
+			verb("LEFT", "teal.400")
+		elseif attacker and attacker ~= "" and cause == "knocked" then
+			name(attacker, 1, "gold.400")
+			verb("KNOCKED OUT", "danger.600")
+			name(victim, 3, "ivory.50")
+		else
+			name(victim, 1, "ivory.50")
+			verb("FELL", "class.Bruiser")
+		end
 		Poster.run(slide, T.FeedIn, function(t: number)
-			slide.Position = UDim2.fromOffset(L.FeedWidth / 2 * (1 - PosterEase.spring(t)), 0)
+			slide.Position = UDim2.new(1, L.FeedWidth / 2 * (1 - PosterEase.spring(t)), 0.5, 0)
 		end)
-		local row: FeedRow = { frame = frame, label = label, born = os.clock() }
+		local row: FeedRow = { frame = frame, born = os.clock() }
 		table.insert(feedRows, 1, row)
 		while #feedRows > L.FeedRows do
 			local old = table.remove(feedRows) :: FeedRow
@@ -1468,7 +1527,7 @@ function HudController:KnitStart()
 				table.remove(feedRows, at)
 				-- out to the right, past the feed's own edge, which cuts it off
 				Poster.run(slide, T.FeedOut, function(t: number)
-					slide.Position = UDim2.fromOffset((L.FeedWidth + 40) * PosterEase.easeIn(t), 0)
+					slide.Position = UDim2.new(1, (L.FeedWidth + 40) * PosterEase.easeIn(t), 0.5, 0)
 				end, function()
 					frame:Destroy()
 				end)
@@ -1607,6 +1666,15 @@ function HudController:KnitStart()
 			charConns,
 			model:GetAttributeChangedSignal("HT_Spectating"):Connect(function()
 				refreshGroups()
+			end)
+		)
+		-- You use your ultimate (UltimateService marks you "attacker"): your class's name, in cards (ui-17a).
+		table.insert(
+			charConns,
+			model:GetAttributeChangedSignal("HT_Ultimate"):Connect(function()
+				if model:GetAttribute("HT_Ultimate") == "attacker" and not menuOpen then
+					Callouts.className(ability:GetKitId(), classColour, device == "touch")
+				end
 			end)
 		)
 		-- Nothing from a previous life carries over.
@@ -1969,8 +2037,7 @@ function HudController:KnitStart()
 			local info = HudLogic.strip(readRound(), workspace:GetServerTimeNow())
 			if info.count and info.count ~= lastCountdown then
 				lastCountdown = info.count
-				stripCountSlot.Text = info.count
-				Poster.setFigures(stripFigures, info.count)
+				stripSet(info.count, stripSaid.words, stripSaid.loud, stripSaid.countFirst)
 			end
 		end
 

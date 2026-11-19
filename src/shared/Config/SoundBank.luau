@@ -395,6 +395,34 @@ local SoundBank: { [string]: Entry } = {
 		name = "HT last_2",
 		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
 	},
+	-- THE ROUND-START COUNTDOWN (ui-16a): the mockup's 'cd' and 'go' through the punchy master
+	-- (make_ui_sounds.py, COUNTDOWN). A click and a low thump under one note, a step higher each beat (392, 440,
+	-- 523 Hz); then a rising rush, a bigger thump and a three-note chord. `volume` is the mockup peak x 2.2.
+	["cd_3"] = {
+		takes = { { id = 94564587273247, length = 0.33, start = 0, volume = 0.75 } },
+		looped = false,
+		name = "HT cd_3",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
+	["cd_2"] = {
+		takes = { { id = 75392261806381, length = 0.33, start = 0, volume = 0.75 } },
+		looped = false,
+		name = "HT cd_2",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
+	["cd_1"] = {
+		takes = { { id = 124811278249045, length = 0.33, start = 0, volume = 0.75 } },
+		looped = false,
+		name = "HT cd_1",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
+	-- TUSSLE!
+	["round_go"] = {
+		takes = { { id = 130821106950645, length = 0.68, start = 0, volume = 0.8 } },
+		looped = false,
+		name = "HT round_go",
+		creator = "Haymaker Tussle (synthesised, make_ui_sounds.py)",
+	},
 	-- The pointer comes onto a button. NOT in the mockup (the owner asked for it, 2026-11-17): a soft sine that
 	-- lifts a little where the press falls, at about half the press's level.
 	["ui_hover"] = {

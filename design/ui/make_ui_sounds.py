@@ -200,6 +200,35 @@ PUNCHY = {
 }
 
 
+# THE ROUND-START COUNTDOWN (ui-16a, the owner 2026-11-18: "3, 2, 1, TUSSLE!" with sounds; heard on the mockup page
+# first). The mockup's `punch()` cases 'cd' and 'go', always through the punchy master: a click and a low thump
+# under one note, a step higher each beat; then a rising rush, a bigger thump and a bright three-note chord.
+def beat(f):
+    return [
+        click(0.03, 0.2, 2400, 1500, 0, 0.001, 1.2),
+        osc(150, 62, 0.22, "sine", 0.3, 0, 0.002),
+        osc(f, f, 0.3, "triangle", 0.17, 0, 0.003),
+        osc(f * 1.5, f * 1.5, 0.22, "sine", 0.05, 0, 0.003),
+    ]
+
+
+def go():
+    parts = [
+        click(0.3, 0.14, 600, 4200, 0, 0.14, 0.8),
+        click(0.04, 0.22, 2600, 1500, 0.02, 0.001, 1.2),
+        osc(130, 44, 0.5, "sine", 0.34, 0.02, 0.003),
+    ]
+    for i, f in enumerate((523, 659, 784)):
+        parts.append(osc(f, f, 0.6, "triangle", 0.13, 0.02 + i * 0.015, 0.004))
+    parts.append(osc(1568, 1568, 0.34, "sine", 0.05, 0.1, 0.004))
+    return parts
+
+
+COUNTDOWN = {"cd_3": beat(392), "cd_2": beat(440), "cd_1": beat(523), "round_go": go()}
+SOUNDS.update(COUNTDOWN)
+PUNCHY.update(COUNTDOWN)
+
+
 def main():
     out_dir = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "sfx", "ui")
     os.makedirs(out_dir, exist_ok=True)

@@ -50,7 +50,39 @@ Shapes.ids = {
 	-- the kill leader's crown in the fighters' row: pixel art, 21 x 15 cells at 16 px (design/ui/make_crown.py);
 	-- drawn with ResampleMode Pixelated. NOT tinted: it carries its own colours.
 	crownPixel = "rbxassetid://112758624871088",
+	-- the round-start countdown's lettering (assets/icons/poster/countdown_sheet.png, 1024 x 600, from
+	-- design/ui/poster_countdown.html): see `Shapes.count`
+	count = "rbxassetid://101250510173451",
+	-- the letter cards' letters, A to Z and "!" (assets/icons/poster/card_letters.png, 1024 x 720, from
+	-- design/ui/poster_cards.html): see `Shapes.cards`
+	cards = "rbxassetid://103788059570384",
+	-- the coach's notes (ui-19d; design/ui/make_note_marks.py, assets/icons/poster/). The hooked arrow (208 x
+	-- 192) and the hand-drawn ring (400 x 160) are WHITE and tinted ink; the stopwatch (272 x 272) carries its own
+	-- colours, a cream face and an ink line, and is shown untinted.
+	noteArrow = "rbxassetid://99511529578400",
+	noteRing = "rbxassetid://89833043727802",
+	stopwatch = "rbxassetid://130771830611628",
 } :: { [string]: string }
+
+-- The round-start countdown's sheet (ui-16a). TOP ROW: the numbers 3, 2, 1 in cells of `cell`, each in its own
+-- colour with its outline and shadow, shown untinted. FROM `letterTop` DOWN: the TUSSLE! cards' letters in cells
+-- of `letterCell`, WHITE (tinted where used), drawn `letterScale` times the mockup's 128 px; `width` is each
+-- letter's own width at 128 px as the browser measures it.
+Shapes.count = {
+	cell = Vector2.new(256, 400),
+	numbers = { [3] = 0, [2] = 1, [1] = 2 },
+	letterCell = Vector2.new(128, 200),
+	letterTop = 400,
+	letterScale = 1.25,
+	letters = {
+		T = { cell = 0, width = 57 },
+		U = { cell = 1, width = 75.3 },
+		S = { cell = 2, width = 65.8 },
+		L = { cell = 3, width = 56.7 },
+		E = { cell = 4, width = 57.2 },
+		["!"] = { cell = 5, width = 32.9 },
+	} :: { [string]: { cell: number, width: number } },
+}
 
 -- The window's drifting word: one TILE per word, from design/ui/make_word_tiles.py (the browser draws them in
 -- the mockup's font). A tile is one word-and-gap wide and two rows (168) tall, its second row set 140 to the
@@ -86,6 +118,45 @@ Shapes.letters = {
 	},
 	words = { "rbxassetid://140543979882744" },
 } :: { [string]: { string } }
+
+-- The letter cards' sheet (ui-17a): A to Z and "!" in cells of `cell`, `perRow` to a row, WHITE (tinted where
+-- used), drawn `scale` times the reference `size` (the mockup's 128 px). `width` is each letter's own width at
+-- that size as the browser measures it.
+Shapes.cards = {
+	cell = Vector2.new(144, 180),
+	perRow = 7,
+	scale = 1.125,
+	size = 128,
+	letters = {
+		A = { cell = 0, width = 70.5 },
+		B = { cell = 1, width = 75.3 },
+		C = { cell = 2, width = 72.1 },
+		D = { cell = 3, width = 75 },
+		E = { cell = 4, width = 57.2 },
+		F = { cell = 5, width = 55.6 },
+		G = { cell = 6, width = 74.5 },
+		H = { cell = 7, width = 78.1 },
+		I = { cell = 8, width = 38.5 },
+		J = { cell = 9, width = 44.7 },
+		K = { cell = 10, width = 72.6 },
+		L = { cell = 11, width = 56.7 },
+		M = { cell = 12, width = 90.1 },
+		N = { cell = 13, width = 71.8 },
+		O = { cell = 14, width = 75 },
+		P = { cell = 15, width = 73.1 },
+		Q = { cell = 16, width = 75 },
+		R = { cell = 17, width = 76.8 },
+		S = { cell = 18, width = 65.8 },
+		T = { cell = 19, width = 57 },
+		U = { cell = 20, width = 75.3 },
+		V = { cell = 21, width = 67.3 },
+		W = { cell = 22, width = 89.2 },
+		X = { cell = 23, width = 65.9 },
+		Y = { cell = 24, width = 63.1 },
+		Z = { cell = 25, width = 55.4 },
+		["!"] = { cell = 26, width = 32.9 },
+	} :: { [string]: { cell: number, width: number } },
+}
 
 -- The last-players numbers' sheet: cells in the order 5, 4, 3, 2, each number's own box in the middle of its
 -- cell. Full colour (cream, ink outline and shadow), so it is shown untinted.

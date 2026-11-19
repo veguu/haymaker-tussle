@@ -257,6 +257,9 @@ Tokens.family = {
 	poster = "rbxasset://fonts/families/Oswald.json", -- the fight-poster look's numbers and big words
 	text = "rbxasset://fonts/families/TitilliumWeb.json",
 	mono = "rbxasset://fonts/families/BuilderMono.json",
+	-- the coach's notes (ui-19d): the small descriptive lines, as if written on the poster with a brush pen. A
+	-- stock Roblox family with a Bold face (checked with TextService:GetFamilyInfoAsync, 2026-11-18).
+	note = "rbxasset://fonts/families/Kalam.json",
 }
 
 local cache: { [string]: any } = {}
