@@ -662,7 +662,14 @@ local function armAt(arm, spec)
 	end
 	local sideSign = if arm == "Right Arm" then 1 else -1
 	local direction = aim(sideSign, spec.sweep, spec.lift)
-	return add(SHOULDER[arm], direction, spec.reach), direction
+	-- `out` (kits-8h): the arm's pivot moved out past the torso's edge. SHOULDER is the torso's edge (x 1), so an arm
+	-- aimed forward from it sits half inside the torso; an R6 arm hangs on x 1.5. The owner on the Fold pose: "the arms
+	-- are inside the torso whereas in the drawing, the arms are outside the torso".
+	local centre = add(SHOULDER[arm], direction, spec.reach)
+	if spec.out then
+		centre = add(centre, { sideSign, 0, 0 }, spec.out)
+	end
+	return centre, direction
 end
 
 local EASINGS = {
@@ -884,16 +891,29 @@ local TAKEOFF_FEET = {
 -- tests/support/Rig), so to keep a world aim the sweep follows the turn and the lift adds the lean.
 local HAY_TURN_LOADED = -45
 local HAY_TURN_STRUCK = 20
-local HAY_UP = 28
+-- the drive's rise above level. kits-8g, the owner: "the animations need to be re-angled a little to match the impact
+-- frame, for the last punch the blow should be straighter and the target shouldnt be angled too highly" (the drawn
+-- plunge drives nearly level into an upright torso). It was 28.
+local HAY_UP = 10
 local HAY_LEAN_LOADED = 35
 local HAY_LEAN_STRUCK = 22
-local HAY_INWARD = 18 -- a straight right aims at their middle: the fist crosses to the centreline at full reach
+-- a straight right aims at their middle: the fist crosses to the centreline at full reach. kits-8h: 22 (it was 18), so the fist
+-- lands on the chest's centre as the drawn plunge has it (Plunge.cs HX 0; measured live: 14 put it at -0.31, 18 at -0.15)
+local HAY_INWARD = 22
 -- cocked: the fist up and back by the ear (solved on the Rig for the loaded torso: world aim about (0.2, 0.87, 0.43))
 local COCKED_UP = { sweep = 122, lift = 28, reach = 0.65 }
-local STRUCK = { sweep = HAY_TURN_STRUCK - HAY_INWARD, lift = HAY_UP + HAY_LEAN_STRUCK, reach = 1.45 }
+local STRUCK =
+	{ sweep = HAY_TURN_STRUCK - HAY_INWARD, lift = HAY_UP + HAY_LEAN_STRUCK, reach = 1.45 }
 local SIGHT = { sweep = -HAY_TURN_LOADED, lift = 25 + HAY_LEAN_LOADED, reach = 1.15 } -- the left hand out at them
 local HAYMAKER_UP_KEYS = {
-	{ t = 0, right = GUARDED, left = GUARDED, lean = STANCE_DIP, turn = STANCE_TURN, feet = STANCE_FEET },
+	{
+		t = 0,
+		right = GUARDED,
+		left = GUARDED,
+		lean = STANCE_DIP,
+		turn = STANCE_TURN,
+		feet = STANCE_FEET,
+	},
 	{
 		t = 0.18,
 		ease = "out",
@@ -1028,7 +1048,13 @@ local RUSH_IN_KEYS = {
 -- and a little down in the world)
 local RUN_COCKED = { sweep = 158, lift = -67, reach = 0.8 }
 local RUSH_RUN_KEYS = {
-	{ t = 0, right = RUN_COCKED, left = { sweep = -15, lift = 35, reach = 1.05 }, lean = 40, look = 6 },
+	{
+		t = 0,
+		right = RUN_COCKED,
+		left = { sweep = -15, lift = 35, reach = 1.05 },
+		lean = 40,
+		look = 6,
+	},
 	{
 		t = 0.16,
 		ease = "smooth",
@@ -1144,8 +1170,9 @@ local FOLD_FEET = {
 local FOLD_KEYS = {
 	{
 		t = 0,
-		right = { sweep = 22, lift = -25, reach = 1.0 },
-		left = { sweep = 18, lift = -30, reach = 1.0 },
+		-- kits-8h: the arms hang outside the torso (`out` 0.5, on the R6 arm line), as the drawn plunge has them
+		right = { sweep = 22, lift = -25, reach = 1.0, out = 0.5 },
+		left = { sweep = 18, lift = -30, reach = 1.0, out = 0.5 },
 		lean = 28,
 		turn = 0,
 		crouch = 0,
@@ -1156,8 +1183,8 @@ local FOLD_KEYS = {
 		-- the C closes round the fist a little more as it drives in
 		t = 0.25,
 		ease = "out",
-		right = { sweep = 26, lift = -35, reach = 1.0 },
-		left = { sweep = 22, lift = -38, reach = 1.0 },
+		right = { sweep = 26, lift = -35, reach = 1.0, out = 0.5 },
+		left = { sweep = 22, lift = -38, reach = 1.0, out = 0.5 },
 		lean = 34,
 		turn = 2,
 		crouch = 0,

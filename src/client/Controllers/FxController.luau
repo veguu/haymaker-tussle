@@ -22,7 +22,7 @@ local BeastFx = require(script.Parent.Parent.Fx.BeastFx)
 local BruiserFx = require(script.Parent.Parent.Fx.BruiserFx)
 local ClashFx = require(script.Parent.Parent.Fx.ClashFx)
 local DashFx = require(script.Parent.Parent.Fx.DashFx)
-local ImpactFrame = require(script.Parent.Parent.Fx.ImpactFrame)
+local DrawnImpact = require(script.Parent.Parent.Fx.DrawnImpact)
 local DragonFx = require(script.Parent.Parent.Fx.DragonFx)
 local FrostFx = require(script.Parent.Parent.Fx.FrostFx)
 local FxKit = require(script.Parent.Parent.Fx.FxKit)
@@ -1115,7 +1115,7 @@ function FxController:KnitInit()
 	task.spawn(KickHitFx.preload)
 	task.spawn(ClashFx.preload)
 	task.spawn(AirFx.preload)
-	task.spawn(ImpactFrame.preload) -- the ultimate's cards (kits-8c: first-shown images drew blank)
+	task.spawn(DrawnImpact.preload) -- the ultimate's drawn impact frames (kits-8c: first-shown images drew blank)
 end
 
 -- Smoke at the feet of anyone drifting in a propel: moving fast with the body pointing away from

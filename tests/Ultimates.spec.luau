@@ -198,10 +198,11 @@ return {
 			if freeze then
 				frozen += 1
 				-- a SLOWED hit (kits-7m, the haymaker: the owner asked for slow motion "so you can feel the weight")
-				-- runs longer, its bodies creep on, and the camera zooms in instead of snapping
+				-- runs longer, its bodies creep on, and the camera zooms in instead of snapping (kits-8e: up to 1.8 s, the
+				-- owner's "the part where the fist sinks in should be longer")
 				local slowed = blow.slow ~= nil
 				assert(
-					freeze >= 0.15 - 1e-6 and freeze <= (if slowed then 1 else 0.4),
+					freeze >= 0.15 - 1e-6 and freeze <= (if slowed then 1.8 else 0.4),
 					`freeze at {blow.t} out of the measured range`
 				)
 				if not slowed then
@@ -479,21 +480,33 @@ return {
 		-- an ease-out to 4 studs/s and a jump to 56-101 as the flight took over, and a 46 deg snap in its turn.
 		local line = Ultimates.TIMELINES.Base
 		local start = Vector3.new(0, 0, 12)
-		local haymaker = 0
+		-- kits-8e, the owner: "the part where the fist sinks in should be longer". So the sink, from the hit to the blast,
+		-- may be slow, but it never stops; after the blast it is fast at once and speeds up into the flight.
+		local haymaker, blast = 0, 0
 		for _, cue in line.cues do
 			if cue.name == "haymaker" then
 				haymaker = cue.t
+			elseif cue.name == "blast" then
+				blast = cue.t
 			end
 		end
+		assert(blast - haymaker >= 1.2, `the sink lasts {blast - haymaker} s`)
 		local step = 1 / 60
 		local t = haymaker + step
+		local fastest = 0
 		while t < line.cinematic do
 			local _, a = Ultimates.pose(line, t - step, start)
 			local _, b = Ultimates.pose(line, t, start)
 			local speed = (b - a).Magnitude / step
-			assert(speed > 2, `the target stalls at {t} ({speed} studs/s)`)
+			if t <= blast + 1e-6 then
+				assert(speed > 0.6, `the target stalls in the sink at {t} ({speed} studs/s)`)
+			else
+				assert(speed > 2, `the target stalls after the blast at {t} ({speed} studs/s)`)
+				fastest = math.max(fastest, speed)
+			end
 			t += step
 		end
+		assert(fastest > 10, `the knockback only reaches {fastest} studs/s after the blast`)
 		-- the flight leaves at the speed the knockback reached, and its turn goes on from the last pose
 		local anchor = CFrame.new(0, 0, 0)
 		local _, last = Ultimates.pose(line, line.cinematic, start)
@@ -514,6 +527,189 @@ return {
 		)
 		local _, snap = (posed.Rotation:Inverse() * first.Rotation):ToAxisAngle()
 		assert(math.deg(snap) < 2, `the turn snaps {math.deg(snap)} deg`)
+	end,
+
+	["the camera sees the haymaker as the drawn plunge does, and no darkening before it (kits-8h)"] = function()
+		-- the owner: "the camera zoom should match the impact frame, and also the arm posiitoning should match the impact
+		-- frame too, at least before the impact frame hits"; "right before the first impact frame the screen darkens"
+		local DrawnView = require("./support/DrawnView")
+		local line = Ultimates.TIMELINES.Base
+		local start = Vector3.new(0, 0, 12)
+		local at: { [string]: number } = {}
+		for _, cue in line.cues do
+			assert(cue.name ~= "darken", "the darkening before the haymaker is back")
+			at[cue.name] = at[cue.name] or cue.t
+		end
+		-- the owner: "Hide body, keep arm": every drawn-view close-up shows the attacker's striking arm alone
+		local solo = line.soloArm
+		assert(solo and solo.part == "Right Arm", "the drawn view shows the striking arm alone")
+		for _, s in line.shots do
+			if s.rel == "target" then
+				assert(
+					s.t >= solo.from - 1e-6 and s.t < solo.to,
+					`a drawn-view shot at {s.t} shows the attacker's body`
+				)
+			end
+		end
+		for _, case in { { at.haymaker, 1.9, "contact" }, { at.plunge, 1, "plunge" } } do
+			local t, scale, name = case[1], case[2], case[3]
+			local cam, look, roll = DrawnView.view(line, t, scale, start)
+			local shot
+			for _, s in line.shots do
+				if s.rel == "target" and s.t <= t + 1e-6 then
+					shot = s
+				end
+			end
+			assert(shot, `no drawn-view shot by the {name}`)
+			assert(
+				(shot.cam - cam).Magnitude < 0.05,
+				`the {name} camera is {(shot.cam - cam).Magnitude} studs off the drawing's line`
+			)
+			local dir = (shot.look - shot.cam).Unit
+			local want = (look - cam).Unit
+			local off = math.deg(math.acos(math.clamp(dir:Dot(want), -1, 1)))
+			assert(off < 1, `the {name} camera aims {off} deg off the drawing's`)
+			assert(math.abs(shot.fov - DrawnView.FOV) < 0.2, `the {name} FOV is not the drawing's`)
+			assert(math.abs((shot.roll or 0) - roll) < 1, `the {name} roll is not the drawing's`)
+		end
+	end,
+
+	["the barrage sound lasts the whole flurry (kits-8g)"] = function()
+		-- the owner: "the barrage sound doesnt play until the end of the animation" (a 1.02 s file over 1.875 s of punches)
+		local SoundCandidates = require("../src/shared/Config/SoundCandidates")
+		local line = Ultimates.TIMELINES.Base
+		local from, last = math.huge, 0
+		for _, cue in line.cues do
+			if cue.name == "barrage" then
+				from = math.min(from, cue.t)
+			elseif cue.name == "flurryHit" then
+				last = math.max(last, cue.t)
+			end
+		end
+		local options = SoundCandidates.OPTIONS.ult_barrage
+		assert(options and #options > 0, "no barrage sound to play")
+		for _, option in options do
+			local take = option.takes[1]
+			local plays = take.length - (take.start or 0)
+			assert(
+				plays >= last - from - 0.05,
+				`barrage "{option.name}" plays {plays} s over {last - from} s of punches`
+			)
+		end
+	end,
+
+	["the fist sinks deeper through the slow part, and nothing stands still (kits-8f)"] = function()
+		-- kits-8e's live check: the "sink" read as a freeze. Measured, the fist backed OUT of the chest (0.74 studs clear by
+		-- the plunge) while the attacker crept at 0.2 studs/s. Now, from the end of the contact frames to the blast, the
+		-- fist tip works deeper past the chest's front face, never through the back, and both bodies keep moving.
+		local Rig = require("./support/Rig")
+		local UltimateClips = require("../src/shared/Config/AnimClipsUltimate")
+		local line = Ultimates.TIMELINES.Base
+		local start = Vector3.new(0, 0, 12)
+		local hit, blast = 0, 0
+		for _, cue in line.cues do
+			if cue.name == "haymaker" then
+				hit = cue.t
+			elseif cue.name == "blast" then
+				blast = cue.t
+			end
+		end
+		local slow, foldFrom = 0, 0
+		for _, blow in line.blows do
+			if math.abs(blow.t - hit) < 0.011 then
+				slow = blow.slow or 0
+			end
+		end
+		for _, c in line.targetClips do
+			if c.name == "Fold" and c.t <= hit then
+				foldFrom = c.t
+			end
+		end
+		local clip, fold = UltimateClips.HaymakerUp, UltimateClips.Fold
+		-- the fist tip past the chest's front face, and its height up the torso (-1 bottom, 0 centre, +1 top)
+		local function depth(t: number): (number, number)
+			local a, tg = Ultimates.pose(line, t, start)
+			local tip = Rig.strike(
+				Ultimates.attackerFrame(a, tg),
+				clip,
+				(clip.strike or 0) + (t - hit) * slow
+			)
+			local root =
+				Ultimates.targetCFrame(tg, tg + Vector3.new(0, 0, 1), Ultimates.tilt(line, t))
+			local torso = Rig.parts(root, Rig.sample(fold, t - foldFrom)).Torso
+			local l = torso:PointToObjectSpace(tip)
+			return l.Z + 0.5, l.Y
+		end
+		local from = hit + Ultimates.drawnLength("contact")
+		local step = 0.05
+		local last = depth(from)
+		assert(last > 0.15, `the fist is out of the chest as the contact frames end ({last})`)
+		-- kits-8g, the owner: "the target should be getting hit in the center of the torso not the top"
+		-- (kits-8h: the centre the drawn plunge hits: the chest's true centre, the owner's pick. Measured live at ~40 fps the game
+		-- matches this rig; a 0.35 offset seen at ~14 fps was a measuring artefact)
+		local DENT = 0
+		local _, atHit = depth(hit)
+		assert(math.abs(atHit - DENT) < 0.25, `the fist lands {atHit} off the chest's centre`)
+		local t = from + step
+		while t <= blast + 1e-6 do
+			local d, height = depth(t)
+			assert(d >= last - 0.01, `the fist backs out at {t} ({last} -> {d})`)
+			assert(d < 0.8, `the fist goes through the back at {t} ({d})`)
+			assert(
+				math.abs(height - DENT) < 0.25,
+				`the fist rides off the chest's centre at {t} ({height})`
+			)
+			local a1, t1 = Ultimates.pose(line, t - step, start)
+			local a2, t2 = Ultimates.pose(line, t, start)
+			assert((a2 - a1).Magnitude / step > 0.6, `the attacker stalls in the sink at {t}`)
+			assert((t2 - t1).Magnitude / step > 0.6, `the target stalls in the sink at {t}`)
+			last = d
+			t += step
+		end
+		assert(last - depth(from) > 0.15, "the fist works visibly deeper over the sink")
+	end,
+
+	["two drawn impact runs: contact on the hit, the plunge ending on the blast (kits-8e)"] = function()
+		-- the owner: "there should only be 2 impact frames, the initial connection and then right before the knockback"
+		local line = Ultimates.TIMELINES.Base
+		local at: { [string]: number } = {}
+		for _, cue in line.cues do
+			assert(
+				cue.name ~= "soak" and cue.name ~= "release",
+				`the old card run "{cue.name}" is still cued`
+			)
+			at[cue.name] = cue.t
+		end
+		assert(at.haymaker and at.plunge and at.blast, "haymaker, plunge and blast are all cued")
+		-- kits-8h, the owner: "you should see the frame before you ssee the punch hit"
+		assert(
+			at.impact and at.impact < at.haymaker,
+			"the contact frames flash before the fist lands"
+		)
+		assert(
+			at.impact + Ultimates.drawnLength("contact") > at.haymaker,
+			"and are still up as it lands"
+		)
+		assert(
+			math.abs(at.plunge + Ultimates.drawnLength("plunge") - at.blast) < 1e-6,
+			"the plunge ends as the knockback goes full speed"
+		)
+		assert(
+			at.plunge - (at.haymaker + Ultimates.drawnLength("contact")) >= 0.8,
+			"the slow sink shows between the two runs"
+		)
+		-- kits-8g, the owner: an impact frame is "an instant" (Azure Flames: each drawing 1-3 frames at 30 fps)
+		for name, run in Ultimates.DRAWN do
+			local length = Ultimates.drawnLength(name)
+			assert(length <= 0.15, `the {name} run lasts {length} s: not an instant`)
+			assert(#run.show >= 3, `the {name} run flashes too few drawings to read as motion`)
+			for _, drawing in run.show do
+				assert(
+					drawing >= 1 and drawing <= run.frames,
+					`{name} shows drawing {drawing} of {run.frames}`
+				)
+			end
+		end
 	end,
 
 	["the anchor faces outward from the arena's middle"] = function()

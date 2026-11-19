@@ -175,6 +175,30 @@ Applied in `design/vfx/impact/build_plunge.ps1`:
 - **The fist:** its end square on the chest round the contact, its edges to the right vanishing point.
 - **Cross-contours:** they turn at the near corner, and the heavy line runs down that corner.
 
+## 5. The scratchy style, read from the user's sketch references (zpicyowl, Kopinski, ink sketches)
+
+The user rejected thick outlines with even hatching inside every shape ("not the scratchy style"), and scribble loops.
+What the references do:
+1. **No traced outlines.** Edges are a few thin searching lines, tapered, overlapping, slightly off each other. On the
+   lit side they fade or vanish (lost edges). Dark accents only where forms overlap or press together.
+2. **Tone is shadow only.**
+   - Lit planes stay paper.
+   - Shadow shapes (form shadows, cast shadows, the inside of a dent) are hatched.
+   - A shadow shape has an edge where the hatching stops, ragged rather than a fade.
+   - Inside the shape the tone is even, darker toward its darkest spot (more rows in between).
+3. **Hatching in rows.** Parallel strokes, evenly spaced, laid along the surface's own directions. On a dent's wall
+   they curve round in rings (contour hatching). Each stroke is tapered, drifts a little off true, and lifts every
+   40-140 px, overlapping the next. Random short strokes read as fur.
+4. **The whole drawing is marks:** no fills, no clean geometry.
+
+And Roblox parts are slightly rounded (the user's rounded-cube and R6 references):
+- Edges are fillets, quarter-rounds in the same perspective. The tone grades across them from one face to the next.
+- The silhouette runs where each fillet turns away from the eye, so the corners come out round.
+- Where two seen faces meet there's only a soft light line, not a crease.
+
+Code: `design/vfx/impact/Plunge.cs` (`Rows`, `Search`, `DrawRB`, the torso's fillet loop), `design/vfx/study/Pencil.cs`
+(`Hair`).
+
 ## Sources
 - [Curvilinear perspective (Wikipedia)](https://en.wikipedia.org/wiki/Curvilinear_perspective); [Fish-eye perspective with Peter Han (Proko)](https://www.proko.com/lesson/fish-eye-perspective-with-peter-han); [5-point perspective](https://www.inkl.com/news/how-to-draw-5-point-perspective)
 - [Cross-contour lines (Fiveable)](https://fiveable.me/drawing-foundations/key-terms/cross-contour-lines); [Construction drawing and cross contour (Rebelle Art School)](https://www.escapemotions.com/blog/rebelle-art-school-construction-drawing-and-cross-contour); [Hatching that follows a surface (Eurographics paper)](https://diglib.eg.org/bitstream/handle/10.2312/exp20191082/111-121.pdf); [Cross contour on organic forms (Proko)](https://www.proko.com/course-lesson/project-cross-contour-on-organic-forms)
