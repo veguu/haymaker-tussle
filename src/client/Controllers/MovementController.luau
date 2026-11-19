@@ -1183,7 +1183,11 @@ function MovementController:_bind(
 						local moving = root.AssemblyLinearVelocity
 						local level = Vector3.new(moving.X, 0, moving.Z)
 						local up, forward = Jump.launch(jumpCfg, level.Magnitude)
-						jumpReadyAt = now + jumpCfg.Cooldown
+						-- NO JUMP COOLDOWN IN THE LOBBY (the owner, 2026-11-18): it is a fight's rule, and in
+						-- the lobby, its practice end too, you may jump again as soon as you land. In a
+						-- round (the server marks you HT_InRound) the cooldown stands as before.
+						local inRound = Players.LocalPlayer:GetAttribute("HT_InRound") == true
+						jumpReadyAt = if inRound then now + jumpCfg.Cooldown else now
 						jumping = true
 						if forward then
 							state = Momentum.moving(state, level.X, level.Z, forward)

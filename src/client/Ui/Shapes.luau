@@ -56,6 +56,12 @@ Shapes.ids = {
 	-- the letter cards' letters, A to Z and "!" (assets/icons/poster/card_letters.png, 1024 x 720, from
 	-- design/ui/poster_cards.html): see `Shapes.cards`
 	cards = "rbxassetid://103788059570384",
+	-- the coach's notes (ui-19d; design/ui/make_note_marks.py, assets/icons/poster/). The hooked arrow (208 x
+	-- 192) and the hand-drawn ring (400 x 160) are WHITE and tinted ink; the stopwatch (272 x 272) carries its own
+	-- colours, a cream face and an ink line, and is shown untinted.
+	noteArrow = "rbxassetid://99511529578400",
+	noteRing = "rbxassetid://89833043727802",
+	stopwatch = "rbxassetid://130771830611628",
 } :: { [string]: string }
 
 -- The round-start countdown's sheet (ui-16a). TOP ROW: the numbers 3, 2, 1 in cells of `cell`, each in its own

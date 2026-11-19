@@ -283,11 +283,20 @@ local HIT = 0.13 -- a number: seconds from first sight to the hit
 local HIT_SIZE = 0.84 -- how far it is driven in by the hit, before it springs back to 1
 local SETTLE = 0.34
 local CARD_HIT, CARD_GAP, CARD_SETTLE, CARD_SIZE = 0.1, 0.035, 0.28, 0.88
-local WORD_HIT = CARD_HIT + CARD_GAP * (#TUSSLE - 1) -- when the last card lands: 0.31 s
--- the whole word over 1.3 s: a punch as the last card lands, a hold, a small dip, then it swells and is gone
-local GO_SIZE =
-	{ { 0, 1 }, { 0.238, 1 }, { 0.27, 1.12 }, { 0.42, 1 }, { 0.74, 1 }, { 0.82, 0.94 }, { 1, 1.7 } }
-local GO_CLEAR = { { 0, 0 }, { 0.82, 0 }, { 1, 1 } }
+-- TUSSLE! POPS OUT (the owner, 2026-11-18: "it should have more of a POPOUT animation, cuz its like 3, 2, 1,
+-- FIGHT ... the one rn doesnt feel like its popping out it feels like the anims are slow"). Until then its seven
+-- cards came DOWN one after another (0.31 s before the last had landed) and the word stood 1.3 s. Now the whole
+-- word bursts out of its own middle AT ONCE: every card starts small at the centre, flies to its place and past
+-- its size in GO_POP, and springs back; the shake, the lines and the shards go off at that same moment. The word
+-- holds, dips and swells away: GO_LIFE in all.
+local GO_POP = 0.09 -- seconds from nothing to the burst's full size
+local GO_OVER = 1.26 -- a card overshoots to this before it springs back to 1
+local GO_SETTLE = 0.26
+local GO_LIFE = 0.95
+local WORD_HIT = GO_POP -- when the word hits
+local GO_SIZE = { { 0, 1 }, { 0.7, 1 }, { 0.8, 0.93 }, { 1, 1.8 } }
+local GO_CLEAR = { { 0, 0 }, { 0.8, 0 }, { 1, 1 } }
+local popCurve = PosterEase.bezier(0.1, 0.9, 0.2, 1) -- out fast, easing as it arrives
 
 -- a hard shake: one big kick, then less each way
 local JOLT = { { 0, 0 }, { 0.15, -1 }, { 0.35, 0.8 }, { 0.55, -0.5 }, { 0.78, 0.25 }, { 1, 0 } }
@@ -631,8 +640,9 @@ function Callouts.count(beat: number, small: boolean)
 end
 
 --- "TUSSLE!": the fight is on. Seven cut-out letters in boxes (cream, your class colour `tone`, yellow, the "!"
---- pink and tipped) hit one after another; on the last the whole word punches and shakes, impact lines and
---- shards fly and the screen's edge bars pulse once; then the word swells and is gone: 1.3 s in all.
+--- pink and tipped) BURST OUT of the word's middle together and spring back to their size; as they hit, the word
+--- shakes, impact lines and shards fly out ALL ROUND it and the screen's edge bars pulse once; then the word swells and is gone:
+--- GO_LIFE in all.
 function Callouts.go(tone: Color3, small: boolean)
 	UiSound.play("round_go")
 	serial += 1
@@ -728,22 +738,25 @@ function Callouts.go(tone: Color3, small: boolean)
 		}
 		table.move(mine, 1, #mine, #fades + 1, fades)
 		if not still then
-			-- each card comes down fast and hits (driven a little under its size), then springs back
-			local wait = (index - 1) * CARD_GAP
-			Poster.run(`{id}letter{index}`, CARD_HIT, function(t: number)
-				local e = PosterEase.easeIn(t)
+			-- every card bursts out of the word's middle at the same moment: small to bigger than itself, flying
+			-- to its place with a twist, then springing back to its size
+			local fromX, fromY = total / 2, TALL / 2
+			local fromTurn = if even then 34 else -34
+			Poster.run(`{id}letter{index}`, GO_POP, function(t: number)
+				local e = popCurve(t)
 				card.Visible = true
-				local clear = 1 - math.min(1, t * 3)
+				local clear = 1 - math.min(1, t * 4)
 				for _, fade in mine do
 					fade[1][fade[2]] = clear
 				end
-				card.Position = UDim2.fromOffset(restX, restY - 150 * (1 - e))
-				card.Rotation = -28 + (restTurn + 28) * e
-				cardScale.Scale = 2 + (CARD_SIZE - 2) * e
-			end, nil, wait)
-			Poster.run(`{id}set{index}`, CARD_SETTLE, function(t: number)
-				cardScale.Scale = CARD_SIZE + (1 - CARD_SIZE) * spring(t)
-			end, nil, wait + CARD_HIT)
+				card.Position =
+					UDim2.fromOffset(fromX + (restX - fromX) * e, fromY + (restY - fromY) * e)
+				card.Rotation = fromTurn + (restTurn - fromTurn) * e
+				cardScale.Scale = 0.2 + (GO_OVER - 0.2) * e
+			end)
+			Poster.run(`{id}set{index}`, GO_SETTLE, function(t: number)
+				cardScale.Scale = GO_OVER + (1 - GO_OVER) * spring(t)
+			end, nil, GO_POP)
 		end
 	end
 
@@ -751,17 +764,21 @@ function Callouts.go(tone: Color3, small: boolean)
 		task.delay(1, away)
 		return
 	end
-	-- the last card lands: the shake, the lines (on an oval, the word is wide) and the shards. NOTHING GOES UP:
-	-- the fighters' row comes up over the word at this very moment, and lines all round crossed its tiles (seen
-	-- 2026-11-18; no UI piece may overlap another), so both fan out to the sides and downward only
-	jolt(`{id}shake`, group, 26, 14, 0.4, WORD_HIT)
+	-- the word hits: the shake, the lines (on an oval, the word is wide) and the shards, ALL ROUND THE WORD (the
+	-- owner, 2026-11-18: "have the effects SURROUNDING the word, like a popup"). Until then nothing went up: the
+	-- fighters' row comes up over the word at this very moment, and lines all round crossed its tiles (no UI
+	-- piece may overlap another). So the upper half is there but SHORT: its lines stand on a flatter oval and
+	-- stop sooner, and its shards are thrown only a little way, so both end under the row.
+	jolt(`{id}shake`, group, 30, 16, 0.34, WORD_HIT)
+	local lineTones = { tone, ink }
+	-- the sides and below (0 is right, 90 is down)
 	slashes(
 		group,
 		`{id}lines`,
 		0,
 		0,
 		fan(16, -8, 188),
-		{ tone, ink },
+		lineTones,
 		300,
 		480,
 		190,
@@ -770,10 +787,40 @@ function Callouts.go(tone: Color3, small: boolean)
 		0.32,
 		WORD_HIT
 	)
+	-- above
+	slashes(
+		group,
+		`{id}linesUp`,
+		0,
+		0,
+		fan(11, 202, 338),
+		lineTones,
+		300,
+		400,
+		120,
+		16,
+		0.4,
+		0.32,
+		WORD_HIT
+	)
 	shards(group, `{id}shards`, 0, 0, 20, 300, 560, { coin, tone, paper }, 0, 180, 0.55, WORD_HIT)
+	shards(
+		group,
+		`{id}shardsUp`,
+		0,
+		0,
+		12,
+		110,
+		170,
+		{ coin, tone, paper },
+		195,
+		150,
+		0.5,
+		WORD_HIT
+	)
 	Callouts.edges(tone)
-	-- the whole word: punches as the last card lands, holds, dips a little, then swells and is gone
-	Poster.run(id, 1.3, function(t: number)
+	-- the whole word: holds, dips a little, then swells and is gone
+	Poster.run(id, GO_LIFE, function(t: number)
 		rowScale.Scale = keyframes(GO_SIZE, t, ease)
 		local clear = keyframes(GO_CLEAR, t, ease)
 		if clear > 0 then

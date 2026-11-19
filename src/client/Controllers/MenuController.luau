@@ -148,7 +148,8 @@ local function cooldownOf(skillId: string): number?
 end
 
 local function seconds(value: number): string
-	return if value % 1 == 0 then `{value} s` else string.format("%.1f s", value)
+	-- (the figure alone: the cooldown counter writes SEC beside it)
+	return if value % 1 == 0 then `{value}` else string.format("%.1f", value)
 end
 
 local function deviceOf(): string
@@ -394,10 +395,11 @@ function MenuController:KnitStart()
 	end
 	local titleScale = make("UIScale", titleBox, {})
 	local titleRest = titleBox.Rotation
-	local sub = Poster.text(body, "label", 16, "ink.900", {
+	-- (a note since ui-19d: the coach's hand, in sentence case; capitals in that hand are hard to read)
+	local sub = Poster.note(body, 19, {
 		Name = "Sub",
-		Position = UDim2.fromOffset(40, 90),
-		Size = UDim2.fromOffset(796, 24),
+		Position = UDim2.fromOffset(40, 87),
+		Size = UDim2.fromOffset(796, 30),
 		ZIndex = 3,
 	})
 	-- THE PICKED CLASS, STANDING: your avatar in that class's pose, right of the tiles and over the Equip button
@@ -774,8 +776,8 @@ function MenuController:KnitStart()
 		end
 		classPage = math.clamp(classPage, 1, pages)
 		sub.Text = if pages > 1
-			then `YOUR CLASSES · PICK ONE TO FIGHT WITH · PAGE {classPage} OF {pages}`
-			else "YOUR CLASSES · PICK ONE TO FIGHT WITH"
+			then `Your classes · pick one to fight with · page {classPage} of {pages}`
+			else "Your classes · pick one to fight with"
 		for index = 1, per do
 			local id = order[(classPage - 1) * per + index]
 			if not id then
@@ -951,13 +953,13 @@ function MenuController:KnitStart()
 		end
 		preview.show(pick, owned[pick] == true)
 		-- the picked class: what it is, its two skills, and the one thing to do with it
-		local blurb = Poster.text(page, "label", 18, "ink.900", {
-			Position = UDim2.fromOffset(28, 374 - PAGE_TOP),
-			Size = UDim2.fromOffset(540, 27),
+		Poster.note(page, 20, {
+			Name = "Blurb",
+			Position = UDim2.fromOffset(28, 370 - PAGE_TOP),
+			Size = UDim2.fromOffset(540, 32),
 			Text = kit.blurb,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 		})
-		blurb.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.SemiBold)
 		local device = deviceOf()
 		local y = 400 - PAGE_TOP
 		for _, slot in { "mobility", "attack" } do
@@ -977,7 +979,7 @@ function MenuController:KnitStart()
 			local detail = if SKILL_DETAIL_PLACEHOLDER ~= ""
 				then SKILL_DETAIL_PLACEHOLDER
 				else skill.blurb
-			local height = if not detail or detail == "" then 46 elseif #detail > 57 then 88 else 68
+			local height = PosterKit.rowHeight(546, key, detail)
 			local row = PosterKit.row(
 				page,
 				546,
@@ -985,7 +987,8 @@ function MenuController:KnitStart()
 				key,
 				skill.name,
 				detail,
-				if not skill.built then "PLANNED" elseif cooldown then seconds(cooldown) else nil
+				if not skill.built then "PLANNED" else nil,
+				if skill.built and cooldown then seconds(cooldown) else nil
 			)
 			PosterKit.placeRow(row, 22, y)
 			y += height + 4
@@ -1035,14 +1038,13 @@ function MenuController:KnitStart()
 			Size = UDim2.new(1, -44, 0, 45),
 			Text = string.upper(name),
 		})
-		local line = Poster.text(slab, "label", 16, "ink.900", {
+		Poster.note(slab, 17, {
 			Position = UDim2.fromOffset(22, 69),
 			Size = UDim2.new(1, -44, 0, 48),
 			Text = words_,
 			TextWrapped = true,
 			TextYAlignment = Enum.TextYAlignment.Top,
 		})
-		line.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.SemiBold)
 		PosterKit.tag(slab, "Planned", { Position = UDim2.new(0, 22, 1, -46) })
 		return slab
 	end
@@ -1051,7 +1053,7 @@ function MenuController:KnitStart()
 		tint(colour(TONES.shop))
 		setWord("Shop")
 		setTitle("Shop")
-		sub.Text = "CLASSES · PAY WITH COINS"
+		sub.Text = "Classes · pay with coins"
 		local owned = ability:GetOwned()
 		local coins = ability:GetCoins()
 		local x, y, rowHeight, count = 40, 128 - PAGE_TOP, 0, 0
@@ -1082,12 +1084,11 @@ function MenuController:KnitStart()
 				)
 				PosterKit.place(cut, atX, atY)
 				className(cut.face, kit.name, 30, 18, 16, 45)
-				local line = Poster.text(cut.face, "label", 16, "ink.900", {
+				Poster.note(cut.face, 17, {
 					Position = UDim2.fromOffset(18, 65),
 					Size = UDim2.fromOffset(250, 24),
 					Text = `{kit.mobility.name} · {kit.attack.name}`,
 				})
-				line.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.SemiBold)
 				if inRound() then
 					action(cut.face, 18, 99, "Locked in a round", "off")
 				elseif coins < kit.price then
@@ -1129,12 +1130,11 @@ function MenuController:KnitStart()
 				Size = UDim2.fromOffset(250, 45),
 				Text = "ALL OWNED",
 			})
-			local line = Poster.text(cut.face, "label", 16, "ink.900", {
+			Poster.note(cut.face, 17, {
 				Position = UDim2.fromOffset(18, 65),
 				Size = UDim2.fromOffset(250, 24),
 				Text = "You own every class.",
 			})
-			line.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.SemiBold)
 		end
 		for _, name in { "Passes", "Cosmetics" } do
 			local atX, atY = place(294, 181)
@@ -1147,7 +1147,7 @@ function MenuController:KnitStart()
 		tint(colour(TONES.ranked))
 		setWord("Ranked")
 		setTitle("Ranked")
-		sub.Text = "PLANNED · NOT IN THE GAME YET"
+		sub.Text = "Planned · not in the game yet"
 		-- the mockup's one cream slab (420 wide inside 18 of padding), not a dashed "planned" one
 		local cut = PosterKit.cut(
 			page,
@@ -1162,14 +1162,13 @@ function MenuController:KnitStart()
 			Size = UDim2.fromOffset(420, 45),
 			Text = "COMING LATER",
 		})
-		local line = Poster.text(cut.face, "label", 16, "ink.900", {
+		Poster.note(cut.face, 16, {
 			Position = UDim2.fromOffset(18, 65),
-			Size = UDim2.fromOffset(420, 48),
+			Size = UDim2.fromOffset(420, 50),
 			Text = "This screen is a placeholder. The game has no ranked system, so no ranks, seasons or rewards are shown.",
 			TextWrapped = true,
 			TextYAlignment = Enum.TextYAlignment.Top,
 		})
-		line.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.SemiBold)
 		PosterKit.tag(cut.face, "Planned", { Position = UDim2.fromOffset(18, 123) })
 	end
 
@@ -1188,9 +1187,9 @@ function MenuController:KnitStart()
 			for offset = 0, 1 do
 				local item = items[index + offset]
 				if item and item.detail and item.detail ~= "" then
-					-- a line of the small text holds about 36 letters here; every line the detail needs gets its
-					-- 26 units (with two heights only, Punch's three-line detail lost its last word; 2026-11-18)
-					height = math.max(height, 46 + 26 * math.ceil(#item.detail / 36))
+					-- every line the note needs gets its room (with two heights only, Punch's three-line detail
+					-- lost its last word; 2026-11-18)
+					height = math.max(height, PosterKit.rowHeight(381, item.key, item.detail))
 				end
 			end
 			for offset = 0, 1 do
@@ -1228,9 +1227,9 @@ function MenuController:KnitStart()
 		setTitle("Moves")
 		local device = deviceOf()
 		sub.Text = if device == "touch"
-			then "CONTROLS ON TOUCH"
-			elseif device == "gamepad" then "CONTROLS ON A GAMEPAD"
-			else "CONTROLS ON KEYBOARD AND MOUSE"
+			then "Controls on touch"
+			elseif device == "gamepad" then "Controls on a gamepad"
+			else "Controls on keyboard and mouse"
 		local items: { Item } = {}
 		for _, move in (HudTheme.Guide :: any)[device] or {} do
 			local name, detail = splitMove(move.action)
@@ -1250,7 +1249,7 @@ function MenuController:KnitStart()
 		tint(colour(TONES.more))
 		setWord("More")
 		setTitle("More")
-		sub.Text = "COMING LATER"
+		sub.Text = "Coming later"
 		local items: { Item } = {}
 		for _, name in PLANNED do
 			table.insert(items, { name = name, right = "PLANNED" })
@@ -1428,7 +1427,7 @@ function MenuController:KnitStart()
 		tint(colour("ivory.50"):Lerp(colour("stone.300"), 0.45))
 		setWord("") -- no repeated word behind this page
 		setTitle("Settings")
-		sub.Text = "FIGHTER ROW WORKS  ·  THE OTHER THREE DON'T CHANGE ANYTHING YET"
+		sub.Text = "Fighter row works  ·  the other three don't change anything yet"
 		local y = 128 - PAGE_TOP
 		for _, setting in SETTINGS do
 			settingRow(setting, y)
@@ -1436,10 +1435,10 @@ function MenuController:KnitStart()
 		end
 		-- whether your progress is being saved: one quiet line, not a row
 		local saving = ability:IsReady() and not ability:IsTemporary()
-		Poster.text(page, "label", 15, "ink.900", {
+		Poster.note(page, 18, {
 			Name = "Saving",
 			Position = UDim2.fromOffset(SROW.X + 4, y + 2),
-			Size = UDim2.fromOffset(SROW.Width, 22),
+			Size = UDim2.fromOffset(SROW.Width, 28),
 			Text = if not ability:IsReady()
 				then "LOADING YOUR DATA  ·  One moment."
 				elseif saving then "SAVED  ·  Your Coins and classes are saved."

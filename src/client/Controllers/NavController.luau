@@ -31,7 +31,6 @@ local Icons = require(script.Parent.Parent.Ui.Icons)
 local Poster = require(script.Parent.Parent.Ui.Poster)
 local HudTheme = require(script.Parent.Parent.Ui.HudTheme)
 local PosterKit = require(script.Parent.Parent.Ui.PosterKit)
-local Shapes = require(script.Parent.Parent.Ui.Shapes)
 local UiSound = require(script.Parent.Parent.Ui.UiSound)
 
 local colour = Tokens.colour
@@ -407,50 +406,46 @@ function NavController:KnitStart()
 	end
 
 	-- THE COINS ------------------------------------------------------------------------------------------
-	-- a slanted ink plate, 22 from the right and 18 from the top: a coin and the number in 22 px Oswald
-	-- (its width is set from the number's measured width: left to AutomaticSize, the plate, which is wider than
-	-- its box, made the box grow without end; first run, 2026-11-17)
+	-- NO PLATE (the owner, 2026-11-18: "i HATE this style ... for EVERYTHING"; a slanted ink plate until then): a
+	-- coin and the number as poster lettering, standing straight on the world, 22 from the right and 18 from the
+	-- top. The row is laid out from the right, so nothing has to be measured.
 	local coins = make("Frame", topGui, {
 		Name = "Coins",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 0),
-		Size = UDim2.fromOffset(120, 48),
+		Size = UDim2.fromOffset(240, 48),
 	})
 	local coinsScale = make("UIScale", coins, {})
-	local coinsLean = 48 * math.tan(math.rad(10))
-	Shapes.slant(coins, "ink.900", coinsLean, {
-		Name = "Plate",
-		Position = UDim2.fromOffset(-coinsLean / 2, 0),
-		Size = UDim2.new(1, coinsLean, 1, 0),
-	})
-	local coinsRow = make("Frame", coins, {
-		Name = "Row",
-		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 1),
-		ZIndex = 2,
-	})
-	make("UIPadding", coinsRow, { PaddingLeft = UDim.new(0, 15), PaddingRight = UDim.new(0, 16) })
-	make("UIListLayout", coinsRow, {
+	make("UIListLayout", coins, {
 		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Right,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
 		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 11),
+		Padding = UDim.new(0, 10),
 	})
-	local coin = make("Frame", coinsRow, {
+	local coin = make("Frame", coins, {
 		Name = "Coin",
-		BackgroundColor3 = colour("gold.400"),
-		BorderSizePixel = 0,
+		BackgroundTransparency = 1,
 		LayoutOrder = 1,
-		Size = UDim2.fromOffset(20, 20),
+		Size = UDim2.fromOffset(28, 28),
 	})
-	make("UICorner", coin, { CornerRadius = UDim.new(0.5, 0) })
-	make("UIStroke", coin, { Color = colour("ivory.50"), Thickness = 3 })
-	-- the amount: figures from the lettering sheet (Ui/Shapes.letters), so its width is known at once
-	local coinsFigures =
-		Poster.figures(coinsRow, 12, 22, "ivory.50", { Name = "Amount", LayoutOrder = 2 })
+	-- a yellow disc with an ink edge, and the same disc in ink a little right and down: its hard shadow
+	for _, part in { { "Shadow", "ink.900", 5, 6, 1 }, { "Face", "gold.400", 3, 3, 2 } } do
+		local disc = make("Frame", coin, {
+			Name = part[1],
+			BackgroundColor3 = colour(part[2] :: string),
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(part[3] :: number, part[4] :: number),
+			Size = UDim2.fromOffset(20, 20),
+			ZIndex = part[5] :: number,
+		})
+		make("UICorner", disc, { CornerRadius = UDim.new(0.5, 0) })
+		make("UIStroke", disc, { Color = colour("ink.900"), Thickness = 3 })
+	end
+	local coinsAmount =
+		PosterKit.lettering(coins, 26, "gold.400", "0", { Name = "Amount", LayoutOrder = 2 }) -- coin yellow: louder than cream
 	local function refreshCoins()
-		local width = Poster.setFigures(coinsFigures, tostring(ability:GetCoins()))
-		coins.Size = UDim2.fromOffset(15 + 20 + 11 + math.ceil(width) + 16, 48)
+		PosterKit.setLettering(coinsAmount, tostring(ability:GetCoins()))
 	end
 	ability.InventoryChanged:Connect(refreshCoins)
 	refreshCoins()
