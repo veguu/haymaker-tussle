@@ -4260,11 +4260,35 @@ drawing-technique study. Nothing here is uploaded to Roblox or wired into `Impac
   - rounded R6 parts;
   - the head and arms in the Fold pose, peeking in.
   Previews: `bash design/vfx/impact/make_previews.sh`.
-- **NEXT (needs the owner's go-ahead):**
-  - pack both sequences into flipbook sheets;
-  - upload them (Studio `upload_image`, owner's OK first);
-  - wire them into `ImpactFrame.luau` / `UltimateFx.luau` as the two runs (contact, and fist plunge before the
-    knockback), replacing the three-run structure;
-  - slow the final punch with a longer sink, and update the knockback test.
 - **Outputs:** `design/vfx/study/out` and `design/vfx/impact/out` are ignored except the final sheets and previews. The
   `ours-kits-*` recordings stay local (ignored).
+
+## kits-8e (2026-11-18): the two drawn impact frames IN THE GAME; the sink lengthened (committed 49180d7, merged e6aae58)
+Build stamp `kits-8e+lobby-4+ui-19d`.
+
+- **The frames:** the 18 drawn frames were downscaled to 1024 x 576 (`design/vfx/impact/out/upload`, ignored) and uploaded
+  with the owner's OK. Their ids are in `src/client/Fx/DrawnImpact.luau`.
+- **`Fx/DrawnImpact`** plays a run full screen, one ImageLabel per frame (`Crop`), timed by the clock. It has `studySlow`
+  and a warm preload GUI (`HT_DrawnWarm`). Both GUI names are in UltimateController's hide list.
+- **The timeline (`Core/Ultimates`):**
+  - `Ultimates.DRAWN`: contact is 10 frames at 30 fps (0.333 s); plunge is 8 frames at 24 fps plus a 0.1 s hold
+    (0.433 s).
+  - The slow part is 1.62 s (it was 0.8) and HAY_SLOW is 0.15 (it was 0.3), so it's the same sink, stretched.
+  - The `plunge` cue ends on the blast. The `soak` and `release` cues are gone.
+- **`UltimateFx`:** the three procedural card runs and the silhouette cloning are removed. `ImpactFrame.luau` is unused
+  now but kept.
+- **Tests:** 559 pass. The knockback test allows a slow sink (> 0.6 studs/s) and requires > 10 studs/s after the
+  blast. A new test checks the two runs' timing.
+- **In the place:**
+  - The place held the teammate's UNPUSHED work: 12 scripts newer than `ui-19d` on GitHub, plus a new
+    `NpcController`, behind an unchanged `ui-19d` stamp.
+  - So NO Rojo sync was done. Only our 7 scripts were patched in by `execute_luau` and checked by hash against disk:
+    Ultimates, UltimateFx, DrawnImpact, FxController, UltimateController and both boots. The place was not saved by
+    us.
+  - **Do not Rojo-sync until the teammate pushes**, or their scripts are saved from the place first.
+- **Seen in Play (HT_UltReplay at 0.02x):**
+  - all 18 images load;
+  - the contact burst shows on the hit;
+  - the plunge shows its frames before the blast.
+  - Studio's viewport is about 2.8:1, so `Crop` trims the top and bottom there. 16:9 shows the whole drawing.
+- **NOT DONE:** the owner hasn't watched it at full speed with sound, so the new sink length isn't judged yet.
