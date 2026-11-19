@@ -529,6 +529,65 @@ return {
 		assert(math.deg(snap) < 2, `the turn snaps {math.deg(snap)} deg`)
 	end,
 
+	["the fist sinks deeper through the slow part, and nothing stands still (kits-8f)"] = function()
+		-- kits-8e's live check: the "sink" read as a freeze. Measured, the fist backed OUT of the chest (0.74 studs clear by
+		-- the plunge) while the attacker crept at 0.2 studs/s. Now, from the end of the contact frames to the blast, the
+		-- fist tip works deeper past the chest's front face, never through the back, and both bodies keep moving.
+		local Rig = require("./support/Rig")
+		local UltimateClips = require("../src/shared/Config/AnimClipsUltimate")
+		local line = Ultimates.TIMELINES.Base
+		local start = Vector3.new(0, 0, 12)
+		local hit, blast = 0, 0
+		for _, cue in line.cues do
+			if cue.name == "haymaker" then
+				hit = cue.t
+			elseif cue.name == "blast" then
+				blast = cue.t
+			end
+		end
+		local slow, foldFrom = 0, 0
+		for _, blow in line.blows do
+			if math.abs(blow.t - hit) < 0.011 then
+				slow = blow.slow or 0
+			end
+		end
+		for _, c in line.targetClips do
+			if c.name == "Fold" and c.t <= hit then
+				foldFrom = c.t
+			end
+		end
+		local clip, fold = UltimateClips.HaymakerUp, UltimateClips.Fold
+		local function depth(t: number): number
+			local a, tg = Ultimates.pose(line, t, start)
+			local tip = Rig.strike(
+				Ultimates.attackerFrame(a, tg),
+				clip,
+				(clip.strike or 0) + (t - hit) * slow
+			)
+			local root =
+				Ultimates.targetCFrame(tg, tg + Vector3.new(0, 0, 1), Ultimates.tilt(line, t))
+			local torso = Rig.parts(root, Rig.sample(fold, t - foldFrom)).Torso
+			return torso:PointToObjectSpace(tip).Z + 0.5 -- past the chest's front face
+		end
+		local from = hit + Ultimates.drawnLength("contact")
+		local step = 0.05
+		local last = depth(from)
+		assert(last > 0.15, `the fist is out of the chest as the contact frames end ({last})`)
+		local t = from + step
+		while t <= blast + 1e-6 do
+			local d = depth(t)
+			assert(d >= last - 0.01, `the fist backs out at {t} ({last} -> {d})`)
+			assert(d < 0.8, `the fist goes through the back at {t} ({d})`)
+			local a1, t1 = Ultimates.pose(line, t - step, start)
+			local a2, t2 = Ultimates.pose(line, t, start)
+			assert((a2 - a1).Magnitude / step > 0.6, `the attacker stalls in the sink at {t}`)
+			assert((t2 - t1).Magnitude / step > 0.6, `the target stalls in the sink at {t}`)
+			last = d
+			t += step
+		end
+		assert(last - depth(from) > 0.15, "the fist works visibly deeper over the sink")
+	end,
+
 	["two drawn impact runs: contact on the hit, the plunge ending on the blast (kits-8e)"] = function()
 		-- the owner: "there should only be 2 impact frames, the initial connection and then right before the knockback"
 		local line = Ultimates.TIMELINES.Base

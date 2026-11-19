@@ -4292,3 +4292,17 @@ Build stamp `kits-8e+lobby-4+ui-19d`.
   - the plunge shows its frames before the blast.
   - Studio's viewport is about 2.8:1, so `Crop` trims the top and bottom there. 16:9 shows the whole drawing.
 - **NOT DONE:** the owner hasn't watched it at full speed with sound, so the new sink length isn't judged yet.
+- **Phase 7 verification (same day):** `design/cutscene-study/16-verification-kits-8e.md`.
+  - **Passed live:** knockback on the hit, no anchoring, restore and control back, interrupt-safe.
+  - **Still open:** the sink reads almost still; the sound isn't retimed to the 1.62 s slow part; the rings cover
+    the uppercut and the blast (stage D/E).
+
+## kits-8f (2026-11-18): the sink fixed (build `kits-8f+lobby-4+ui-19d`; patched into the place by hash, no Rojo)
+- **Cause:** the fist backed out of the chest during the sink: 0.74 studs clear by the plunge (`lune/sink_check`).
+- **Fix:**
+  - the attacker is carried with the target (`CARRY_*`);
+  - the fold deepens to `SINK_FOLD`;
+  - the sink shot pushes in slowly.
+- **Result:** the fist works in from 0.22 to 0.65. There's a new test, and all 560 pass. Seen in a held replay.
+  Details: study 16.
+- **Still open:** the sound pass, and the stage D/E rings.

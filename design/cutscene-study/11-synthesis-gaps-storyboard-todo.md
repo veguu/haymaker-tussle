@@ -200,6 +200,9 @@ Also fixed: bystanders saw the dummy target with no tilt (`DummyService` posed i
   output also warns that the assistant plugin changed version and asks for a restart. The kits-8b changes pass the
   camera spec and the Rig measures only.
 
+**Superseded:** the live checklist for kits-8e (2026-11-18) is in `16-verification-kits-8e.md`. The table below is
+kept as it was at kits-8b.
+
 Acceptance checklist, as of kits-8b:
 
 | Check | State |

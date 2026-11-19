@@ -287,6 +287,17 @@ local THROW_DIR = Vector3.new(0, 0.5, -1).Unit
 local THROW_TO_SOAK = 1.05 -- from the contact to the soak (about 2.8 studs a second, never still)
 local THROW_SLOW = 1.15 -- from the soak to full speed (kits-8e: over 1.24 s now, about 0.9 studs a second: the sink)
 local THROW_FAST = 4.5 -- full speed: from there into the flight without a stop (Ultimates.flight)
+-- THE SINK (kits-8f). The owner asked for a longer sink, and kits-8e's live check found it read as still: measured
+-- (lune/sink_check), the fist was 0.22 into the chest at the contact and then BACKED OUT, 0.74 studs clear by the
+-- plunge, because the attacker crept 0.2 studs a second while the target slid away at 0.9. Now the attacker is carried
+-- with the target along the drive and a little past it, so the fist works its way deeper all through the sink, and the
+-- fold deepens round it. The attacker's root moves this far along the drive by each key:
+-- (measured: the fist tip 0.22 into the chest at the contact, 0.43 when the contact frames end, 0.65 at the blast; the
+-- torso is a stud deep, so it never shows through the back)
+local CARRY_SOAK = 1
+local CARRY_SLOW = 2.45
+local CARRY_THROWN = 2.9 -- the follow-through as they are thrown off the fist
+local SINK_FOLD = HAY_FOLD - 22 -- the fold at its deepest, as the plunge frames show it (the chest caving round the fist)
 
 -- where the dash starts and the launch parks them (anchor space; the same numbers rushKeys builds), for the dash shot
 local CAUGHT_Z = REACH - UP_REACH - FLURRY_HITS * JUGGLE_BACK - 0.1
@@ -435,19 +446,20 @@ local function rushKeys(): { Key }
 	local thrown3 = thrown2 + THROW_DIR * THROW_FAST
 	table.insert(keys, {
 		t = SOAK,
-		attacker = contactSpot + THROW_DIR * 0.3,
+		attacker = contactSpot + THROW_DIR * CARRY_SOAK,
 		target = thrown1,
-		targetTilt = Vector3.new(HAY_FOLD - 8, 0, 0), -- the fold deepest as it soaks the fist
+		targetTilt = Vector3.new(HAY_FOLD - 8, 0, 0), -- folding round the fist
 	})
+	-- the sink (kits-8f): both carried along the drive, the fist working deeper, the fold deepening to its most
 	table.insert(keys, {
 		t = SLOW_TO,
-		attacker = contactSpot + THROW_DIR * 0.55,
+		attacker = contactSpot + THROW_DIR * CARRY_SLOW,
 		target = thrown2,
-		targetTilt = Vector3.new(HAY_FOLD - 12, 0, 0),
+		targetTilt = Vector3.new(SINK_FOLD, 0, 0),
 	})
 	table.insert(keys, {
 		t = THROWN,
-		attacker = contactSpot + THROW_DIR * 1.05,
+		attacker = contactSpot + THROW_DIR * CARRY_THROWN,
 		target = thrown3,
 		targetTilt = Vector3.new(HAY_FOLD + 40, 0, 0),
 		ease = "throw",
@@ -717,11 +729,13 @@ local HAYMAKER_RUSH: Timeline = {
 			rel = "pair",
 			ease = "whip",
 		},
+		-- the sink (kits-8f): a slow push-in all through it (it drifted 0.15 studs and read as a freeze), the fist working
+		-- into the folding chest at the middle of the frame
 		{
 			t = SLOW_TO,
-			cam = Vector3.new(5.85, -1.05, 0.1),
-			look = Vector3.new(0, 0.3, -0.75),
-			fov = 53,
+			cam = Vector3.new(5.1, -0.95, 0.2),
+			look = Vector3.new(0, 0.55, -0.65),
+			fov = 50,
 			rel = "pair",
 			ease = "smooth",
 		},
