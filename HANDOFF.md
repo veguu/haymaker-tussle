@@ -4053,13 +4053,15 @@ asks while it was being built. Gates: stylua clean, selene 0, 558 tests, rojo bu
 - NOT SEEN OR TESTED: TUSSLE!'s new motion (only code), the lobby jump, ROUND OVER, ARENA CLOSING, SPECTATING,
   the spectate who-line, Ranked, More and Settings pages, a phone, a gamepad, Reduced Motion. After the last fix
   (tools column) no new picture was taken.
-- AFTER THE COMMIT (2026-11-19, place v515, NOT COMMITTED): the cooldown counter says what it is. His words:
-  "when u hover over the clock on the moves section in classes, it should just give u a frame that says
-  cooldown on it, just incase some people dont know". `PosterKit.row`: a cream card COOLDOWN (`PosterKit.chip`,
-  Oswald 17, 32 tall) left of the counter while the pointer is on it (`MouseEnter` / `MouseLeave` on the
-  counter); a tap shows it for 1.8 s on a touch screen. Patched into Studio by `execute_luau` (the other
-  session's work is still uncommitted in src, so no full push). SEEN: the hover in a play test, on both of
-  Base's rows. NOT TESTED: the tap on a touch screen; a gamepad has no way to see it.
+- THE COOLDOWN HOVER TIP: BUILT, THEN REVERTED ON HIS WORD (2026-11-19). He asked: "when u hover over the clock
+  on the moves section in classes, it should just give u a frame that says cooldown on it". Built as a cream
+  COOLDOWN card left of the counter on hover (seen working), and he answered: "nah revert it". It is GONE from
+  `PosterKit.row` (the file equals the commit again) and from the place (removed by `execute_luau`, `--check`
+  shows PosterKit matching; place saved v531). Do not bring it back unless he asks; he gave no reason.
+- STATE AT THE END OF THIS SESSION (2026-11-19): everything of the UI is committed (95c3620, then the other
+  session's 33d787b and merge 5d58dfc on top). Build stamp in the repo `kits-8h+lobby-4+ui-19d`. `--check`
+  shows ONE script differing, `Client.Fx.DrawnImpact` by one character (not mine, left alone). `selene src`
+  reports 1 error in `UltimateController.luau` line 189 (not mine, in HEAD). 564 tests pass.
 - THE STRIP IS ONE CARD (place v513; this is the CURRENT strip, the two strip bullets around it are history).
   His words on a yellow number beside a separate "/ 25 STANDING" card: "bro what the fuck is this, why is
   seperate like this ... just make it the same frame, for both this and the lobby countdown". So number and
