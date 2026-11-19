@@ -129,6 +129,9 @@ export type Timeline = {
 	-- 1/30 s; and JOLTS, one directional push (screen right `x`, up `y`) that springs back within `seconds`
 	jitter: { { from: number, to: number, studs: number } }?,
 	jolts: { { t: number, studs: number, x: number, y: number, seconds: number } }?,
+	-- kits-8h: while `from` <= t < `to`, on the fighters' screens, the attacker shows only `part` (the drawn view's
+	-- close-ups, where the camera sits beside the attacker's shoulder and the drawing shows only the striking arm)
+	soloArm: { from: number, to: number, part: string }?,
 }
 
 -- BASE: "Haymaker Rush" (2026-11-16). The user picked it over a black-and-white "Lights Out" (full colour,
@@ -152,7 +155,7 @@ export type Timeline = {
 --     one directional JOLT as each freeze ends, gone within ~0.2 s (Ultimates.shake). No rolling wobble, no zoom.
 --   * THE RUSH from a FIXED camera behind the attacker's start (`rel = "start"`): they sprint away from the lens.
 --   * Close INSERTS (`insert`) on the attacker for the lock-in and the wind-up; the wind-up pushes in and then holds
---     still while the scene darkens, before the silence.
+--     still before the silence (the darkening under it was removed in kits-8h).
 --   * THE RESULT in line with the throw: the target shoots away from the lens.
 --
 --   0.00 lock-in    close insert on the attacker's face and fist, slow push                      glint
@@ -161,7 +164,7 @@ export type Timeline = {
 --   1.70 flurry     ONE held framing, low side 3/4, tilted; slow drift; jitter: 16 punches         ult_barrage
 --   3.84 uppercut   flash, SNAP to a worm's-eye front-side; freeze 0.25 s; jolt up; tilt after them
 --   4.65 leap       extreme wide from below, still, both against the sky
---   4.95 wind-up    close insert on the attacker's face, push in, then still; the scene darkens
+--   4.95 wind-up    close insert on the attacker's face, push in, then still
 --   5.55 silence    every sound cut
 --   5.70 haymaker   side profile under the drawn impact frames; freeze 0.15 s; jolt
 --   6.15 blast      in line with the throw, from below behind them: the target shoots away
@@ -213,22 +216,33 @@ local RELEASE = HAYMAKER - 0.07 -- the cocked fist snaps out (HaymakerUp 0.38-0.
 local DIP = HAYMAKER - 0.15 -- every sound cut
 -- kits-8e (2026-11-18), the owner: "there should only be 2 impact frames, the initial connection and then right before
 -- the knockback", drawn by hand (design/vfx/impact: the pencil ink burst and the fist plunge, accepted "Looks good"),
--- played as pre-rendered frames by Fx/DrawnImpact. Their lengths, here so the timeline and the player agree:
---   contact  10 frames at 30 fps (0.333 s), on the hit
---   plunge   8 frames at 24 fps and the last held 0.1 s (0.433 s), ending as the knockback goes full speed
+-- played as pre-rendered frames by Fx/DrawnImpact. Their lengths, here so the timeline and the player agree.
+-- kits-8g, the owner on kits-8f: "the impact frame is wayy too long (should be an instant, refer to the roblox
+-- references)". Azure Flames (study 02, 30 fps) holds each drawing 1-3 frames and flips between them; ours held a run
+-- 0.33 s and 0.43 s. Now each run flashes a few of its drawings (`show`, indices into the drawn sequence, so it still
+-- reads as the burst blowing out and the fist sinking) at 60 fps, about 0.1 s each:
+--   contact  6 of the 10 drawings (0.1 s), on the hit
+--   plunge   5 of the 8 drawings, the last held 2 frames (0.117 s), ending as the knockback goes full speed
 local DRAWN = {
-	contact = { frames = 10, fps = 30, hold = 0 },
-	plunge = { frames = 8, fps = 24, hold = 0.1 },
+	contact = { frames = 10, show = { 1, 2, 4, 6, 8, 10 }, fps = 60, hold = 0 },
+	plunge = { frames = 8, show = { 1, 3, 5, 7, 8 }, fps = 60, hold = 1 / 30 },
 }
 local function drawnLength(name: string): number
 	local run = DRAWN[name]
-	return run.frames / run.fps + run.hold
+	return #run.show / run.fps + run.hold
 end
 Ultimates.DRAWN = DRAWN
 Ultimates.drawnLength = drawnLength
-local HAY_CARDS = drawnLength("contact") -- the contact frames
+-- kits-8h, the owner: "the impact frame comes too late, it hits midway through the gut punch ... you should see the
+-- frame before you ssee the punch hit". The contact frames flash as the fist snaps out (RELEASE, 0.07 s before the
+-- contact) and clear onto the fist already landed; the heavy hit's sound goes with them (the "impact" cue).
+-- Then "uhh the flash still happens after the punch connects": measured in a live ultimate (with the attacker's facing
+-- fixed), the fist reaches the chest front on screen about 4.965 s, 0.035 s after HAYMAKER (the swing lags the body a
+-- frame). So the frames start with the snap itself and are gone just before the fist lands: the frame, then the hit.
+local CONTACT_FLASH = RELEASE
+local HAY_CARDS = CONTACT_FLASH - HAYMAKER + drawnLength("contact") -- the contact frames' end, after the contact
 -- the owner (kits-8e): "the last punch happens too fast", "the part where the fist sinks in should be longer". The slow
--- part runs 1.62 s (it was 0.8): the same sink, stretched, about 0.85 s of it between the two drawn runs.
+-- part runs 1.62 s (it was 0.8): the same sink, stretched, about 1.4 s of it between the two drawn runs (kits-8g).
 local SOAK = HAYMAKER + 0.38 -- the fist sunk in, the fold deepest (a key only now; no cards)
 local SLOW_TO = HAYMAKER + 1.62 -- the slow part: the knockback in slow motion, the body MOVING away all through it
 local PLUNGE = SLOW_TO - drawnLength("plunge") -- the fist plunge frames, right before they fly
@@ -272,18 +286,26 @@ local UPPER_CATCH = 2.4
 local LAUNCH_BACK = 9.5
 local LAUNCH_UP = 5
 local HANG_DRIFT = Vector3.new(0, 0.4, -0.35) -- the hang drifts on a little (holds always move: every reference)
--- The haymaker (kits-8a): a straight drive out of the held load, about 30 deg up (HaymakerUp HAY_LIFT). Root to root
+-- The haymaker (kits-8a): a straight drive out of the held load (HaymakerUp HAY_UP; kits-8g: about 11 deg up, it was 29,
+-- the owner: "the blow should be straighter and the target shouldnt be angled too highly"). Root to root
 -- at the contact, measured on the baked clips (tests/support/Rig: the fist tip in the torso's front, the drive square
 -- to it): the target this far ahead and this much higher.
-local HAY_GAP = 2.7
-local HAY_RISE = 2.4
-local HAY_SIDE = -0.6 -- the attacker a little to the left, so the right fist meets their middle
+local HAY_GAP = 3.2 -- kits-8g: the flatter drive reaches farther (it was 2.7)
+-- kits-8h: the attacker's height at the contact, so the fist lands on the chest's centre (the owner's pick "D"). Measured in a live
+-- ultimate at ~40 fps the game matches the offline rig (tests/support/Rig); an earlier 0.35 "live drop" came from runs at ~14 fps
+-- and was wrong. (It was 2.4, then 1.7.)
+local HAY_RISE = 1.65
+-- the attacker a little to the left, so the right fist meets their middle. kits-8h: -1.1 (it was -0.6), measured live: the fist
+-- landed 0.2-0.3 toward the target's left of the drawing's dent
+local HAY_SIDE = -1.1
 -- The target's whole-body pitch at the two contacts (minus is forward, over the fist), with the Fold clip's own 28 deg
 -- fold on top: the chest faces the fist's drive (tests: "the fist lands square on the chest front")
 local UPPER_FOLD = -55
-local HAY_FOLD = 360 -- upright: the Fold clip's own 28 deg puts the chest square to the 28 deg rising drive
+-- kits-8g: leaning back 18 deg, so the Fold clip's own 28 deg leaves the chest square to the ~10 deg drive (it was 360,
+-- upright, for the 28 deg drive)
+local HAY_FOLD = 378
 -- the knockback (kits-8a): along the drive, out and up; the target's root moves this far in each part
-local THROW_DIR = Vector3.new(0, 0.5, -1).Unit
+local THROW_DIR = Vector3.new(0, 0.2, -1).Unit -- kits-8g: along the flatter drive (it was 0.5 up)
 local THROW_TO_SOAK = 1.05 -- from the contact to the soak (about 2.8 studs a second, never still)
 local THROW_SLOW = 1.15 -- from the soak to full speed (kits-8e: over 1.24 s now, about 0.9 studs a second: the sink)
 local THROW_FAST = 4.5 -- full speed: from there into the flight without a stop (Ultimates.flight)
@@ -292,12 +314,20 @@ local THROW_FAST = 4.5 -- full speed: from there into the flight without a stop 
 -- plunge, because the attacker crept 0.2 studs a second while the target slid away at 0.9. Now the attacker is carried
 -- with the target along the drive and a little past it, so the fist works its way deeper all through the sink, and the
 -- fold deepens round it. The attacker's root moves this far along the drive by each key:
--- (measured: the fist tip 0.22 into the chest at the contact, 0.43 when the contact frames end, 0.65 at the blast; the
--- torso is a stud deep, so it never shows through the back)
-local CARRY_SOAK = 1
-local CARRY_SLOW = 2.45
-local CARRY_THROWN = 2.9 -- the follow-through as they are thrown off the fist
-local SINK_FOLD = HAY_FOLD - 22 -- the fold at its deepest, as the plunge frames show it (the chest caving round the fist)
+-- (measured on the rig, kits-8h: the fist tip 0.21 into the chest at the contact, 0.76 at the blast, the game reading it about
+-- 0.3 shallower and 0.35 lower; in the game it holds on the drawn plunge's dent, the chest's centre, all through the sink)
+local CARRY_SOAK = 1.2
+local CARRY_SLOW = 2.55
+local CARRY_THROWN = 3.05 -- the follow-through as they are thrown off the fist
+-- the fold at its deepest by the blast. kits-8h: 6 deg (it was 22), measured live at the plunge: the deepening fold turned the
+-- chest 20 deg down off the level punch, so the arm came down into it from beside the lens; the drawn plunge has the chest
+-- square to the fist (the owner: the arms should match the drawing before the impact frame)
+local SINK_FOLD = HAY_FOLD - 6
+-- kits-8g, the owner: "the target should be getting hit in the center of the torso not the top". Measured: the fist lands
+-- mid-chest, then as the body folds forward over it the fist rode up to the upper chest (0.5 above the centre by the
+-- blast). The attacker sinks this far below the drive by each key, so the fist stays at the centre all through the sink.
+local SINK_DROP_SOAK = 0.4
+local SINK_DROP_SLOW = 0.5
 
 -- where the dash starts and the launch parks them (anchor space; the same numbers rushKeys builds), for the dash shot
 local CAUGHT_Z = REACH - UP_REACH - FLURRY_HITS * JUGGLE_BACK - 0.1
@@ -446,20 +476,20 @@ local function rushKeys(): { Key }
 	local thrown3 = thrown2 + THROW_DIR * THROW_FAST
 	table.insert(keys, {
 		t = SOAK,
-		attacker = contactSpot + THROW_DIR * CARRY_SOAK,
+		attacker = contactSpot + THROW_DIR * CARRY_SOAK - Vector3.new(0, SINK_DROP_SOAK, 0),
 		target = thrown1,
 		targetTilt = Vector3.new(HAY_FOLD - 8, 0, 0), -- folding round the fist
 	})
 	-- the sink (kits-8f): both carried along the drive, the fist working deeper, the fold deepening to its most
 	table.insert(keys, {
 		t = SLOW_TO,
-		attacker = contactSpot + THROW_DIR * CARRY_SLOW,
+		attacker = contactSpot + THROW_DIR * CARRY_SLOW - Vector3.new(0, SINK_DROP_SLOW, 0),
 		target = thrown2,
 		targetTilt = Vector3.new(SINK_FOLD, 0, 0),
 	})
 	table.insert(keys, {
 		t = THROWN,
-		attacker = contactSpot + THROW_DIR * CARRY_THROWN,
+		attacker = contactSpot + THROW_DIR * CARRY_THROWN - Vector3.new(0, SINK_DROP_SLOW, 0),
 		target = thrown3,
 		targetTilt = Vector3.new(HAY_FOLD + 40, 0, 0),
 		ease = "throw",
@@ -486,8 +516,8 @@ local function rushCues(): { { t: number, name: string } }
 			-- the load in the crouch: the charge glows on the held fist through the whole dash (no arm turning)
 			{ t = LOAD, name = "windup" },
 			{ t = TAKEOFF, name = "leap" },
-			{ t = HAYMAKER - 0.45, name = "darken" },
 			{ t = DIP, name = "dip" },
+			{ t = CONTACT_FLASH, name = "impact" },
 			{ t = HAYMAKER, name = "haymaker" },
 			{ t = PLUNGE, name = "plunge" },
 			{ t = BLAST, name = "blast" },
@@ -621,29 +651,33 @@ local HAYMAKER_RUSH: Timeline = {
 			fov = 59.5,
 			ease = "smooth",
 		},
-		-- 1.70-3.58 the flurry: ONE held framing, low, side 3/4, tilted; only a slow drift (the jitter is on top)
+		-- 1.70-3.58 the flurry: ONE held framing, low, side 3/4, tilted; only a slow drift (the jitter is on top). kits-8g,
+		-- the owner: "the camera should be more zoomed in during the barrage part, its kinda far away" (the pair filled about
+		-- 40 % of the frame's height in a wide window): 14 % closer, FOV 60 and less roll, so the pair is about a fifth bigger.
+		-- That is as close as it goes with both whole and the floor under them on a phone (the user's kits-7c rule; the
+		-- target hangs 3.2 up, so the pair is tall), measured by tests/UltimateCamera.spec
 		{
 			t = FLURRY_FROM,
-			cam = Vector3.new(10.6, -0.4, 1.8),
+			cam = Vector3.new(9.12, -0.4, 1.55),
 			look = Vector3.new(0, 0.7, 0.5),
-			fov = 62,
-			roll = 10,
+			fov = 60,
+			roll = 6,
 			ease = "smooth",
 		},
 		{
 			t = 2.7,
-			cam = Vector3.new(10.4, -0.6, 1),
-			look = Vector3.new(0, 0.7, 0.2),
-			fov = 62,
-			roll = 12,
+			cam = Vector3.new(8.94, -0.6, 0.86),
+			look = Vector3.new(0, 0.6, 0.2),
+			fov = 60,
+			roll = 8,
 			ease = "smooth",
 		},
 		{
 			t = LAST_PUNCH + 0.14,
-			cam = Vector3.new(10.2, -0.8, 0.3),
-			look = Vector3.new(0, 0.6, -0.1),
-			fov = 62,
-			roll = 12,
+			cam = Vector3.new(8.77, -0.8, 0.26),
+			look = Vector3.new(0, 0.4, -0.1),
+			fov = 60,
+			roll = 8,
 			ease = "smooth",
 		},
 		-- 3.84 the uppercut: flash, SNAP to the REVERSE angle, low beyond the target on the attacker's right, looking back
@@ -701,42 +735,43 @@ local HAYMAKER_RUSH: Timeline = {
 			rel = "pair",
 			cut = true,
 		},
+		-- THE DRAWN VIEW (kits-8h, the owner: "the camera zoom should match the impact frame, and also the arm
+		-- posiitoning should match the impact frame too, at least before the impact frame hits"). The plunge drawing has a
+		-- measurable eye: a real camera fitted to the drawing's own projection (lune/drawn_fit, tests/support/DrawnView):
+		-- above the target's left front, 3 studs from the torso, FOV 30.8, rolled with the folded torso. The camera zooms onto the contact ALONG that same line of
+		-- sight (1.9 times as far), so the ink burst flashes out of the fist, then pushes in along it through the whole sink
+		-- and arrives at the drawing's own eye as the plunge frames flash: the live arm and torso lie where the drawn ones
+		-- do. Offsets from the target's root (rel = "target"), printed by lune/plunge_view; the test "the camera sees the
+		-- haymaker as the drawn plunge does" fails if the pose moves and these go stale.
 		{
-			t = HAYMAKER - 0.02,
-			cam = Vector3.new(4.4, -1, 0.6),
-			look = Vector3.new(0, 0.7, -0.5),
-			fov = 47,
-			rel = "pair",
+			t = CONTACT_FLASH,
+			cam = Vector3.new(3.07, 1.4, 4.16),
+			look = Vector3.new(0.96, 0.08, 1.03),
+			fov = 30.8,
+			roll = 6.2,
+			rel = "target",
 			insert = true,
 			ease = "whip",
 		},
-		-- held almost still into the contact and under the drawn contact frames (they cover the screen)
+		-- held under the drawn contact frames
 		{
 			t = HAYMAKER + HAY_CARDS,
-			cam = Vector3.new(4.3, -0.98, 0.6),
-			look = Vector3.new(0, 0.72, -0.55),
-			fov = 46.5,
-			rel = "pair",
+			cam = Vector3.new(3.07, 1.4, 4.16),
+			look = Vector3.new(0.96, 0.08, 1.03),
+			fov = 30.8,
+			roll = 6.2,
+			rel = "target",
 			insert = true,
 		},
-		-- the slow motion: the camera pulls back with the blow (a whip out, then a drift), so the target sliding away
-		-- folded round the fist stays in frame
+		-- the sink: pushing in along the drawing's line of sight to its eye as the plunge frames flash
 		{
-			t = HAYMAKER + HAY_CARDS + 0.14,
-			cam = Vector3.new(6, -1.1, 0.3),
-			look = Vector3.new(0, 0.2, -0.55),
-			fov = 54,
-			rel = "pair",
-			ease = "whip",
-		},
-		-- the sink (kits-8f): a slow push-in all through it (it drifted 0.15 studs and read as a freeze), the fist working
-		-- into the folding chest at the middle of the frame
-		{
-			t = SLOW_TO,
-			cam = Vector3.new(5.1, -0.95, 0.2),
-			look = Vector3.new(0, 0.55, -0.65),
-			fov = 50,
-			rel = "pair",
+			t = PLUNGE,
+			cam = Vector3.new(1.68, -0.5, 2.66),
+			look = Vector3.new(-0.51, -1.21, -0.61),
+			fov = 30.8,
+			roll = 13.2,
+			rel = "target",
+			insert = true,
 			ease = "smooth",
 		},
 		-- full speed: the result, in line with the throw, low behind them and to the right, the target shooting away
@@ -764,7 +799,7 @@ local HAYMAKER_RUSH: Timeline = {
 	kicks = {},
 	-- the flurry's constant small jitter (Garou vs Stinger 7.5-8.9: 0.8-1.7 % of the frame, a new direction every
 	-- frame): about 0.22 studs at this distance
-	jitter = { { from = FLURRY_FROM - 0.05, to = LAST_PUNCH + 0.1, studs = 0.07 } },
+	jitter = { { from = FLURRY_FROM - 0.05, to = LAST_PUNCH + 0.1, studs = 0.06 } }, -- kits-8g: the camera is closer, so a little less
 	-- one jolt as each freeze ends, along the hit (screen right is the way every blow travels; up for the
 	-- uppercut): 5-7 % of the frame, gone within ~0.2 s. The haymaker's as its slow motion ends and the throw goes
 	-- full speed.
@@ -775,6 +810,9 @@ local HAYMAKER_RUSH: Timeline = {
 		{ t = TAKEOFF, studs = 0.55, x = -0.3, y = -1, seconds = 0.16 },
 		{ t = SLOW_TO, studs = 1.3, x = 1, y = 0.45, seconds = 0.26 },
 	},
+	-- the drawn view's close-ups, from the contact frames to the blast: only the striking arm of the attacker, as the
+	-- drawn plunge (the owner, kits-8h: "Hide body, keep arm"; the camera there sits beside the attacker's shoulder)
+	soloArm = { from = CONTACT_FLASH, to = BLAST, part = "Right Arm" },
 	swings = rushSwings(),
 	-- the rising flurry loop, started so its first fist lands on the first punch, stopped after the last
 	barrage = {
@@ -960,6 +998,10 @@ function Ultimates.shot(
 		if shot.rel == "pair" and attackerAt and targetAt then
 			local middle = attackerAt:Lerp(targetAt, 0.5)
 			return middle + shot.cam, middle + shot.look
+		end
+		-- kits-8h: offsets from the target's root (anchor axes, not turned with its pitch, so the world stays steady)
+		if shot.rel == "target" and targetAt then
+			return targetAt + shot.cam, targetAt + shot.look
 		end
 		return shot.cam, shot.look
 	end

@@ -53,7 +53,7 @@ print(
 		clip.strike or 0
 	)
 )
-print("   t    clip   depth  gap   target v  attacker v  tilt")
+print("   t    clip   depth  height  gap   target v  attacker v  tilt")
 local step = 0.1
 local prevA, prevT
 local t = hit
@@ -70,18 +70,17 @@ while t <= blast + 1e-6 do
 	local va = if prevA then (a - prevA).Magnitude / step else 0
 	local vt = if prevT then (tg - prevT).Magnitude / step else 0
 	local tilt = Ultimates.tilt(line, t)
-	print(
-		string.format(
-			"%5.2f  %5.3f  %+5.2f  %4.2f  %6.2f    %6.2f    %5.1f",
-			t,
-			ct,
-			depth,
-			Rig.torsoGap(torso, tip),
-			vt,
-			va,
-			if typeof(tilt) == "Vector3" then tilt.X else tilt
-		)
-	)
+	print(string.format(
+		"%5.2f  %5.3f  %+5.2f  %+5.2f   %4.2f  %6.2f    %6.2f    %5.1f",
+		t,
+		ct,
+		depth,
+		l.Y, -- up the torso: -1 its bottom, 0 its centre, +1 its top
+		Rig.torsoGap(torso, tip),
+		vt,
+		va,
+		if typeof(tilt) == "Vector3" then tilt.X else tilt
+	))
 	prevA, prevT = a, tg
 	t += step
 end

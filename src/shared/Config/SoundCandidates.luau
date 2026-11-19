@@ -68,19 +68,15 @@ local function barrage(
 	}
 end
 SoundCandidates.OPTIONS = {
+	-- kits-8g, the owner: "the barrage sound doesnt play until the end of the animation". The flurry's punches run 1.875 s
+	-- (1.70 to 3.575) and the default, the first option, was 1.02 s long: the last 0.85 s of punches had no sound. Only
+	-- files that cover the whole flurry are offered now, the first (the default) ending just as the uppercut cuts it.
+	-- Dropped as too short: "dio punching barrage sfx 1 second" (117958044865545, 1.02 s), "Dragon Ball Rapid Punches
+	-- SFX" (87361464437966, 1.65 s), "punch barrage sfx" (108575892208319, 1.70 s).
 	ult_barrage = {
-		barrage(
-			"A",
-			117958044865545,
-			1.02,
-			"dio punching barrage sfx 1 second",
-			"Your_uncleisreal"
-		),
-		barrage("B", 87361464437966, 1.65, "Dragon Ball Rapid Punches SFX", "QQshka1UP"),
-		barrage("C", 108575892208319, 1.70, "punch barrage sfx", "Axellatic"),
-		barrage("D", 95801559782723, 1.83, "one punch man barrage hit sfx", "Axellatic"),
-		barrage("E", 114289646726161, 2.12, "Rapid punches sfx", "isiahjen8"),
-		barrage("F", 102850005066154, 3.51, "Multi Punch / Barrage", "Kaaizarr"),
+		barrage("A", 114289646726161, 2.12, "Rapid punches sfx", "isiahjen8"),
+		barrage("B", 102850005066154, 3.51, "Multi Punch / Barrage", "Kaaizarr"),
+		barrage("C", 95801559782723, 1.83, "one punch man barrage hit sfx", "Axellatic"),
 	},
 } :: { [string]: { Option } }
 return SoundCandidates

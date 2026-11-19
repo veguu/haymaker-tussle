@@ -174,6 +174,38 @@ function UltimateController:KnitStart()
 		-- the timeline poses both bodies: their knocked-about blends stay off so the flinches show (kits-7i)
 		anim:SetCutscene(attacker, true)
 		anim:SetCutscene(target, true)
+		-- kits-8h, measured in a live ultimate: this body's facing constraint (MovementController's HT_Facing
+		-- AlignOrientation, infinite torque) stayed on with the heading from before the ultimate and twisted the root back
+		-- every physics step after it was set here, so the attacker faced 35-50 deg off the target all through the haymaker
+		-- and the fist landed beside the chest (the owner: "the target is not being hit at the center of their torso").
+		-- Off while the timeline owns the body; back on afterwards holding the facing the body has then.
+		-- the attacker shown as the striking arm alone (Ultimates soloArm, the drawn view's close-ups), and back
+		local soloShown = false
+		local function setSolo(part: string, on: boolean)
+			for _, item in attacker:GetDescendants() do
+				if item:IsA("BasePart") and item.Name ~= part then
+					item.LocalTransparencyModifier = if on then 1 else 0
+				elseif item:IsA("Decal") then
+					item.LocalTransparencyModifier = if on then 1 else 0
+				end
+			end
+			soloShown = on
+		end
+		local myFacing: AlignOrientation? = nil
+		do
+			local myRoot = role and me and me:FindFirstChild("HumanoidRootPart")
+			-- (its Attachment has the same name and comes first, so look for the constraint itself)
+			for _, child in if myRoot then myRoot:GetChildren() else {} do
+				if
+					child.Name == "HT_Facing"
+					and child:IsA("AlignOrientation")
+					and child.Enabled
+				then
+					child.Enabled = false
+					myFacing = child
+				end
+			end
+		end
 
 		local connection: RBXScriptConnection? = nil
 		connection = RunService.RenderStepped:Connect(function()
@@ -408,6 +440,15 @@ function UltimateController:KnitStart()
 					* CFrame.new(sx, sy, 0)
 				camera.FieldOfView = fov
 			end
+			-- the drawn view's close-ups: only the attacker's striking arm (kits-8h), set every frame (Roblox's own
+			-- transparency control for the local character would otherwise set it back)
+			local solo = line.soloArm
+			if role and solo then
+				local inside = t >= solo.from and t < solo.to and attacker.Parent ~= nil
+				if inside or soloShown then
+					setSolo(solo.part, inside)
+				end
+			end
 			-- The dip to black: timed so the camera swap below (at ending + 0.1) happens under full black.
 			if role and not dipped and t >= ending + 0.1 - DIP_IN - DIP_HOLD * 0.5 then
 				dipped = true
@@ -435,6 +476,14 @@ function UltimateController:KnitStart()
 				if role and camera then
 					camera.CameraType = Enum.CameraType.Custom
 					camera.FieldOfView = fovBefore
+				end
+				if soloShown and line.soloArm then
+					setSolo(line.soloArm.part, false)
+				end
+				if myFacing and myFacing.Parent then
+					local root = myFacing.Parent :: BasePart
+					myFacing.CFrame = root.CFrame.Rotation
+					myFacing.Enabled = true
 				end
 			end
 		end)

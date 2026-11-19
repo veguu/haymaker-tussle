@@ -4306,3 +4306,93 @@ Build stamp `kits-8e+lobby-4+ui-19d`.
 - **Result:** the fist works in from 0.22 to 0.65. There's a new test, and all 560 pass. Seen in a held replay.
   Details: study 16.
 - **Still open:** the sound pass, and the stage D/E rings.
+
+## kits-8g (2026-11-18): the owner's full-speed notes (build `kits-8g+lobby-4+ui-19d`; patched into the place by hash)
+- **"The impact frame is wayy too long (should be an instant)":** each drawn run now flashes a few drawings at 60 fps
+  (`Ultimates.DRAWN.show`): contact 0.1 s, plunge 0.12 s, measured live at 0.109 and 0.120 s. A test caps runs at
+  0.15 s. The vault Field Notes got section 11, "An impact frame is an instant".
+- **"The barrage sound doesnt play until the end of the animation":** the default was a 1.02 s file over 1.875 s of
+  punches.
+  - Only options that cover the flurry are kept: A "Rapid punches sfx" (2.12 s, the default), B (3.51 s), C (1.83 s).
+  - Live: it plays from 1.81 to 3.93 s.
+  - A test checks every option's length.
+- **"The blast away" had no sound:** K1 (`ult_haymaker`) now plays its front only on the contact (`cut` 0.4) and in
+  full on the blast. Live: 4.95 s and 6.57 s.
+  - A split rebuild (round 8) was measured first. Without the thud, the blast half was loudest at +0.95 s (the
+    downer), so it was dropped. No new upload.
+- **Flurry camera "kinda far away":** 14 % closer, FOV 60, roll 6-8 (the pair is about a fifth bigger). That's the
+  limit while keeping the owner's kits-7c rule (the floor under their feet in shot on a phone).
+- **"The blow should be straighter and the target shouldnt be angled too highly":**
+  - `HAY_UP` 28 → 10 in `animations/build_strikes.luau`, with HaymakerUp rebaked.
+  - The drive is now 11 deg up.
+  - `HAY_GAP` 3.2, `HAY_RISE` 1.7, `HAY_FOLD` 378 (leaning back 18 deg), `THROW_DIR` 0.2 up.
+  - Contact is 4 deg off square.
+- **"Hit in the center of the torso not the top":**
+  - The fist rode up to +0.5 as the body folded over it.
+  - Now the attacker sinks through the slow part (`SINK_DROP_*`) and is carried farther (`CARRY_*` 1.2 / 2.85 / 3.35).
+  - The fist stays within 0.1 of the centre and works in 0.25 → 0.68.
+  - The sink test now also checks the height. `lune/sink_check` prints it.
+- **Gates:** 561 tests, selene 0, stylua clean, rojo build OK. Seen in a held replay.
+- **Not done:** the owner's full-speed look.
+
+## kits-8h (2026-11-18): the camera and pose matched to the drawn frames; the real cause of the off-centre hit (patched by hash)
+Build stamp `kits-8h+lobby-4+ui-19d`.
+
+- **Root cause of "not hitting the centre":** MovementController's `HT_Facing` AlignOrientation stayed on during the
+  ultimate and twisted the attacker's root 35-50 deg off the target every physics step.
+  - `UltimateController` now disables it (found by class: its Attachment shares the name) and restores it at the end.
+  - Live: the facing is now 0-2 deg off.
+- **Hit, set from live logs:** `HAY_RISE` 1.15, `HAY_SIDE` -1.1, `CARRY_*`.
+  - The game reads the fist 0.35 lower than the rig. The tests carry this as `LIVE_DROP`.
+  - Live mean over the sink: y +0.14 (the drawing's dent), x -0.14 (0.2 to the target's left), depth 0.3-0.6.
+  - Finer x needs the strike's `HAY_INWARD` and a rebake.
+- **Target's arms "inside the torso":** build_strikes pivots arms at the torso's edge (`SHOULDER` x 1).
+  - Keyed arms got an `out` shift. The Fold pose uses `out` 0.5, so the arms hang on the R6 arm line as drawn.
+  - Live: the arm centres are at x ±1.8.
+- **The contact flash comes before the hit:** a new `impact` cue at `RELEASE` (0.07 s before contact) carries the
+  frames and the hit's front sound. Live: the flash runs 4.86-4.96 and the fist lands on screen about 4.965.
+- **The darken cue is removed.**
+- **Drawn view camera** (`rel = "target"` shots):
+  - The plunge drawing's 3-VP construction isn't a real camera (190-450 px off).
+  - `lune/drawn_fit` fits a real camera to it: rms 52 px, the dent 22 px, the fist 47 px. That's eye (-1.42, 1.39,
+    -1.84) in torso units, FOV 34.7.
+  - `tests/support/DrawnView` + `lune/plunge_view` turn it into shot offsets. A test fails if the pose moves and they go
+    stale.
+  - The camera zooms onto the contact along that line and pushes in to the drawing's eye by the plunge.
+- **The owner picked "Hide body, keep arm":**
+  - `Ultimates` `soloArm` runs from `CONTACT_FLASH` to `BLAST`.
+  - `UltimateController` sets `LocalTransparencyModifier` every frame, on the fighters' screens only, and restores it at
+    the end.
+  - Live: 7 parts hidden, the Right Arm shown.
+- **Arm square to the chest at the plunge:**
+  - The sink's deepening fold turned the chest 20 deg down off the level punch, so the arm came down into it. Now
+    `SINK_FOLD` = `HAY_FOLD` - 6 (it was -22), `CARRY_SLOW` 2.55, `CARRY_THROWN` 3.05, and the plunge shot was re-fitted.
+  - Live at 6.42: arm direction (-0.12, -0.11, 0.99) in the torso's frame (the drawing: (0, 0, 1)), fist at (-0.15, 0.05).
+- **The drawing was updated to the game instead:**
+  - `Plunge.cs` `FH` is 0.5 (an R6 arm, 1 x 1; it was 0.32).
+  - `HX` is -0.3 (it was 0.06). Seen from above the target's left front, the true chest centre looks pushed to the far
+    side and the head sits over the torso's depth, so the hit read as off-centre (the owner: "the cave isnt centered ...
+    the fist isnt hitting the center"). At -0.3 the fist and cave sit under the head (x ≈ 587 against the head's 612
+    on the frame).
+- **The game matches:**
+  - `HAY_INWARD` 14 (it was 18), with HaymakerUp rebaked.
+  - The camera was refit (`lune/drawn_fit` with HX -0.3: eye (-1.60, 1.50, -1.96), FOV 31.8) and the shots updated.
+  - Live, clean run: fist x -0.31, y +0.1, depth 0.3-0.6 (the drawing: -0.3, 0.14).
+- **Frames:** the 8 plunge frames are redrawn and resized in `out/upload`, NOT UPLOADED. Upload them (ask first), then
+  swap the plunge ids in `Fx/DrawnImpact.luau` and patch.
+- **Live tests:** a round start mid-test teleports the attacker and spoils the log. Re-run until the log is clean.
+- **Superseded, then final:**
+  - The owner judged the hit at HX -0.3 "too far right, too high". With guides drawn on candidates (the chest's centre
+    lines, the head line, the real hit point), they picked **D**, the chest's true centre: `Plunge.cs` HX 0, HY 0.
+  - The fist's visible outline is its end face's top-right corner, half a stud up and right of the hit point.
+  - The camera was refit: eye (-1.61, 1.52, -2.05), FOV 30.8.
+  - Game: `HAY_INWARD` 22, `HAY_RISE` 1.65. The rig puts the fist at (0.05, -0.01) at the contact, within 0.11 of
+    centre through the sink, and a live run at ~40 fps matched the rig.
+  - The "0.35 live drop" was a logging artefact (logging before the cutscene re-places the body, at low fps), so the
+    tests' `LIVE_DROP` was removed.
+  - The 8 plunge frames are redrawn and **uploaded** (the owner's OK). The new ids are in `Fx/DrawnImpact` and patched.
+    In game, all 18 frames load, and the new plunge was seen on screen in a replay.
+  - The cave: the owner chose "Keep it true" (a round dent on the sloping chest reads as a leaning oval; guides in
+    `design/cutscene-study/20-plunge-cave-guides.png`).
+- **Gates:** 562 tests, selene 0, stylua clean. Everything is patched into the place and hash-checked.
+  `MovementController` (the teammate's newer copy is in the place) was not touched.

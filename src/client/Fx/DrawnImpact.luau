@@ -3,9 +3,10 @@
 -- 2 impact frames, the initial connection and then right before the knockback", and 3D silhouettes are "a bad crutch".
 -- Both are pre-rendered pencil drawings (design/vfx/impact: build_contact.ps1, build_plunge.ps1 with Plunge.cs),
 -- accepted as drawn ("Looks good"), shown full screen one image per frame:
---   contact  the ink burst exploding out from the hit (10 frames)
---   plunge   the fist sinking into the folded torso, the chest caving round it (8 frames, the last held)
--- Their frame counts and rates are Core/Ultimates.DRAWN, so the timeline and this agree.
+--   contact  the ink burst exploding out from the hit (10 drawings)
+--   plunge   the fist sinking into the folded torso, the chest caving round it (8 drawings)
+-- Which drawings flash, how fast and the last one's hold are Core/Ultimates.DRAWN, so the timeline and this agree
+-- (kits-8g: about 0.1 s a run, "an instant").
 --
 -- How: a full-screen ScreenGui over everything with a black back, one ImageLabel per frame (Crop, so any screen shape is
 -- filled), switched with Visible and picked by the time since the start, so a slow frame skips a drawing instead of
@@ -34,15 +35,16 @@ local IMAGES: { [string]: { string } } = {
 		"rbxassetid://134156521030781",
 		"rbxassetid://132619956547692", -- contact_09
 	},
+	-- kits-8h: redrawn with an R6-size arm and the fist on the chest's true centre (the owner's pick "D"), uploaded again
 	plunge = {
-		"rbxassetid://132441043160915", -- plunge_00, the hit (inverted)
-		"rbxassetid://72311555114909",
-		"rbxassetid://93340321261861",
-		"rbxassetid://113611348094108",
-		"rbxassetid://125043205931833",
-		"rbxassetid://76379947312727",
-		"rbxassetid://120416021460247",
-		"rbxassetid://94176657298016", -- plunge_07, held 0.1 s
+		"rbxassetid://125585537552772", -- plunge_00, the hit (inverted)
+		"rbxassetid://74862787074852",
+		"rbxassetid://135589918766176",
+		"rbxassetid://78281243761093",
+		"rbxassetid://99957165322728",
+		"rbxassetid://117639981545261",
+		"rbxassetid://122792301712896",
+		"rbxassetid://78692019679916", -- plunge_07
 	},
 }
 DrawnImpact.IMAGES = IMAGES
@@ -132,11 +134,12 @@ function DrawnImpact.play(name: string)
 	back.ZIndex = 1
 	back.Parent = gui
 
+	-- kits-8g: only the drawings in `show`, one per 1/fps (the owner: an impact frame is "an instant")
 	local frames: { ImageLabel } = {}
-	for index = 1, run.frames do
+	for index, drawing in run.show do
 		local frame = Instance.new("ImageLabel")
-		frame.Name = `Frame{index}`
-		frame.Image = list[index]
+		frame.Name = `Frame{drawing}`
+		frame.Image = list[drawing]
 		frame.ScaleType = Enum.ScaleType.Crop
 		frame.BackgroundTransparency = 1
 		frame.Size = UDim2.fromScale(1, 1)
@@ -158,7 +161,7 @@ function DrawnImpact.play(name: string)
 			break
 		end
 		-- the last drawing holds through `hold`
-		local index = math.min(math.floor(elapsed / step) + 1, run.frames)
+		local index = math.min(math.floor(elapsed / step) + 1, #run.show)
 		if index ~= shown then
 			frames[shown].Visible = false
 			frames[index].Visible = true

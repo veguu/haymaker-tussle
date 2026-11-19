@@ -17,8 +17,8 @@
 --   flurry   ONE rapid-punches sound over the whole barrage (ult_barrage, kits-7d); its punches add none
 --   wind-up  the rumble builds
 --   dip      every sound cut to silence for 0.15 s before the haymaker (7 of 8 big hits in the study)
---   haymaker one designed huge hit (ult_haymaker, our heavy hit, kits-7a)
---   blast    no new sound and no processing: the heavy hit's own roar, muffle and sinking boom carry it
+--   haymaker the heavy hit's front only (ult_haymaker cut at 0.4 s): the snap and thud on the contact (kits-8g)
+--   blast    the heavy hit whole (ult_haymaker): its roar, muffle and sinking boom as the target is thrown (kits-8g)
 local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -67,6 +67,7 @@ local states: { [Context]: State } = setmetatable({}, { __mode = "k" }) :: any
 local BED_VOLUME = 0.5 -- under the punches, never over them
 local DIP_FADE = 0.05
 local CHOKE = 0.04 -- how fast a punch's ring fades when the next one lands
+local HAYMAKER_CUT = 0.4 -- the contact's share of the heavy hit: its snap, thud and the roar's burst, then a fade
 
 -- The impact frames (kits-8e): two hand-drawn runs, full screen on the two fighters' screens only (Fx/DrawnImpact).
 -- They replace kits-8c's three procedural card runs (contact, soak, release); the owner: "there should only be 2 impact
@@ -347,12 +348,19 @@ local function dip(_ctx: Context, state: State)
 end
 
 -- The haymaker: ONE complete designed hit (the user: one sound that is the thing, not a stack of parts), on
--- the frame the fist lands, after the silence, under the drawn contact frames (the ink burst).
+-- the frame the fist lands, after the silence.
+-- kits-8h: the drawn contact frames and the hit's sound come first, as the fist snaps out ("impact", 0.06 s before
+-- the contact; the owner: "you should see the frame before you ssee the punch hit"); the burst lands on the contact,
+-- as the frames clear onto the fist already in.
+local function impact(ctx: Context, state: State)
+	drawn(ctx, "contact")
+	-- kits-8g: only the heavy hit's front here (the whole of it is the blast's, 1.6 s later)
+	sound("ult_haymaker", ctx, state, { volume = 1, cut = HAYMAKER_CUT })
+end
+
 local function haymaker(ctx: Context, state: State)
 	local at = chest(ctx)
-	drawn(ctx, "contact")
 	PunchHitFx.play(at + fistSide(ctx, "Right"), outward(ctx), 2.2, nil, true, nextTurn(state))
-	sound("ult_haymaker", ctx, state, { volume = 1 })
 end
 
 -- right before they fly (kits-8e): the drawn fist plunge, ending as the blast goes full speed
@@ -360,11 +368,15 @@ local function plunge(ctx: Context, _state: State)
 	drawn(ctx, "plunge")
 end
 
--- The blast: colour back, the shockwave, and no new sound. Our heavy hit (ult_haymaker, kits-7a) already carries
--- the blast: its roar's highs sweep down (the muffle) and a bass downer sinks under it, designed into the one file,
--- so nothing here re-filters or re-pitches it (v2; before kits-7a this muffled a community upload at run time).
+-- The blast: colour back, the shockwave, and the heavy hit WHOLE (kits-8g). Since kits-8e's 1.62 s sink the blast that
+-- throws the target came 1.6 s after the one heavy hit, whose every layer starts in its first 0.09 s, and so it was
+-- silent (the owner: the "blast away" had no sound). Our heavy hit (ult_haymaker, kits-7a, K1 "blast") was designed as
+-- this moment: its roar's highs sweep down (the muffle) and a bass downer sinks under it, in the one file, so nothing
+-- here re-filters or re-pitches it. The contact plays only its front. (A split rebuild was measured first: without the
+-- thud the blast half was loudest at +0.95 s, the downer, so the whole K1 is the better blast.)
 local function blast(ctx: Context, state: State)
 	local at = chest(ctx)
+	sound("ult_haymaker", ctx, state, { volume = 1 })
 	PunchHitFx.play(at, outward(ctx), 3, nil, true, nextTurn(state))
 	local floor = FxKit.floorUnder(at, 16, { ctx.attacker, ctx.target })
 	if floor then
@@ -386,17 +398,12 @@ local function flash(ctx: Context, _state: State)
 	end
 end
 
--- The scene darkens through the held wind-up (Human Battery, Jotaro: the climax goes dark), cut off at once under
--- the haymaker's impact frames.
-local function darken(ctx: Context, _state: State)
-	if ctx.mine then
-		CutsceneScreen.blackout(0.45, 0.25, 0.2, 0)
-	end
-end
+-- (kits-8h: the "darken" before the haymaker is gone. It dimmed the screen to 45 % black over the 0.45 s before the
+-- contact, from Human Battery and Jotaro's dark climax; the owner, at full speed: "right before the first impact frame
+-- the screen darkens for some reason".)
 
 local BASE: { [string]: (Context, State) -> () } = {
 	flash = flash,
-	darken = darken,
 	dash = dash,
 	blow = blow,
 	punchLeft = punch("Left"),
@@ -407,6 +414,7 @@ local BASE: { [string]: (Context, State) -> () } = {
 	leap = leap,
 	windup = windup,
 	dip = dip,
+	impact = impact,
 	haymaker = haymaker,
 	plunge = plunge,
 	blast = blast,

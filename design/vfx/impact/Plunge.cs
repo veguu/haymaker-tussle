@@ -33,8 +33,11 @@ public class Plunge
     static readonly PointF VL0 = new PointF(-2400, -500), VR0 = new PointF(2050, -500), VD0 = new PointF(620, 3600), T00 = new PointF(950, 160);
     static readonly double WX = 0.26 / (2 * 0.74), WZ = 0.27 / 0.73, WD = 0.25 / (2 * 0.75);
     public static double Zs = 1, Zdy = 0;                     // framing: as the earlier frames (the torso's middle the focus)
-    public static double HX = 0.06, HY = 0.14;                // the contact on the chest
-    public static double FH = 0.32;                            // the fist's half size
+    // the contact on the chest: its true centre (kits-8h, the owner's pick "D" from guides drawn on candidates: the chest's
+    // centre lines and the head line; at -0.3, 0.14 the punch read "too far right ... too high"). The fist's visible outline is its
+    // end face's top-right corner, half a stud up and right of this point, which lands on the head line
+    public static double HX = 0, HY = 0;
+    public static double FH = 0.5;                             // the fist's half size: an R6 arm, 1 x 1 (kits-8h; it was 0.32)
     static readonly V3 Light = new V3(0.35, 0.8, -0.5).Unit();
 
     public static PointF Fr(double x, double y) { return new PointF((float)(640 + (x - 640) * Zs), (float)(360 + (y - 360) * Zs + Zdy)); }
