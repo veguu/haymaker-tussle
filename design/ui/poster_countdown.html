@@ -1,7 +1,8 @@
 <!doctype html><meta charset="utf-8">
 <!-- The round-start countdown's lettering (ui-16a), drawn by the browser exactly as the mockup's `.cd` draws it.
      TOP ROW, cells 256 x 400 in the order 3 2 1: Oswald 700 slanted at 250 px, an 11 px ink outline and a 13 px hard
-     ink shadow, each in its own colour (3 cream, 2 yellow, 1 pink). Full colour: shown as they are, not tinted.
+     ink shadow, the faces WHITE (since ui-24a, 2026-11-20: the owner wants the whole countdown in one colour,
+     picked at random each round, so the game tints them; the ink outline and shadow stay near-black when tinted).
      Each number's own box (its width, 0.95 of its size tall) sits in the middle of its cell.
      SECOND ROW, from y = 400, cells 128 x 200 in the order T U S L E !: the TUSSLE! cards' letters, Oswald 700
      upright, WHITE on clear (tinted in the game), drawn at 160 px for the mockup's 128 (1.25 times), each in the
@@ -14,7 +15,7 @@
 <style>
 html,body{margin:0;background:transparent;overflow:hidden}
 .c{position:absolute;top:0;width:256px;height:400px;display:flex;align-items:center;justify-content:center}
-.n{display:inline-block;font:700 250px/.95 Oswald;font-style:italic;-webkit-text-stroke:11px #43365A;paint-order:stroke fill;text-shadow:13px 13px 0 #43365A}
+.n{display:inline-block;font:700 250px/.95 Oswald;font-style:italic;-webkit-text-stroke:11px #1E2233;paint-order:stroke fill;text-shadow:13px 13px 0 #1E2233}
 .g{position:absolute;top:400px;width:128px;height:200px;display:flex;align-items:center;justify-content:center}
 .l{display:inline-block;font:700 160px/1 Oswald;color:#fff}
 .m{position:absolute;left:0;top:700px;font:700 128px/1 Oswald;white-space:nowrap}
@@ -22,7 +23,7 @@ pre{position:absolute;left:0;top:900px;font:12px monospace}
 </style>
 <body>
 <script>
-const TONE={3:'#FFF9EC',2:'#FADF7F',1:'#F5A6C0'};
+const TONE={3:'#FFFFFF',2:'#FFFFFF',1:'#FFFFFF'};
 [3,2,1].forEach((d,i)=>{const c=document.createElement('div'); c.className='c'; c.style.left=(i*256)+'px';
   const n=document.createElement('span'); n.className='n'; n.style.color=TONE[d]; n.textContent=d; n.id='n'+d; c.appendChild(n); document.body.appendChild(c);});
 const LETTERS=['T','U','S','L','E','!'];

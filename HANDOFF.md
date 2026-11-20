@@ -4222,6 +4222,163 @@ only the training session's GameConfig, MapEnvironments, LobbyService and DrawnI
   to Oswald Bold. NOT SEEN: the clash bar, kick meter, kick prompt, tutorial and toast with the new font on
   screen (Oswald is narrower and has no slanted face: check words that were italic or tightly boxed).
 
+## ui-20f (2026-11-19): the palette a BIT DARKER and LESS GIRLISH. IN THE PLACE (saved), NOT COMMITTED. START HERE.
+His words after ui-20e: "i want the ui colors to be a BIT darker, its too light, don't make it girlish, use ur own
+interpretation on what I mean by girlish, but dont make it as dark as it was last time before the revamp".
+MY READING of "girlish" (say so to him if asked): the pink, lavender and candy pastels leading the look. So, in
+`Tokens.hex` only (names and jobs unchanged): ink a deep slate #2A2540 (pastel #43365A, old #1A1236), yellow a
+warm gold #F2C744, cyan a clear teal #5CC6DB, the warning pink a CORAL RED #EE7A5E, the light violet a SLATE BLUE
+#AEB8D6, cream #FFF8EA, green #5CCB8A, red #E8655C, the class sweep and meter at mid strength (Trickster and Dragon
+toned down). `tests/Tokens.spec.luau` has the new measured contrasts; every ink-on-fill and text-on-ink pair is
+4.9:1 or better. Shapes, font and layout untouched. 573 tests, stylua clean, rojo build OK. Only Tokens written
+into Studio (the place also differs in another session's Ultimates, UltimateService, UltimateController,
+UltimateFx, DummyService and the Server folder: not mine, left alone).
+- SEEN in a play test: the fight HUD, the lobby strips, the Classes page (gold) and the Ranked page (coral).
+- BAKED IMAGES REDRAWN AND RE-UPLOADED on his "Yes, redraw them": the drawing tools hold this palette (slate
+  outline #2A2540, cream #FFF8EA; countdown 3 cream, 2 gold #F2C744, 1 CORAL #EE7A5E; crown gold and orange;
+  dash, punch, jump recoloured from `work/before-soft/` with 15 % white). Group-owned (Open Cloud, Approved):
+  countdown_sheet 107954220228526, stopwatch 119814264319818, crown_pixel 110394369204290. Through Studio
+  `upload_image` (their folders are not approved for group uploads): titles 107518598522161, 139862987344824,
+  87714606110550, poster_last 71740494192591, dash 120035798291196, punch 91284385529538, jump 114202255252902.
+  Wired in `Shapes.luau` and `Icons.luau` (older ids in the comments). SEEN: the coral "1", the FROST title.
+
+## lobby-5 (2026-11-19): the village lobby recoloured in the UI's ui-20f palette. IN THE PLACE (saved), NOT COMMITTED.
+His words: "re color the map with the same palette, make sure it flows well and its good" (he picked THE LOBBY when
+asked). It replaces the training session's pastel / sakura repaint (in the place at v546, not written up in this
+file; that session stopped at a usage limit).
+- PAINT (`design/lobby/village.py`, the `PAL.update` block): warm cream stone shading to slate, coral terracotta
+  roofs and clay, honey timber, gold / coral / teal / slate-blue / green cloth, GREEN trees with GOLD leaf clumps
+  (my reading of "not girlish": no pink blossom, no lavender; the bag names still say Sakura / leaf_pink).
+  `training_sections.json` section colours mapped to the UI tokens (pink -> coral, butter -> gold, cyan -> teal,
+  mint -> green, lavender -> slate blue); `apply_sections.py` petals are gold falling leaves (F2C744 -> FFF1C8);
+  `studio_lobby.py` banners coral EE7A5E and gold F2C744 (they were forced pastel). Lighting
+  (`MapEnvironments.luau`, the lobby): between the first golden hour and the pastel pass (sun 16.2 { 255, 222,
+  186 } 2.4, slate shade, warm cream haze).
+- BUILT headless (Blender 5.2, `village.py -- out/village`): 89 meshes, 98,107 triangles, 145 colliders, 86 kit
+  pieces. UPLOADED on his "Yes, upload" (Open Cloud Model, group 2970443, Approved): `village_1.glb` =
+  86044855344733 (62 meshes, 12.1 MB), `village_2.glb` = 116554501810565 (27, 7.5 MB). Assembled with
+  `out/village/studio_lobby.luau`: 89 of 89, worst 0.001, kit 86 of 86. The pastel model is kept as
+  `ServerStorage.HT_LobbyArchive.Village_pastel_20261119`. Old pastel-file copies: `work/before-lobby-recolour/`.
+  CAUTION: `studio_mcp.py luau` can report "Target is not reachable" and STILL run the script; running it again
+  then builds an EMPTY Village (the imports are consumed). Re-insert the imports before any retry.
+- SETTINGS: `apply_sections.py --apply` (game.json Lobby.Training and Petals, GameConfig regenerated; check OK),
+  LobbyLayout unchanged (check OK). Written into Studio: GameConfig, MapEnvironments only. 573 tests, stylua
+  clean, rojo build OK.
+- SEEN in a play test (stills): the square from above (terracotta roofs, teal and white awnings, banners) and the
+  training gate (clay wall, teal and coral flags, gold leaves falling). NOT SEEN: the trees close up, the training
+  sections' floors, the obby, frame cost. The training session also reported switching off one lighting setting
+  in an earlier play test: not checked.
+
+## ui-21a (2026-11-20): ANIMATED TEXTURE on every button, tile, chip and card. IN THE PLACE (saved), NOT COMMITTED.
+His words, with two pictures of our own Classes page and the quest clipboard: "the buttons NEED textures, FIND
+EVERY BUTTON THAT THIS APPLIES TO, it doesnt feel complete the way it is ... add textures to the UI ... the textures
+need to be animated". MY READING: the two pictures show what is missing (flat plates), not a look to copy.
+- NEW `Ui/Texture.luau`, called from `Shapes.image` for every ROUND shape whose image is named "Fill" (so every
+  PosterKit.cut, chip, row key cap, Callouts quad, strip card, ULT badge, HUD skill tile: the whole UI at once).
+  Four layers, all clipped to the fill, NO upload: DEPTH (UIGradient on the fill, colour x 1 at the top to x 0.78 at
+  the bottom), GLOSS (white sheen over the top, gone by the middle), GRAIN (the window's own halftone dot,
+  `Shapes.ids.dots`, tiled 13 units in ink at 0.74 transparency, DRIFTING one cell up-right every 2.8 s, a looping
+  tween), SHINE (a white band that sweeps across every 5 to 11 s per fill, staggered, and at once on hover:
+  `PosterKit.pressable` calls `Texture.shine`). The grain's clip frame is square, but the fill's corners lie inside
+  the ink outline, so ink dots there do not show.
+- First pass (dots 0.86, no gloss) was too faint, seen enlarged; this is the second.
+- PHONE (Drift.lite): no shine. REDUCED MOTION: nothing moves. Switch for measuring: workspace attribute
+  HT_TextureOff = true pauses every drift and the shine.
+- MEASURED (Studio, menu open, bots fighting): 17.33 ms on / 16.95 off, then 34.91 on / 38.16 off: no difference
+  above Studio's noise. Not measured on a phone.
+- SEEN enlarged: the class tiles, menu strips, Equip button, key caps, and the fight HUD's Q, R, CONTROLS, Jump and
+  Punch. NOT SEEN: the drift and the shine MOVING (stills only), the hover shine, Shop, Settings, pop-ups, the quest
+  clipboard (the quest session's; it uses its own shapes), a phone.
+- NOT PULLED: origin/main is 2 commits ahead (someone's ultimate work); the pull would be refused because
+  DummyService has the training session's uncommitted changes. My files are not in those commits.
+- Written into Studio: Texture (new ModuleScript), Shapes, PosterKit only.
+
+## ui-21b + ui-22a (2026-11-20): SPARKLES on every button; RETRO COMIC palette for the whole UI. UI IN THE PLACE (saved), NOT COMMITTED.
+- SPARKLES (his pick of six on `work/pattern-candidates.png`, drawn by NEW `design/ui/make_button_patterns.py`):
+  `assets/ui/pattern_stars.png` 128 x 128 white seamless, uploaded through Studio `upload_image` (assets/ui is not an
+  approved Open Cloud folder) = 78736200114644, `Shapes.ids.sparkles`. `Ui/Texture` tiles it 44 units over every
+  rounded Fill, WHITE at 0.58 on a coloured face and INK at 0.76 on a light one (it follows the face's colour), and
+  DRIFTS it one tile up-right every 8 s, never stopping. His words: "don't make the sparkles disappear ... just keep
+  it flowing": the twinkle (breathing transparency) was removed; first strength 0.74 read too faint (seen enlarged).
+- RETRO COMIC (palette 2 of six on `work/palette-options.png`, NEW `design/ui/make_palette_options.py`; then "change
+  the entire vibe of the game, the entire ui ... it doesn't have to pertain to those 4 colors"): `Tokens.hex` navy
+  ink 1E2233, newsprint cream FFF4D6, yellow FFD23F, blue 64A3FF (the "teal" job; lightened from 3A86FF so it reads as
+  text on ink.700), red F0525A (lightened from E63946 so ink reads on it), grey-blue A9B4C9, green 2EC27E, class sweep
+  in primaries (Inferno FF7A2F, Bruiser FFA41C, Dragon 8C6CF0, Trickster C46BE0, Tempest 2EC4B6). Every essential
+  pair is 4.5:1 or better; `tests/Tokens.spec.luau` holds the measured values. ClashBar, KickMeterBar and
+  TrainingPanel had their own RGB literals: now on Tokens.
+- SEEN in a play test: the fight HUD and the Classes page with menu strips (Retro Comic, sparkles visible).
+- REDRAWN ON DISK, NOT UPLOADED YET (asked): the ten baked images in Retro Comic (titles, 3 2 1 with a RED 1, last
+  numbers, stopwatch, crown, dash, punch, jump). THE LOBBY in Retro Comic: `village.py` PAL (newsprint stone, red
+  roofs, primary cloth, blue accents), section colours, yellow petals, banners, lighting (crisp day: sun 15.6
+  { 255, 238, 214 } 2.6). Blender rebuild running; GameConfig/MapEnvironments go into Studio WITH the new model.
+  Copies of the pre-retro lobby files: `work/before-retro-lobby/`.
+- UPLOADED AND IN THE PLACE on his "Yes, upload all" (saved after): group-owned, Approved: countdown_sheet
+  138423895593788, stopwatch 86564951602776, crown_pixel 79399273981355, `village_1.glb` 133694186837348 (62
+  meshes, 12.0 MB), `village_2.glb` 90109925798448 (27, 7.5 MB). Through Studio `upload_image`: titles
+  108455015162951, 97002286037312, 121132883577067, poster_last 134239453319885, dash 125091513698034, punch
+  128270995338570, jump 74172471855716. Wired in Shapes and Icons (older ids in the comments).
+- LOBBY ASSEMBLED: 89 of 89 meshes, 86 of 86 kit, banners red F0525A and yellow FFD23F. The ui-20f lobby is kept
+  as `ServerStorage.HT_LobbyArchive.Village_ui20f_20261119` (beside the pastel one). `studio_mcp.py luau` again
+  reported "Target is not reachable" and HAD run: checked by reading the model, not run twice.
+  `apply_sections.py --apply` + gen_config (check OK), gen_layout check OK; written into Studio: GameConfig,
+  MapEnvironments, Shapes, Icons (`--check`: only others' scripts differ).
+- SEEN in a play test (stills): the training wall and gate (red wall, red and blue flags, green and white
+  bunting), the training grounds from above (blue and white sparring ring, red and yellow section borders), the
+  sparkle buttons over it. A menu window opened on its own during the test (someone else in it). NOT SEEN: the
+  square and shops up close, the great tree, the obby, frame cost, the new titles and countdown in motion.
+
+## ui-23a (2026-11-20): page titles, the Classes layout, finishes by place, labels printed in. IN THE PLACE (saved), NOT COMMITTED. START HERE.
+A run of the owner's asks in one sitting, each with his words:
+- WINDOW STYLE: he rejected all five of `work/window-options.png` and all six of `work/window-options-2.png` (tools
+  `design/ui/make_window_options.py`, `_2.py`), then: "rebuild the current ui while keeping the same textures/
+  everything but with this structure". So the window keeps its look; what changed is below.
+- NOTEBOOK GONE ("i DONT like the notebook style"): the spine and punch holes are removed (`MenuController`).
+  The coach's handwritten notes are KEPT (not confirmed either way; ask if he means them too).
+- PAGE TITLE ("the actual title of the ui will be top left maybe a little tilted while playing an animation, and
+  classes title is its own thing ... apply that for all the titles"; "MAKE IT POP OUT TOWARDS THE LEFT ... no
+  frame"): `titlePivot > titleSway > titleBox` in the window's own frame at (-30, 8), turned -5, bare lettering,
+  swaying 1.6 degrees and 3 units on a looping tween while the window is open (`setSwing`). The page name
+  (CLASSES is drawn as text: it is not on the title sheet; SHOP, MOVES ... are images). Body moved left (34 in,
+  was 84) and the page up (`PAGE_AT` 56; children still use `PAGE_TOP` 118). The sub line sits right of the title.
+- CLASSES PAGE ("descriptions and stuff like cds etc should be in a frame ... under the roblox character pose";
+  "i want it swapped"; "it can be a little bigger and underlap ... popout the ui and underlap the title"): tiles
+  3 x 3 on the LEFT (`TILE_X` 44, `TILE_Y` 34, `CLASSES_PER_PAGE` 9), Equip under them, the sub line over them;
+  on the RIGHT an info frame (a slab, `INFO_W` 320, standing on `INFO_BOTTOM` 518, as tall as it holds) with the
+  class's OWN name heading (title lettering, 52), its line (two lines), and Q / R rows with cooldowns; the pose is
+  400 x 440 over that column, its foot 60 behind the frame, its top above the window. PosterKit.row gives a name
+  more room when only a cooldown stands at its right (UPPERCUT was cut).
+- FINISHES BY PLACE (`Shapes.image` decides once a Fill is on screen, deferred, by its ScreenGui and the attribute
+  `HT_Finish`): SPARKLES only on the lobby's main UI (`LOBBY_GUIS`: HT_Nav, HT_Menu, HT_Spectate; "ONLY the main
+  hud when ur in the lobby"); everywhere else the still COMIC HALFTONE (`Texture.comic`, my pick for "something more
+  fitting"); "plain" (shading and gloss, no sparkles: `Texture.plain`) on the X, page arrows, key caps, the tools
+  (Settings, Spectate, AFK), the in-round cog and CONTROLS chip, and every action button (Equip, Buy ...: "stuff like
+  equip don't need the textures"); "none" on the top strip, which is WHITE with ink lettering, BLACK with white for
+  ROUND OVER / FINAL TWO / LAST ONE ("the top ui can probably just be white or black, like a non color").
+- POP-UP LETTER CARDS (TUSSLE!, ULTIMATE, class name; "EVERYTHING should reflect our current ui style"): rounded
+  corners and the comic halftone at their foot (`Callouts.comicCard`). SEEN on the class-name pop-up.
+- LABELS PRINTED IN ("i dont want it to be SEPARATE LABELS ... a square label pasted on top ... I want it to be IN
+  THE UI ... look through EVERYTHING"): Q / R / Space / Click printed on their tiles (ink on a bright tile, cream on
+  a dark one) and the state word (READY with a tick, CAN'T USE, STUNNED) inside the tile's top right; the stagger
+  line is lettering INSIDE the dial above its foot, its colour stepping white / yellow / red (was a white plate);
+  ULT READY's G printed on the badge; the menu strips' 1-4 printed on the strips; OWNED / EQUIPPED / NOT OWNED and
+  PLANNED printed on the class tiles; `PosterKit.tag` is ink lettering; the CONTROLS panel's keys yellow lettering;
+  the fighters' row counter is a TAB in the frame's band colour with ink figures. Kept as boxes on purpose: stand-
+  alone pop-ups (top strip, toast, area card, chips, Settings' help tip).
+- MENU STRIPS: no number printed on them any more (the owner, with a picture; `NavController` SHOW_KEYS = false).
+  The 1-4 keys still open the pages.
+- HIT / MISS over the Punch tile REMOVED ("adds no value"); the "NOW" cue that shares the helper stays.
+- KICK PROMPT on the palette (it had fixed RGB colours).
+- TRAINING CURTAIN ("a transparent wall between lobby and training area subtly"): NEW
+  `Controllers/TrainingCurtainController.luau`, a client-only part across the lobby at the free-practice line
+  (training line + Inset), 12 tall, two SurfaceGuis: a blue wash from the foot fading up, a white floor line, a
+  slow shimmer; no collision, queries, touches or shadow. SEEN through the middle gate (place v575): at 12 tall and
+  0.74 it hid behind the clay wall, so it is 16 tall, foot wash 0.55, brightness 1.6, a 3-pixel floor line.
+- SEEN (stills): Moves and Classes pages, the fight HUD (Q/R, Space/Click, ULT badge, stagger in the dial, the
+  counters as tabs), the class-name pop-up. NOT SEEN: Shop, Ranked, More, Settings pages after the move up, the
+  curtain, TUSSLE! / ULTIMATE / last-players pop-ups, a phone, gamepad glyphs on the tiles, frame cost.
+- Clash bar (MASH M1!) is still the old dark translucent bar: not restyled.
+
 ## kits-7d..7f (2026-11-17): Haymaker Rush rush-in, flurry, camera study, gap study, stage A (NOT PLAY-TESTED: the place kept being overwritten)
 Build stamp `kits-7f+lobby-4+ui-13c`. Spec chain: `design/haymaker-rush-v3-beats.md` (camera study and the owner's picks), then
 `design/haymaker-rush-gap-study-prompt.md` (the study brief) and `design/haymaker-rush-v4-gaps.md` (the ranked fix list, owner picks
@@ -4737,3 +4894,264 @@ middle moved; training exclusive to one person (everyone else disappears); the b
   village-4 in it. Left out of the commit on purpose: README.md and src/client/Ui/PosterKit.luau (someone else's
   uncommitted work), CLAUDE.md, tools/, the map outputs, and the scratch builds `design/lobby/out/village_dry` and
   `village_big_archive`.
+
+## train-1 (2026-11-19): the training grounds made bigger, ten sections, two bots. IN THE PLACE (saved v540), NOT COMMITTED. Sign boards still in the model: see "OPEN".
+Owner: "The training area SHOULD be a designated area to train where theres multiple sections ... expand it: each
+part SHOULD have its own section, like a little ring where u can 1v1 a bot, an attacking bot, etc, THINK OF ANYTHING
+AND EVERYTHING". Then, on seeing it: "remove the signs". Readings taken: "expand" = deeper, not wider; "the signs" =
+the standing section sign boards (the floor numbers and the pad's name stay).
+- **Size:** lobby 150 x 330 (was 150 x 216); training 210 deep (was 96), grown BACKWARDS only. The square, shops,
+  obby and leaderboards did not move (`check_obby.py`: 11 hops, 0 failing). The obby's back row (Decks 4 to 7, d 197)
+  is now a bridge over a clear walk between the front yard and the back yard. `Lobby.spec`: training share up to 0.7.
+- **ONE SOURCE: `design/lobby/training_sections.json`.** `village.py` builds each section's floor and props from it;
+  `design/lobby/apply_sections.py --apply` copies it to `village_config.json` and `game.json` as
+  `config.Lobby.Training` (and Depth, TrainingDepth; `Lobby.Dummies` is now empty), then regenerates GameConfig.
+- **The ten sections** (X across, Back from the viewing edge):
+  - Front yard: COMBO POSTS (2 dummies that never move), SPARRING RING (roped ring, a bot that chases and fights
+    inside 15 studs of the ring's middle), ATTACKER PEN (fenced; a bot that holds its spot and swings every 1.5 s at
+    whoever is within 9 studs).
+  - Back yard: AIR KICK COURT (dummies on a 5 and a 10 stud pillar), MOVING TARGET (walks a 50 stud line at 16),
+    CROWD CORNER (3 dummies together), RING-OUT DECK (raised 5, steps at the front, a dummy near the far edge, a
+    pad that launches YOU off: out 30, up 80), ULTIMATE STAGE (1 dummy on a gold stage), KNOCKBACK LANE (3 dummies
+    at 0, 50, 100 % stagger, a line and a floor number every 10 studs to 90).
+  - Back wall: MOVEMENT LANE (the runway, a mark every 20, three jump boxes 3, 6, 9 high).
+- **Code:**
+  - NEW `shared/Core/TrainingGrounds.luau` (pure) + `tests/TrainingGrounds.spec.luau` (9 tests: sections inside the
+    zone and not overlapping, every dummy on bare floor or on the thing built for it, bots' rings inside their
+    section, the bots' steering, the lane's marks, the deck and its pad).
+  - `DummyService`: `spec.trainer` (a bot tied to a spot: fights only a player with `HT_TrainingFree` inside its
+    radius, on its own settings `Lobby.Training.Bots`; walks home; never parked); `SetDormant` (anchored at home,
+    skipped every frame).
+  - `LobbyService`: spawns the 15 section dummies; puts them all to sleep 4 s after the last player leaves free
+    practice and wakes them when one walks in; resets a player's stagger when they leave training; the launch pad;
+    floor numbers on the knockback lane. `HT_TrainingFree` means what it meant (on foot behind the wall).
+- **Signs: OFF** (`Training.Sign.Enabled` false): no cards (`LobbyService.spawnSigns`), no boards built by
+  `village.py`, no colliders for them. The data (titles, hints, where) is kept, so turning them back on is one flag
+  plus a rebuild.
+- **Model:** uploaded on his "Yes, upload" (Open Cloud Model, group 2970443, Approved): `village_1.glb` =
+  115741778212873 (57 meshes), `village_2.glb` = 73282879454449 (24). Assembled: 81 of 81 meshes, worst 0.001 off,
+  80 of 80 kit pieces, 86,683 triangles (village-4: 71,639 in 78). village-4's assets (136660718604805,
+  80221718782811) are now unused.
+- **Into the place:** the play test (46 minutes old, the owner in it) was stopped; GameConfig, LobbyService and
+  DummyService in the place were compared line by line with the last commit first (only the UI session's three
+  Barrier colours differed, which my file holds too); then ONLY GameConfig, LobbyLayout, TrainingGrounds (new),
+  LobbyService, DummyService were written (`studio_mcp.py`, one trailing newline stripped).
+- **Gates:** rojo build OK, 573 tests, selene 0 on server and shared (the one known UltimateController error is not
+  mine), StyLua clean on my files, gen_config and gen_layout checks OK.
+- **SEEN in Play (Studio PC, the owner playing, so his character was never moved by me):** config 330 / 210; 15
+  dummies at their designed spots and heights (pillars +5 and +10, the deck +5), all asleep (anchored) with the lobby
+  empty, stagger 0 / 50 / 100 on the lane; the sparring bot woke and moved about its ring when he walked in; his
+  punches built stagger on a combo post, which reset; sections detected as he walked (Combo, AirKick, Moving, Crowd,
+  Ultimate, RingOut, Attacker). One still: the knockback lane's numbers and a soft sign card (before signs went off).
+- **Frame cost (his PC, Studio, he was moving and fighting; no before-number from the same session):** client, six
+  5 s samples inside training: 88, 95, 96, 55, 74, 91 fps (worst frame 20 to 35 ms). Server: 84 fps average, physics
+  step 1.5 ms, with all 15 awake.
+- **NOT VERIFIED:** a bot actually landing a punch on a player, and a clash with the attacker (nobody stood still in
+  a ring while I watched); the launch pad; the moving target walking; the ultimate on the stage dummy; kicking the
+  pillar dummies; the jump boxes; the 55 fps sample's cause; a phone; two players (bots are shared while training
+  hides other players, so a bot may fight someone you cannot see); the kick's rebound disc (`Lobby.disc`) now sits
+  further back (centre d 165, radius 75), unplayed.
+- **KNOWN SMALL THINGS:** obby Decks 3 and 8 overhang the outer 2 studs of the Combo and Attacker mats, 9 studs up.
+  The dummies keep DummyService's orange / blue colours; the two bots are teal (spar) and coral (attacker).
+
+## quest-1 (2026-11-19/20): daily quests on a CLIPBOARD at the notice board; icons over every station. IN THE PLACE, NOT COMMITTED.
+Owner: "can u make me a quest system so like when ppl go up to the quest board they'll be able to see" and "make my
+billboard guis icons ... on top of the quest board maybe ... a paper icon ... do that for everything". Shown on the
+website first (artifact https://claude.ai/artifact/MSvNUtnd77ZiiSWgK2Vnif, private); his notes there: "make it so it
+reflects like a clipboard" (my reading: the quests page is a clipboard, and the board's icon a clipboard too), then
+"build everything that hasn't been built yet" (my reading: yes to the Coins 25 / 50 / 100, dailies only, and the one
+icon upload, all three asked on that page with the count, name and size).
+- **DESIGN (agreed as above):** 3 dailies a player (Easy 25, Medium 50, Hard 100 Coins; never two of one kind), new
+  at 00:00 UTC. Pool `Config/Quests.luau` (9 quests: play 3 / 8 rounds, land 30 / 100 / 250 hits, train 3 minutes,
+  knock out 3 / 10, win a round). Counted ONLY by the server: rounds, hits, ring-outs and wins from
+  `RewardService:RoundEnded` by round pay's own rule (2+ fighters and a hit landed, so AFK earns nothing; hits are
+  NOT capped like pay); training seconds every 10 s while `HT_TrainingFree`. Rewards frozen when dealt; a finished
+  quest left unclaimed is paid on the next day's deal. Ids are permanent (see the file's header).
+- **SAVING:** the board is a `quests` field in the existing profile (`AbilityKit.Profile`, kept by `sanitize`/`copy`,
+  checked by `Quests.sanitize` on every read, capped at 6 entries), so it rides the same session lock, autosave and
+  BindToClose as Coins. A claim marks the quest and adds its Coins in ONE `PlayerDataService:Update`
+  (`AbilityKit.withQuests`). Vault notes read in full first: DataStore Fundamentals, Session Locking, Saving
+  Correctly, Data Schema Design (Common mistakes + Checklist), Quests and Objectives, Quest Chain System.
+  Rollout note: an OLD server (code before this) re-saving a profile drops the `quests` field (its sanitize keeps only
+  known fields): the board is re-dealt, Coins are untouched. Harmless, but publish all servers together.
+- **CODE:** NEW `shared/Core/Quests.luau` (pure) + `tests/Quests.spec.luau` (12 tests); `shared/Config/Quests.luau`;
+  `server/Services/QuestService.luau` (deals, counts, claims; the board's ProximityPrompt on its own invisible part
+  `workspace.HT_QuestBoard` at u 0, d 34.7, HT_Page "quests"; STUDIO-ONLY knob: workspace attribute `HT_DevQuest =
+  "Hits:53"` counts for everyone); `client/Controllers/QuestController.luau`; NEW `client/Ui/QuestClipboard.luau`
+  (gold board, slate clip, cream paper, checklist; pops in 0.32 s; blur like the window; closes on X, gamepad B, the
+  menu opening, a round, or walking 24 studs from the board). Small hunks: `Net` (QuestState, QuestClaim),
+  `AbilityKit`, `RewardService` (one call), `NpcController` (HT_Page "quests" opens the clipboard). MenuController
+  is UNCHANGED (a Quests page was tried in the window, then replaced by the clipboard).
+- **ICONS:** `client/Controllers/LobbyMarkerController.luau` + `shared/Config/LobbyMarkers.luau`: 11 BillboardGuis
+  made by the client (cream rounded tile, ink edge, ink line icon, 42 px; phone 34 px), MaxDistance 120 (phone 90),
+  hidden within 12 studs of their spot and during a round, AlwaysOnTop off. Over the six keepers, the notice board
+  (clipboard), the training gate, the leaderboards, the obby ramp and the Champion's Perch. NOT inside training (the
+  owner had its signs removed). Art: ONE sheet `assets/icons/poster/lobby_markers.png` (1024 x 256, 23 KB, drawn by
+  `design/ui/make_lobby_icons.py`), UPLOADED to group 2970443 (Open Cloud, "Reviewing" at upload) =
+  117635314269796; cells in `LobbyMarkerController.CELLS`. Empty `SHEET` falls back to the older coloured icons.
+- **GATES:** rojo build OK, 585 tests, selene only the known UltimateController error, StyLua clean on my files,
+  gen_config check OK. NOT PULLED: origin/main is 2 ahead (spicy's kits-8t) and touches HANDOFF.md and
+  DummyService.luau, which hold other sessions' uncommitted work; none of it touches my files.
+- **INTO THE PLACE:** only my 11 scripts (each changed one written only if the place's copy still
+  equalled the last commit; it did). `rojo_push.py --check` afterwards: only others' scripts differ (Ultimates,
+  UltimateService, UltimateController, UltimateFx, DummyService, SoundCandidates, the Server boot, DrawnImpact).
+- **SEEN IN A PLAY TEST (Studio PC, the owner's own saved profile, not a temporary one):** a board dealt and SAVED
+  (read back from the DataStore: play_3, hits_100, win_1, today's day, this server's lock); a REAL round then counted
+  Rounds 1/3 and Hits 47/100 (pay was 130 Coins), and both survived a new session; F at the board opened the
+  clipboard with that progress; the knob finished Land 100 hits (green tick, CLAIM · 50, toast); the real Claim
+  button paid +50 (24,646 -> 24,696) and crossed the line off; 5 repeat claims, a made-up id, an unfinished quest and
+  a junk value from the client paid nothing. 11 icons built with the uploaded sheet and the right cells, all hidden in
+  a round. Studio's capture does not draw ProximityPrompts (AlwaysOnTop); the prompt's gui was there.
+- **FRAME COST:** the 11 icons on vs off, three 3 s pairs in the square: 11.2 / 11.5 / 17.5 ms vs 9.9 / 10.3 / 19.0
+  ms, i.e. inside the noise of a Studio session with bots fighting; no per-frame script (a 0.25 s distance check over
+  11 points while you are in the lobby).
+- **FIXED AFTER THE FIRST TEST, IN THE PLACE AND SEEN:** the clipboard now stands under the fighters' row
+  (`Callouts.taken`) and under the toast's spot (in the first test the clip touched the row and a toast lay on the
+  title); seen in a round with the row up, nothing touching, the claimed quest still crossed off after a restart.
+  The notice board's icon lowered to 9.8 (the bunting hung in front of it from spawn at 11): written, NOT SEEN.
+  The other icons SEEN by eye from the square: shield over the Ranked Herald, shirt over the Outfitter, steps at
+  the ramp, clipboard over the board. Place SAVED v565 and v566 (v566 holds all of quest-1).
+- **PLAY TESTS STOPPED:** the owner was playing in a test twice; I stopped it once while it looked like rounds
+  cycling with bots, and once after he had been idle 33 s with the clipboard open (his rule allows it).
+- **NOT VERIFIED:** the lowered board icon; the training gate, leaderboards and Perch icons by eye; a phone; a
+  gamepad (B to close); Reduced Motion; the day turning over while online and the unclaimed payout in play; training
+  seconds in play; two players; the leaderboards icon at a distance it shows (from the side view it is 145 studs
+  away, past MaxDistance); the independent quality review against the vault rubric.
+
+## ui-24a (2026-11-20): speed pills, pop-ups in your palette, random countdown colours, two UI bugs. IN THE PLACE (saved v579), NOT COMMITTED. START HERE.
+The owner's asks this sitting, with his words, in order:
+- THE BURST: "make a BETTER effect" for the pop-ups' burst. Four ideas on `work/burst-options.html` (A speed pills,
+  B halftone print pop, C comic shock marks, D misprint, beside the old one); HIS PICK: A. `Callouts.slashes` and
+  `shards` are GONE; `pills` replaces both everywhere (count, go, ultimate, last, className): round-capped speed
+  lines from behind the hit, pulled away into their tips (head 1-(1-u)^4, tail u^1.7), thick and thin, staggered
+  up to 0.03 s, a small tint pop at each thick one's tip; on a phone every other line and no pops. One Poster.run
+  per burst. The ink edge is a fifth of each line's width (a fixed 4 made the thin lines all ink: seen in Studio).
+- COLOURS: "make it so the word popups kinda match the color pallete of whatever class u have equipped". NEW
+  `src/shared/Core/ColourMath.luau` (+ `tests/ColourMath.spec.luau`, 600 tests): `palette` = tint (mixed 0.55 toward
+  cream), the colour, deep (HSL lightness -0.22, floor 0.3, saturation x0.9); `inkReads` picks ink or cream letters.
+  `cardRow` takes the palette: last card deep, every third tint, every second the colour, the rest cream. The
+  ULTIMATE READY tag is the tint; the last-players tile is your colour (deep at 3 and 2). `Callouts.setColour` is
+  set from `HudController.paintClass`. All eight palettes were shown on `work/burst-options.html`.
+- THE COUNTDOWN: first "the same color for everything, including the tussle", then "randomized everytime", then
+  "RANDOM COLORS, not random SETS of colors, so it shouldnt be all purple, all blue". So the 3, the 2, the 1 and
+  each TUSSLE! card get their own colour from `Callouts.ROUND_TONES` (8 comic colours), no two neighbours alike,
+  via `ColourMath.sequence(CountdownEnd, 10, 8)`: every client draws the SAME list with no message sent.
+  `Callouts.roundColours(finish)`; `count(beat, small, tone)`, `go(colours, small)`.
+  UPLOADED on his "Yes, upload both" (Studio `upload_image`): `countdown_sheet.png` redrawn with WHITE number faces
+  (`design/ui/poster_countdown.html`, 1024 x 600, 32,863 bytes) = 78462777937833 (`Shapes.ids.count`; old ids in the
+  comment), and `assets/ui/colour_wheel.png` (NEW `design/ui/make_colour_wheel.py`, 384 x 384, 37,508 bytes, hue
+  round it with red at the top, white in the middle) = 71863076399547, NOT WIRED YET (for Cosmetics).
+- BUG 1, "this error got cut off" (read as ARROW: his picture was the Classes page's "<"): it stood at TILE_X - 48
+  = -4, past the left edge of the page, which is a ScrollingFrame and clips. Both page arrows are 32 wide now
+  (`ARROW_W`), "<" at 4. NOT SEEN in Studio (the play test was stopped by someone else twice).
+- BUG 2, "the sparkle textures can be seen extruding outside the frame but after a second its fixed": FOUND.
+  Roblox IGNORES ClipsDescendants while the frame or ANY ancestor is turned (shown in Studio with two test buttons:
+  the straight one clipped, the one turned 12 degrees showed its whole drifting field, a tile wider and taller
+  than the face). Every piece that pops in turns from -18 degrees over 0.6 s (`PosterKit` line 235), pressables
+  tip under the pointer, and the nav strips swayed a degree. FIX in `Ui/Texture.apply`: it hooks Rotation on the
+  face and every ancestor up to its ScreenGui (re-hooked on AncestryChanged, dropped on Destroying); while any is
+  turned the field is cut to the face's size and stops; when straight it is a tile bigger again and drifts on
+  from one tile back (the same picture, so nothing jumps as a pop settles; it does jump once as a pop starts).
+  The nav strips no longer sway a degree (`NavController`, up and down only). Tried and dropped: a sub-rect of the
+  sparkle image does not TILE (Roblox stretches it), so the drift cannot live in ImageRectOffset. NOT SEEN by eye
+  in the real menu (same reason).
+- STATS FRAME ("the stats should have a different style, idk which"): four styles on
+  `work/stats-frame-options.html` (A halftone, B plain card, C class band, D graph paper); WAITING FOR HIS PICK.
+- COSMETICS, AGREED, NOT BUILT: More > Cosmetics with a colour wheel you DRAG (the border changes colour live) and
+  an exact colour you can type; your colour replaces your class colour on your border (everyone sees it) and your
+  pop-ups. Colours FREE; border textures and effects a ROBUX add-on he will make (no products or prices invented).
+  `work/cosmetics-options.html` shows six textures and the page. Needs: profile fields in Core/AbilityKit and
+  PlayerDataService (read the vault's DataStore and purchase notes' Common mistakes and Checklist first), a remote
+  the server checks, `RosterFrames` texture styles, HudController's colour source.
+- A SYNTAX TRAP (cost one broken client): a statement starting with "(" right after a call, e.g.
+  `quad(...)` then `(tag:FindFirstChild("Fill") :: ImageLabel).ImageColor3 = x`, is "Ambiguous syntax" in Luau and
+  the module fails to load; selene, stylua and rojo build all PASS it. Compile each changed file with Lune's
+  `luau.compile` before a sync (a 10-line script did it).
+- SYNC: origin has spicycaik's 3428b34 and fba3584 (kits-8i..8t); NOT PULLED, because HANDOFF.md and DummyService.luau
+  have uncommitted changes here that are not mine. Only my scripts were written (ColourMath, Callouts, Shapes,
+  Texture, NavController, MenuController, HudController); `--check` after: 12 of 201 differ, all others' (FieldGrass,
+  EnvironmentKit, MapEnvironments, SoundCandidates, Ultimates, Server, DummyService, UltimateService,
+  UltimateController, DrawnImpact, UltimateFx). Place saved v579.
+- SEEN in a play test: the client loads with no errors; a real round's "2" tinted green with its pills; DRAGON in its
+  palette with pills, frozen mid-burst. NOT SEEN: TUSSLE! and the numbers in random colours, ULTIMATE and last
+  players, the thin pills after the edge fix, the two bug fixes in the menu, a phone, Reduced Motion. NOT MEASURED:
+  frame cost (pieces per burst went from about 84 Frames to about 42 on the class name).
+- A local server (python http.server, port 8765, folder work/) was left running for the mockups.
+
+## lobby-6 (2026-11-20): training as FOUR ZONES in a 2 x 2 grid; the obby over the training cross and out to BELL ROCK. IN THE PLACE (saved v582), NOT COMMITTED.
+Owner: "in the lobby, the OBBY should use the extra space in the training area, ALSO maybe make it lead to another
+island behind them where u get there with floating island platforms, make it creative. and ALSO revamp the training
+area, there SHOULD four distinct areas, one is arena where u can 1v1 a bot, one just a row of dummies to be hit, one
+clashing dummy, and then the other area, idk think of something urself", with a sketch: a rectangle in a 2 x 2 grid.
+Proposal shown first (private page https://claude.ai/artifact/RQsas2d9HUXV2HYoJBgXyx); he answered "Yes, build it",
+then "Yes, upload". READINGS (stated on the page): "use the extra space in training" = the obby runs over the walkway
+cross between the four zones; "behind them" = behind training, away from the arena; "1v1 a bot" = a raised arena
+where ring-outs count; "clashing dummy" = a steady beat with a warning flash; the fourth zone (mine) = RECOVERY CLIFF.
+- **ZONES** (`design/lobby/training_sections.json`, the one source; `apply_sections.py --apply` copies it, and now
+  also `Sky`, into game.json): a walkway cross (spine X -9..9, bar Back 222..240) with a zone in each corner, all
+  about 64 x 90. FRONT LEFT DUMMY ROW: 5 Free dummies on one line at X -20 facing the walkway, hit toward the outer
+  wall over floor lines (numbers by LobbyService) every 10 studs. FRONT RIGHT CLASH DUMMY: new Kind "Clash" (an
+  Attacker with Bots.Clash Beat 1.5, Tell 0.45): it swings on the beat at whoever stands on the X 5.5 studs in
+  front, and a Highlight (cream fill, gold edge) is on for the Tell before each swing (DummyService `setTell`,
+  `beatDue`); the leaderboards stay on this wall. BACK LEFT 1V1 BOT ARENA: a raised round arena (r 22, +5, steps
+  from the bar), the Spar bot (blue) on it; LobbyService `watchRing`: the challenger is whoever last stood on it,
+  the bot going off scores YOU, you going off scores BOT, the bot is put back after 3 s, leaving training ends
+  the bout; the score is floor text by the steps ("YOU 1 - 0 BOT", "1V1: STEP UP"). BACK RIGHT RECOVERY CLIFF: the
+  right side of the lobby is OPEN from Back 242 to 326 (no wall, no parapet, no barrier); pads LIGHT 55/40, MEDIUM
+  80/50, HEAVY 110/60 (out/up) throw you off; below training floor - 26 out there you are put back on the cliff.
+  The ten train-1 sections are gone; dummies 15 -> 7.
+- **OBBY** (14 running jumps, `check_obby.py` 0 failing): ramp, Decks 1..4 up the left as before (3 and 4 nudged),
+  Turn deck (-42, 234), the Crossroads (24 x 24, centre of the cross, one thick post), Spine 1 and 2 (posts at the
+  sides of the walk), out through a GAP in the back wall (X -14..14, solid below h 25 so nobody on the floor can
+  jump out) onto the Launch Rock (checkpoint), Isles 1..4 (+2 a hop), BELL ROCK (r 32, top h 36). Old Decks 5..9
+  and the long deck are gone. Bell Rock: a gold boxing bell (punch it within 8 studs, facing it: everyone hears it,
+  it swings; CombatService fires a new `PunchThrown` BindableEvent, 2 lines), THE HAYMAKER glove (stand on its X:
+  it punches you home on a 3 s arc, apex 80, onto the Champion's Perch, through the back-wall gap; your own client
+  flies you: NEW `client/Controllers/LobbyFlightController` on remotes LobbyFlight and LobbyFx), a tree, a bench,
+  a 30-stud summit flag (the goal, meant to show over the wall), lanterns, kit plants. Falls in the sky put you on
+  the last checkpoint stood on (Spine 2 before the Launch Rock). Sounds: bell 135309651997361 ("Boxing Bell",
+  scorp_ius, loads, 3.03 s), glove = the game's punch_hit 82235785832022. Neither heard by me.
+- **CODE:** `Core/Lobby`: `openings`, walls cut around them (+ a sill), `wallFaces` (the barrier is drawn per
+  stretch; BarrierController changed to use it), `inSky`, `checkpoints`, `standingOn`, `flightPoint`.
+  `Core/TrainingGrounds`: Face, Marks along X, `pads` (several; `pad` removed), `ring`/`onRing`/`offRing`,
+  `edge`/`edgeAt`. LobbyService: catches (sky, cliff) before the lobby check, the sky leg and the air of the cliff
+  count as the lobby (and that air as training), checkpoints, glove, bell, ring bout; edges and checkpoints cached.
+  Tests: TrainingGrounds.spec rewritten for four zones; Lobby.spec walls test rewritten + sill, sky leg, flight.
+- **MODEL:** `village.py` (zones, cross paving, arena, cliff lip, Bell Rock pieces as their own elements:
+  Lobby_Bell_* and Lobby_Glove_* move, Lobby_BellFrame_* and Lobby_GloveFrame_* do not; crag spires and shelves
+  moved out of the sky-leg and cliff corridors). 96,695 triangles in 104 meshes (the live one was 98,107), 123
+  colliders, 98 kit pieces. Uploaded on his "Yes, upload" through Studio's open_cloud_invoke (group 2970443, both
+  Approved): `village_1.glb` = 99340522747040 (73 meshes, 12.04 MB), `village_2.glb` = 98938637149415 (31, 7.78 MB).
+  Assembled: 104 of 104, worst 0.001, kit 98 of 98. The train-1 model is kept as
+  `ServerStorage.HT_LobbyArchive.Village_train1_20261120`; its assets (115741778212873, 73282879454449) are unused.
+  Pre-change copies of the three lobby source files: `work/before-lobby-revamp/`.
+- **INTO THE PLACE:** each script's place copy was fetched and diffed first: all differed from disk only by my
+  edits, except DummyService, whose place copy has the kits-8i `Ultimates.clock` line (on origin/main, not pulled
+  here), so DummyService went in as the PLACE text plus my hunks. Written: GameConfig (only Lobby differed),
+  LobbyLayout, Core/Lobby, Core/TrainingGrounds, Net, LobbyService, DummyService, CombatService,
+  BarrierController, LobbyFlightController (new). `rojo_push --check` after: all match except DummyService (that
+  line, on purpose) and the unsynced work of others (EnvironmentKit, FieldGrass*, MapEnvironments, Ultimates, ...).
+- **GATES:** 605 tests, stylua clean (src tests), selene 1 known error (UltimateController), rojo build OK,
+  gen_config and gen_layout checks OK, every changed file compiles with luau.compile.
+- **SEEN in Play** (Studio, me alone, test character moved by script, AFK on so rounds left it alone): config 4
+  zones + Sky; 7 wall pieces; 7 dummies at designed spots and heights (ring bot at +5). Cliff: the LIGHT pad threw
+  the body to 20 past the edge, caught and put back in 1.0 s, training and lobby flags kept. Sky: falls caught back
+  to Spine 2 / Launch Rock / Bell Rock as reached; the sill stopped a push out the back from the floor. Glove: an arc
+  up to h 115, landed on the Perch (65, 32, 10) at 3.0 s and stayed; on the client the glove shot out 5 studs and
+  back. Bell: punch accepted, LobbyFx "bell", the bell swung and came to rest, sound playing and loaded. Ring: on =
+  "YOU 0 - 0 BOT"; bot off = YOU 1; the bot then knocked the character off = BOT 1; bot home after 3 s; leaving
+  training reset it. Clash: flash 0.42-0.45 s before each swing, the swing landed (stagger 7, 14). Frame time 59 fps
+  (capped), worst 23 ms, in training and on Bell Rock (the game's own readout said 238 fps). No script errors.
+- **NOT VERIFIED:** anything by eye in Studio (screen_capture came back blank in Edit and Play this session), so
+  the zones' paint, the isles, Bell Rock and whether the summit flag shows over the wall from the square are seen
+  only in the Blender renders (`design/lobby/out/village/village_*.png`); a real clash (the 0.05 s window) by hand;
+  the obby run by hand; whether LIGHT/MEDIUM/HEAVY are recoverable by a real player (the catch is 26 under the floor,
+  about 1 s of falling: likely too quick; tune `Edge.CatchBelow` and the pads after he tries it); two players (bots
+  are shared, training hides others); phones; the sounds by ear; the facing rule of the bell with a real approach.
+- **NOT PULLED:** origin/main is 2 ahead (kits-8i..8t); the pull would clash with uncommitted DummyService and
+  HANDOFF here. NOTHING COMMITTED. My files: design/lobby/{training_sections.json, village.py, village_config.json,
+  apply_sections.py}, design/game.json (Lobby block), src/shared/Core/{Lobby,TrainingGrounds}.luau,
+  src/shared/Net.luau, src/shared/Config/LobbyLayout.luau, src/server/Services/{LobbyService,DummyService,
+  CombatService}.luau, src/client/Controllers/{BarrierController,LobbyFlightController}.luau,
+  tests/{Lobby,TrainingGrounds}.spec.luau, design/lobby/out/village/*. Several of these also hold train-1, lobby-5
+  and quest-1 work that was never committed.

@@ -30,6 +30,9 @@ export type Profile = {
 	equipped: string,
 	-- the last one-time class reset this profile has been through (Config/Abilities.ClassReset.Version); 0 = none
 	reset: number,
+	-- the daily quest board (Core/Quests.Board), or nil before the first one is dealt. Kept as it came here;
+	-- QuestService checks it with Quests.sanitize when it reads it.
+	quests: any?,
 }
 
 AbilityKit.VERSION = 1
@@ -89,6 +92,7 @@ function AbilityKit.sanitize(book: Book, raw: any): Profile
 		owned = owned,
 		equipped = equipped,
 		reset = reset,
+		quests = if typeof(raw.quests) == "table" then raw.quests else nil,
 	}
 end
 
@@ -99,7 +103,22 @@ local function copy(profile: Profile): Profile
 		owned = table.clone(profile.owned),
 		equipped = profile.equipped,
 		reset = profile.reset,
+		quests = profile.quests,
 	}
+end
+
+--- The profile with a new quest board (`board` is a Core/Quests board, already checked) and `coins` more Coins,
+--- in ONE change, so a claimed quest and its pay are saved together. The old profile is never changed.
+function AbilityKit.withQuests(profile: Profile, board: any, coins: any): Profile
+	local nextProfile = copy(profile)
+	nextProfile.quests = board
+	if typeof(coins) == "number" and coins == coins and coins > 0 then
+		nextProfile.coins = math.min(
+			profile.coins + math.floor(math.min(coins, AbilityKit.MAX_COINS)),
+			AbilityKit.MAX_COINS
+		)
+	end
+	return nextProfile
 end
 
 --- A ONE-TIME CLASS RESET (`reset`: { Version, Keep }, Config/Abilities.ClassReset): a profile that has not

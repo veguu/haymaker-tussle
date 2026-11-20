@@ -9,12 +9,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local Typography = require(ReplicatedStorage.Shared.Typography)
+local Tokens = require(ReplicatedStorage.Shared.Tokens)
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local KickMeter = require(ReplicatedStorage.Shared.Core.KickMeter)
 local KickMeterBar = require(script.Parent.Parent.Ui.KickMeterBar)
 
 local KEY_SIZE = 44
-local IDLE = Color3.fromRGB(235, 238, 245)
+-- (on the UI palette since ui-23a, 2026-11-20; were fixed RGB values)
+local IDLE = Tokens.colour("ivory.50")
 local KickPromptController = Knit.CreateController({
 	Name = "KickPromptController",
 })
@@ -43,7 +45,7 @@ function KickPromptController:KnitStart()
 	local key = Instance.new("TextLabel")
 	key.Name = "Key"
 	key.Size = UDim2.fromScale(1, 1)
-	key.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
+	key.BackgroundColor3 = Tokens.colour("ink.900")
 	key.BackgroundTransparency = 0.25
 	key.TextColor3 = IDLE
 	Typography.apply(key, "Key")

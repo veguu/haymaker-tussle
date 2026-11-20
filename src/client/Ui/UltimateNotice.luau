@@ -137,9 +137,10 @@ local function build(): Parts
 		Name = "Words",
 		LayoutOrder = 1,
 	})
+	-- the key, printed on the badge (ui-23a, 2026-11-20: no square label pasted on top; the owner, "I want it to be IN THE UI")
 	local cap = make("Frame", row, {
 		Name = "Cap",
-		BackgroundColor3 = colour("ivory.50"),
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		LayoutOrder = 2,
 		Size = UDim2.fromOffset(42, 30),
@@ -206,7 +207,7 @@ local function layout(made: Parts)
 	made.capGlyph.Image = glyph
 	made.capGlyph.Visible = glyph ~= ""
 	made.capText.Visible = glyph == ""
-	made.cap.BackgroundTransparency = if glyph ~= "" then 1 else 0
+	made.cap.BackgroundTransparency = 1
 end
 
 -- The badge's slow breath while it waits (`ub`: to 1.1 times and 3 degrees over 0.6 s, and back, for ever).

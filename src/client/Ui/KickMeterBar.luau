@@ -19,17 +19,19 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Typography = require(ReplicatedStorage.Shared.Typography)
+local Tokens = require(ReplicatedStorage.Shared.Tokens)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local KickMeter = require(ReplicatedStorage.Shared.Core.KickMeter)
 
 local cfg = GameConfig.KickMeter
 
-local RED = Color3.fromRGB(236, 62, 54)
-local ORANGE = Color3.fromRGB(255, 140, 40)
-local YELLOW = Color3.fromRGB(255, 222, 62)
-local GREEN = Color3.fromRGB(58, 222, 104)
-local INK = Color3.fromRGB(12, 14, 22) -- the frame
-local FAINT = Color3.fromRGB(120, 128, 142) -- what the colours wake from
+-- (on the UI palette since ui-22a, Retro Comic; were fixed RGB values)
+local RED = Tokens.colour("meter.red")
+local ORANGE = Tokens.colour("meter.orange")
+local YELLOW = Tokens.colour("meter.yellow")
+local GREEN = Tokens.colour("meter.green")
+local INK = Tokens.colour("ink.950") -- the frame
+local FAINT = Tokens.colour("stone.500") -- what the colours wake from
 local WHITE = Color3.new(1, 1, 1)
 local STOPS = { RED, ORANGE, YELLOW, GREEN, YELLOW, ORANGE, RED } -- evenly spaced: green dead centre
 
@@ -37,35 +39,35 @@ local RESULT: { [string]: { text: string, colour: Color3, glow: number, pulse: n
 	{
 		perfect = {
 			text = "PERFECT",
-			colour = Color3.fromRGB(150, 255, 178),
+			colour = Tokens.colour("go.400"):Lerp(Color3.new(1, 1, 1), 0.4),
 			glow = 1,
 			pulse = 0.09,
 			seconds = 0.3,
 		},
 		good = {
 			text = "GOOD",
-			colour = Color3.fromRGB(96, 232, 128),
+			colour = Tokens.colour("go.400"),
 			glow = 0.7,
 			pulse = 0.05,
 			seconds = 0.24,
 		},
 		okay = {
 			text = "OKAY",
-			colour = Color3.fromRGB(255, 222, 62),
+			colour = Tokens.colour("gold.400"),
 			glow = 0.45,
 			pulse = 0.03,
 			seconds = 0.2,
 		},
 		poor = {
 			text = "POOR",
-			colour = Color3.fromRGB(255, 104, 92),
+			colour = Tokens.colour("danger.600"),
 			glow = 0.3,
 			pulse = 0.015,
 			seconds = 0.16,
 		},
 		late = {
 			text = "TOO LATE",
-			colour = Color3.fromRGB(255, 104, 92),
+			colour = Tokens.colour("danger.600"),
 			glow = 0.3,
 			pulse = 0.015,
 			seconds = 0.16,

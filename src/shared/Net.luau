@@ -64,6 +64,10 @@ export type EventName =
 	| "Frozen" -- server to all: this character was frozen in ice (the Frost kit's Frostbite), for this many seconds
 	| "Thawed" -- server to all: this character's ice is gone, and whether a hit broke it
 	| "CoinsEarned" -- server to client: what the round just paid you: total Coins, and each line (label, Coins)
+	| "QuestState" -- server to one client: your daily quest board (Core/Quests.view) and a line for the toast, or nil
+	| "QuestClaim" -- client to server: claim this daily quest (its id string), or nil for "send me my board"
+	| "LobbyFlight" -- server to one client: the Haymaker glove threw you: from, to, apex, seconds (your client flies you)
+	| "LobbyFx" -- server to all: a lobby set piece moved: "bell" (it rang) or "glove" (it punched)
 
 local Net = {}
 

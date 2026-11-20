@@ -905,6 +905,8 @@ function CombatService:KnitInit()
 	self._hitConfirmed = Net.server("HitConfirmed")
 	self._punchResult = Net.server("PunchResult")
 	self._punchDebug = Net.server("PunchDebug")
+	-- Server-side: a player's ordinary punch was accepted (attacker, player). The lobby's bell listens (2026-11-20).
+	self.PunchThrown = Instance.new("BindableEvent")
 end
 
 function CombatService:KnitStart()
@@ -996,6 +998,7 @@ function CombatService:KnitStart()
 		record.recovery = 0
 		record.nextSide = Combat.nextSwing(side)
 		self._punchStarted:FireAllClients(attacker, side, step)
+		self.PunchThrown:Fire(attacker, player)
 		trace(`{player.Name} {side} thrown, step {step}{if air then " (air)" else ""}`)
 		Knit.GetService("EndlagService")
 			:Start(attacker, "Punch", now, windup + punchCfg.ActiveSeconds)

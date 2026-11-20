@@ -23,9 +23,12 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Tokens = require(ReplicatedStorage.Shared.Tokens)
+local Texture = require(script.Parent.Texture)
 
 local Shapes = {}
 
+-- (Retro Comic, ui-22a, 2026-11-20: the baked images were redrawn and re-uploaded; the ids in the comments beside
+-- them are the ui-20f and older versions, in order)
 Shapes.ids = {
 	wedge = "rbxassetid://109222334678409",
 	wedgeEnd = "rbxassetid://136069994270465",
@@ -35,7 +38,7 @@ Shapes.ids = {
 	stripes = "rbxassetid://98179049591933",
 	digits = "rbxassetid://73013783840248",
 	badge = "rbxassetid://101402484359518",
-	last = "rbxassetid://108683290339266", -- soft palette, 2026-11-19 (was 134576604933482)
+	last = "rbxassetid://134239453319885", -- ui-20f palette (pastel 108683290339266, first 134576604933482)
 	-- the lobby (assets/ui/poster_nav_*.png and friends): each is the mockup's own clip-path polygon, stretched
 	navA = "rbxassetid://136856775817076", -- Classes, Ranked, More
 	navB = "rbxassetid://124539778494442", -- Shop
@@ -47,12 +50,17 @@ Shapes.ids = {
 	act = "rbxassetid://81122324445766", -- an action button (Equip, Buy, Confirm)
 	slab = "rbxassetid://128027657366818", -- a shop slab
 	dots = "rbxassetid://99839905290934", -- one cell of the window's dot pattern, four times its size
+	-- the buttons' texture (ui-21b, the owner picked SPARKLES of six): design/ui/make_button_patterns.py ->
+	-- assets/ui/pattern_stars.png, 128 x 128, WHITE, seamless; tiled and tinted by Ui/Texture
+	sparkles = "rbxassetid://78736200114644",
 	-- the kill leader's crown in the fighters' row: pixel art, 21 x 15 cells at 16 px (design/ui/make_crown.py);
 	-- drawn with ResampleMode Pixelated. NOT tinted: it carries its own colours.
-	crownPixel = "rbxassetid://115985638632070", -- soft palette, 2026-11-19 (was 112758624871088)
+	crownPixel = "rbxassetid://79399273981355", -- ui-20f palette (pastel 115985638632070, first 112758624871088)
 	-- the round-start countdown's lettering (assets/icons/poster/countdown_sheet.png, 1024 x 600, from
 	-- design/ui/poster_countdown.html): see `Shapes.count`
-	count = "rbxassetid://94526405306326", -- soft palette, 2026-11-19 (was 101250510173451)
+	-- ui-24a: the 3 2 1 with WHITE faces, tinted with the round's colour (retro full colour 138423895593788,
+	-- ui-20f pastel 94526405306326, first 101250510173451)
+	count = "rbxassetid://78462777937833",
 	-- the letter cards' letters, A to Z and "!" (assets/icons/poster/card_letters.png, 1024 x 720, from
 	-- design/ui/poster_cards.html): see `Shapes.cards`
 	cards = "rbxassetid://103788059570384",
@@ -61,11 +69,11 @@ Shapes.ids = {
 	-- colours, a cream face and an ink line, and is shown untinted.
 	noteArrow = "rbxassetid://99511529578400",
 	noteRing = "rbxassetid://89833043727802",
-	stopwatch = "rbxassetid://136415911847198", -- soft palette, 2026-11-19 (was 130771830611628)
+	stopwatch = "rbxassetid://86564951602776", -- ui-20f palette (pastel 136415911847198, first 130771830611628)
 } :: { [string]: string }
 
--- The round-start countdown's sheet (ui-16a). TOP ROW: the numbers 3, 2, 1 in cells of `cell`, each in its own
--- colour with its outline and shadow, shown untinted. FROM `letterTop` DOWN: the TUSSLE! cards' letters in cells
+-- The round-start countdown's sheet (ui-16a). TOP ROW: the numbers 3, 2, 1 in cells of `cell`, WHITE faces with
+-- their ink outline and shadow, tinted with the round's one colour (ui-24a). FROM `letterTop` DOWN: the TUSSLE! cards' letters in cells
 -- of `letterCell`, WHITE (tinted where used), drawn `letterScale` times the mockup's 128 px; `width` is each
 -- letter's own width at 128 px as the browser measures it.
 Shapes.count = {
@@ -112,9 +120,9 @@ Shapes.words = {
 -- uploading the sheet again. Anything long or changing stays real text.
 Shapes.letters = {
 	titles = {
-		"rbxassetid://78958349726285", -- soft palette, 2026-11-19 (were 87365915153934,
-		"rbxassetid://121477646655774", -- 118820953416670,
-		"rbxassetid://93708484056207", -- 139550002196137)
+		"rbxassetid://108455015162951", -- ui-20f palette; pastel 78958349726285, 121477646655774, 93708484056207;
+		"rbxassetid://97002286037312", -- first 87365915153934, 118820953416670,
+		"rbxassetid://121132883577067", -- 139550002196137
 	},
 	words = { "rbxassetid://140543979882744" },
 } :: { [string]: { string } }
@@ -192,6 +200,10 @@ local ROUND: { [string]: boolean } = {
 	slab = true,
 }
 
+-- The screens that are the lobby's MAIN UI and wear the moving sparkle texture (the owner, 2026-11-20: "ONLY the
+-- main hud when ur in the lobby"): the menu strips and tools, the window and its pages, the spectate panel.
+local LOBBY_GUIS: { [string]: boolean } = { HT_Nav = true, HT_Menu = true, HT_Spectate = true }
+
 --- A stretched shape image in a colour token, filling its parent until sized.
 function Shapes.image(
 	parent: Instance?,
@@ -215,6 +227,42 @@ function Shapes.image(
 	image.ImageColor3 = Tokens.colour(tone)
 	for key, value in props or {} do
 		(image :: any)[key] = value
+	end
+	-- every rounded FILL (the coloured face of a button, tile, chip or card) gets a finish once it is on screen
+	-- (ui-21a, ui-23a; Ui/Texture): in the LOBBY's main UI (LOBBY_GUIS) the moving sparkle texture; everywhere else
+	-- in the game the still comic halftone. Outlines, shadows and other layers stay plain.
+	if ROUND[name] and image.Name == "Fill" then
+		-- A caller may ask for a finish with the attribute HT_Finish ("plain", "none", "comic" or "sparkle") right
+		-- after making the shape: the choice is DEFERRED to after the caller's code, so it is seen.
+		local watch: RBXScriptConnection? = nil
+		local decided = false
+		local function decide()
+			if decided then
+				return
+			end
+			local gui = image:FindFirstAncestorWhichIsA("LayerCollector")
+			if not gui then
+				return
+			end
+			decided = true
+			if watch then
+				watch:Disconnect()
+				watch = nil
+			end
+			local asked = image:GetAttribute("HT_Finish")
+			if asked == "none" then
+				return
+			elseif asked == "plain" then
+				Texture.plain(image)
+			elseif asked == "comic" or (asked == nil and not LOBBY_GUIS[gui.Name]) then
+				Texture.comic(image, Shapes.ids.dots)
+			else
+				Texture.apply(image, Shapes.ids.sparkles)
+			end
+		end
+		watch = image.AncestryChanged:Connect(function()
+			task.defer(decide)
+		end)
 	end
 	image.Parent = parent
 	return image

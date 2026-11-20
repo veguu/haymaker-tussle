@@ -8,7 +8,10 @@
 --   className    your class's name in cards as you use your ultimate (`.cband2` / fire)
 --
 -- One style for all of them since ui-16a / ui-17a: things come fast and HIT, the hit shakes them and throws
--- sharp ink-edged impact lines, the big moments throw shards. No bars, streaks, stamps or confetti.
+-- SPEED PILLS (ui-24a: round-capped speed lines pulled away into their tips, small pops at the tips; they replaced
+-- the straight bars and tumbling shards, which "look cheap"). No bars, streaks, stamps or confetti.
+-- COLOURS (ui-24a): the word pop-ups are in YOUR colour's palette (`Callouts.setColour`; a tint, the colour, a
+-- deep shade, cream and ink: Core/ColourMath); the countdown is ONE colour the caller picks for the round.
 --
 -- Neither covers the screen, nothing flashes, and nothing here runs unless one is on screen: each is built when
 -- it starts and destroyed when it ends. Under Reduced Motion they appear and leave without the motion.
@@ -18,6 +21,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
 
+local ColourMath = require(ReplicatedStorage.Shared.Core.ColourMath)
 local PosterEase = require(ReplicatedStorage.Shared.Core.PosterEase)
 local Tokens = require(ReplicatedStorage.Shared.Tokens)
 local VoiceLines = require(ReplicatedStorage.Shared.Config.VoiceLines)
@@ -36,6 +40,35 @@ local gui: ScreenGui? = nil
 local edgeGui: ScreenGui? = nil
 local serial = 0
 
+-- A colour's palette as Color3s (Core/ColourMath): the tint, the colour itself, the deep shade.
+type Tones = { tone: Color3, light: Color3, deep: Color3 }
+
+local function rgb(c: Color3): ColourMath.RGB
+	return { r = c.R, g = c.G, b = c.B }
+end
+
+local function tonesOf(c: Color3): Tones
+	local p = ColourMath.palette(rgb(c))
+	return {
+		tone = c,
+		light = Color3.new(p.light.r, p.light.g, p.light.b),
+		deep = Color3.new(p.deep.r, p.deep.g, p.deep.b),
+	}
+end
+
+-- ink or cream letters, whichever reads better on `face`
+local function letterOn(face: Color3): Color3
+	return if ColourMath.inkReads(rgb(face)) then colour("ink.900") else colour("ivory.50")
+end
+
+local yours: Color3? = nil
+
+--- Your colour, for the pop-ups that are about you (the last players count): your class colour, or the one you
+--- picked in More > Cosmetics. The callers that already pass a colour pass this same one.
+function Callouts.setColour(tone: Color3)
+	yours = tone
+end
+
 local function make(class: string, parent: Instance?, props: { [string]: any }): any
 	local object = Instance.new(class)
 	for key, value in props do
@@ -43,6 +76,34 @@ local function make(class: string, parent: Instance?, props: { [string]: any }):
 	end
 	object.Parent = parent
 	return object
+end
+
+-- A letter card's look in the current style (ui-23a, 2026-11-20): rounded corners on its shadow, edge and face,
+-- and the in-game comic shading on the face (a still halftone toward its foot, as Ui/Texture.comic). Until then a
+-- card was a plain square block of flat colour.
+local function comicCard(shadow: Frame, edge: Frame, face: Frame, radius: number)
+	for _, piece in { shadow, edge, face } do
+		make("UICorner", piece, { CornerRadius = UDim.new(0, radius) })
+	end
+	local halftone = make("ImageLabel", face, {
+		Name = "Halftone",
+		BackgroundTransparency = 1,
+		Image = Shapes.ids.dots,
+		ScaleType = Enum.ScaleType.Tile,
+		TileSize = UDim2.fromOffset(10, 10),
+		ImageColor3 = colour("ink.900"),
+		ImageTransparency = 0.78,
+		Size = UDim2.fromScale(1, 1),
+	})
+	make("UICorner", halftone, { CornerRadius = UDim.new(0, math.max(0, radius - 3)) })
+	make("UIGradient", halftone, {
+		Rotation = 90,
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.4, 1),
+			NumberSequenceKeypoint.new(1, 0),
+		}),
+	})
 end
 
 -- how far down the screen (pixels) something stands that the pop-ups must start under, or nil
@@ -300,9 +361,6 @@ local popCurve = PosterEase.bezier(0.1, 0.9, 0.2, 1) -- out fast, easing as it a
 
 -- a hard shake: one big kick, then less each way
 local JOLT = { { 0, 0 }, { 0.15, -1 }, { 0.35, 0.8 }, { 0.55, -0.5 }, { 0.78, 0.25 }, { 1, 0 } }
--- an impact line's length over its life: out at once, then drawn away to nothing
-local SLASH_LONG = { { 0, 0.2 }, { 0.25, 1 }, { 1, 0 } }
-local shardCurve = PosterEase.bezier(0.1, 0.7, 0.2, 1)
 
 local function fan(count: number, first: number, last: number): { number }
 	local angles = table.create(count)
@@ -329,7 +387,6 @@ end
 --   1  punches in from the left: lines thrown forward to the right, swells upward into the word
 local COUNT_MOVE = {
 	[3] = {
-		tone = "ivory.50",
 		fromSize = 3.6,
 		turn = -18,
 		fromX = 0,
@@ -347,7 +404,6 @@ local COUNT_MOVE = {
 		outTurn = 11,
 	},
 	[2] = {
-		tone = "gold.400",
 		fromSize = 1.4,
 		turn = 14,
 		fromX = 0,
@@ -365,7 +421,6 @@ local COUNT_MOVE = {
 		outTurn = 28,
 	},
 	[1] = {
-		tone = "danger.600",
 		fromSize = 1.2,
 		turn = -14,
 		fromX = -420,
@@ -385,6 +440,32 @@ local COUNT_MOVE = {
 }
 
 local countHolder: Frame? = nil
+
+-- THE COUNTDOWN'S COLOURS (ui-24a; the owner, 2026-11-20: "randomized everytime ... RANDOM COLORS, not random
+-- SETS of colors, so it shouldnt be all purple, all blue"): the 3, the 2, the 1 and each TUSSLE! card its own
+-- colour, no two neighbours alike, new every round, and the SAME on every player's screen, because
+-- Core/ColourMath.sequence draws them from the round's CountdownEnd, which every client has. No message is sent.
+local ROUND_TONES = {
+	"gold.400",
+	"danger.600",
+	"teal.400",
+	"go.400",
+	"class.Inferno",
+	"class.Dragon",
+	"class.Tempest",
+	"class.Trickster",
+}
+
+--- The countdown's colours for the round whose CountdownEnd is `finish`: ten, in order the 3, the 2, the 1 and the
+--- seven TUSSLE! cards.
+function Callouts.roundColours(finish: number): { Color3 }
+	local picks = ColourMath.sequence(finish, 3 + #TUSSLE, #ROUND_TONES)
+	local list = table.create(#picks)
+	for index, pick in picks do
+		list[index] = colour(ROUND_TONES[pick])
+	end
+	return list
+end
 
 --- Takes the countdown off the screen at once (the round was called off).
 function Callouts.countStop()
@@ -435,144 +516,158 @@ local function jolt(key: any, group: Frame, x: number, y: number, seconds: numbe
 	end, nil, wait)
 end
 
--- Impact lines: straight ink-edged bars that shoot out from behind a hit along `angles` (degrees; 0 is right,
--- 90 is down) and are drawn away to nothing as they go. They start `near` from (x, y) and run out to `far`;
--- `flat` squashes the ring they stand on (a wide word's is an oval). Every other one is `tones[2]`.
-local function slashes(
+-- SPEED PILLS (ui-24a; the owner's pick "A" of four on work/burst-options.html, 2026-11-20, in place of the straight
+-- bars and tumbling shards that "look cheap"): round-capped speed lines that shoot out from BEHIND a hit and are
+-- pulled away into their tips, thick and thin, a few hundredths of a second apart; each thick one leaves a small
+-- pop at its tip. They start on a rounded box round the hit (`halfX`, `halfY` out from (x, y)) along `angles`
+-- (degrees; 0 is right, 90 is DOWN) and run `reach` further (longer to the sides than straight down), `thick`
+-- wide. Thick ones are the colour (every third cream), thin ones and the pops the tint. `small` (a phone) throws
+-- every other line and no pops. One frame connection for the whole burst; nothing is left behind.
+local PILL_LIFE = 0.32 -- a line's own life
+local PILL_STAGGER = 0.03 -- lines set off up to this much apart
+local POP_AT, POP_LIFE = 0.17, 0.22 -- a pop shows this long after its line sets off, for this long
+
+local function backOut(t: number): number
+	local c1 = 2.4
+	return 1 + (c1 + 1) * (t - 1) ^ 3 + c1 * (t - 1) ^ 2
+end
+
+local function pills(
 	parent: Instance,
 	key: any,
 	x: number,
 	y: number,
+	halfX: number,
+	halfY: number,
 	angles: { number },
-	tones: { Color3 },
-	near: number,
-	far: number,
-	long: number,
+	tones: Tones,
+	reach: number,
 	thick: number,
-	flat: number,
-	seconds: number,
-	wait: number
+	wait: number,
+	small: boolean
 )
 	if HudMotion.reduced() then
 		return
 	end
-	local ink = colour("ink.900")
+	local ink, paper = colour("ink.900"), colour("ivory.50")
 	local lines = {}
-	for index, angle in angles do
+	for index = 1, #angles, if small then 2 else 1 do
+		local angle = angles[index] + (math.random() - 0.5) * 6
+		local turn = math.rad(angle)
+		local cos, sin = math.cos(turn), math.sin(turn)
+		local thin = index % 2 == 0
+		local wide = if thin then thick * 0.6 else thick
+		-- the ink edge a fifth of the line's width (a fixed 4 left a thin line nearly all ink: seen in Studio)
+		local edge = math.max(2, math.round(wide * 0.2))
 		local line = make("Frame", parent, {
-			Name = "Slash",
+			Name = "Pill",
 			BackgroundColor3 = ink,
 			BorderSizePixel = 0,
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Size = UDim2.fromOffset(0, 0),
 			Rotation = angle,
+			Size = UDim2.fromOffset(0, 0),
 			Visible = false,
 			ZIndex = 1,
 		})
+		make("UICorner", line, { CornerRadius = UDim.new(1, 0) })
 		local face = make("Frame", line, {
-			BackgroundColor3 = tones[(index - 1) % #tones + 1],
+			BackgroundColor3 = if thin
+				then tones.light
+				elseif (index - 1) / 2 % 3 == 2 then paper
+				else tones.tone,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(3, 3),
-			Size = UDim2.new(1, -6, 1, -6),
+			Position = UDim2.fromOffset(edge, edge),
+			Size = UDim2.new(1, -2 * edge, 1, -2 * edge),
 		})
-		local turn = math.rad(angle)
-		local cos, sin = math.cos(turn), math.sin(turn) * flat
-		-- on a squashed ring a line still points straight away from the middle
-		line.Rotation = math.deg(math.atan2(sin, cos))
-		lines[index] = { line = line, face = face, cos = cos, sin = sin }
+		make("UICorner", face, { CornerRadius = UDim.new(1, 0) })
+		local pop: Frame? = nil
+		if not thin and not small then
+			pop = make("Frame", parent, {
+				Name = "Pop",
+				BackgroundColor3 = ink,
+				BorderSizePixel = 0,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Size = UDim2.fromOffset(0, 0),
+				Visible = false,
+				ZIndex = 1,
+			})
+			make("UICorner", pop, { CornerRadius = UDim.new(1, 0) })
+			local dot = make("Frame", pop, {
+				BackgroundColor3 = tones.light,
+				BorderSizePixel = 0,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.new(1, -2 * edge, 1, -2 * edge),
+			})
+			make("UICorner", dot, { CornerRadius = UDim.new(1, 0) })
+		end
+		table.insert(lines, {
+			line = line,
+			face = face,
+			pop = pop,
+			-- on a rounded box round the hit (a squarish ellipse), so they come out from behind its edge
+			x = x + halfX * math.sign(cos) * math.abs(cos) ^ 0.5,
+			y = y + halfY * math.sign(sin) * math.abs(sin) ^ 0.5,
+			cos = cos,
+			sin = sin,
+			wide = wide,
+			far = reach * (0.55 + 0.6 * math.abs(cos)) * (0.85 + 0.3 * math.random()),
+			at = math.random() * PILL_STAGGER,
+		})
 	end
-	Poster.run(key, seconds, function(t: number)
-		local out = near + (far - near) * PosterEase.easeOut(t)
-		local length = long * keyframes(SLASH_LONG, t, PosterEase.linear)
-		local wide = thick * (1 - 0.35 * t)
-		local reach = out + length / 2
+	local life = PILL_STAGGER + (if small then PILL_LIFE else POP_AT + POP_LIFE)
+	Poster.run(key, life, function(t: number)
+		local elapsed = t * life
 		for _, l in lines do
-			l.line.Visible = true
-			l.line.Position = UDim2.fromOffset(x + l.cos * reach, y + l.sin * reach)
-			l.line.Size = UDim2.fromOffset(length, wide)
-			l.face.Visible = length > 8
+			local u = (elapsed - l.at) / PILL_LIFE
+			if u > 0 and u < 1 then
+				-- the head races out and slows; the tail follows faster at the end, so the line is pulled away
+				-- into its tip instead of shrinking where it stands
+				local head = l.far * (1 - (1 - u) ^ 4)
+				local tail = l.far * u ^ 1.7
+				local length = head - tail + l.wide
+				local middle = (head + tail) / 2
+				local clear = if u > 0.9 then (u - 0.9) / 0.1 else 0
+				l.line.Visible = true
+				l.line.Position = UDim2.fromOffset(l.x + l.cos * middle, l.y + l.sin * middle)
+				l.line.Size = UDim2.fromOffset(length, l.wide * (1 - 0.25 * u))
+				l.line.BackgroundTransparency = clear
+				l.face.BackgroundTransparency = clear
+			else
+				l.line.Visible = false
+			end
+			local pop = l.pop
+			if pop then
+				local p = (elapsed - l.at - POP_AT) / POP_LIFE
+				if p > 0 and p < 1 then
+					local out = l.far * 0.96 + l.wide * 1.3 * (1 - (1 - p) ^ 3)
+					local size = l.wide
+						* (
+							if p < 0.35
+								then backOut(p / 0.35) * 1.1
+								else 1.1 * (1 - (p - 0.35) / 0.65)
+						)
+					pop.Visible = true
+					pop.Position = UDim2.fromOffset(l.x + l.cos * out, l.y + l.sin * out)
+					pop.Size = UDim2.fromOffset(size, size)
+				else
+					pop.Visible = false
+				end
+			end
 		end
 	end, function()
 		for _, l in lines do
 			l.line:Destroy()
-		end
-	end, wait)
-end
-
--- Shards: thin ink-edged slivers thrown out fast from (x, y), tumbling, gone in about half a second. The word's
--- answer to confetti: nothing round, nothing that drifts.
-local function shards(
-	parent: Instance,
-	key: any,
-	x: number,
-	y: number,
-	count: number,
-	reachMin: number,
-	reachMax: number,
-	tones: { Color3 },
-	first: number, -- the fan they are thrown into: from this angle (0 is right, 90 is down)...
-	sweep: number, -- ...round by this many degrees
-	seconds: number,
-	wait: number
-)
-	if HudMotion.reduced() then
-		return
-	end
-	local ink = colour("ink.900")
-	local pieces = {}
-	for index = 1, count do
-		local angle = first
-			+ (index - 1) / math.max(count - 1, 1) * sweep
-			+ (math.random() - 0.5) * 10
-		local reach = reachMin + math.random() * (reachMax - reachMin)
-		local piece = make("Frame", parent, {
-			Name = "Shard",
-			BackgroundColor3 = ink,
-			BorderSizePixel = 0,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromOffset(x, y),
-			Size = UDim2.fromOffset(0, 0),
-			Visible = false,
-			ZIndex = 1,
-		})
-		local face = make("Frame", piece, {
-			BackgroundColor3 = tones[(index - 1) % #tones + 1],
-			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(3, 3),
-			Size = UDim2.new(1, -6, 1, -6),
-		})
-		local turn = math.rad(angle)
-		pieces[index] = {
-			piece = piece,
-			face = face,
-			angle = angle,
-			spin = (math.random() * 2 - 1) * 220,
-			dx = math.cos(turn) * reach,
-			dy = math.sin(turn) * reach * 0.7,
-		}
-	end
-	Poster.run(key, seconds, function(t: number)
-		local e = shardCurve(t)
-		local size = 0.6 + 0.4 * math.min(1, t * 4)
-		local clear = if t > 0.7 then (t - 0.7) / 0.3 else 0
-		for _, p in pieces do
-			p.piece.Visible = true
-			p.piece.Position = UDim2.fromOffset(x + p.dx * e, y + p.dy * e + 40 * t * t)
-			p.piece.Size = UDim2.fromOffset(34 * size, 10 * size)
-			p.piece.Rotation = p.angle + p.spin * t
-			p.piece.BackgroundTransparency = clear
-			p.face.BackgroundTransparency = clear
-		end
-	end, function()
-		for _, p in pieces do
-			p.piece:Destroy()
+			if l.pop then
+				l.pop:Destroy()
+			end
 		end
 	end, wait)
 end
 
 --- One number of the countdown (3, 2 or 1): it comes fast in its own way (COUNT_MOVE), hits hard, shakes and
 --- throws its impact lines, and is knocked away just before the next one is due. `small` is the phone size.
-function Callouts.count(beat: number, small: boolean)
+function Callouts.count(beat: number, small: boolean, tone: Color3?)
 	local sheet = Shapes.count
 	local cell = sheet.numbers[beat]
 	local move = COUNT_MOVE[beat]
@@ -580,6 +675,7 @@ function Callouts.count(beat: number, small: boolean)
 		return
 	end
 	UiSound.play(`cd_{beat}`)
+	local tones = tonesOf(tone or colour("gold.400"))
 	serial += 1
 	local id = `count{serial}`
 	local _holder, group, away = countStage("Countdown", small)
@@ -591,6 +687,8 @@ function Callouts.count(beat: number, small: boolean)
 		Image = Shapes.ids.count,
 		ImageRectOffset = Vector2.new(cell * sheet.cell.X, 0),
 		ImageRectSize = sheet.cell,
+		-- the sheet's faces are WHITE (ui-24a): the round's colour tints them; the ink stays near-black
+		ImageColor3 = tones.tone,
 		ZIndex = 2,
 	})
 	if HudMotion.reduced() then
@@ -614,20 +712,19 @@ function Callouts.count(beat: number, small: boolean)
 		scale.Scale = HIT_SIZE + (1 - HIT_SIZE) * spring(t)
 	end, nil, HIT)
 	jolt(`{id}shake`, group, 22 * move.shakeX, 22 * move.shakeY, 0.34, HIT)
-	slashes(
+	pills(
 		group,
 		`{id}lines`,
 		0,
 		move.lineY,
+		move.near * 0.7,
+		move.near * 0.9,
 		move.lines,
-		{ colour(move.tone), colour("ink.900") },
-		move.near,
-		move.far,
-		move.long,
-		14,
-		1,
-		0.3,
-		HIT
+		tones,
+		move.far - move.near + move.long * 0.4,
+		18,
+		HIT,
+		small
 	)
 	-- away: 0.2 s from 0.78 s
 	Poster.run(`{id}out`, 0.2, function(t: number)
@@ -639,18 +736,18 @@ function Callouts.count(beat: number, small: boolean)
 	end, away, 0.78)
 end
 
---- "TUSSLE!": the fight is on. Seven cut-out letters in boxes (cream, your class colour `tone`, yellow, the "!"
---- pink and tipped) BURST OUT of the word's middle together and spring back to their size; as they hit, the word
+--- "TUSSLE!": the fight is on. Seven cut-out letters in boxes, each in its own colour from `colours` (ui-24a; the
+--- "!" tipped) BURST OUT of the word's middle together and spring back to their size; as they hit, the word
 --- shakes, impact lines and shards fly out ALL ROUND it and the screen's edge bars pulse once; then the word swells and is gone:
 --- GO_LIFE in all.
-function Callouts.go(tone: Color3, small: boolean)
+function Callouts.go(colours: { Color3 }, small: boolean)
 	UiSound.play("round_go")
 	serial += 1
 	local id = `go{serial}`
 	local _holder, group, away = countStage("Tussle", small)
 	local sheet = Shapes.count
-	local ink, paper = colour("ink.900"), colour("ivory.50")
-	local coin, danger = colour("gold.400"), colour("danger.600")
+	local ink = colour("ink.900")
+	local tones = tonesOf(colours[1])
 	local still = HudMotion.reduced()
 
 	-- a card is its letter plus the mockup's 12 of padding and 5 of border each side, 138 tall, 7 apart
@@ -707,16 +804,13 @@ function Callouts.go(tone: Color3, small: boolean)
 		})
 		local face = make("Frame", card, {
 			Name = "Face",
-			BackgroundColor3 = if last
-				then danger
-				elseif index % 3 == 0 then coin
-				elseif even then tone
-				else paper,
+			BackgroundColor3 = colours[index] or colours[1],
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(5, 5),
 			Size = UDim2.new(1, -10, 1, -10),
 			ZIndex = 3,
 		})
+		comicCard(shadow, edge, face, 12)
 		local spot = sheet.letters[letter]
 		local glyph = make("ImageLabel", card, {
 			Name = "Glyph",
@@ -727,7 +821,7 @@ function Callouts.go(tone: Color3, small: boolean)
 			Image = Shapes.ids.count,
 			ImageRectOffset = Vector2.new(spot.cell * sheet.letterCell.X, sheet.letterTop),
 			ImageRectSize = sheet.letterCell,
-			ImageColor3 = if last then paper else ink,
+			ImageColor3 = letterOn(colours[index] or colours[1]),
 			ZIndex = 4,
 		})
 		local mine: { { any } } = {
@@ -770,55 +864,37 @@ function Callouts.go(tone: Color3, small: boolean)
 	-- piece may overlap another). So the upper half is there but SHORT: its lines stand on a flatter oval and
 	-- stop sooner, and its shards are thrown only a little way, so both end under the row.
 	jolt(`{id}shake`, group, 30, 16, 0.34, WORD_HIT)
-	local lineTones = { tone, ink }
-	-- the sides and below (0 is right, 90 is down)
-	slashes(
+	-- (ui-24a) speed pills: to the sides and below, and a short fan above (the row comes up over the word now)
+	pills(
 		group,
 		`{id}lines`,
 		0,
 		0,
+		total / 2 + 10,
+		TALL / 2 + 8,
 		fan(16, -8, 188),
-		lineTones,
+		tones,
 		300,
-		480,
-		190,
-		16,
-		0.5,
-		0.32,
-		WORD_HIT
+		24,
+		WORD_HIT,
+		small
 	)
-	-- above
-	slashes(
+	pills(
 		group,
 		`{id}linesUp`,
 		0,
 		0,
-		fan(11, 202, 338),
-		lineTones,
-		300,
-		400,
-		120,
-		16,
-		0.4,
-		0.32,
-		WORD_HIT
+		total / 2 + 10,
+		TALL / 2 + 8,
+		fan(9, 206, 334),
+		tones,
+		130,
+		18,
+		WORD_HIT,
+		small
 	)
-	shards(group, `{id}shards`, 0, 0, 20, 300, 560, { coin, tone, paper }, 0, 180, 0.55, WORD_HIT)
-	shards(
-		group,
-		`{id}shardsUp`,
-		0,
-		0,
-		12,
-		110,
-		170,
-		{ coin, tone, paper },
-		195,
-		150,
-		0.5,
-		WORD_HIT
-	)
-	Callouts.edges(tone)
+
+	Callouts.edges(colours[1])
 	-- the whole word: holds, dips a little, then swells and is gone
 	Poster.run(id, GO_LIFE, function(t: number)
 		rowScale.Scale = keyframes(GO_SIZE, t, ease)
@@ -855,12 +931,12 @@ local function cardRow(
 	key: string,
 	text: string,
 	size: number,
-	alt: Color3,
+	tones: Tones,
 	wait: number,
 	gap: number
 ): (Frame, Vector2, number)
 	local sheet = Shapes.cards
-	local ink, paper, coin = colour("ink.900"), colour("ivory.50"), colour("gold.400")
+	local ink, paper = colour("ink.900"), colour("ivory.50")
 	local still = HudMotion.reduced()
 	local k = size / sheet.size
 	local border = math.max(3, math.round(size * 0.045))
@@ -892,6 +968,12 @@ local function cardRow(
 		local restTurn = if last then -6 elseif even then 5 else 0
 		local restY = tall / 2 + (if last then -0.04 * size elseif even then 0.04 * size else 0)
 		local width = widths[index]
+		-- the palette (ui-24a): the last card deep, every third the tint, every second the colour, the rest cream
+		local faceTone = if last
+			then tones.deep
+			elseif index % 3 == 0 then tones.light
+			elseif even then tones.tone
+			else paper
 		local card = make("Frame", row, {
 			Name = letter,
 			BackgroundTransparency = 1,
@@ -919,12 +1001,13 @@ local function cardRow(
 		})
 		local face = make("Frame", card, {
 			Name = "Face",
-			BackgroundColor3 = if index % 3 == 0 then coin elseif even then alt else paper,
+			BackgroundColor3 = faceTone,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(border, border),
 			Size = UDim2.new(1, -2 * border, 1, -2 * border),
 			ZIndex = 3,
 		})
+		comicCard(shadow, edge, face, math.max(6, math.round(size * 0.09)))
 		local spot = sheet.letters[letter]
 		local glyph = make("ImageLabel", card, {
 			Name = "Glyph",
@@ -940,7 +1023,7 @@ local function cardRow(
 				)
 				else Vector2.zero,
 			ImageRectSize = sheet.cell,
-			ImageColor3 = ink,
+			ImageColor3 = letterOn(faceTone),
 			Visible = spot ~= nil,
 			ZIndex = 4,
 		})
@@ -1079,7 +1162,8 @@ function Callouts.ultimate(tone: Color3, key: string?, done: (() -> ())?)
 	local seconds = math.max(1.7, (0.12 + line.seconds) / 0.8)
 	serial += 1
 	local id = `ultimate{serial}`
-	local row, box, hit = cardRow(id, "ULTIMATE", 74, tone, 0.25, CARD_GAP)
+	local tones = tonesOf(tone)
+	local row, box, hit = cardRow(id, "ULTIMATE", 74, tones, 0.25, CARD_GAP)
 	local holder, group, _groupScale, origin, span = stage("Ultimate", box, 0.6)
 	local centre = origin + box / 2
 	row.Position = UDim2.fromOffset(centre.X, centre.Y)
@@ -1101,6 +1185,9 @@ function Callouts.ultimate(tone: Color3, key: string?, done: (() -> ())?)
 	})
 	local tagScale = make("UIScale", tag, {})
 	quad(tag, "badge", "gold.400", 5, 6, 7)
+	-- the tag in your tint (ui-24a: no yellow mixed in)
+	local tagFill = tag:FindFirstChild("Fill") :: ImageLabel
+	tagFill.ImageColor3 = tones.light
 	local words = make("Frame", tag, {
 		Name = "Words",
 		BackgroundTransparency = 1,
@@ -1138,35 +1225,20 @@ function Callouts.ultimate(tone: Color3, key: string?, done: (() -> ())?)
 	-- (from twice its size, not three times: at three its corner swept over the fighters' row)
 	slam(`{id}ready`, tag, tagScale, -8, 2, hit + 0.16)
 
-	-- the last card lands: lines on a flat oval (the word is wide) and shards, to the sides and down only
-	slashes(
+	-- the last card lands: speed pills, to the sides and down only
+	pills(
 		group,
 		`{id}lines`,
 		centre.X,
 		centre.Y,
+		box.X / 2 + 8,
+		box.Y / 2 + 6,
 		fan(14, -8, 188),
-		{ tone, colour("ink.900") },
-		300,
-		470,
-		170,
-		14,
-		0.45,
-		0.32,
-		hit
-	)
-	shards(
-		group,
-		`{id}shards`,
-		centre.X,
-		centre.Y,
+		tones,
+		210,
 		16,
-		260,
-		470,
-		{ colour("gold.400"), tone, colour("ivory.50") },
-		0,
-		180,
-		0.55,
-		hit
+		hit,
+		key == nil
 	)
 	Callouts.edges(tone)
 	task.delay(0.12, Callouts.speak, "ultimate-ready")
@@ -1179,7 +1251,6 @@ end
 -- drawn at there, the size it is shown at, the words, the first kick of the shake, how many lines
 local LAST = {
 	[5] = {
-		tone = "gold.400",
 		cell = 0,
 		wide = 117,
 		drawn = 230,
@@ -1190,7 +1261,6 @@ local LAST = {
 		lines = 9,
 	},
 	[4] = {
-		tone = "gold.400",
 		cell = 1,
 		wide = 121,
 		drawn = 230,
@@ -1201,7 +1271,6 @@ local LAST = {
 		lines = 9,
 	},
 	[3] = {
-		tone = "danger.600",
 		cell = 2,
 		wide = 131,
 		drawn = 255,
@@ -1212,7 +1281,6 @@ local LAST = {
 		lines = 9,
 	},
 	[2] = {
-		tone = "danger.600",
 		cell = 3,
 		wide = 149,
 		drawn = 290,
@@ -1253,13 +1321,13 @@ function Callouts.last(count: number, small: boolean, done: (() -> ())?)
 	local two = count == 2
 	local still = HudMotion.reduced()
 	local ink = colour("ink.900")
-	local tone = colour(spec.tone)
+	local tones = tonesOf(yours or colour("coral.500"))
 
 	-- the sizes first: the tile is its number plus the mockup's padding; beside it the tag over the cards
 	local shown = spec.font / spec.drawn
 	local tileSize = Vector2.new(math.round(spec.wide * shown) + 62, spec.font + 10)
 	local row, rowSize =
-		cardRow(id, spec.words, if two then 104 else 92, tone, TILE_AT + 0.2, CARD_GAP)
+		cardRow(id, spec.words, if two then 104 else 92, tones, TILE_AT + 0.2, CARD_GAP)
 	local sideTall = TAG_TALL + TAG_GAP + rowSize.Y
 	local box = Vector2.new(tileSize.X + SIDE_GAP + rowSize.X, math.max(tileSize.Y, sideTall))
 	local holder, group, _groupScale, origin, span =
@@ -1280,7 +1348,10 @@ function Callouts.last(count: number, small: boolean, done: (() -> ())?)
 		ZIndex = 2,
 	})
 	local tileScale = make("UIScale", tile, {})
-	quad(tile, "tile", spec.tone, 7, 9, 10)
+	quad(tile, "tile", "ivory.50", 7, 9, 10)
+	-- your colour, its deep shade at three and two (ui-24a; it was yellow, then red)
+	local tileFill = tile:FindFirstChild("Fill") :: ImageLabel
+	tileFill.ImageColor3 = if count <= 3 then tones.deep else tones.tone
 	local sheet = Shapes.last
 	make("ImageLabel", tile, {
 		Name = "Figure",
@@ -1328,39 +1399,22 @@ function Callouts.last(count: number, small: boolean, done: (() -> ())?)
 		end, nil, TILE_AT + 0.42)
 	end
 
-	-- the tile lands: lines from behind it, to the sides and down only; at two, shards as well
-	slashes(
+	-- the tile lands: speed pills from behind it, to the sides and down only (more and further at two)
+	pills(
 		group,
 		`{id}lines`,
 		tileX,
-		middle + tileSize.Y * 0.06,
+		middle,
+		tileSize.X / 2 + 6,
+		tileSize.Y / 2 + 6,
 		fan(spec.lines, -8, 188),
-		{ tone, ink },
-		if two then 150 else 130,
-		if two then 330 else 250,
-		if two then 150 else 120,
-		if two then 16 else 14,
-		0.8,
-		0.3,
-		hit
+		tones,
+		if two then 240 else 180,
+		if two then 18 else 15,
+		hit,
+		small
 	)
-	if two then
-		shards(
-			group,
-			`{id}shards`,
-			tileX,
-			middle,
-			16,
-			200,
-			420,
-			{ colour("gold.400"), tone, colour("ivory.50") },
-			0,
-			180,
-			0.55,
-			hit
-		)
-	end
-	Callouts.edges(tone)
+	Callouts.edges(tones.tone)
 	task.delay(0.1, Callouts.speak, voice)
 	live(
 		id,
@@ -1390,41 +1444,27 @@ function Callouts.className(name: string, tone: Color3, small: boolean)
 	end
 	serial += 1
 	local id = `class{serial}`
-	local row, box, hit = cardRow(id, word, 112, tone, 0.3, 0.04)
+	local tones = tonesOf(tone)
+	local row, box, hit = cardRow(id, word, 112, tones, 0.3, 0.04)
 	local holder, group, _groupScale, origin, span =
 		stage("ClassName", box, if small then 0.4 else 0.5)
 	local centre = origin + box / 2
 	row.Rotation = -5
 	row.Position = UDim2.fromOffset(centre.X, centre.Y)
 	row.Parent = group
-	slashes(
+	pills(
 		group,
 		`{id}lines`,
 		centre.X,
 		centre.Y,
-		fan(18, -8, 188),
-		{ tone, colour("ink.900") },
-		340,
-		600,
-		220,
-		16,
-		0.5,
-		0.32,
-		hit
-	)
-	shards(
-		group,
-		`{id}shards`,
-		centre.X,
-		centre.Y,
-		24,
+		box.X / 2 + 10,
+		box.Y / 2 + 8,
+		fan(16, -8, 188),
+		tones,
 		300,
-		620,
-		{ colour("gold.400"), tone, colour("ivory.50") },
-		0,
-		180,
-		0.55,
-		hit
+		22,
+		hit,
+		small
 	)
 	Callouts.edges(tone)
 	live(id, holder, group, span, 1.7, CN_AWAY, hit, 0.4, 30, 16, nil)

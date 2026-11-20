@@ -14,6 +14,7 @@ local Tokens = require(ReplicatedStorage.Shared.Tokens)
 local HudTheme = require(script.Parent.HudTheme)
 local Poster = require(script.Parent.Poster)
 local Shapes = require(script.Parent.Shapes)
+local Texture = require(script.Parent.Texture)
 local UiSound = require(script.Parent.UiSound)
 
 local PosterKit = {}
@@ -193,6 +194,7 @@ function PosterKit.pressable(cut: Cut, onPress: () -> (), still: boolean?): Text
 		button.MouseEnter:Connect(function()
 			over = true
 			UiSound.hover()
+			Texture.shine(cut.fill)
 			go(cut.restScale * 1.07, cut.restTurn, 0.55)
 		end)
 		button.MouseLeave:Connect(function()
@@ -263,10 +265,10 @@ end
 
 --- The small ink tag (PLANNED): cream Titillium on ink, turned 2 degrees.
 function PosterKit.tag(parent: Instance?, words: string, props: { [string]: any }?): TextLabel
-	local tag = Poster.text(nil, "label", 15, "ivory.50", {
+	-- (lettering printed on what it marks, no ink box (ui-23a, 2026-11-20: no square label pasted on top; the owner, "I want it to be IN THE UI"))
+	local tag = Poster.text(nil, "label", 15, "ink.900", {
 		Name = "Tag",
-		BackgroundColor3 = colour("ink.900"),
-		BackgroundTransparency = 0,
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Size = UDim2.fromOffset(0, 27),
 		AutomaticSize = Enum.AutomaticSize.X,
@@ -479,12 +481,13 @@ function PosterKit.row(
 			{ Name = "Shadow", Position = UDim2.fromOffset(3, 4) }
 		)
 		Shapes.image(tile, "tile", "ink.900", { Name = "Line", ZIndex = 2 })
-		Shapes.image(tile, "tile", "ivory.50", {
+		local keyFill = Shapes.image(tile, "tile", "ivory.50", {
 			Name = "Fill",
 			Position = UDim2.fromOffset(3, 3),
 			Size = UDim2.new(1, -6, 1, -6),
 			ZIndex = 3,
 		})
+		keyFill:SetAttribute("HT_Finish", "plain") -- (a key cap: no sparkles, 2026-11-20)
 		-- (straight: small text turned even a degree is drawn soft)
 		Poster.text(tile, "display", 18, "ink.900", {
 			Name = "Letter",
@@ -494,10 +497,15 @@ function PosterKit.row(
 			ZIndex = 4,
 		})
 	end
-	local hasRight = (right ~= nil and right ~= "") or cooldown ~= nil
 	local nameProps = {
 		Position = UDim2.fromOffset(x, 3),
-		Size = UDim2.new(1, -x - (if hasRight then 112 else 12), 0, 34),
+		-- (a ringed note needs 112 at the right; the cooldown counter about 90: UPPERCUT was cut short, 2026-11-20)
+		Size = UDim2.new(
+			1,
+			-x - (if right ~= nil and right ~= "" then 112 elseif cooldown ~= nil then 92 else 12),
+			0,
+			34
+		),
 		Text = string.upper(name),
 		TextTruncate = Enum.TextTruncate.AtEnd,
 	}

@@ -22,7 +22,7 @@ EDGE = [
     r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
 ]
-INK, CREAM = "#43365A", "#FFF9EC"  # the soft palette (2026-11-19); were #1A1236, #FFFBEF
+INK, CREAM = "#1E2233", "#FFF4D6"  # Retro Comic ui-22a (2026-11-20); ui-20f #2A2540, #FFF8EA; pastel #43365A; first #1A1236
 ROUND = 'stroke-linecap="round" stroke-linejoin="round"'
 
 # name -> (width, height, the whole svg's inside)

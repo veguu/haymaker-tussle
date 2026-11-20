@@ -126,6 +126,9 @@ local TOOLS = {
 local TOOL = Vector2.new(94, 78)
 local TOOL_GAP = 12
 
+-- whether the menu strips print their hotkey number (1-4) at their right end
+local SHOW_KEYS = false
+
 local NavController = Knit.CreateController({
 	Name = "NavController",
 })
@@ -194,12 +197,12 @@ function NavController:KnitStart()
 		).frame
 		local wordScale = make("UIScale", word, {})
 		local cap: TextLabel? = nil
-		if entry.keyName then
-			-- the key: cream on ink, at the strip's right end
-			local made = Poster.text(cut.face, "label", 15, "ivory.50", {
+		-- (no number on the strips since 2026-11-20, the owner had them removed; the 1-4 keys still open the pages)
+		if entry.keyName and SHOW_KEYS then
+			-- the key, printed on the strip at its right end (ui-23a, 2026-11-20: no square label pasted on top; the owner, "I want it to be IN THE UI")
+			local made = Poster.text(cut.face, "display", 20, "ink.900", {
 				Name = "Key",
-				BackgroundColor3 = colour("ink.900"),
-				BackgroundTransparency = 0,
+				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				AnchorPoint = Vector2.new(1, 0.5),
 				Position = UDim2.new(1, -22, 0.5, 0),
@@ -216,7 +219,9 @@ function NavController:KnitStart()
 		-- Idle drift (Ui/Drift): 4 units, and the shape and the word (an image) swing half a degree each way. The
 		-- key cap is small text, so it only rides up and down. 4 and half a degree, not the mockup's 5 and 0.8:
 		-- two neighbours at their far ends must still not touch (14 apart, less a 7-unit shadow).
-		Drift.add("nav", cut.body, entry.size.Y, 4, nil, 1, { cut.shape, word })
+		-- up and down only (ui-24a): the strips used to sway a degree as well, but Roblox stops clipping under
+		-- anything turned, so the sparkles spilled past the strip at every sway (and "nothing tilted", 2026-11-19)
+		Drift.add("nav", cut.body, entry.size.Y, 4)
 		table.insert(strips, {
 			entry = entry,
 			cut = cut,
@@ -259,6 +264,7 @@ function NavController:KnitStart()
 	for index, spec in TOOLS do
 		if spec.id ~= "afk" or afkRemote then
 			local cut = PosterKit.cut(tools, "tile", TOOL, colour("ivory.50"), Vector2.new(5, 6))
+			cut.fill:SetAttribute("HT_Finish", "plain") -- (utility tiles: no sparkles, the owner, 2026-11-20)
 			cut.root.Name = spec.id
 			local home = Vector2.new(TOOL.X / 2, (index - 1) * (TOOL.Y + TOOL_GAP) + TOOL.Y / 2)
 			cut.root.Position = UDim2.fromOffset(home.X, home.Y)
@@ -454,6 +460,7 @@ function NavController:KnitStart()
 	-- 68 x 68 (58 until 2026-11-18: the owner wanted it a little bigger), cream, 22 from the left and 18 from the
 	-- top; in a round it opens the window straight on its Settings, which is all the round's menu is
 	local gear = PosterKit.cut(topGui, "gear", Vector2.new(GEAR, GEAR), colour("ivory.50"))
+	gear.fill:SetAttribute("HT_Finish", "plain")
 	gear.root.Name = "Menu"
 	-- a cog, not the word MENU (the owner, 2026-11-18: it is only the settings button now): the same line
 	-- drawing as the lobby's SETTINGS tile, in ink
@@ -479,6 +486,7 @@ function NavController:KnitStart()
 	})
 	local chipScale = make("UIScale", chipHolder, {})
 	local chip = PosterKit.cut(chipHolder, "act", CHIP, colour("ivory.50"), Vector2.new(3, 4))
+	chip.fill:SetAttribute("HT_Finish", "plain")
 	chip.root.Position = UDim2.fromOffset(CHIP.X / 2, CHIP.Y / 2)
 	local chipWord = Poster.text(chip.face, "label", 15, "ink.900", {
 		Size = UDim2.fromScale(1, 1),
@@ -551,10 +559,10 @@ function NavController:KnitStart()
 				LayoutOrder = index,
 				Size = UDim2.new(1, -8, 0, 24),
 			})
-			local cap = Poster.text(row, "label", 14, "ink.900", {
+			-- (the key as yellow lettering on the panel, no cream box (ui-23a, 2026-11-20: no square label pasted on top; the owner, "I want it to be IN THE UI"))
+			local cap = Poster.text(row, "label", 14, "gold.400", {
 				Name = "Key",
-				BackgroundColor3 = colour("ivory.50"),
-				BackgroundTransparency = 0,
+				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Size = UDim2.fromOffset(64, 24),
 				Text = move.key,

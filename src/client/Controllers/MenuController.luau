@@ -47,8 +47,15 @@ local UiSound = require(script.Parent.Parent.Ui.UiSound)
 
 local book: any = Abilities
 ClassPreview.lite = Drift.lite
--- how many class tiles a page of the Classes screen holds (two rows of four)
-local CLASSES_PER_PAGE = 8
+-- how many class tiles a page of the Classes screen holds: three rows of three on the LEFT (ui-23a: the right
+-- column is the picked class's pose and its info frame, swapped there on the owner's word, 2026-11-20; it was two
+-- rows of four across the page)
+local CLASSES_PER_PAGE = 9
+-- the Classes page's tile grid, in page coordinates
+local TILE_COLS, TILE_X, TILE_Y = 3, 44, 34
+-- the right column: the pose above, the info frame below it
+local INFO_W, INFO_BOTTOM = 320, 518
+local INFO_X = 836 - INFO_W
 -- What every skill row on the Classes page says instead of the skill's own description. "" shows the real ones.
 local SKILL_DETAIL_PLACEHOLDER = "Placeholder. This move's description comes later."
 -- PLACEHOLDER TILES after the real classes (the owner, 2026-11-18: "make like 2 more pages with like 8
@@ -317,36 +324,8 @@ function MenuController:KnitStart()
 			follow(degrees)
 		end
 	end
-	-- THE SPINE (2026-11-19; the owner had the slanted cream slash removed from every window: "remove that ...
-	-- and fill in the spot with something else. YOU decide"). The window is the coach's notebook, so the left
-	-- edge is its binding: a STRAIGHT cream strip with a straight ink line and a column of round punch holes.
-	local SPINE = 52
-	local slash = make("Frame", back, {
-		Name = "Spine",
-		BackgroundColor3 = colour("ivory.50"),
-		BorderSizePixel = 0,
-		Size = UDim2.new(0, SPINE, 1, 0),
-		ZIndex = 4,
-	})
-	make("Frame", slash, {
-		Name = "Line",
-		BackgroundColor3 = colour("ink.900"),
-		BorderSizePixel = 0,
-		Position = UDim2.fromScale(1, 0),
-		Size = UDim2.new(0, 4, 1, 0),
-	})
-	for hole = 1, 6 do
-		local dot = make("Frame", slash, {
-			Name = "Hole",
-			BackgroundColor3 = colour("stone.300"),
-			BorderSizePixel = 0,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, (hole - 0.5) / 6),
-			Size = UDim2.fromOffset(16, 16),
-		})
-		make("UICorner", dot, { CornerRadius = UDim.new(1, 0) })
-		make("UIStroke", dot, { Color = colour("ink.900"), Thickness = 2 })
-	end
+	-- (THE SPINE, a cream notebook binding with punch holes down the left edge, 2026-11-19, was removed on
+	-- 2026-11-20: the owner, "i DONT like the notebook style of the ui". The field now runs edge to edge.)
 	-- The window's height. It is the mockup's 612 in the lobby and SHORT in a round, where its pages are a few
 	-- rows and the room between the strip and the skill tiles is small: a shorter window can be drawn larger.
 	local sheetTall = SHEET.Y
@@ -360,33 +339,66 @@ function MenuController:KnitStart()
 	local body = make("Frame", slide, {
 		Name = "Body",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(BORDER + 84, BORDER + 8),
+		Position = UDim2.fromOffset(BORDER + 34, BORDER + 8),
 		Size = UDim2.new(0, BODY.X, 1, -(SHEET.Y - BODY.Y)),
 		ZIndex = 5,
 	})
-	-- the title: 84 px Oswald, cream with an ink outline and shadow, turned 3 degrees about its bottom-left
-	local titleBox, setTitle = PosterKit.title(body, 84, {
-		AnchorPoint = Vector2.new(0.5, 0.5),
+	-- THE PAGE TITLE (ui-23a, 2026-11-20; the owner: "the actual title of the ui will be top left maybe a little
+	-- tilted while playing an animation, and classes title is its own thing ... apply that for all the titles";
+	-- then "MAKE IT POP OUT TOWARDS THE LEFT A LITTLE ... and it should have no frame"). It names the PAGE (CLASSES,
+	-- SHOP, MOVES ...), sits on the window's top-left corner and sticks out past its left edge and over its top,
+	-- bare lettering with no plate, turned TITLE_TURN, and sways a little for as long as the window is open. What
+	-- a page is ABOUT (the picked class's name) is a separate heading on the page itself.
+	-- Built as pivot (turned) > sway (the idle swing) > the title box, its left-middle on the pivot, so it turns
+	-- and grows about its left end and the open slam and the idle swing never write the same property.
+	local TITLE_TURN = -5
+	local titlePivot = make("Frame", slide, {
+		Name = "TitlePivot",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(-30, 8),
+		Size = UDim2.fromOffset(0, 0),
+		Rotation = TITLE_TURN,
+		ZIndex = 7,
+	})
+	local titleSway = make("Frame", titlePivot, {
+		Name = "Sway",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(0, 0),
+	})
+	local titleBox, setTitle = PosterKit.title(titleSway, 84, {
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.fromOffset(0, 0),
 		Size = UDim2.fromOffset(802, 84),
-		Rotation = 0, -- (turned 3 degrees until 2026-11-19)
 		ZIndex = 3,
 	})
-	do
-		-- turning about the bottom-left corner is turning about the centre and then moving the centre
-		local half = Vector2.new(401, -42)
-		local angle = math.rad(0)
-		local turned = Vector2.new(
-			half.X * math.cos(angle) - half.Y * math.sin(angle),
-			half.X * math.sin(angle) + half.Y * math.cos(angle)
-		)
-		titleBox.Position = UDim2.fromOffset(34 + turned.X, 84 + turned.Y)
-	end
 	local titleScale = make("UIScale", titleBox, {})
-	local titleRest = titleBox.Rotation
+	local titleRest = TITLE_TURN
+	local titleSwing: Tween? = nil
+	local function setSwing(on: boolean)
+		if titleSwing then
+			titleSwing:Cancel()
+			titleSwing = nil
+		end
+		titleSway.Rotation = 0
+		titleSway.Position = UDim2.fromOffset(0, 0)
+		if on and not HudMotion.reduced() then
+			titleSway.Rotation = -1.6
+			titleSway.Position = UDim2.fromOffset(0, 2)
+			titleSwing = TweenService:Create(
+				titleSway,
+				TweenInfo.new(1.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+				{ Rotation = 1.6, Position = UDim2.fromOffset(0, -3) }
+			)
+			titleSwing:Play()
+		end
+	end
 	-- (a note since ui-19d: the coach's hand, in sentence case; capitals in that hand are hard to read)
+	-- (beside the page title on the top band; the Classes page moves it over its tiles, where the big pose
+	-- cannot cover it: see SUB_CLASSES)
+	local SUB_HOME = UDim2.fromOffset(300, 14)
 	local sub = Poster.note(body, 19, {
 		Name = "Sub",
-		Position = UDim2.fromOffset(40, 87),
+		Position = SUB_HOME,
 		Size = UDim2.fromOffset(796, 30),
 		ZIndex = 3,
 	})
@@ -411,13 +423,16 @@ function MenuController:KnitStart()
 			then math.floor(forced)
 			else CLASSES_PER_PAGE
 	end
-	-- the page: straight below the title, scrolling when it has more than fits (the shop, for a new player)
+	-- the page: under the top band, scrolling when it has more than fits (the shop, for a new player). Its children
+	-- still use PAGE_TOP (the mockup's 118); the frame itself stands at PAGE_AT since the title left the window
+	-- (ui-23a), so every page moved up by the difference.
+	local PAGE_AT = 56
 	local page = make("ScrollingFrame", body, {
 		Name = "Page",
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(0, 118),
-		Size = UDim2.new(1, 14, 1, -118),
+		Position = UDim2.fromOffset(0, PAGE_AT),
+		Size = UDim2.new(1, 14, 1, -PAGE_AT),
 		CanvasSize = UDim2.new(),
 		ScrollBarThickness = 6,
 		ScrollBarImageColor3 = colour("ink.900"),
@@ -591,6 +606,7 @@ function MenuController:KnitStart()
 
 	-- PAGES ----------------------------------------------------------------------------------------------
 	local function clear()
+		sub.Position = SUB_HOME
 		Drift.clear("page")
 		for _, child in page:GetChildren() do
 			Poster.stop(child)
@@ -620,6 +636,8 @@ function MenuController:KnitStart()
 			else colour("violet.400")
 		local tall = height or 66
 		local cut = PosterKit.cut(parent, "act", Vector2.new(250, tall), fill)
+		-- (action buttons, Equip, Buy, Confirm, Equipped: no sparkles, the owner, 2026-11-20)
+		cut.fill:SetAttribute("HT_Finish", "plain")
 		PosterKit.place(cut, x, y)
 		local label = Poster.text(cut.face, "display", if tall < 60 then 20 else 28, "ink.900", {
 			Size = UDim2.fromScale(1, 1),
@@ -751,7 +769,7 @@ function MenuController:KnitStart()
 		local kit = book.Kits[pick]
 		tint(classColour(pick))
 		setWord(pick)
-		setTitle(kit.name)
+		setTitle("Classes")
 		local order = classOrder()
 		for slot = 1, PLACEHOLDER_CLASSES do
 			table.insert(order, `?{slot}`)
@@ -763,6 +781,8 @@ function MenuController:KnitStart()
 			classPage = math.ceil((table.find(order, pick) or 1) / per)
 		end
 		classPage = math.clamp(classPage, 1, pages)
+		-- the sub line over the tiles (the pose stands where it usually is, 2026-11-20)
+		sub.Position = UDim2.fromOffset(TILE_X, PAGE_AT + 2)
 		sub.Text = if pages > 1
 			then `Your classes · pick one to fight with · page {classPage} of {pages}`
 			else "Your classes · pick one to fight with"
@@ -782,8 +802,8 @@ function MenuController:KnitStart()
 				)
 				PosterKit.place(
 					cut,
-					44 + ((index - 1) % 4) * 144,
-					128 - PAGE_TOP + math.floor((index - 1) / 4) * 124
+					TILE_X + ((index - 1) % TILE_COLS) * 144,
+					TILE_Y + math.floor((index - 1) / TILE_COLS) * 124
 				)
 				cut.root.ZIndex = 2
 				Shapes.image(cut.face, "classStripes", "ink.900", {
@@ -805,8 +825,7 @@ function MenuController:KnitStart()
 					Text = "SOON",
 				})
 				local soon = Poster.text(cut.face, "label", 15, "ivory.50", {
-					BackgroundColor3 = colour("ink.900"),
-					BackgroundTransparency = 0,
+					BackgroundTransparency = 1,
 					BorderSizePixel = 0,
 					Position = UDim2.fromOffset(10, 81),
 					Size = UDim2.fromOffset(0, 23),
@@ -827,7 +846,7 @@ function MenuController:KnitStart()
 			local other = book.Kits[id]
 			local state = standing(id, wearing, owned)
 			local picked = id == pick
-			local column, rowIndex = (index - 1) % 4, math.floor((index - 1) / 4)
+			local column, rowIndex = (index - 1) % TILE_COLS, math.floor((index - 1) / TILE_COLS)
 			local cut = PosterKit.cut(
 				page,
 				"class",
@@ -837,8 +856,8 @@ function MenuController:KnitStart()
 			)
 			PosterKit.place(
 				cut,
-				44 + column * 144,
-				128 - PAGE_TOP + rowIndex * 124 - (if picked then 8 else 0)
+				TILE_X + column * 144,
+				TILE_Y + rowIndex * 124 - (if picked then 8 else 0)
 			)
 			cut.root.ZIndex = if picked then 3 else 2
 			if state == "NOT OWNED" then
@@ -857,9 +876,9 @@ function MenuController:KnitStart()
 				TextXAlignment = Enum.TextXAlignment.Right,
 			})
 			className(cut.face, other.name, 22, 12, 50, 32)
-			local badge = Poster.text(cut.face, "label", 15, "ivory.50", {
-				BackgroundColor3 = colour("ink.900"),
-				BackgroundTransparency = 0,
+			-- the state, printed on the tile under its name (ui-23a, 2026-11-20: no square label pasted on top; the owner, "I want it to be IN THE UI")
+			local badge = Poster.text(cut.face, "label", 15, "ink.900", {
+				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Position = UDim2.fromOffset(10, 81),
 				Size = UDim2.fromOffset(0, 23),
@@ -909,15 +928,19 @@ function MenuController:KnitStart()
 		end
 		-- More classes than one page holds: an arrow right of the tiles turns to the next page, and from the
 		-- second page on one left of them turns back (the owner, 2026-11-18). With one page there are none.
+		-- (32 wide since ui-24a: at 40 the back arrow stood 4 past the page's left edge and the page, which clips,
+		-- cut it off; the owner's picture of 2026-11-20. Now 4 in from the edge and 4 short of the tiles)
+		local ARROW_W = 32
 		local function pageArrow(x: number, sign: string, to: number)
 			local cut = PosterKit.cut(
 				page,
 				"close",
-				Vector2.new(40, 72),
+				Vector2.new(ARROW_W, 72),
 				colour("ivory.50"),
 				Vector2.new(4, 5)
 			)
-			PosterKit.place(cut, x, 128 - PAGE_TOP + 82)
+			cut.fill:SetAttribute("HT_Finish", "plain")
+			PosterKit.place(cut, x, TILE_Y + 150)
 			Poster.text(cut.face, "display", 28, "ink.900", {
 				Size = UDim2.fromScale(1, 1),
 				Text = sign,
@@ -934,22 +957,19 @@ function MenuController:KnitStart()
 			end
 		end
 		if classPage < pages then
-			pageArrow(612, ">", classPage + 1)
+			pageArrow(TILE_X + TILE_COLS * 144 + 2, ">", classPage + 1)
 		end
 		if classPage > 1 then
-			pageArrow(0, "<", classPage - 1)
+			pageArrow(TILE_X - ARROW_W - 8, "<", classPage - 1)
 		end
-		preview.show(pick, owned[pick] == true)
-		-- the picked class: what it is, its two skills, and the one thing to do with it
-		Poster.note(page, 20, {
-			Name = "Blurb",
-			Position = UDim2.fromOffset(28, 370 - PAGE_TOP),
-			Size = UDim2.fromOffset(540, 32),
-			Text = kit.blurb,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-		})
+		-- THE INFO COLUMN, on the RIGHT (ui-23a; the owner: "descriptions and stuff like cds etc should be in a frame
+		-- ... under the roblox character pose", then "i want it swapped, left side should be right"): the pose on top, and under it ONE frame holding the class's own
+		-- name (its own heading, apart from the page title), its line, and its two moves with their cooldowns. The
+		-- frame is as tall as what it holds, standing on INFO_BOTTOM; the pose takes the room above it.
 		local device = deviceOf()
-		local y = 400 - PAGE_TOP
+		local rows: { { key: string?, skill: any, detail: string, height: number, cooldown: number? } } =
+			{}
+		local rowsTall = 0
 		for _, slot in { "mobility", "attack" } do
 			local skill = kit[slot]
 			local key = if device == "touch"
@@ -957,32 +977,92 @@ function MenuController:KnitStart()
 				elseif device == "gamepad" then (if slot == "mobility" then "B" else "L2")
 				elseif slot == "mobility" then "Q"
 				else "R"
-			local cooldown = cooldownOf(skill.id)
-			-- BOTH skills say what they do (until 2026-11-18 only the first did, to save room: the owner's review
-			-- found the two rows unlike each other). A line of the small text holds about 54 letters at this
-			-- width; a longer one takes a second line. Two two-line rows end exactly at the page's foot (400 + 88 + 4 + 88),
-			-- so nothing scrolls: the rows start 17 higher and stand 4 apart to make that room.
 			-- (PLACEHOLDER text for now, the owner, 2026-11-18: the moves are not final, so their real
 			-- descriptions, still in Config/Abilities as each skill's `blurb`, are not shown here yet)
 			local detail = if SKILL_DETAIL_PLACEHOLDER ~= ""
 				then SKILL_DETAIL_PLACEHOLDER
 				else skill.blurb
-			local height = PosterKit.rowHeight(546, key, detail)
+			local height = PosterKit.rowHeight(INFO_W - 24, key, detail)
+			table.insert(rows, {
+				key = key,
+				skill = skill,
+				detail = detail,
+				height = height,
+				cooldown = cooldownOf(skill.id),
+			})
+			rowsTall += height + 4
+		end
+		-- (two lines always: a count of one let a longer line be cut, and Roblox drops a wrapped line that does not
+		-- wholly fit, so the box has room to spare; both seen 2026-11-20)
+		local blurbTall = Poster.notePitch(18) * 2 + 24
+		local NAME_TALL = 58
+		local infoTall = 12 + NAME_TALL + blurbTall + rowsTall + 8
+		local infoTop = INFO_BOTTOM - infoTall
+		local info = PosterKit.cut(
+			page,
+			"slab",
+			Vector2.new(INFO_W, infoTall),
+			colour("ivory.50"),
+			Vector2.new(5, 6)
+		)
+		PosterKit.place(info, INFO_X, infoTop)
+		info.root.ZIndex = 1
+		-- the class's own name: the lettering of the titles, smaller, on the frame's top
+		local heading, setHeading = PosterKit.title(page, 52, {
+			Name = "ClassName",
+			Position = UDim2.fromOffset(INFO_X + 14, infoTop + 8),
+			Size = UDim2.fromOffset(INFO_W - 28, 52),
+			ZIndex = 4,
+		})
+		setHeading(kit.name)
+		Poster.note(page, 18, {
+			Name = "Blurb",
+			Position = UDim2.fromOffset(INFO_X + 16, infoTop + 12 + NAME_TALL),
+			Size = UDim2.fromOffset(INFO_W - 28, blurbTall),
+			Text = kit.blurb,
+			TextWrapped = true,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			ZIndex = 4,
+		})
+		local y = infoTop + 12 + NAME_TALL + blurbTall
+		for _, made in rows do
 			local row = PosterKit.row(
 				page,
-				546,
-				height,
-				key,
-				skill.name,
-				detail,
-				if not skill.built then "PLANNED" else nil,
-				if skill.built and cooldown then seconds(cooldown) else nil
+				INFO_W - 24,
+				made.height,
+				made.key,
+				made.skill.name,
+				made.detail,
+				if not made.skill.built then "PLANNED" else nil,
+				if made.skill.built and made.cooldown then seconds(made.cooldown) else nil
 			)
-			PosterKit.placeRow(row, 22, y)
-			y += height + 4
+			PosterKit.placeRow(row, INFO_X + 12, y)
+			row.root.ZIndex = 4
+			y += made.height + 4
+		end
+		-- the pose: the room above the frame, in the window's own coordinates (the page stands at body PAGE_AT)
+		-- BIG, and allowed to overlap (the owner, 2026-11-20: "it can be a little bigger and underlap its surrounding
+		-- uis if need, can also popout the ui and underlap the title"): a 400 x 440 view over the info column whose
+		-- foot stands POSE_SINK units down behind the info frame (the page is drawn over the pose) and whose top may
+		-- rise past the window's top edge. The first two tries, fitted into the room above the frame, drew the
+		-- avatar too small.
+		local POSE = Vector2.new(400, 440)
+		local POSE_SINK = 60
+		local frameTopInSlide = BORDER + 8 + PAGE_AT + infoTop
+		preview.frame.Position = UDim2.fromOffset(
+			BORDER + 34 + INFO_X + INFO_W / 2 - POSE.X / 2,
+			frameTopInSlide + POSE_SINK - POSE.Y
+		)
+		preview.frame.Size = UDim2.fromOffset(POSE.X, POSE.Y)
+		preview.show(pick, owned[pick] == true)
+		if fresh then
+			PosterKit.pop(info.root, info.scale, 0.08, 1, 0)
+			PosterKit.pop(heading, make("UIScale", heading, {}), 0.12, 1, 0)
 		end
 		local state = standing(pick, wearing, owned)
-		local x, top = 586, 474 - PAGE_TOP
+		-- the one thing to do with the picked class: under the tiles
+		local x, top = TILE_X + (TILE_COLS * 144 - 12 - 250) / 2, TILE_Y + 3 * 124 + 18
 		if state == "EQUIPPED" and not inRound() and pick ~= book.DefaultKit then
 			wornAction(page, x, top)
 		elseif state == "EQUIPPED" then
@@ -1464,7 +1544,7 @@ function MenuController:KnitStart()
 			Poster.run(titleBox, 0.6, function(t: number)
 				local s = spring(t)
 				titleScale.Scale = 2.1 + (1 - 2.1) * s
-				titleBox.Rotation = -16 + (titleRest + 16) * s
+				titlePivot.Rotation = -16 + (titleRest + 16) * s
 			end)
 		end
 	end
@@ -1603,6 +1683,7 @@ function MenuController:KnitStart()
 		end
 		draw(true)
 		setDrift(true)
+		setSwing(true)
 		Drift.show("window", true)
 		Drift.show("page", true)
 		setBlur(true)
@@ -1619,6 +1700,7 @@ function MenuController:KnitStart()
 		UiSound.play("ui_close")
 		ContextActionService:UnbindAction(CLOSE_ACTION)
 		setDrift(false)
+		setSwing(false)
 		Drift.show("window", false)
 		Drift.show("page", false)
 		setBlur(false)
@@ -1644,6 +1726,7 @@ function MenuController:KnitStart()
 	-- the X: pink, 12 in from the top-right corner. 62 x 62 (the mockup's is 54): the window is drawn smaller
 	-- than the mockup's, and this has to stay easy to hit
 	local closeCut = PosterKit.cut(slide, "close", Vector2.new(62, 62), colour("danger.600"))
+	closeCut.fill:SetAttribute("HT_Finish", "plain") -- (no sparkles on the X: the owner, 2026-11-20)
 	PosterKit.place(closeCut, SHEET.X - BORDER - 12 - 62, BORDER + 12)
 	closeCut.root.ZIndex = 7
 	-- It keeps its place by the paper's top-right corner while the paper leans (it stays upright itself: small

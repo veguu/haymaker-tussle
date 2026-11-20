@@ -21,9 +21,11 @@ return {
 
 	["training is about the far third, and the rest is lobby"] = function()
 		-- up to 0.5: in the village lobby (owner, 2026-11-18) the square is back near its first size and
-		-- training is its own zone of five stations, sized by the dummies' launch room
+		-- training is its own zone of five stations, sized by the dummies' launch room.
+		-- up to 0.7 (owner, 2026-11-19: "expand it", every kind of practice its own section): the square keeps its
+		-- size and training grows backwards, away from the arena
 		local share = CFG.TrainingDepth / CFG.Depth
-		assert(share >= 0.3 and share <= 0.5, `training is {share} of the platform`)
+		assert(share >= 0.3 and share <= 0.7, `training is {share} of the platform`)
 		local _, _, z0, z1 = Lobby.bounds(CFG)
 		assert(Lobby.inTraining(CFG, CFG.CenterX, z1 - 1))
 		assert(not Lobby.inTraining(CFG, CFG.CenterX, z0 + 1))
@@ -146,8 +148,9 @@ return {
 	end,
 
 	["the dummies are well inside training, with room for a launch on every side"] = function()
+		-- the old loose list (Lobby.Dummies). Since 2026-11-19 every dummy belongs to a training section and the
+		-- list is empty: their rules are in TrainingGrounds.spec. Whatever is still listed here keeps this rule.
 		local dummies = Lobby.dummies(CFG)
-		assert(#dummies >= 2)
 		local x0, x1, _, z1 = Lobby.bounds(CFG)
 		local line = Lobby.trainingLine(CFG)
 		local room = PUNCH.Range * 3
@@ -170,22 +173,157 @@ return {
 		end
 	end,
 
-	["the invisible walls sit on the floor's edge and close the corners"] = function()
+	["the invisible walls sit on the floor's edge and close the corners, but for the two openings"] = function()
 		local x0, x1, z0, z1 = Lobby.bounds(CFG)
 		local walls = Lobby.walls(CFG)
-		assert(#walls == 4)
+		local t = CFG.WallThickness
 		assert(walls[1].z + walls[1].sz / 2 == z0, "front wall isn't on the viewing edge")
-		assert(walls[2].z - walls[2].sz / 2 == z1)
-		assert(walls[3].x + walls[3].sx / 2 == x0)
-		assert(walls[4].x - walls[4].sx / 2 == x1)
-		-- the end walls reach past the side walls' outer faces
-		assert(walls[1].sx >= (x1 - x0) + 2 * CFG.WallThickness)
+		assert(walls[1].sx >= (x1 - x0) + 2 * t, "the front wall runs past the side walls")
+		local full = CFG.WallHeight + 12
 		for _, wall in walls do
 			assert(wall.y - wall.sy / 2 < CFG.FloorY, "a wall starts above the floor")
-			assert(wall.y + wall.sy / 2 >= CFG.FloorY + CFG.WallHeight)
+			local onEdge = wall.z + wall.sz / 2 == z0
+				or wall.z - wall.sz / 2 == z1
+				or wall.x + wall.sx / 2 == x0
+				or wall.x - wall.sx / 2 == x1
+			assert(onEdge, "a wall is off the floor's edge")
 		end
+		-- along each side, the walls and the openings together cover the whole length, with no other gap
+		local function covered(side: string, lo: number, hi: number)
+			local spans = {}
+			for _, wall in walls do
+				if wall.sy >= full - 0.01 then
+					if side == "Back" and wall.z - wall.sz / 2 == z1 then
+						table.insert(spans, { wall.x - wall.sx / 2, wall.x + wall.sx / 2 })
+					elseif side == "Left" and wall.x + wall.sx / 2 == x0 then
+						table.insert(spans, { wall.z - wall.sz / 2, wall.z + wall.sz / 2 })
+					elseif side == "Right" and wall.x - wall.sx / 2 == x1 then
+						table.insert(spans, { wall.z - wall.sz / 2, wall.z + wall.sz / 2 })
+					end
+				end
+			end
+			for _, opening in Lobby.openings(CFG) do
+				if opening.side == side then
+					table.insert(spans, { opening.a, opening.b })
+				end
+			end
+			table.sort(spans, function(p, q)
+				return p[1] < q[1]
+			end)
+			local reach = lo
+			for _, span in spans do
+				assert(span[1] <= reach + 1e-6, `a gap in the {side} wall at {reach}`)
+				reach = math.max(reach, span[2])
+			end
+			assert(reach >= hi - 1e-6, `the {side} wall stops short`)
+		end
+		covered("Back", x0 - t, x1 + t)
+		covered("Left", z0, z1)
+		covered("Right", z0, z1)
 		-- taller than the highest thing that happens in the lobby: an uppercut launch and a kick rebound
 		assert(CFG.WallHeight >= 2 * (GameConfig.KickMeter :: any).RiseMax + 100)
+	end,
+
+	["the obby's gap in the back wall: a sill nobody on the training floor can jump, open above it"] = function()
+		local sky = CFG.Sky
+		assert(sky and sky.Enabled)
+		local back
+		for _, opening in Lobby.openings(CFG) do
+			if opening.side == "Back" then
+				back = opening
+			end
+		end
+		assert(back, "no gap in the back wall")
+		local jump = GameConfig.Jump
+		local best = jump.UpMax ^ 2 / (2 * 196.2) -- the highest jump there is, from full speed
+		local floor = CFG.Terraces[#CFG.Terraces].Rise
+		assert(
+			back.sill > floor + best,
+			"someone on the training floor could jump out over the sill"
+		)
+		-- the sill is drawn as a wall up to it
+		local sillFound = false
+		for _, wall in Lobby.walls(CFG) do
+			if math.abs(wall.y + wall.sy / 2 - (CFG.FloorY + back.sill)) < 1e-6 then
+				sillFound = true
+			end
+		end
+		assert(sillFound)
+		-- the obby's last deck sits below the sill's top only by its own jump: its jump clears the sill
+		local spine = sky.Checkpoints[1]
+		assert(
+			spine.Up + 0 < back.sill and back.sill - spine.Up <= 3,
+			"the last deck is too low for the gap"
+		)
+		-- the barrier is not drawn across the gap
+		for _, face in Lobby.wallFaces(CFG) do
+			if face.nz == -1 then
+				local a, b = face.x - face.length / 2, face.x + face.length / 2
+				assert(
+					b <= back.a + 1e-6 or a >= back.b - 1e-6,
+					"the barrier is drawn over the gap"
+				)
+			end
+		end
+	end,
+
+	["the sky leg: its checkpoints climb, all behind the lobby but the first, which is the last deck"] = function()
+		local marks = Lobby.checkpoints(CFG)
+		assert(#marks >= 3)
+		local _, _, _, z1 = Lobby.bounds(CFG)
+		assert(
+			Lobby.contains(CFG, marks[1].x, marks[1].z),
+			"the first is the obby's last deck, in the lobby"
+		)
+		for index = 2, #marks do
+			local mark = marks[index]
+			assert(
+				mark.z > z1 and Lobby.inSky(CFG, mark.x, mark.z),
+				`{mark.name} is not behind the lobby`
+			)
+			assert(mark.y > marks[index - 1].y, "each checkpoint higher than the last")
+		end
+		assert(not Lobby.inSky(CFG, CFG.CenterX, z1 - 10), "the lobby itself is not the sky leg")
+		-- a fall is caught before the lobby's own fall line, so a falling body never counts as out of the lobby
+		assert(CFG.Sky.CatchBelow < CFG.FallDepth)
+		local mark = marks[2]
+		assert(Lobby.standingOn(mark, mark.x + 1, mark.y, mark.z, 2.5))
+		assert(not Lobby.standingOn(mark, mark.x, mark.y - 10, mark.z, 2.5))
+		-- the bell and the glove's X are on Bell Rock
+		local rock = marks[#marks]
+		local sky = CFG.Sky
+		for _, spot in { sky.Bell, sky.Glove.Pad } do
+			local x, z = CFG.CenterX + spot.X, CFG.ViewEdgeZ + spot.Back
+			assert((x - rock.x) ^ 2 + (z - rock.z) ^ 2 < (rock.radius - 3) ^ 2, "off Bell Rock")
+		end
+	end,
+
+	["the Haymaker's flight starts on the glove's X, ends on the Perch, and leaves through the gap"] = function()
+		local sky = CFG.Sky
+		local glove = sky.Glove
+		local ax, ay, az =
+			CFG.CenterX + glove.Pad.X, CFG.FloorY + glove.Up, CFG.ViewEdgeZ + glove.Pad.Back
+		local bx, by, bz =
+			CFG.CenterX + glove.To.X, CFG.FloorY + glove.To.Up, CFG.ViewEdgeZ + glove.To.Back
+		local x, y, z = Lobby.flightPoint(ax, ay, az, bx, by, bz, glove.Apex, glove.Seconds, 0)
+		assert(x == ax and y == ay and z == az)
+		x, y, z = Lobby.flightPoint(ax, ay, az, bx, by, bz, glove.Apex, glove.Seconds, 1)
+		assert(math.abs(x - bx) < 1e-9 and math.abs(y - by) < 1e-9 and math.abs(z - bz) < 1e-9)
+		local _, my = Lobby.flightPoint(ax, ay, az, bx, by, bz, glove.Apex, glove.Seconds, 0.5)
+		assert(math.abs(my - ((ay + by) / 2 + glove.Apex)) < 1e-9, "the apex is at the middle")
+		-- it lands inside the lobby, on the Perch's top (the Perch is the balcony's right-hand tower)
+		assert(Lobby.contains(CFG, bx, bz))
+		-- where it crosses the back edge, it is inside the gap and above the sill
+		local _, _, _, z1 = Lobby.bounds(CFG)
+		local share = (az - z1) / (az - bz)
+		local cx, cy = Lobby.flightPoint(ax, ay, az, bx, by, bz, glove.Apex, glove.Seconds, share)
+		local gap = sky.Gap
+		assert(cx > CFG.CenterX + gap.X0 and cx < CFG.CenterX + gap.X1, "it hits the back wall")
+		assert(cy > CFG.FloorY + gap.Sill + 10)
+		-- its velocity is the path's slope
+		local _, _, _, vx, vy, vz =
+			Lobby.flightPoint(ax, ay, az, bx, by, bz, glove.Apex, glove.Seconds, 0.25)
+		assert(vx == (bx - ax) / glove.Seconds and vz == (bz - az) / glove.Seconds and vy > 0)
 	end,
 
 	["the rebound platform is the lobby when you're on it"] = function()

@@ -425,13 +425,19 @@ function BarrierController:KnitStart()
 	folder.Name = "HT_BarrierFx"
 	folder.Parent = workspace
 
-	local x0, x1, z0, z1 = Lobby.bounds(lobby)
+	-- one barrier a stretch of wall: the lobby's openings (the obby's gap in the back wall, the recovery cliff's open
+	-- side; Core/Lobby.openings, 2026-11-20) are left bare
 	local y = lobby.FloorY + cfg.Height / 2
-	local midX, midZ = (x0 + x1) / 2, (z0 + z1) / 2
-	buildWall(playerGui, folder, 1, Vector3.new(midX, y, z0), Vector3.zAxis, x1 - x0)
-	buildWall(playerGui, folder, 2, Vector3.new(midX, y, z1), -Vector3.zAxis, x1 - x0)
-	buildWall(playerGui, folder, 3, Vector3.new(x0, y, midZ), Vector3.xAxis, z1 - z0)
-	buildWall(playerGui, folder, 4, Vector3.new(x1, y, midZ), -Vector3.xAxis, z1 - z0)
+	for index, face in Lobby.wallFaces(lobby) do
+		buildWall(
+			playerGui,
+			folder,
+			index,
+			Vector3.new(face.x, y, face.z),
+			Vector3.new(face.nx, 0, face.nz),
+			face.length
+		)
+	end
 
 	local vx, vy = HexBarrier.driftVelocity(cfg.Drift, cfg.DriftSpeed)
 	local labelHeight = cfg.Height * PPS + grid.periodY

@@ -346,24 +346,27 @@ function Roster.new(parent: Instance)
 		-- THE KILL COUNTER: a small plate hung on the middle of the frame's bottom edge, so it lies on the frame
 		-- and under it, not on the picture (on the bottom right corner it covered a quarter of the face).
 		-- Everyone starts at 0 and it is always there (the owner, 2026-11-18).
+		-- A TAB OF THE FRAME, in the frame's own colour with ink figures (ui-23a, 2026-11-20: no square label pasted on top; the owner, "I want it to be IN THE UI"): it was an ink
+		-- plate with a cream edge stuck on the frame's bottom.
 		local plate = make("Frame", body, {
 			Name = "Count",
-			BackgroundColor3 = ink,
+			BackgroundColor3 = band, -- the frame's visible colour (its band), not its ink outline
 			BorderSizePixel = 0,
 			AnchorPoint = Vector2.new(0.5, 1),
 			Position = UDim2.new(0.5, 0, 1, 8),
 			Size = UDim2.fromOffset(22, 17),
 			ZIndex = 4,
 		})
+		make("UICorner", plate, { CornerRadius = UDim.new(0, 4) })
 		local plateEdge = make("UIStroke", plate, {
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-			Color = colour("ivory.50"),
-			LineJoinMode = Enum.LineJoinMode.Miter,
-			Thickness = 1,
+			Color = ink,
+			LineJoinMode = Enum.LineJoinMode.Round,
+			Thickness = 1.5,
 		})
 		fades(plate, "BackgroundTransparency")
 		fades(plateEdge, "Transparency")
-		local plateText = Poster.text(plate, "display", 13, "ivory.50", {
+		local plateText = Poster.text(plate, "display", 13, "ink.900", {
 			Size = UDim2.fromScale(1, 1),
 			Text = "0",
 			TextXAlignment = Enum.TextXAlignment.Center,

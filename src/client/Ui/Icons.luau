@@ -12,6 +12,8 @@
 
 local Icons = {}
 
+-- (Retro Comic, ui-22a, 2026-11-20: the baked images were redrawn and re-uploaded; the ids in the comments beside
+-- them are the ui-20f and older versions, in order)
 Icons.ids = {
 	-- navigation
 	shop = "rbxassetid://113266493401732",
@@ -34,9 +36,9 @@ Icons.ids = {
 	toolSpectate = "rbxassetid://137196821444275",
 	toolAfk = "rbxassetid://113101514810430",
 	-- skills: one generic drawing per slot until each class skill has its own
-	dash = "rbxassetid://81201255540202", -- soft palette, 2026-11-19 (was 94822682143267) -- Q, mobility
-	punch = "rbxassetid://128200783139350", -- soft palette, 2026-11-19 (was 110847993507835) -- R, attack
-	jump = "rbxassetid://83962124185633", -- soft palette, 2026-11-19 (was 132051153313434)
+	dash = "rbxassetid://125091513698034", -- ui-20f palette (pastel 81201255540202, first 94822682143267) -- Q, mobility
+	punch = "rbxassetid://128270995338570", -- ui-20f palette (pastel 128200783139350, first 110847993507835) -- R, attack
+	jump = "rbxassetid://74172471855716", -- ui-20f palette (pastel 83962124185633, first 132051153313434)
 	-- class emblems, by kit id
 	class_Base = "rbxassetid://129522498789082",
 	class_Tempest = "rbxassetid://75604246553728",

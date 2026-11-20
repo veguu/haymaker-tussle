@@ -18,6 +18,17 @@
 --   danger   MAGENTA = critical, warnings, close line.*  500 = outline ink, 300 = the faint inner edge
 --   violet   LIGHT VIOLET = the gamepad focus ring and quiet controls
 
+-- RETRO COMIC (ui-22a, the owner, 2026-11-20: picked palette 2 of six, then "you HAVE TO change the entire vibe
+-- of the game, the entire ui ... to the same vibe ... it doesn't have to pertain to those 4 colors"): comic-book
+-- primaries. A deep navy ink #1E2233, warm newsprint cream #FFF4D6, primary yellow #FFD23F, a bright comic blue
+-- #64A3FF (the 'teal' job; lightened from #3A86FF so it reads as text on the darkest panel), a red #F0525A for
+-- warnings (lightened from #E63946 so ink reads on it), a cool grey-blue #A9B4C9 for quiet things, green #2EC27E,
+-- and the class sweep in the same printing-press primaries. Earlier notes, kept for history:
+-- A BIT DARKER, LESS GIRLISH (the owner, later on 2026-11-19: "a BIT darker, its too light, don't make it girlish ...
+-- but dont make it as dark as it was last time"): between the old fight-poster palette and the pastel one. My reading
+-- of "girlish": the pink, lavender and candy pastels leading the look. So the ink is a deep slate (#2A2540), the
+-- yellow a warm gold, cyan a clear teal, the warning pink a coral red, the light violet a slate blue, the class
+-- sweep at mid strength. Earlier note, kept for history:
 -- SOFT PALETTE (the owner, 2026-11-19: "less vibrant and easier on the eyes ... lighter", from two reference
 -- clips: a butter-yellow flower and a pastel toy room). Every name keeps its job; only the paint changed: the
 -- ink is a dusty plum instead of near-black violet, the cream is the same paper, and yellow, cyan, magenta and
@@ -26,54 +37,54 @@
 local Tokens = {}
 
 Tokens.hex = {
-	["ink.950"] = "#3A2E4D",
-	["ink.900"] = "#43365A",
-	["ink.800"] = "#4A3D62",
-	["ink.700"] = "#52456B",
-	["ink.600"] = "#3D3151",
-	["ink.500"] = "#6B5D86",
-	["stone.500"] = "#A9A1C4",
-	["stone.300"] = "#CFC9E2",
-	["ivory.200"] = "#F2EADB",
-	["ivory.50"] = "#FFF9EC",
-	["coral.700"] = "#C9A84C",
-	["coral.500"] = "#FADF7F",
-	["coral.300"] = "#FDEDB4",
-	["teal.700"] = "#62AABB",
-	["teal.400"] = "#A5DFEC",
-	["teal.200"] = "#D6F2F8",
+	["ink.950"] = "#151826",
+	["ink.900"] = "#1E2233",
+	["ink.800"] = "#262B40",
+	["ink.700"] = "#2F354E",
+	["ink.600"] = "#191C2B",
+	["ink.500"] = "#4A5272",
+	["stone.500"] = "#9AA2BA",
+	["stone.300"] = "#C8CEDD",
+	["ivory.200"] = "#F3E7C8",
+	["ivory.50"] = "#FFF4D6",
+	["coral.700"] = "#C99A0E",
+	["coral.500"] = "#FFD23F",
+	["coral.300"] = "#FFE48A",
+	["teal.700"] = "#2563D9",
+	["teal.400"] = "#64A3FF",
+	["teal.200"] = "#BFD7FF",
 	-- the Equip button alone (the owner, 2026-11-17: a vibrant, cool green, easier to notice than the cyan)
-	["go.400"] = "#A3E2BB",
+	["go.400"] = "#2EC27E",
 	-- its opposite: the Equipped button under the pointer, where it offers to take the class off
-	["stop.400"] = "#F29A9A",
-	["gold.600"] = "#C9A84C",
-	["gold.400"] = "#FADF7F",
-	["gold.200"] = "#FDF1C4",
-	["danger.600"] = "#F5A6C0",
-	["line.500"] = "#3A2E4D",
-	["line.300"] = "#8A7EA8",
-	["violet.400"] = "#DAD3F7",
+	["stop.400"] = "#F0525A",
+	["gold.600"] = "#C99A0E",
+	["gold.400"] = "#FFD23F",
+	["gold.200"] = "#FFEBA8",
+	["danger.600"] = "#F0525A",
+	["line.500"] = "#151826",
+	["line.300"] = "#4C5577",
+	["violet.400"] = "#A9B4C9",
 	-- the fight-poster mockup's own darks, used as drawn there: a skill tile that is cooling or can't be used,
 	-- its stripes, and an unlit stagger segment
-	["poster.dark"] = "#6E667D",
-	["poster.stripe"] = "#8A8299",
-	["poster.unlit"] = "#7D758C",
+	["poster.dark"] = "#3E4252",
+	["poster.stripe"] = "#5A5F70",
+	["poster.unlit"] = "#4C5062",
 	-- one colour per class, as ONE sweep from warm to cool at even brightness (Base yellow, Bruiser orange,
 	-- Inferno red-orange, Beast red-pink, Trickster pink, Dragon violet, Frost blue, Tempest teal), so any two
 	-- sit well together. Marks and card art only, never state.
-	["class.Base"] = "#FADF7F",
-	["class.Tempest"] = "#97E0D3",
-	["class.Inferno"] = "#F7AC92",
-	["class.Frost"] = "#A3CEF5",
-	["class.Beast"] = "#F4A0AE",
-	["class.Dragon"] = "#C8B0F5",
-	["class.Bruiser"] = "#F9C488",
-	["class.Trickster"] = "#F5ABDB",
+	["class.Base"] = "#FFD23F",
+	["class.Tempest"] = "#2EC4B6",
+	["class.Inferno"] = "#FF7A2F",
+	["class.Frost"] = "#64A3FF",
+	["class.Beast"] = "#F0525A",
+	["class.Dragon"] = "#8C6CF0",
+	["class.Bruiser"] = "#FFA41C",
+	["class.Trickster"] = "#C46BE0",
 	-- the timing meter's own scale
-	["meter.red"] = "#EC8A8C",
-	["meter.orange"] = "#F3B07A",
-	["meter.yellow"] = "#F4DB84",
-	["meter.green"] = "#8FD6A6",
+	["meter.red"] = "#F0525A",
+	["meter.orange"] = "#FF9F1C",
+	["meter.yellow"] = "#FFD23F",
+	["meter.green"] = "#2EC27E",
 }
 
 -- Text tokens that may sit under 4.5:1 because what they carry is never essential (Color Palette section 5).

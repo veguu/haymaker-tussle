@@ -515,29 +515,37 @@ MapEnvironments.Maps = {
 			-- golden hour: a low, warm sun from the lobby's left (late clock time swings it toward -X), long
 			-- readable shadows, shade that leans violet so lit and shaded stone separate by hue, a warm haze
 			-- toward the horizon. Exposure near neutral: the pale paving must not blow out.
-			sun = { clockTime = 16.55, latitude = 50, colour = { 255, 206, 150 }, brightness = 2.6 },
+			-- ui-20f, later 2026-11-19 (owner: recolour the lobby with the UI's new palette, "not girlish", "flows
+			-- well"): between the first golden hour and the pastel pass. A warm, slightly high sun, slate (not
+			-- lavender) shade, a warm cream haze. The pastel pass had: sun 16.0 { 255, 236, 222 } 2.2; ambient
+			-- { 166, 156, 180 } / { 194, 184, 204 } / { 84, 70, 92 }; haze { 250, 232, 238 } / { 252, 214, 226 }.
+			-- The first golden hour: sun 16.55 { 255, 206, 150 } 2.6; ambient { 138, 126, 142 } / { 172, 158, 166 }.
+			-- RETRO COMIC (ui-22a, 2026-11-20): a crisp bright day, whiter sun, cool navy shade, clearer air, a
+			-- little more colour and contrast. The ui-20f values: sun 16.2 { 255, 222, 186 } 2.4; ambient
+			-- { 150, 146, 160 } / { 184, 178, 184 } / { 62, 52, 50 }; grade 0.04 / 0.1; haze { 252, 234, 214 }.
+			sun = { clockTime = 15.6, latitude = 50, colour = { 255, 238, 214 }, brightness = 2.6 },
 			ambient = {
-				ambient = { 138, 126, 142 },
-				outdoor = { 172, 158, 166 },
-				bottom = { 44, 30, 22 },
+				ambient = { 146, 152, 172 },
+				outdoor = { 180, 186, 200 },
+				bottom = { 54, 56, 66 },
 				shadowSoftness = 0.3,
 				diffuse = 0.5,
 				specular = 0.1,
 			},
 			exposure = -0.05,
 			grade = {
-				saturation = 0.06,
-				contrast = 0.14,
+				saturation = 0.1,
+				contrast = 0.12,
 				brightness = 0,
-				tint = { 255, 244, 228 },
+				tint = { 255, 250, 242 },
 			},
 			bloom = { intensity = 0.35, size = 28, threshold = 1.4 },
 			sunRays = { intensity = 0.03, spread = 0.16 },
 			atmosphere = {
 				density = 0.2,
 				offset = 0.25,
-				colour = { 255, 228, 200 },
-				decay = { 255, 200, 156 },
+				colour = { 236, 240, 250 },
+				decay = { 232, 222, 210 },
 				glare = 0.1,
 				haze = 0.7,
 			},
@@ -624,6 +632,41 @@ MapEnvironments.Maps = {
 				},
 			},
 		},
+	},
+}
+
+-- MAP 1 OF THE ARENA SUITE, "Grassy Plains" (owner brief 2026-11-20; design/maps/suite/meadow.py): Gnomon revamped.
+-- The same oval as Gnomon, clean (no pond, no obstacles), floating in open sky with floating islands for a
+-- background. Gnomon's light and wind for now. NOT IN THE ROTATION until the owner approves it (game.json
+-- Maps.Rotation); until its model is at ServerStorage.HT_Maps.Meadow a stand-in floor is built.
+MapEnvironments.Maps.meadow = {
+	name = "Grassy Plains",
+	model = "Meadow",
+	codeObstacles = false,
+	arena = {
+		semiX = 213,
+		semiZ = 176,
+		spawnShare = 0.65,
+	},
+	environment = MapEnvironments.Maps.gnomon.environment,
+	-- FIELD GRASS (owner, 2026-11-20: "that feel of you running through a grass field, shouldn't be taller than the
+	-- character, wind should also blow on it"): knee-to-thigh clumps in a ring round the camera (Shared/FieldGrassField,
+	-- Core/FieldGrass), meshes ReplicatedStorage.HT_FieldGrass (design/maps/suite/field_grass.py).
+	fieldGrass = {
+		cell = 4, -- studs between clump roots
+		radius = 80, -- drawn this far round the camera
+		radiusTouch = 44, -- phones
+		fade = 28, -- the ring's last studs: clumps sink into the floor (long and soft, so no line shows)
+		margin = 2.5, -- kept clear inside the edge
+		variants = 4,
+		scale = { 0.85, 1.15 },
+		-- the floor's greens, a shade lighter (the meshes are dark at the root, light at the tip)
+		colours = { { 112, 172, 84 }, { 98, 160, 80 }, { 128, 178, 88 }, { 104, 164, 96 } },
+		gustBoost = 2.2, -- tall grass waves harder than the map's wind numbers
+		bendRadius = 4.2, -- studs round a character that part the grass
+		bendMax = 55, -- degrees at a character's feet
+		sink = 0.15,
+		height = 2.6, -- the tallest clump at scale 1 (field_grass.py), under a fighter's 5
 	},
 }
 

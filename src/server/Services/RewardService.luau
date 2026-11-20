@@ -73,6 +73,8 @@ function RewardService:RoundEnded(winner: Model?)
 		if total <= 0 then
 			continue
 		end
+		-- the daily quests count the same rounds the pay does (QuestService)
+		Knit.GetService("QuestService"):RoundDone(player, tally)
 		local paid = data:Update(player, function(profile)
 			return AbilityKit.addCoins(profile, total)
 		end)

@@ -22,6 +22,11 @@ function NpcController:KnitStart()
 		if who ~= Players.LocalPlayer or typeof(page) ~= "string" then
 			return
 		end
+		-- the notice board's prompt opens the daily quests' clipboard, not a menu page (QuestController)
+		if page == "quests" then
+			Knit.GetController("QuestController"):Open()
+			return
+		end
 		menu:Open(page)
 	end)
 end

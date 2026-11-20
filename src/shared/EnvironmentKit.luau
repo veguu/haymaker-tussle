@@ -21,6 +21,7 @@ local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Environment = require(script.Parent.Core.Environment)
+local FieldGrassField = require(script.Parent.FieldGrassField)
 local GrassField = require(script.Parent.GrassField)
 local PlantField = require(script.Parent.PlantField)
 local Envs = require(script.Parent.Config.MapEnvironments)
@@ -359,6 +360,8 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 
 	local bobs: { Bob } = {}
 	local grass: GrassField.Field? = nil
+	-- the field grass a fighter runs through (a map whose entry has `fieldGrass`; Shared/FieldGrassField)
+	local fieldGrass: FieldGrassField.Field? = nil
 	local plants: PlantField.Field? = nil
 	-- the lobby is always there (LobbyService), so its plants keep moving while an arena is up, for everyone
 	-- waiting or spectating in it; out of the camera's range they cost a distance check 4 times a second
@@ -485,11 +488,14 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 				lobbyPlants = PlantField.new(lobbyModel, lobbyWind)
 			end
 		end
-		if grass or plants or lobbyPlants then
+		if grass or fieldGrass or plants or lobbyPlants then
 			local camera = workspace.CurrentCamera
 			local at = camera and camera.CFrame.Position
 			if grass then
 				grass:step(t, at)
+			end
+			if fieldGrass then
+				fieldGrass:step(t, at)
 			end
 			if plants or lobbyPlants then
 				local clock = os.clock()
@@ -532,6 +538,20 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 		end
 		-- the map's low grass tufts, built on this client from its layout (nil when the map has none)
 		grass = GrassField.new(mapModel, mapId, p.wind)
+		if fieldGrass then
+			fieldGrass:destroy()
+			fieldGrass = nil
+		end
+		local fieldEntry = mapId and Envs.Maps[mapId :: string]
+		if fieldEntry and fieldEntry.fieldGrass and fieldEntry.arena then
+			fieldGrass = FieldGrassField.new(
+				mapModel,
+				fieldEntry.fieldGrass,
+				p.wind,
+				fieldEntry.arena.semiX,
+				fieldEntry.arena.semiZ
+			)
+		end
 		-- its flowers, plants, bushes, tree crowns and lilies, moved in the same wind (nil when it has none)
 		if plants then
 			plants:destroy()
@@ -592,6 +612,10 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 		if grass then
 			grass:destroy()
 			grass = nil
+		end
+		if fieldGrass then
+			fieldGrass:destroy()
+			fieldGrass = nil
 		end
 		if plants then
 			plants:destroy()

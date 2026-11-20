@@ -16,11 +16,11 @@ from PIL import Image
 
 CELL = 16
 WIDE, TALL = 21, 15
-INK = (67, 54, 90, 255)  # ink.900
-YELLOW = (250, 223, 127, 255)  # coral.500 / gold.400, the coin yellow
-ORANGE = (249, 196, 136, 255)  # class.Bruiser
-LIGHT = (255, 248, 214, 255)
-BAND = (226, 170, 105, 255)
+INK = (30, 34, 51, 255)  # ink.900
+YELLOW = (255, 210, 63, 255)  # coral.500 / gold.400, the coin yellow
+ORANGE = (255, 164, 28, 255)  # class.Bruiser
+LIGHT = (255, 240, 170, 255)
+BAND = (230, 57, 70, 255)
 CLEAR = (0, 0, 0, 0)
 
 PEAKS = [(2, 1), (10, 1), (18, 1)]  # column, row of each point's tip

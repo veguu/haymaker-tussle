@@ -338,10 +338,11 @@ local function makeTile(parent: Instance, id: string, x: number, big: boolean): 
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		ZIndex = 5,
 	})
-	-- the key cap: cream with ink lettering, top left, at least 30 wide; a gamepad's glyph takes its place
+	-- the key: PRINTED ON THE TILE, top left, in the tile's lettering colour (ui-23a, 2026-11-20: it was a cream
+	-- cap stuck on the corner, "a square label pasted on top"); a gamepad's glyph takes its place
 	local cap = make("Frame", box, {
 		Name = "Cap",
-		BackgroundColor3 = colour("ivory.50"),
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Position = UDim2.fromOffset(capAt, capAt),
 		Size = UDim2.fromOffset(30, capTall),
@@ -354,7 +355,7 @@ local function makeTile(parent: Instance, id: string, x: number, big: boolean): 
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
 	})
-	local capText = Poster.text(cap, "display", 16, TT.OnBright, {
+	local capText = Poster.text(cap, "display", if big then 20 else 16, TT.OnBright, {
 		Size = UDim2.fromScale(0, 1),
 		AutomaticSize = Enum.AutomaticSize.X,
 		TextXAlignment = Enum.TextXAlignment.Center,
@@ -366,39 +367,23 @@ local function makeTile(parent: Instance, id: string, x: number, big: boolean): 
 		ScaleType = Enum.ScaleType.Fit,
 		Visible = false,
 	})
-	-- the flag, top right (Q and R): READY with a tick, or why the skill can't be used. In the mockup it lies
-	-- over the key cap and hides the key; the key must always show, so here it stands right of the cap and
-	-- reaches past the tile's right edge instead.
+	-- the state word, top right INSIDE the tile (Q and R): READY with a tick, or why the skill can't be used. It is
+	-- lettering on the tile's own face (ui-23a: it was a coloured tag that reached past the tile's edge).
 	local flag: Frame? = nil
 	local flagWord: TextLabel? = nil
 	local tick: Frame? = nil
 	if big then
 		local made = make("Frame", box, {
 			Name = "Flag",
-			BackgroundColor3 = colour(TT.Ready),
+			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(8 + 30 + 3, 10),
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -8, 0, 9),
 			Size = UDim2.fromOffset(0, L.LineHeight),
 			AutomaticSize = Enum.AutomaticSize.X,
 			Visible = false,
 			ZIndex = 6,
 		})
-		-- It starts just right of the key cap, however wide the cap or the word is, and grows to the right
-		-- past the tile's edge. (It was hung from the tile's right edge and grew LEFT: READY cleared the cap,
-		-- but the longer CAN'T USE and STUNNED lay over the key; seen 2026-11-18.)
-		local function seatFlag()
-			local wide = box.AbsoluteSize.X
-			local unit = if wide > 0 then size / wide else 1
-			made.Position = UDim2.fromOffset(8 + math.max(30, cap.AbsoluteSize.X * unit) + 3, 10)
-		end
-		cap:GetPropertyChangedSignal("AbsoluteSize"):Connect(seatFlag)
-		make("UIStroke", made, {
-			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-			Color = colour(TT.Line),
-			LineJoinMode = Enum.LineJoinMode.Miter,
-			Thickness = 2,
-		})
-		make("UIPadding", made, { PaddingLeft = UDim.new(0, 5), PaddingRight = UDim.new(0, 5) })
 		make("UIListLayout", made, {
 			FillDirection = Enum.FillDirection.Horizontal,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -422,7 +407,7 @@ local function makeTile(parent: Instance, id: string, x: number, big: boolean): 
 				Rotation = arm[4],
 			})
 		end
-		flagWord = Poster.text(made, "label", 15, TT.OnBright, {
+		flagWord = Poster.text(made, "label", 13, TT.OnBright, {
 			LayoutOrder = 2,
 			Size = UDim2.fromScale(0, 1),
 			AutomaticSize = Enum.AutomaticSize.X,
@@ -499,12 +484,19 @@ local function paintTile(tile: Tile, state: string, held: boolean, stunned: bool
 	tile.icon.Size = UDim2.fromOffset(iconSize, iconSize)
 	tile.icon.Position = if cooling then UDim2.fromScale(0.34, 0.36) else UDim2.fromScale(0.5, 0.44)
 	tile.icon.ImageTransparency = if blocked then 0.45 elseif cooling then 0.2 else 0
+	-- the key and the state word are printed on the face: ink on a bright tile, cream on a dark one
+	local lettering = colour(if bright then TT.OnBright else TT.OnDark)
+	tile.capText.TextColor3 = lettering
 	local flag, flagWord, tick = tile.flag, tile.flagWord, tile.tick
 	if flag and flagWord and tick then
 		flag.Visible = state ~= "recovering" and not held
-		flag.BackgroundColor3 = colour(if blocked then TT.Blocked else TT.Ready)
 		tick.Visible = not blocked
-		flagWord.TextColor3 = colour(if blocked then TT.OnBlocked else TT.OnBright)
+		for _, arm in tick:GetChildren() do
+			if arm:IsA("Frame") then
+				arm.BackgroundColor3 = lettering
+			end
+		end
+		flagWord.TextColor3 = lettering
 		flagWord.Text = if not blocked
 			then TT.WordReady
 			elseif stunned then TT.WordStunned
@@ -623,6 +615,9 @@ function HudController:KnitStart()
 		Size = UDim2.new(1, -6, 1, -6),
 		ZIndex = 3,
 	})
+	-- (no texture and no colour on the top strip: the owner, 2026-11-20, "the top ui can probably just be white or
+	-- black, like a non color")
+	stripFill:SetAttribute("HT_Finish", "none")
 	local stripRow = make("Frame", stripCardFrame, {
 		Name = "Row",
 		BackgroundTransparency = 1,
@@ -682,11 +677,12 @@ function HudController:KnitStart()
 		stripCount.Text = count or ""
 		stripCountSlot.LayoutOrder = if countFirst then 1 else 3
 		stripWords.Text = words
-		-- (ink on the pink card too since the soft palette, 2026-11-19: cream on pastel pink was too faint)
-		local tone = colour("ink.900")
+		-- WHITE with ink lettering; the loud states (ROUND OVER, FINAL TWO, LAST ONE) turned over, BLACK with white
+		-- lettering: no colour on the top strip (the owner, 2026-11-20)
+		local tone = if loud then Color3.new(1, 1, 1) else colour("ink.900")
 		stripWords.TextColor3 = tone
 		stripCount.TextColor3 = tone
-		stripFill.ImageColor3 = colour(if loud then SS.Warning else SS.Word)
+		stripFill.ImageColor3 = if loud then colour("ink.900") else Color3.new(1, 1, 1)
 		local inner = stripWide(words, 21)
 			+ (if count then stripWide(count, 34) + L.StripGap else 0)
 		stripPanel.Size = UDim2.fromOffset(inner + 2 * STRIP_PAD, L.Strip.Y)
@@ -855,19 +851,21 @@ function HudController:KnitStart()
 		ZIndex = 2,
 	})
 	local figure = Poster.number(figureBox, 3, { Name = "Digits", Size = UDim2.fromScale(1, 1) })
-	-- the stagger strip in the dial's base: STAGGER, the number, a dot, the knockback the next hit will use.
-	-- The strip itself goes cream, then yellow, then pink as the number did.
+	-- the stagger line in the dial's base: STAGGER, the number, a dot, the knockback the next hit will use. It is
+	-- PART OF THE DIAL (ui-23a, 2026-11-20; the owner: labels must not be "a square label pasted on top of the
+	-- ui ... I want it to be IN THE UI"): no plate, lettering on the dial's own dark face just above its foot,
+	-- and the LETTERING goes white, then yellow, then red as the number did (it was a white plate on the edge).
+	local STAGGER_BOTTOM = D.chord - D.stroke - 4
 	local staggerStrip = make("Frame", youPlate, {
 		Name = "Stagger",
 		AnchorPoint = Vector2.new(0.5, 1),
 		AutomaticSize = Enum.AutomaticSize.X,
-		BackgroundColor3 = colour(ST.Tone.white),
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(D.centre.X, D.stripBottom),
+		Position = UDim2.fromOffset(D.centre.X, STAGGER_BOTTOM),
 		Size = UDim2.fromOffset(0, D.stripHeight),
 		ZIndex = 3,
 	})
-	make("UIStroke", staggerStrip, { Thickness = 3, Color = colour(TT.Line) })
 	make(
 		"UIPadding",
 		staggerStrip,
@@ -880,7 +878,7 @@ function HudController:KnitStart()
 		Padding = UDim.new(0, 7),
 	})
 	local stripScale = make("UIScale", staggerStrip, {})
-	Poster.text(staggerStrip, "label", D.stripFont, TT.OnBright, {
+	local staggerLabel = Poster.text(staggerStrip, "label", D.stripFont, ST.Tone.white, {
 		Name = "Label",
 		AutomaticSize = Enum.AutomaticSize.X,
 		Size = UDim2.fromOffset(0, D.stripHeight),
@@ -892,12 +890,12 @@ function HudController:KnitStart()
 		staggerStrip,
 		3,
 		D.stripFigures,
-		TT.OnBright,
+		ST.Tone.white,
 		{ Name = "Number", LayoutOrder = 2, ZIndex = 3 }
 	)
 	local dot = make("Frame", staggerStrip, {
 		Name = "Dot",
-		BackgroundColor3 = colour(TT.OnBright),
+		BackgroundColor3 = colour(ST.Tone.white),
 		BorderSizePixel = 0,
 		Size = UDim2.fromOffset(5, 5),
 		LayoutOrder = 3,
@@ -908,7 +906,7 @@ function HudController:KnitStart()
 		staggerStrip,
 		5,
 		D.stripFigures,
-		TT.OnBright,
+		ST.Tone.white,
 		{ Name = "Multiplier", LayoutOrder = 4, ZIndex = 3 }
 	)
 
@@ -928,7 +926,11 @@ function HudController:KnitStart()
 		local tier = HudLogic.staggerTier(stagger, STAGGER_MAX, ST.YellowShare, ST.PinkShare)
 		if tier ~= shownTier then
 			shownTier = tier
-			staggerStrip.BackgroundColor3 = colour(ST.Tone[tier])
+			local tone = colour(ST.Tone[tier])
+			staggerLabel.TextColor3 = tone
+			Poster.tintFigures(staggerFigures, tone)
+			Poster.tintFigures(knock, tone)
+			dot.BackgroundColor3 = tone
 		end
 	end
 	-- The dial for a speed. Only what changed is written: the number when its whole value changes, the ticks
@@ -1013,6 +1015,8 @@ function HudController:KnitStart()
 	local function paintClass()
 		local hex = Tokens.hex[`class.{ability:GetKitId()}`]
 		classColour = if hex then Color3.fromHex(hex) else colour("coral.500")
+		-- the pop-ups about you (the last players count) in your colour's palette (ui-24a)
+		Callouts.setColour(classColour)
 		paintDial(classColour)
 		for _, id in ORDER do
 			local tile = tiles[id]
@@ -1348,7 +1352,10 @@ function HudController:KnitStart()
 					local phase = readRound().phase
 					if beat == 0 then
 						if not menuOpen and (phase == "Starting" or phase == "Fighting") then
-							Callouts.go(classColour, device == "touch")
+							Callouts.go(
+								table.move(Callouts.roundColours(finish), 4, 10, 1, {}),
+								device == "touch"
+							)
 						end
 						break
 					elseif
@@ -1357,7 +1364,11 @@ function HudController:KnitStart()
 						and phase == "Starting"
 						and HudLogic.countLate(now, finish, beat) < 0.5
 					then
-						Callouts.count(beat, device == "touch")
+						Callouts.count(
+							beat,
+							device == "touch",
+							Callouts.roundColours(finish)[4 - beat]
+						)
 					end
 				end
 				if now > finish + 0.5 then
@@ -1654,7 +1665,7 @@ function HudController:KnitStart()
 			local key = (actionById[id].keys :: any)[device] or ""
 			setCap(tile.capText, tile.capGlyph, key)
 			tile.cap.Visible = device ~= "touch"
-			tile.cap.BackgroundTransparency = if tile.capGlyph.Visible then 1 else 0
+			tile.cap.BackgroundTransparency = 1
 		end
 		layout()
 		refreshGroups()
@@ -1828,11 +1839,9 @@ function HudController:KnitStart()
 			press(tile)
 		elseif kind == "blocked" then
 			refuse(tile)
-		elseif kind == "hit" then
-			word(tile, "HIT", "coral.300")
-		elseif kind == "miss" or kind == "cancelled" then
-			word(tile, "MISS", "stone.300")
 		end
+		-- (no HIT / MISS word over the Punch tile any more: the owner, 2026-11-20, "remove this hit/miss thing
+		-- everytime u punch, adds no value to the game")
 	end)
 	movement.Propelled:Connect(function()
 		press(tiles.propel)

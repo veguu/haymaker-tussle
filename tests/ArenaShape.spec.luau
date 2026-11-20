@@ -20,11 +20,16 @@ return {
 		assert(shape.semiX == 213 and shape.semiZ == 176, "426 x 352 studs")
 	end,
 
-	["the other maps keep the base circle"] = function()
+	["a map with its own oval has Gnomon's (the suite's shared surface, owner 2026-11-20); the rest keep the circle"] = function()
+		local g = (Envs :: any).Maps.gnomon.arena
 		for id, entry in (Envs :: any).Maps do
 			if id ~= "gnomon" then
 				local a: any = Round.arenaFor(BASE, entry, nil)
-				assert(a.SemiX == nil and a.StartRadius == BASE.StartRadius, id)
+				if entry.arena then
+					assert(a.SemiX == g.semiX and a.SemiZ == g.semiZ, id)
+				else
+					assert(a.SemiX == nil and a.StartRadius == BASE.StartRadius, id)
+				end
 			end
 		end
 	end,

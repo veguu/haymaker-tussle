@@ -4,6 +4,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Typography = require(ReplicatedStorage.Shared.Typography)
+local Tokens = require(ReplicatedStorage.Shared.Tokens)
 
 local TrainingPanel = {}
 TrainingPanel.__index = TrainingPanel
@@ -12,8 +13,9 @@ local WIDTH = 270
 local ROW_HEIGHT = 20
 local BUTTON_HEIGHT = 40
 local PAD = 8
-local INK = Color3.fromRGB(16, 18, 26)
-local ACCENT = Color3.fromRGB(255, 200, 80)
+-- (on the UI palette since ui-22a, Retro Comic; were fixed RGB values)
+local INK = Tokens.colour("ink.950")
+local ACCENT = Tokens.colour("gold.400")
 local ROWS =
 	{ "Station", "Attack", "Hits", "Target", "Stagger", "Knockback", "Height", "Kick", "Recovery" }
 
@@ -23,7 +25,7 @@ local function makeButton(parent: Instance, text: string, x: number, width: numb
 	local button = Instance.new("TextButton")
 	button.Size = UDim2.fromOffset(width, BUTTON_HEIGHT)
 	button.Position = UDim2.fromOffset(x, 0)
-	button.BackgroundColor3 = Color3.fromRGB(50, 58, 78)
+	button.BackgroundColor3 = Tokens.colour("ink.700")
 	button.TextColor3 = Color3.new(1, 1, 1)
 	Typography.apply(button, "Button")
 	button.TextSize = 14

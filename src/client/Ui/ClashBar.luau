@@ -8,13 +8,15 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Typography = require(ReplicatedStorage.Shared.Typography)
+local Tokens = require(ReplicatedStorage.Shared.Tokens)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Clash = require(ReplicatedStorage.Shared.Core.Clash)
 
 local cfg = GameConfig.Clash
-local MINE = Color3.fromRGB(90, 190, 255)
-local THEIRS = Color3.fromRGB(255, 105, 85)
-local INK = Color3.fromRGB(16, 18, 26)
+-- (on the UI palette since ui-22a, Retro Comic; were fixed RGB values)
+local MINE = Tokens.colour("teal.400")
+local THEIRS = Tokens.colour("danger.600")
+local INK = Tokens.colour("ink.950")
 local FADE_SECONDS = 0.35
 
 local ClashBar = {}
@@ -74,7 +76,7 @@ function ClashBar.new(parent: Instance)
 	hint.AnchorPoint = Vector2.new(0.5, 0)
 	hint.Position = UDim2.fromScale(0.5, 0.08)
 	hint.Size = UDim2.fromScale(0.24, 0.36)
-	hint.TextColor3 = Color3.fromRGB(255, 225, 120)
+	hint.TextColor3 = Tokens.colour("gold.400")
 
 	local track = Instance.new("Frame")
 	track.Name = "Track"
@@ -179,7 +181,7 @@ function ClashBar:Show(me: Model, other: Model, seconds: number)
 	self.fadeAt = nil
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	self.hint.Text = if touch then "TAP PUNCH!" else "MASH M1!"
-	self.hint.TextColor3 = Color3.fromRGB(255, 225, 120)
+	self.hint.TextColor3 = Tokens.colour("gold.400")
 	self.root.GroupTransparency = 0
 	self.root.Visible = true
 	self.fill.Size = UDim2.fromScale(0.5, 1)
@@ -198,7 +200,7 @@ function ClashBar:Result(kind: string, myScore: number, otherScore: number)
 	local words: { [string]: string } =
 		{ win = "YOU WIN!", lose = "YOU LOSE", tie = "TIE", over = "OVER" }
 	local colours: { [string]: Color3 } = {
-		win = Color3.fromRGB(120, 255, 160),
+		win = Tokens.colour("go.400"),
 		lose = THEIRS,
 		tie = Color3.new(1, 1, 1),
 		over = Color3.new(1, 1, 1),

@@ -15,6 +15,12 @@
 -- along the lobby's viewing edge, never go home on their own, and are removed - not rebuilt - when they
 -- fall out or the round ends. RoundService spawns and clears them.
 --
+-- TRAINERS (the lobby's training sections, 2026-11-19): a spec with `trainer` is a bot tied to one spot. It fights
+-- only a player who is in free practice (HT_TrainingFree) and inside its radius, with its own settings
+-- (Lobby.Training.Bots), and walks home when nobody is. It is never the arena's bot and is never parked.
+-- DORMANT (SetDormant): a dummy nobody can reach is anchored at home and skipped every frame, so the training
+-- sections cost nothing while the training grounds are empty.
+--
 -- Going home waits for a launch, a kick, a bounce or a combo to finish: see TrainingLayout.shouldReset.
 
 local CollectionService = game:GetService("CollectionService")
@@ -35,6 +41,7 @@ local Momentum = require(ReplicatedStorage.Shared.Core.Momentum)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Round = require(ReplicatedStorage.Shared.Core.Round)
 local Pond = require(ReplicatedStorage.Shared.Core.Pond)
+local TrainingGrounds = require(ReplicatedStorage.Shared.Core.TrainingGrounds)
 local TrainingLayout = require(ReplicatedStorage.Shared.Core.TrainingLayout)
 local Ultimates = require(ReplicatedStorage.Shared.Core.Ultimates)
 local Combatants = require(script.Parent.Parent.Combatants)
@@ -82,6 +89,8 @@ export type Spec = {
 	fill: boolean?, -- a fill bot: fights anyone in the round, removed when out
 	colour: Color3?,
 	fallY: number?, -- below this it goes home; the training fall line if left out
+	-- a training-section bot: its settings (Lobby.Training.Bots), the spot it guards and how far from it
+	trainer: { bot: any, x: number, z: number, radius: number }?,
 }
 
 type Dummy = {
@@ -94,6 +103,7 @@ type Dummy = {
 	slammed: boolean?,
 	stationary: boolean,
 	parked: boolean?, -- held out of sight while there's no arena (the arena's own bot, between rounds)
+	dormant: boolean?, -- asleep at home, anchored, not stepped (SetDormant)
 	toB: boolean,
 	align: AlignOrientation,
 	tracks: { [string]: AnimationTrack },
@@ -111,6 +121,9 @@ type Dummy = {
 	lockSeenAt: number?,
 	-- Its own last ground punch: it runs no faster than Punch.MoveSpeed for MoveSeconds after (Combat.stringSpeed).
 	punchedAt: number?,
+	-- A clash dummy's next swing on its beat, and the flash that warns of it (a trainer whose bot has a Beat).
+	beatDue: number?,
+	tell: Highlight?,
 }
 
 local DummyService = Knit.CreateService({
@@ -118,6 +131,30 @@ local DummyService = Knit.CreateService({
 })
 
 local dummies: { [Model]: Dummy } = {}
+
+-- THE CLASH DUMMY'S WARNING (owner, 2026-11-20: a clashing dummy): it glows cream with a gold edge for the
+-- Tell seconds before each swing on its beat, so a player can throw their punch with it and clash.
+local function setTell(dummy: Dummy, on: boolean)
+	if not on and not dummy.tell then
+		return
+	end
+	local tell = dummy.tell
+	if not tell then
+		local made = Instance.new("Highlight")
+		made.Name = "HT_Tell"
+		made.FillColor = Color3.fromRGB(255, 244, 214)
+		made.FillTransparency = 0.3
+		made.OutlineColor = Color3.fromRGB(255, 210, 63)
+		made.OutlineTransparency = 0
+		made.DepthMode = Enum.HighlightDepthMode.Occluded
+		made.Parent = dummy.model
+		dummy.tell = made
+		tell = made
+	end
+	if tell and tell.Enabled ~= on then
+		tell.Enabled = on
+	end
+end
 
 local function freshState(home: CFrame): Momentum.State
 	local look = home.LookVector
@@ -384,6 +421,35 @@ function DummyService:IsStationary(model: Model): boolean
 	return dummy ~= nil and dummy.stationary
 end
 
+--- Puts a dummy to sleep at its home (anchored, never stepped) or wakes it. For dummies nobody is near.
+function DummyService:SetDormant(model: Model, on: boolean)
+	local sleeper = dummies[model]
+	if sleeper and on then
+		sleeper.beatDue = nil
+		setTell(sleeper, false)
+	end
+	local dummy = dummies[model]
+	if not dummy or (dummy.dormant == true) == on then
+		return
+	end
+	local root = Combatants.rootOf(model)
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if on then
+		sendHome(self, dummy)
+		if humanoid then
+			humanoid.WalkSpeed = 0
+			humanoid:Move(Vector3.zero, false)
+		end
+	end
+	dummy.dormant = if on then true else nil
+	if root and not dummy.stationary then
+		root.Anchored = on
+		if not on then
+			root:SetNetworkOwner(nil)
+		end
+	end
+end
+
 --- Walking speed along its marked path.
 function DummyService:SetPatrolSpeed(model: Model, speed: number)
 	local dummy = dummies[model]
@@ -543,6 +609,140 @@ local function think(dummy: Dummy, root: BasePart, now: number): (number, number
 	return inputX, inputZ
 end
 
+-- A trainer's target: the nearest player in free practice inside its radius, at punching height.
+local function trainerTarget(dummy: Dummy, root: BasePart): BasePart?
+	local trainer = dummy.spec.trainer
+	if not trainer then
+		return nil
+	end
+	local best: BasePart? = nil
+	local bestDistance = math.huge
+	for _, player in Players:GetPlayers() do
+		local character = player.Character
+		local other = character
+			and player:GetAttribute("HT_TrainingFree") == true
+			and Combatants.isAlive(character)
+			and Combatants.rootOf(character)
+		if
+			other
+			and TrainingGrounds.inReach(
+				trainer.x,
+				trainer.z,
+				trainer.radius,
+				other.Position.X,
+				other.Position.Z
+			)
+			and math.abs(other.Position.Y - root.Position.Y) <= punchCfg.VerticalLimit
+		then
+			local distance = (other.Position - root.Position).Magnitude
+			if distance < bestDistance then
+				best, bestDistance = other, distance
+			end
+		end
+	end
+	return best
+end
+
+-- A trainer's moment of thought: the same eyes and the same punch rules as `think`, on its own settings, tied to
+-- its spot. An Attacker (Moves false) turns to face its target instead of walking at it.
+local function trainerThink(
+	dummy: Dummy,
+	root: BasePart,
+	now: number,
+	target: BasePart?
+): (number, number)
+	local trainer = dummy.spec.trainer :: any
+	local bot = trainer.bot
+	local position = root.Position
+	local seen: Vector3? = nil
+	if target then
+		local model = target.Parent
+		local lagged = if model and model:IsA("Model")
+			then Knit.GetService("SpeedAuditService"):PositionAt(model, bot.TrackingLag)
+			else nil
+		seen = lagged or target.Position
+	end
+	local inputX, inputZ = TrainingGrounds.botSteer(
+		bot,
+		trainer.x,
+		trainer.z,
+		trainer.radius,
+		position.X,
+		position.Z,
+		if seen then seen.X else nil,
+		if seen then seen.Z else nil
+	)
+	local inReach, noticed = false, false
+	if seen then
+		local toward = Vector3.new(seen.X - position.X, 0, seen.Z - position.Z)
+		noticed = toward.Magnitude <= bot.NoticeDistance
+		-- standing its ground, it turns on the spot to look at whoever is there
+		if
+			noticed
+			and toward.Magnitude > 0.5
+			and inputX == 0
+			and inputZ == 0
+			and not dummy.state.knockX
+		then
+			local turned = table.clone(dummy.state)
+			turned.headingX, turned.headingZ = toward.Unit.X, toward.Unit.Z
+			dummy.state = turned
+		end
+		local look = root.CFrame.LookVector
+		local flat = Vector3.new(look.X, 0, look.Z)
+		if noticed and flat.Magnitude > 0.001 then
+			flat = flat.Unit
+			inReach = Combat.inHitbox(
+				dummy.judged or punchCfg,
+				position.X,
+				position.Y,
+				position.Z,
+				flat.X,
+				flat.Z,
+				seen.X,
+				seen.Y,
+				seen.Z
+			)
+		end
+	end
+	if not noticed then
+		dummy.reachSince = nil
+	elseif not dummy.reachSince then
+		dummy.reachSince = now
+	end
+	if bot.Beat then
+		-- A CLASH DUMMY: a steady beat, so you can time your punch with its own. The first swing comes a full beat
+		-- after you step up; each is warned by the flash, Tell seconds before.
+		if not noticed then
+			dummy.beatDue = nil
+			setTell(dummy, false)
+			return inputX, inputZ
+		end
+		local due = dummy.beatDue or (now + bot.Beat)
+		dummy.beatDue = due
+		setTell(dummy, now >= due - bot.Tell)
+		if now >= due then
+			dummy.beatDue = now + bot.Beat
+			setTell(dummy, false)
+			if inReach then
+				dummy.lastPunch = now
+				dummy.judged = punchCfg
+				Knit.GetService("CombatService"):PunchAs(dummy.model, false)
+				dummy.punchedAt = now
+			end
+		end
+		return inputX, inputZ
+	end
+	if inReach and BotBrain.shouldPunch(bot, now, dummy.reachSince, dummy.lastPunch) then
+		dummy.lastPunch = now
+		dummy.judged = BotBrain.judgedPunch(punchCfg, bot.MisjudgeStuds, math.random())
+		Knit.GetService("CombatService")
+			:PunchAs(dummy.model, BotBrain.isWildSwing(bot, math.random()))
+		dummy.punchedAt = now
+	end
+	return inputX, inputZ
+end
+
 -- Should the bot fight right now? Only if someone is ready to be fought.
 local function shouldFight(): boolean
 	-- The attribute is for work/test-harness, which needs it to punch only on cue.
@@ -579,6 +779,9 @@ local function stepDummy(
 			else shouldFight())
 		and not held
 		and dummy.model:GetAttribute("HT_Eliminated") == nil
+	-- a training-section bot fights whoever is in its ring, and nobody else
+	local trainerSees = if dummy.spec.trainer and not held then trainerTarget(dummy, root) else nil
+	fighting = fighting or trainerSees ~= nil
 
 	-- In a clash: walks to the spot it was given and holds there, looking at the other fighter.
 	local clashAt = dummy.model:GetAttribute("HT_ClashAt") :: Vector3?
@@ -713,9 +916,13 @@ local function stepDummy(
 			busy = busy,
 			busyFor = if dummy.busySince then now - dummy.busySince else 0,
 			-- A bot that's fighting is meant to be away from home.
+			-- A trainer WALKS home when nobody is left to fight; it is only put back if it was knocked well
+			-- out of its ring.
 			displaced = patrol == nil and not fighting and not dummy.spec.fill and (
 				root.Position - dummy.spec.home.Position
-			).Magnitude > HOME_TOLERANCE,
+			).Magnitude > (if dummy.spec.trainer
+				then dummy.spec.trainer.radius + 4
+				else HOME_TOLERANCE),
 			sinceHit = now - dummy.lastHit,
 			requested = dummy.requested,
 		}, dummy.spec.resetSeconds)
@@ -751,7 +958,11 @@ local function stepDummy(
 	-- A launched body loses its push at the same rate as on the floor, so an uppercut
 	-- carries as far as any other hit of that strength.
 	local inputX, inputZ = 0, 0
-	if fighting and not air and not stunned then
+	if dummy.spec.trainer then
+		if not air and not stunned and not workspace:GetAttribute("HT_TestBotQuiet") then
+			inputX, inputZ = trainerThink(dummy, root, now, trainerSees)
+		end
+	elseif fighting and not air and not stunned then
 		inputX, inputZ = think(dummy, root, now)
 	end
 	if air ~= "float" then
@@ -1050,6 +1261,9 @@ function DummyService:KnitStart()
 		for model, dummy in dummies do
 			local root = Combatants.rootOf(model)
 			local humanoid = model:FindFirstChildOfClass("Humanoid")
+			if dummy.dormant then
+				continue
+			end
 			if root and humanoid and humanoid.Health > 0 and model.Parent then
 				-- A bot whose home is the arena (the Studio test bot) has nothing under it between rounds: it's
 				-- held still, far below its home and out of sight, until an arena is back (then it's home
