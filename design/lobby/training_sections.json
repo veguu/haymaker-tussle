@@ -1,0 +1,225 @@
+{
+ "_note": "The training grounds (owner, 2026-11-20: FOUR distinct areas in a 2 x 2 grid, from his sketch: a 1v1 bot arena, a row of dummies, a clashing dummy, and one of mine, the recovery cliff). ONE source: village.py builds each zone's floor and props from this, and design/lobby/apply_sections.py copies it into village_config.json and game.json as config.Lobby.Training. X is studs across from the centre, Back is studs back from the viewing edge, Up is studs above the training floor. The zones sit in the four corners of a walkway cross: the spine X -9..9 and the bar Back 222..240. Kinds: Still (never moves), Free (flies when hit; StaggerShare is its starting stagger), Patrol (walks to ToX, ToBack and back), Spar (a bot that chases and fights inside Radius of its home), Attacker (holds its home and swings at whoever is in Radius), Clash (an Attacker on a steady Beat that lights up Tell seconds before each swing). Face (optional, per zone) is the way its dummies look at home; without it they face the arena. Ring: a raised round arena (ring-outs count). Edge: the side of the lobby left open to the sky, with Catch (a body this far below the training floor out there is put back at Return). Pads: launch pads that throw you, OutSpeed along Dir and UpSpeed up. Marks: floor numbers every Step studs from FromX along Dir.",
+ "SleepWhenEmpty": true,
+ "ResetSeconds": 4,
+ "Sign": {
+  "Enabled": false,
+  "Width": 9,
+  "Height": 4.4,
+  "Up": 5.6,
+  "Distance": 120,
+  "Card": "FFF4D6",
+  "Ink": "1E2233"
+ },
+ "Bots": {
+  "Spar": {
+   "StopDistance": 4.5,
+   "CloseInput": 0.1,
+   "ReactionSeconds": 0.4,
+   "PunchCooldown": 1.1,
+   "NoticeDistance": 14,
+   "TrackingLag": 0.2,
+   "MisjudgeStuds": 3,
+   "WildSwingChance": 0.35,
+   "Moves": true
+  },
+  "Clash": {
+   "StopDistance": 4.5,
+   "CloseInput": 0,
+   "ReactionSeconds": 0.2,
+   "PunchCooldown": 1.5,
+   "NoticeDistance": 9,
+   "TrackingLag": 0,
+   "MisjudgeStuds": 0,
+   "WildSwingChance": 0,
+   "Moves": false,
+   "Beat": 1.5,
+   "Tell": 0.45
+  }
+ },
+ "Sections": [
+  {
+   "Key": "Row",
+   "Title": "DUMMY ROW",
+   "Hint": "Five dummies. Watch each hit send them further.",
+   "Colour": "F0525A",
+   "X0": -73,
+   "X1": -9,
+   "Back0": 128,
+   "Back1": 222,
+   "Face": {
+    "X": 1,
+    "Back": 0
+   },
+   "Sign": {
+    "X": -41,
+    "Back": 127
+   },
+   "Marks": {
+    "FromX": -20,
+    "Step": 10,
+    "Count": 5,
+    "Dir": -1,
+    "Back": 136
+   },
+   "Dummies": [
+    {
+     "Name": "Row Dummy 1",
+     "Kind": "Free",
+     "X": -20,
+     "Back": 145
+    },
+    {
+     "Name": "Row Dummy 2",
+     "Kind": "Free",
+     "X": -20,
+     "Back": 159
+    },
+    {
+     "Name": "Row Dummy 3",
+     "Kind": "Free",
+     "X": -20,
+     "Back": 173
+    },
+    {
+     "Name": "Row Dummy 4",
+     "Kind": "Free",
+     "X": -20,
+     "Back": 187
+    },
+    {
+     "Name": "Row Dummy 5",
+     "Kind": "Free",
+     "X": -20,
+     "Back": 201
+    }
+   ]
+  },
+  {
+   "Key": "Clash",
+   "Title": "CLASH DUMMY",
+   "Hint": "Punch when it flashes, then out-tap it.",
+   "Colour": "FFD23F",
+   "X0": 9,
+   "X1": 73,
+   "Back0": 128,
+   "Back1": 222,
+   "Sign": {
+    "X": 41,
+    "Back": 127
+   },
+   "Mark": {
+    "X": 41,
+    "Back": 176.5
+   },
+   "Dummies": [
+    {
+     "Name": "Clash Dummy",
+     "Kind": "Clash",
+     "X": 41,
+     "Back": 182,
+     "Radius": 9
+    }
+   ]
+  },
+  {
+   "Key": "Arena",
+   "Title": "1V1 BOT ARENA",
+   "Hint": "Knock the bot off the edge. Don't go off yourself.",
+   "Colour": "64A3FF",
+   "X0": -73,
+   "X1": -9,
+   "Back0": 240,
+   "Back1": 328,
+   "Sign": {
+    "X": -41,
+    "Back": 238
+   },
+   "Ring": {
+    "X": -41,
+    "Back": 284,
+    "Radius": 22,
+    "Raise": 5,
+    "Steps": {
+     "X0": -47,
+     "X1": -35,
+     "Back0": 254,
+     "Back1": 263
+    },
+    "ReturnSeconds": 3,
+    "Score": {
+     "X": -41,
+     "Back": 268
+    }
+   },
+   "Dummies": [
+    {
+     "Name": "Sparring Bot",
+     "Kind": "Spar",
+     "X": -41,
+     "Back": 290,
+     "Up": 5,
+     "Radius": 18
+    }
+   ]
+  },
+  {
+   "Key": "Cliff",
+   "Title": "RECOVERY CLIFF",
+   "Hint": "The pads throw you off. Punch your way back.",
+   "Colour": "2EC27E",
+   "X0": 9,
+   "X1": 73,
+   "Back0": 240,
+   "Back1": 328,
+   "Sign": {
+    "X": 41,
+    "Back": 238
+   },
+   "Edge": {
+    "Side": "Right",
+    "Back0": 242,
+    "Back1": 326,
+    "Out": 110,
+    "CatchBelow": 26,
+    "Return": {
+     "X": 46,
+     "Back": 284
+    }
+   },
+   "Pads": [
+    {
+     "X": 62,
+     "Back": 258,
+     "Radius": 3.5,
+     "DirX": 1,
+     "DirZ": 0,
+     "OutSpeed": 55,
+     "UpSpeed": 40,
+     "Title": "LIGHT"
+    },
+    {
+     "X": 62,
+     "Back": 284,
+     "Radius": 3.5,
+     "DirX": 1,
+     "DirZ": 0,
+     "OutSpeed": 80,
+     "UpSpeed": 50,
+     "Title": "MEDIUM"
+    },
+    {
+     "X": 62,
+     "Back": 310,
+     "Radius": 3.5,
+     "DirX": 1,
+     "DirZ": 0,
+     "OutSpeed": 110,
+     "UpSpeed": 60,
+     "Title": "HEAVY"
+    }
+   ],
+   "Dummies": []
+  }
+ ]
+}

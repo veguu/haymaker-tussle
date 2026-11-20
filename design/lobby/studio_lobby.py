@@ -132,8 +132,8 @@ for index = 1, FILES do
 				p.Material = Enum.Material.Neon
 				p.Color = Color3.fromRGB(255, 214, 140)
 			end
-			if p.Name == "Lobby_Banners_Coral" then p.TextureID = ""; p.Color = Color3.fromRGB(236, 112, 86) end
-			if p.Name == "Lobby_Banners_Gold" then p.TextureID = ""; p.Color = Color3.fromRGB(238, 180, 62) end
+			if p.Name == "Lobby_Banners_Coral" then p.TextureID = ""; p.Color = Color3.fromRGB(240, 82, 90) end
+			if p.Name == "Lobby_Banners_Gold" then p.TextureID = ""; p.Color = Color3.fromRGB(255, 210, 63) end
 			pcall(function() p.CollisionFidelity = Enum.CollisionFidelity.Box end)
 			p.Parent = meshes
 			seen += 1; tris += e[5]

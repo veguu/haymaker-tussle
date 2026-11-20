@@ -56,19 +56,19 @@ Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Paving7_Stone: 510 tris, 256px
+PAINTED Lobby_Paving7_Stone: 1060 tris, 512px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Paving8_Stone: 500 tris, 256px
+PAINTED Lobby_Paving8_Stone: 1030 tris, 512px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Paving9_Stone: 480 tris, 256px
+PAINTED Lobby_Paving9_Stone: 1070 tris, 512px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
@@ -110,31 +110,61 @@ Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Retaining_Stone: 7612 tris, 1024px
+PAINTED Lobby_Retaining_Stone: 10252 tris, 1024px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Parapet_Stone: 7304 tris, 1024px
+PAINTED Lobby_Parapet_Stone: 8932 tris, 1024px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Crag_Cream: 10008 tris, 1024px
+PAINTED Lobby_Crag_Cream: 12146 tris, 1024px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Crag_Sand: 5008 tris, 1024px
+PAINTED Lobby_Crag_Sand: 5664 tris, 1024px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Crag_Blue: 3156 tris, 512px
+PAINTED Lobby_Crag_Blue: 3324 tris, 512px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Sakura_Bark: 1210 tris, 512px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Sakura_Leaf: 3390 tris, 512px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Sakura_Blush: 4448 tris, 1024px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Petals_Blush: 394 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Petals_Coral: 762 tris, 512px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
@@ -158,19 +188,25 @@ Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_GreatTree_Leaf: 1878 tris, 512px
+PAINTED Lobby_GreatTree_Leaf: 628 tris, 512px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Benches_Stone: 968 tris, 512px
+PAINTED Lobby_GreatTree_Blush: 1250 tris, 512px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Benches_Timber: 484 tris, 256px
+PAINTED Lobby_Benches_Stone: 880 tris, 512px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Benches_Timber: 440 tris, 256px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
@@ -206,13 +242,13 @@ Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Lanterns_Timber: 3140 tris, 512px
+PAINTED Lobby_Lanterns_Timber: 3888 tris, 512px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Lanterns_Paper: 732 tris, 512px
+PAINTED Lobby_Lanterns_Paper: 864 tris, 512px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
@@ -236,55 +272,169 @@ Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Obby_Timber: 2036 tris, 512px
+PAINTED Lobby_Obby_Timber: 1864 tris, 512px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Banners_Timber: 324 tris, 256px
+PAINTED Lobby_Banners_Timber: 684 tris, 512px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Banners_Teal: 36 tris, 256px
+PAINTED Lobby_Banners_Teal: 84 tris, 256px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Bunting_Rope: 1296 tris, 512px
+PAINTED Lobby_Bunting_Rope: 1136 tris, 512px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Bunting_Cream: 41 tris, 256px
+PAINTED Lobby_Bunting_Lav: 24 tris, 256px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Bunting_Coral: 39 tris, 256px
+PAINTED Lobby_Bunting_Mint: 24 tris, 256px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Bunting_Gold: 40 tris, 256px
+PAINTED Lobby_Bunting_Cream: 24 tris, 256px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Bunting_Teal: 42 tris, 256px
+PAINTED Lobby_Bunting_Coral: 25 tris, 256px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Perch_Stone: 2708 tris, 512px
+PAINTED Lobby_Bunting_Gold: 23 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Bunting_Teal: 22 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Isles_Stone: 440 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Isles_Under: 436 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Isles_Grass: 224 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_BellRock_Stone: 88 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_BellRock_Under: 88 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_BellRock_Grass: 58 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_BellRock_Timber: 48 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_BellRock_Gold: 10 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_BellFrame_Timber: 104 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Bell_Gold: 192 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Bell_Iron: 46 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_GloveFrame_Timber: 168 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Glove_Red: 100 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Glove_Cuff: 44 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Glove_Arm: 28 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Glove_Spring: 250 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_BellRock_Clay: 24 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Perch_Stone: 2932 tris, 512px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
@@ -296,7 +446,7 @@ Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Banners_Gold: 24 tris, 256px
+PAINTED Lobby_Banners_Gold: 72 tris, 256px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
@@ -380,67 +530,43 @@ Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Training_Timber: 992 tris, 512px
+PAINTED Lobby_Training_Timber: 324 tris, 256px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Training_Rope: 1332 tris, 512px
+PAINTED Lobby_Zones_Coral: 48 tris, 256px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Mats_Coral: 12 tris, 256px
+PAINTED Lobby_Zones_Gold: 48 tris, 256px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Mats_PunchCanvas: 12 tris, 256px
+PAINTED Lobby_Zones_Teal: 48 tris, 256px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Mats_RingTeal: 80 tris, 256px
+PAINTED Lobby_Zones_Mint: 48 tris, 256px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Mats_RingCream: 80 tris, 256px
+PAINTED Lobby_Walk_Stone: 960 tris, 512px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Mats_RingClay: 280 tris, 256px
-Info: Baking map saved to internal image, save it externally or pack it
-Info: Baking map saved to internal image, save it externally or pack it
-Info: Baking map saved to internal image, save it externally or pack it
-Info: Baking map saved to internal image, save it externally or pack it
-Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Mats_Teal: 12 tris, 256px
-Info: Baking map saved to internal image, save it externally or pack it
-Info: Baking map saved to internal image, save it externally or pack it
-Info: Baking map saved to internal image, save it externally or pack it
-Info: Baking map saved to internal image, save it externally or pack it
-Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Mats_SparCanvas: 12 tris, 256px
-Info: Baking map saved to internal image, save it externally or pack it
-Info: Baking map saved to internal image, save it externally or pack it
-Info: Baking map saved to internal image, save it externally or pack it
-Info: Baking map saved to internal image, save it externally or pack it
-Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Mats_Gold: 12 tris, 256px
-Info: Baking map saved to internal image, save it externally or pack it
-Info: Baking map saved to internal image, save it externally or pack it
-Info: Baking map saved to internal image, save it externally or pack it
-Info: Baking map saved to internal image, save it externally or pack it
-Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Mats_KickCanvas: 12 tris, 256px
+PAINTED Lobby_Mats_Clay: 972 tris, 512px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
@@ -452,207 +578,296 @@ Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Mats_RunwayCanvas: 12 tris, 256px
+PAINTED Lobby_Mats_Teal: 24 tris, 256px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Mats_MarkClay: 36 tris, 256px
+PAINTED Lobby_Mats_Gold: 80 tris, 256px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Training_Coral: 132 tris, 256px
+PAINTED Lobby_Mats_Canvas: 230 tris, 256px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Mats_MarkTeal: 48 tris, 256px
+PAINTED Lobby_Arena_Stone: 2020 tris, 512px
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
 Info: Baking map saved to internal image, save it externally or pack it
-PAINTED Lobby_Training_Teal: 176 tris, 256px
-06:20.843  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_over.png'
-06:54.187  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_top.png'
-07:35.968  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_spawn.png'
-08:24.453  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_square.png'
-08:46.015  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_market.png'
-09:16.843  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_obby.png'
-10:05.968  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_training.png'
-10:24.437  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_arena.png'
+PAINTED Lobby_Arena_Trim: 256 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Arena_Teal: 90 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Arena_Canvas: 90 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Arena_Clay: 320 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Mats_Mint: 186 tris, 256px
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+Info: Baking map saved to internal image, save it externally or pack it
+PAINTED Lobby_Banners_Mint: 24 tris, 256px
+09:51.610  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_over.png'
+10:13.453  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_top.png'
+10:51.781  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_spawn.png'
+11:40.656  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_square.png'
+12:29.641  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_market.png'
+13:18.891  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_obby.png'
+14:03.219  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_training.png'
+14:41.360  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_backyard.png'
+15:11.906  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_traintop.png'
+15:38.110  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_sky.png'
+16:06.031  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_bellrock.png'
+16:58.688  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_fromsquare.png'
+17:32.406  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_cliff.png'
+18:18.797  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_arena1v1.png'
+18:43.688  render           | Saved: 'C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village_arena.png'
 Info: Saved as "village.blend"
 INFO Draco is available, use library at C:\Program Files\Blender Foundation\Blender 5.2\5.2\scripts\addons_core\io_scene_gltf2\bf_intern_draco_bridge.dll
 INFO MeshOptimizer is available, use library at C:\Program Files\Blender Foundation\Blender 5.2\5.2\scripts\addons_core\io_scene_gltf2\bf_intern_meshopt_bridge.dll
-17:49:58 | INFO: Starting glTF 2.0 export
-17:49:58 | INFO: Extracting primitive: Lobby_Arches_Coral
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Arches_Gold
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Arches_Timber
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Banners_Coral
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Banners_Gold
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Banners_Teal
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Banners_Timber
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Beds_Soil
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Beds_Stone
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Benches_Stone
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Benches_Timber
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Bunting_Coral
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Bunting_Cream
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Bunting_Gold
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Bunting_Rope
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Bunting_Teal
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Crag_Blue
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Crag_Cream
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_Crag_Sand
-17:49:58 | INFO: Primitives created: 1
-17:49:58 | INFO: Extracting primitive: Lobby_GreatTree_Bark
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_GreatTree_Leaf
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_GreatTree_Soil
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_GreatTree_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Ground_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Lanterns_Paper
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Lanterns_Timber
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Mats_Coral
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Mats_Cream
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Mats_Gold
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Mats_KickCanvas
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Mats_MarkClay
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Mats_MarkTeal
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Mats_PunchCanvas
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Mats_RingClay
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Mats_RingCream
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Mats_RingTeal
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Mats_RunwayCanvas
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Mats_SparCanvas
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Mats_Teal
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Medallion_Clay
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Medallion_Teal
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Medallion_Trim
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Obby_Timber
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Parapet_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Paving1_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Paving2_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Paving3_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Paving4_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Paving5_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Paving6_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Paving7_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Paving8_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Paving9_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Perch_Gold
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Perch_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Planters_Soil
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Planters_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Props_Cream
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Props_Timber
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Retaining_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Shops_Clay
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Shops_Coral
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Shops_Cream
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Shops_Gold
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Shops_Plaster
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Shops_Roof
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Shops_Teal
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Finished glTF 2.0 export in 1.116668939590454 s
+04:31:40 | INFO: Starting glTF 2.0 export
+04:31:40 | INFO: Extracting primitive: Lobby_Arches_Coral
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Arches_Gold
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Arches_Timber
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Arena_Canvas
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Arena_Clay
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Arena_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Arena_Teal
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Arena_Trim
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Banners_Coral
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Banners_Gold
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Banners_Mint
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Banners_Teal
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Banners_Timber
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Beds_Soil
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Beds_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Bell_Gold
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Bell_Iron
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_BellFrame_Timber
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_BellRock_Clay
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_BellRock_Gold
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_BellRock_Grass
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_BellRock_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_BellRock_Timber
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_BellRock_Under
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Benches_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Benches_Timber
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Bunting_Coral
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Bunting_Cream
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Bunting_Gold
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Bunting_Lav
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Bunting_Mint
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Bunting_Rope
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Bunting_Teal
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Crag_Blue
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Crag_Cream
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Crag_Sand
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Glove_Arm
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Glove_Cuff
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Glove_Red
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Glove_Spring
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_GloveFrame_Timber
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_GreatTree_Bark
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_GreatTree_Blush
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_GreatTree_Leaf
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_GreatTree_Soil
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_GreatTree_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Ground_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Isles_Grass
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Isles_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Isles_Under
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Lanterns_Paper
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Lanterns_Timber
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Mats_Canvas
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Mats_Clay
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Mats_Cream
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Mats_Gold
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Mats_Mint
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Mats_Teal
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Medallion_Clay
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Medallion_Teal
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Medallion_Trim
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Obby_Timber
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Parapet_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Paving1_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Paving2_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Paving3_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Paving4_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Paving5_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Paving6_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Paving7_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Paving8_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Paving9_Stone
+04:31:41 | INFO: Primitives created: 1
+04:31:41 | INFO: Extracting primitive: Lobby_Perch_Gold
+04:31:41 | INFO: Primitives created: 1
+04:31:42 | INFO: Finished glTF 2.0 export in 1.153111457824707 s
 
-GLB village_1.glb 12.41 MB 67 meshes
-17:49:59 | INFO: Starting glTF 2.0 export
-17:49:59 | INFO: Extracting primitive: Lobby_Shops_Timber
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Steps_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Training_Coral
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Training_Rope
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Training_Teal
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_Training_Timber
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_TrainWall_Clay
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_TrainWall_Coral
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_TrainWall_Stone
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_TrainWall_Teal
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Extracting primitive: Lobby_TrainWall_Timber
-17:49:59 | INFO: Primitives created: 1
-17:49:59 | INFO: Finished glTF 2.0 export in 0.12039375305175781 s
+GLB village_1.glb 12.04 MB 73 meshes
+04:31:42 | INFO: Starting glTF 2.0 export
+04:31:42 | INFO: Extracting primitive: Lobby_Perch_Stone
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Petals_Blush
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Petals_Coral
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Planters_Soil
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Planters_Stone
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Props_Cream
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Props_Timber
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Retaining_Stone
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Sakura_Bark
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Sakura_Blush
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Sakura_Leaf
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Shops_Clay
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Shops_Coral
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Shops_Cream
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Shops_Gold
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Shops_Plaster
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Shops_Roof
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Shops_Teal
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Shops_Timber
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Steps_Stone
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Training_Timber
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_TrainWall_Clay
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_TrainWall_Coral
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_TrainWall_Stone
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_TrainWall_Teal
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_TrainWall_Timber
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Walk_Stone
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Zones_Coral
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Zones_Gold
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Zones_Mint
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Extracting primitive: Lobby_Zones_Teal
+04:31:42 | INFO: Primitives created: 1
+04:31:42 | INFO: Finished glTF 2.0 export in 0.6806783676147461 s
 
-GLB village_2.glb 2.26 MB 11 meshes
-TRIANGLES 71639 MESHES 78 COLLIDERS 121 KIT PIECES 80
+GLB village_2.glb 7.78 MB 31 meshes
+TRIANGLES 96695 MESHES 104 COLLIDERS 123 KIT PIECES 98
 Info: Saved as "village.blend"
 SAVED C:\Users\dumpl\Documents\LihFolk\LihFolk Vault V2\LihFolk Vault V2\Haymaker Tussle\Project\design\lobby\out\village\village.blend
 Blender 5.2.2 LTS (hash d13f752e3b9c built 2026-09-15 01:37:04)
