@@ -272,6 +272,10 @@ local HAY_FRAMES = HAYMAKER + 0.1
 -- part runs 1.62 s (it was 0.8): the same sink, stretched.
 local SOAK = HAYMAKER + 0.38 -- the fist sunk in, the fold deepest (a key only now; no cards)
 local SLOW_TO = HAYMAKER + 1.62 -- the slow part: the knockback in slow motion, the body MOVING away all through it
+-- kits-8t: the release bass (Config/SoundCandidates ult_release, shaped like the owner's favourite, Benimaru's Crimson
+-- Moon: a swell, the boom 1.6 s in, a drone) starts this long before the release, so it swells through the slow sink
+-- and booms as the target is thrown
+local RELEASE_RISE = 1.6
 -- the drawn view's eye on the sunk fist, where the plunge frames flashed until kits-8h (its numbers are still that
 -- moment's; tests "the camera sees the haymaker as the drawn plunge does")
 local SINK_EYE = SLOW_TO - drawnLength("plunge")
@@ -585,6 +589,7 @@ local function rushCues(): { { t: number, name: string } }
 			{ t = HAYMAKER, name = "impact" },
 			{ t = HAYMAKER, name = "haymaker" },
 			{ t = HAY_FRAMES, name = "plunge" },
+			{ t = BLAST - RELEASE_RISE, name = "releaseRise" },
 			{ t = BLAST, name = "blast" },
 			{ t = THROWN, name = "launch" },
 		}

@@ -4762,3 +4762,7 @@ MapEnvironments, TrainingGrounds, DummyService, LobbyService) were left as they 
   `C:\Users\spicy\SFX Library\Sonniss GDC 2015-2020 picks` (downloads.sonniss.com has a Cloudflare check; 2021-2024
   not reachable). Study: `design/cutscene-study/18-barrage-release-bass.md`.
 - Gates at this commit: 565 tests, selene 0, stylua clean, rojo build OK.
+- **kits-8t (2026-11-20):** round 9 uploaded (D cinematic hit 84261478851012, E riser into planet 112351575931357, F braam
+  swell 127775643599037) and is now the `ult_release` choice (D default). A new `releaseRise` cue starts it 1.6 s before
+  the release (`RELEASE_RISE`, on the haymaker's contact) so its boom lands as the target is thrown; the blast plays no
+  sound of its own. Replay: D loaded and started at 5.0 s. Build stamp `kits-8t+village-4+ui-20e`; 566 tests.

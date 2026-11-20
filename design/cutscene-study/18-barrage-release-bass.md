@@ -48,3 +48,6 @@ Library candidates (Sonniss GDC 2026, measured the same way):
   A thump + roar 80095578441457, B deep body 84880153310920 (lows made mono), C sinking 97481582534056 (closest to the
   Kakyoin hit: deepest, down 20 dB by 0.3 s, then the rumble). Role `ult_release` in Config/SoundCandidates; A plays
   until the owner picks in the Studio sound picker (P).
+- Round 8 rejected ("none really sound like the references"; favourite: Benimaru). Round 9 (`sfx-lab/build_round9.ps1`,
+  from the Sonniss 2016/2019/2020 picks), each with its boom at 1.6 s: D cinematic hit 84261478851012, E riser into planet
+  112351575931357, F braam swell 127775643599037. They start 1.6 s before the release (cue `releaseRise`).

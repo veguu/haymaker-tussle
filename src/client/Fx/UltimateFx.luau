@@ -401,11 +401,9 @@ end
 -- thud the blast half was loudest at +0.95 s, the downer, so the whole K1 is the better blast.)
 -- kits-8r: the release is Fx/ReleaseFx (the owner: "make it kind of like a serious punch", "a lot better and flashy"),
 -- from the attacker's fist along the throw (was a big PunchHitFx)
-local function blast(ctx: Context, state: State)
+local function blast(ctx: Context, _state: State)
 	local at = chest(ctx)
-	-- kits-8r (the owner: "having the punch sound twice isnt good, instead i want something bassy"): the release bass
-	-- (Config/SoundCandidates ult_release, picked in the Studio sound picker), not the heavy hit again
-	sound("ult_release", ctx, state, { volume = 1 })
+	-- (kits-8t: the release's sound is the bass, started 1.6 s earlier by `releaseRise` so its boom lands here)
 	local arm = ctx.attacker:FindFirstChild("Right Arm")
 	local fist = if arm and arm:IsA("BasePart")
 		then (arm.CFrame * CFrame.new(0, -1, 0)).Position
@@ -415,6 +413,12 @@ local function blast(ctx: Context, state: State)
 	if floor then
 		StepBurstFx.play(floor, 2, true)
 	end
+end
+-- kits-8r/8t (the owner: "having the punch sound twice isnt good, instead i want something bassy", favourite reference
+-- Benimaru's Crimson Moon): the release bass (Config/SoundCandidates ult_release, picked in the Studio sound picker)
+-- swells through the slow sink from here and booms on the release (Core/Ultimates RELEASE_RISE)
+local function releaseRise(ctx: Context, state: State)
+	sound("ult_release", ctx, state, { volume = 1 })
 end
 local function launch(ctx: Context, _state: State)
 	local root = rootOf(ctx.target)
@@ -452,6 +456,7 @@ local BASE: { [string]: (Context, State) -> () } = {
 	impact = impact,
 	haymaker = haymaker,
 	plunge = plunge,
+	releaseRise = releaseRise,
 	blast = blast,
 	launch = launch,
 }

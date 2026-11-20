@@ -702,6 +702,38 @@ return {
 			`the flurry's fists stop {total / index} studs short on average`
 		)
 	end,
+	["the release bass swells through the sink and booms on the release (kits-8t)"] = function()
+		-- the owner: "having the punch sound twice isnt good, instead i want something bassy"; favourite reference: Benimaru's
+		-- Crimson Moon (a swell, the boom ~1.6 s in, a drone). The bass starts so its boom lands on the release.
+		local SoundCandidates = require("../src/shared/Config/SoundCandidates")
+		local line = Ultimates.TIMELINES.Base
+		local at: { [string]: number } = {}
+		for _, cue in line.cues do
+			at[cue.name] = at[cue.name] or cue.t
+		end
+		assert(
+			at.releaseRise and at.blast and at.haymaker,
+			"the bass, the release and the haymaker are cued"
+		)
+		local rise = at.blast - at.releaseRise
+		assert(
+			math.abs(rise - 1.6) < 0.05,
+			`the bass starts {rise} s before the release (its boom is 1.6 s in)`
+		)
+		assert(
+			at.releaseRise >= at.haymaker,
+			"it starts with the contact, not before the fist lands"
+		)
+		local options = SoundCandidates.OPTIONS.ult_release
+		assert(options and #options > 0, "no release bass to play")
+		for _, option in options do
+			local take = option.takes[1]
+			assert(
+				take.length - (take.start or 0) >= rise + 1.5,
+				`bass "{option.name}" ends before its drone`
+			)
+		end
+	end,
 	["the barrage sound lasts the whole flurry (kits-8g)"] = function()
 		-- the owner: "the barrage sound doesnt play until the end of the animation" (a 1.02 s file over 1.875 s of punches)
 		local SoundCandidates = require("../src/shared/Config/SoundCandidates")
