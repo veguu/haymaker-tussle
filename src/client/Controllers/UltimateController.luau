@@ -181,11 +181,10 @@ function UltimateController:KnitStart()
 		-- Off while the timeline owns the body; back on afterwards holding the facing the body has then.
 		-- the attacker shown as the striking arm alone (Ultimates soloArm, the drawn view's close-ups), and back
 		local soloShown = false
+		local vanished = false -- kits-8m: hidden for the flash step
 		local function setSolo(part: string, on: boolean)
 			for _, item in attacker:GetDescendants() do
-				if item:IsA("BasePart") and item.Name ~= part then
-					item.LocalTransparencyModifier = if on then 1 else 0
-				elseif item:IsA("Decal") then
+				if (item:IsA("BasePart") and item.Name ~= part) or item:IsA("Decal") then
 					item.LocalTransparencyModifier = if on then 1 else 0
 				end
 			end
@@ -209,7 +208,11 @@ function UltimateController:KnitStart()
 
 		local connection: RBXScriptConnection? = nil
 		connection = RunService.RenderStepped:Connect(function()
-			local t = if clock then clock() else workspace:GetServerTimeNow() - startedAt
+			-- (cutscene time: the timeline's pauses in, kits-8i)
+			local t = Ultimates.clock(
+				line,
+				if clock then clock() else workspace:GetServerTimeNow() - startedAt
+			)
 			if role and t < ending + 0.1 then
 				hideUi(hiddenUi)
 			end
@@ -449,6 +452,16 @@ function UltimateController:KnitStart()
 					setSolo(solo.part, inside)
 				end
 			end
+			-- kits-8m, the flash step: the attacker gone on EVERY screen while carried to the hook (a part named "" is
+			-- none, so setSolo hides the whole body)
+			local gone = line.vanish
+			if gone then
+				local inside = t >= gone.from and t < gone.to and attacker.Parent ~= nil
+				if inside or vanished then
+					setSolo("", inside)
+					vanished = inside
+				end
+			end
 			-- The dip to black: timed so the camera swap below (at ending + 0.1) happens under full black.
 			if role and not dipped and t >= ending + 0.1 - DIP_IN - DIP_HOLD * 0.5 then
 				dipped = true
@@ -477,8 +490,8 @@ function UltimateController:KnitStart()
 					camera.CameraType = Enum.CameraType.Custom
 					camera.FieldOfView = fovBefore
 				end
-				if soloShown and line.soloArm then
-					setSolo(line.soloArm.part, false)
+				if (soloShown and line.soloArm) or vanished then
+					setSolo("", false)
 				end
 				if myFacing and myFacing.Parent then
 					local root = myFacing.Parent :: BasePart
@@ -544,7 +557,8 @@ function UltimateController:KnitStart()
 			end)
 			task.spawn(function()
 				-- (the cutscene stops at its end + 0.1, so its clock never reads past that)
-				local ending = line.cinematic + cfg.FlightSeconds + 0.05
+				-- (`At` is real replay time: the pauses added in)
+				local ending = Ultimates.realAt(line, line.cinematic) + cfg.FlightSeconds + 0.05
 				while (tonumber(replay:GetAttribute("At")) or 0) < ending and me.Parent do
 					task.wait(0.1)
 				end

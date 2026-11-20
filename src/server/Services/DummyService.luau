@@ -814,7 +814,7 @@ local function stepDummy(
 	local ult = Knit.GetService("UltimateService"):CarriedPose(dummy.model)
 	if ult then
 		local line = ult.line
-		local t = workspace:GetServerTimeNow() - ult.startedAt
+		local t = Ultimates.clock(line, workspace:GetServerTimeNow() - ult.startedAt) -- (the pauses in, kits-8i)
 		humanoid.WalkSpeed = 0
 		humanoid:Move(Vector3.zero, false)
 		dummy.state = Momentum.stopped(dummy.state)

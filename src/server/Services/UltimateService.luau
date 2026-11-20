@@ -164,17 +164,18 @@ local function start(self: any, player: Player, attacker: Model, target: Model)
 		flightEnd
 	)
 
-	-- The throw: the ring-out is credited to the attacker however the target's body gets there.
-	task.delay(line.cinematic, function()
+	-- The throw: the ring-out is credited to the attacker however the target's body gets there. (kits-8i: in real
+	-- seconds, the timeline's pauses added in)
+	task.delay(Ultimates.realAt(line, line.cinematic), function()
 		if target.Parent and attacker.Parent then
 			Knit.GetService("RoundService"):NoteHit(target, attacker)
 			Knit.GetService("StaggerService"):AddHit(target)
 		end
 	end)
-	task.delay(line.attackerFree, function()
+	task.delay(Ultimates.realAt(line, line.attackerFree), function()
 		release(attacker)
 	end)
-	task.delay(line.cinematic + cfg.FlightSeconds, function()
+	task.delay(Ultimates.realAt(line, line.cinematic) + cfg.FlightSeconds, function()
 		release(target)
 		self._ended:FireAllClients(attacker, target)
 	end)

@@ -28,10 +28,14 @@ local DrawnImpact = require(script.Parent.DrawnImpact)
 local PunchHitFx = require(script.Parent.PunchHitFx)
 local StepBurstFx = require(script.Parent.StepBurstFx)
 local AirFx = require(script.Parent.AirFx)
+local FlashStepFx = require(script.Parent.FlashStepFx)
+local BarrageHitFx = require(script.Parent.BarrageHitFx)
+local ReleaseFx = require(script.Parent.ReleaseFx)
 local CutsceneScreen = require(script.Parent.CutsceneScreen)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Sfx = require(ReplicatedStorage.Shared.Sfx)
 local SoundBank = require(ReplicatedStorage.Shared.Config.SoundBank)
+local Ultimates = require(ReplicatedStorage.Shared.Core.Ultimates)
 
 local Tex = FxKit.Tex
 
@@ -231,12 +235,24 @@ local function charge(ctx: Context)
 	end
 end
 
--- The rush in: its whoosh only. The dash effect is gone (kits-7f, the owner: "i dont like the dash vfx for the
--- animation"; the gap study: its white part copies stacked into a blob and no reference rush uses copies). Its
--- replacement, the "Rush Lane" (a ground ring, one trail along the path, a skid), is stage E of
--- design/haymaker-rush-v4-gaps.md.
-local function dash(ctx: Context, state: State)
-	foreground(ctx, state, "dash", { volume = 0.8, cut = 0.7 })
+-- The rush in (kits-8m): a FLASH STEP instead of the run (the owner: "the player just vanishes and reappears at the
+-- location. with some black and white flash step vfx"). The whoosh on the vanish; Fx/FlashStepFx draws it.
+local function flashTo(ctx: Context): Vector3
+	return ctx.anchor:PointToWorldSpace(Ultimates.FLASH_TO)
+end
+local function vanish(ctx: Context, state: State)
+	foreground(ctx, state, "dash", { volume = 0.8, pitch = 1.15, cut = 0.45 })
+	local root = rootOf(ctx.attacker)
+	FlashStepFx.vanish(
+		ctx.attacker,
+		ctx.target,
+		if root then root.Position else ctx.attackerFrom,
+		flashTo(ctx)
+	)
+end
+local function appear(ctx: Context, _state: State)
+	local to = flashTo(ctx)
+	FlashStepFx.appear(ctx.attacker, ctx.target, to, to - ctx.attackerFrom)
 end
 
 -- The first blow, a right hook: big, and the bed comes up to its level.
@@ -275,12 +291,19 @@ local function barrage(ctx: Context, state: State)
 	foreground(ctx, state, "ult_barrage", { volume = 1 })
 end
 
+-- kits-8r (the owner: "default punch doesnt really work here"; pick: black and white): each punch is Fx/BarrageHitFx at
+-- the striking fist's own tip, along the way that arm points (right lands first, BarrageUp, then left, in turn)
 local function flurryHit(ctx: Context, state: State)
 	state.flurry = (state.flurry or 0) + 1
-	-- right lands first (BarrageUp), then left, in turn; each burst points up and away, the way the fist drives
 	local side = if state.flurry % 2 == 1 then "Right" else "Left"
-	local up = (outward(ctx) + Vector3.new(0, 1.2, 0)).Unit
-	PunchHitFx.play(chest(ctx) + fistSide(ctx, side) * 0.6, up, 0.8, nil, false, nextTurn(state))
+	local arm = ctx.attacker:FindFirstChild(side .. " Arm")
+	if arm and arm:IsA("BasePart") then
+		local tip = (arm.CFrame * CFrame.new(0, -1, 0)).Position
+		BarrageHitFx.play(tip, -arm.CFrame.UpVector, state.flurry)
+	else
+		local up = (outward(ctx) + Vector3.new(0, 1.2, 0)).Unit
+		BarrageHitFx.play(chest(ctx) + fistSide(ctx, side) * 0.6, up, state.flurry)
+	end
 end
 
 local function uppercut(ctx: Context, state: State)
@@ -349,11 +372,9 @@ end
 
 -- The haymaker: ONE complete designed hit (the user: one sound that is the thing, not a stack of parts), on
 -- the frame the fist lands, after the silence.
--- kits-8h: the drawn contact frames and the hit's sound come first, as the fist snaps out ("impact", 0.06 s before
--- the contact; the owner: "you should see the frame before you ssee the punch hit"); the burst lands on the contact,
--- as the frames clear onto the fist already in.
+-- kits-8h: the hit's sound comes first ("impact"; the owner: "you should see the frame before you ssee the punch hit").
+-- kits-8k: on the contact; the fist plunge frames flash a moment after it.
 local function impact(ctx: Context, state: State)
-	drawn(ctx, "contact")
 	-- kits-8g: only the heavy hit's front here (the whole of it is the blast's, 1.6 s later)
 	sound("ult_haymaker", ctx, state, { volume = 1, cut = HAYMAKER_CUT })
 end
@@ -363,7 +384,11 @@ local function haymaker(ctx: Context, state: State)
 	PunchHitFx.play(at + fistSide(ctx, "Right"), outward(ctx), 2.2, nil, true, nextTurn(state))
 end
 
--- right before they fly (kits-8e): the drawn fist plunge, ending as the blast goes full speed
+-- kits-8k (the owner: "right after the animation lands ... like immediately"): each drawn run flashes the moment after
+-- its blow lands: the ink burst on the uppercut, the fist plunge on the haymaker (until kits-8h, right before the blast)
+local function burst(ctx: Context, _state: State)
+	drawn(ctx, "contact")
+end
 local function plunge(ctx: Context, _state: State)
 	drawn(ctx, "plunge")
 end
@@ -374,14 +399,26 @@ end
 -- this moment: its roar's highs sweep down (the muffle) and a bass downer sinks under it, in the one file, so nothing
 -- here re-filters or re-pitches it. The contact plays only its front. (A split rebuild was measured first: without the
 -- thud the blast half was loudest at +0.95 s, the downer, so the whole K1 is the better blast.)
-local function blast(ctx: Context, state: State)
+-- kits-8r: the release is Fx/ReleaseFx (the owner: "make it kind of like a serious punch", "a lot better and flashy"),
+-- from the attacker's fist along the throw (was a big PunchHitFx)
+local function blast(ctx: Context, _state: State)
 	local at = chest(ctx)
-	sound("ult_haymaker", ctx, state, { volume = 1 })
-	PunchHitFx.play(at, outward(ctx), 3, nil, true, nextTurn(state))
+	-- (kits-8t: the release's sound is the bass, started 1.6 s earlier by `releaseRise` so its boom lands here)
+	local arm = ctx.attacker:FindFirstChild("Right Arm")
+	local fist = if arm and arm:IsA("BasePart")
+		then (arm.CFrame * CFrame.new(0, -1, 0)).Position
+		else at
+	ReleaseFx.play(fist, outward(ctx), ctx.attacker)
 	local floor = FxKit.floorUnder(at, 16, { ctx.attacker, ctx.target })
 	if floor then
 		StepBurstFx.play(floor, 2, true)
 	end
+end
+-- kits-8r/8t (the owner: "having the punch sound twice isnt good, instead i want something bassy", favourite reference
+-- Benimaru's Crimson Moon): the release bass (Config/SoundCandidates ult_release, picked in the Studio sound picker)
+-- swells through the slow sink from here and booms on the release (Core/Ultimates RELEASE_RISE)
+local function releaseRise(ctx: Context, state: State)
+	sound("ult_release", ctx, state, { volume = 1 })
 end
 local function launch(ctx: Context, _state: State)
 	local root = rootOf(ctx.target)
@@ -404,12 +441,14 @@ end
 
 local BASE: { [string]: (Context, State) -> () } = {
 	flash = flash,
-	dash = dash,
+	vanish = vanish,
+	appear = appear,
 	blow = blow,
 	punchLeft = punch("Left"),
 	punchRight = punch("Right"),
 	barrage = barrage,
 	flurryHit = flurryHit,
+	burst = burst,
 	uppercut = uppercut,
 	leap = leap,
 	windup = windup,
@@ -417,6 +456,7 @@ local BASE: { [string]: (Context, State) -> () } = {
 	impact = impact,
 	haymaker = haymaker,
 	plunge = plunge,
+	releaseRise = releaseRise,
 	blast = blast,
 	launch = launch,
 }

@@ -33,10 +33,11 @@ export type Option = {
 -- (ORDER, ABOUT, OPTIONS, and AUDITION if it plays as a rhythm) to offer choices again.
 
 -- What each role is for, in the order the picker shows them.
-SoundCandidates.ORDER = { "ult_barrage" } :: { string }
+SoundCandidates.ORDER = { "ult_barrage", "ult_release" } :: { string }
 
 SoundCandidates.ABOUT = {
 	ult_barrage = "Haymaker Rush's flurry: ONE rapid-punches sound over the whole 1.9 s barrage (kits-7d)",
+	ult_release = "Haymaker Rush's release: a bass swelling through the slow sink, booming as the target is thrown (kits-8t)",
 } :: { [string]: string }
 
 -- How the picker plays each role, so it sounds the way the game plays it: `options` as Sfx.play takes them,
@@ -67,6 +68,20 @@ local function barrage(
 		takes = { { id = id, length = length, start = 0, volume = 1 } },
 	}
 end
+-- ult_release (kits-8r, 2026-11-19, the owner: "having the punch sound twice isnt good, instead i want something bassy",
+-- references: Kakyoin's death 2.5 s and Benimaru's Crimson Moon). Round 8 (sfx-lab/build_round8.ps1, aimed at the Kakyoin
+-- hit; 80095578441457, 84880153310920, 97481582534056) was rejected: "none really sound like the references", the
+-- favourite is Benimaru. Round 9 (sfx-lab/build_round9.ps1) is shaped like it: a swell, the boom 1.6 s in, a drone held
+-- 2 s; from Sonniss GDC 2016/2019/2020 recordings; uploaded to the game's group 2026-11-20. It starts 1.6 s before the
+-- release (Core/Ultimates RELEASE_RISE), so the boom lands on it (design/cutscene-study/18-barrage-release-bass.md).
+local function bass(label: string, id: number, name: string): Option
+	return {
+		label = label,
+		name = name,
+		creator = "Haymaker Tussle (Sonniss GDC 2016-2020 sources)",
+		takes = { { id = id, length = 4, start = 0, volume = 1.2 } },
+	}
+end
 SoundCandidates.OPTIONS = {
 	-- kits-8g, the owner: "the barrage sound doesnt play until the end of the animation". The flurry's punches run 1.875 s
 	-- (1.70 to 3.575) and the default, the first option, was 1.02 s long: the last 0.85 s of punches had no sound. Only
@@ -77,6 +92,11 @@ SoundCandidates.OPTIONS = {
 		barrage("A", 114289646726161, 2.12, "Rapid punches sfx", "isiahjen8"),
 		barrage("B", 102850005066154, 3.51, "Multi Punch / Barrage", "Kaaizarr"),
 		barrage("C", 95801559782723, 1.83, "one punch man barrage hit sfx", "Axellatic"),
+	},
+	ult_release = {
+		bass("D", 84261478851012, "HT release bass D: cinematic hit"),
+		bass("E", 112351575931357, "HT release bass E: riser into planet"),
+		bass("F", 127775643599037, "HT release bass F: braam swell"),
 	},
 } :: { [string]: { Option } }
 return SoundCandidates

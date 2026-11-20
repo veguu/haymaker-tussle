@@ -132,6 +132,12 @@ export type Timeline = {
 	-- kits-8h: while `from` <= t < `to`, on the fighters' screens, the attacker shows only `part` (the drawn view's
 	-- close-ups, where the camera sits beside the attacker's shoulder and the drawing shows only the striking arm)
 	soloArm: { from: number, to: number, part: string }?,
+	-- kits-8m: while `from` <= t < `to` the attacker's whole body is hidden on every screen (a flash step)
+	vanish: { from: number, to: number }?,
+	-- kits-8i: PAUSES. At each `t` the cutscene's clock stops for `seconds` of real time (a drawn impact run plays over
+	-- it), then runs on. Every time in this timeline is cutscene time; Ultimates.clock turns real seconds into it and
+	-- Ultimates.realAt the other way. Sorted by `t`.
+	holds: { { t: number, seconds: number } }?,
 }
 
 -- BASE: "Haymaker Rush" (2026-11-16). The user picked it over a black-and-white "Lights Out" (full colour,
@@ -159,7 +165,7 @@ export type Timeline = {
 --   * THE RESULT in line with the throw: the target shoots away from the lens.
 --
 --   0.00 lock-in    close insert on the attacker's face and fist, slow push                      glint
---   0.40 rush in    FIXED camera behind their start; they sprint away from it                     streaks
+--   0.48 rush in    behind their start; 0.68 vanish, 0.78 reappear: the same camera zooms in      flash step
 --   1.14 1st blow   flash, SNAP to a low 3/4 two-shot; freeze 0.2 s; jolt                         m1_finish
 --   1.70 flurry     ONE held framing, low side 3/4, tilted; slow drift; jitter: 16 punches         ult_barrage
 --   3.84 uppercut   flash, SNAP to a worm's-eye front-side; freeze 0.25 s; jolt up; tilt after them
@@ -170,9 +176,20 @@ export type Timeline = {
 --   6.15 blast      in line with the throw, from below behind them: the target shoots away
 --
 -- Space: the target starts at the origin facing +Z, the attacker comes in at +Z. y = 0 is root height.
-local DASH = 0.4 -- the rush in starts
-local RUSH_LAUNCH = 0.08 -- the launch crouch before the body moves (RushIn)
-local BLOW = 1.14 -- the running right hook lands
+-- THE FLASH STEP (kits-8m, 2026-11-19), the owner: "instead of having a running animation towards the target at the
+-- start, i think itd be better if the player just vanishes and reappears at the location. with some black and white
+-- flash step vfx" (references: Bleach's sonido and flash step, two Roblox flashsteps; study: Bleach smears the body
+-- for 1-2 frames and is simply THERE, gone in between; the Roblox one leaves fading copies, wind streaks and puffs).
+-- The lock-in pushes in on the crouched attacker; the cut over the target's shoulder shows them far off; they vanish
+-- (Fx/FlashStepFx: a smear of black copies, a streak along the path, a puff), are gone 0.1 s, and reappear in front
+-- of the target already in the hook's swing. The hook lands at the same BLOW, so nothing after it moved.
+-- kits-8n, the owner on kits-8m: the camera after the teleport should be "the same perspective before the tp", "zoomed in
+-- to match the current position", and "a short pause before the hit lands": the step comes 0.16 s sooner, the same
+-- shot snaps in on the attacker as they reappear, and the hook draws back through a 0.29 s pause before it lands.
+local DASH = 0.48 -- the cut over the target's shoulder, the attacker still crouched far off
+local VANISH = 0.68 -- the body is gone (and carried, hidden, to the hook)
+local APPEAR = 0.78 -- and back in front of the target
+local BLOW = 1.14 -- the right hook lands
 local BLOW_FREEZE = 0.2
 local FLURRY_FROM = 1.7 -- the first rising punch lands
 local FLURRY_STEP = 0.125 -- ~8 a second (BarrageUp lands right at 0.0625, left at 0.1875 of its 0.25 s loop)
@@ -234,24 +251,44 @@ end
 Ultimates.DRAWN = DRAWN
 Ultimates.drawnLength = drawnLength
 -- kits-8h, the owner: "the impact frame comes too late, it hits midway through the gut punch ... you should see the
--- frame before you ssee the punch hit". The contact frames flash as the fist snaps out (RELEASE, 0.07 s before the
--- contact) and clear onto the fist already landed; the heavy hit's sound goes with them (the "impact" cue).
--- Then "uhh the flash still happens after the punch connects": measured in a live ultimate (with the attacker's facing
--- fixed), the fist reaches the chest front on screen about 4.965 s, 0.035 s after HAYMAKER (the swing lags the body a
--- frame). So the frames start with the snap itself and are gone just before the fist lands: the frame, then the hit.
-local CONTACT_FLASH = RELEASE
-local HAY_CARDS = CONTACT_FLASH - HAYMAKER + drawnLength("contact") -- the contact frames' end, after the contact
+-- frame before you ssee the punch hit". kits-8h read that as the haymaker and moved the frames 0.07 s earlier there.
+-- kits-8i (2026-11-19), the owner at full speed with sound: "both impact frames come wayy to late, like a whole second
+-- or so after the hit itself", "create small pauses right before the uppercut and the final punch". The "gut punch" is
+-- the UPPERCUT (into the folded belly): the ink burst flashed at 4.86, 1.02 s after the uppercut landed (3.84), and the
+-- plunge at 6.43, 1.5 s after the final punch landed (4.93). So each run now belongs to its blow (the burst to the
+-- uppercut, the fist plunge to the haymaker); kits-8i played them in a PAUSE just before the fist landed, kits-8j a
+-- shorter one ("it plays a little too earlier").
+-- kits-8k, the owner on kits-8j: "actually i think the frames should be right after the animation lands, not right
+-- before. but not like a lot after but like immediately". So no pauses (the `holds` mechanism stays, empty): you SEE the
+-- fist land, then the drawings flash a couple of frames later, over the uppercut's freeze and the haymaker's slow sink.
+-- The uppercut's fist is on the body at UPPERCUT (its swing is synced to the contact); the haymaker's reaches the chest
+-- front about 0.035 s after HAYMAKER (measured live in kits-8h: the swing lags the body a frame), so its run waits a
+-- frame longer.
+local UPPER_FRAMES = UPPERCUT + 0.03
+-- kits-8p, the owner: "i want the second impact frame to appear after the last punch lands, right now it plays slightly
+-- before": a few frames later again
+local HAY_FRAMES = HAYMAKER + 0.1
 -- the owner (kits-8e): "the last punch happens too fast", "the part where the fist sinks in should be longer". The slow
--- part runs 1.62 s (it was 0.8): the same sink, stretched, about 1.4 s of it between the two drawn runs (kits-8g).
+-- part runs 1.62 s (it was 0.8): the same sink, stretched.
 local SOAK = HAYMAKER + 0.38 -- the fist sunk in, the fold deepest (a key only now; no cards)
 local SLOW_TO = HAYMAKER + 1.62 -- the slow part: the knockback in slow motion, the body MOVING away all through it
-local PLUNGE = SLOW_TO - drawnLength("plunge") -- the fist plunge frames, right before they fly
+-- kits-8t: the release bass (Config/SoundCandidates ult_release, shaped like the owner's favourite, Benimaru's Crimson
+-- Moon: a swell, the boom 1.6 s in, a drone) starts this long before the release, so it swells through the slow sink
+-- and booms as the target is thrown
+local RELEASE_RISE = 1.6
+-- the drawn view's eye on the sunk fist, where the plunge frames flashed until kits-8h (its numbers are still that
+-- moment's; tests "the camera sees the haymaker as the drawn plunge does")
+local SINK_EYE = SLOW_TO - drawnLength("plunge")
 -- how fast the follow-through plays meanwhile (of real speed): halved with the slow part doubled, so the fist drives
 -- through the same stretch of the clip, only slower
 local HAY_SLOW = 0.15
 local BLAST = SLOW_TO -- full speed: the blast, and the cut to the throw line
 local THROWN = BLAST + 0.3 -- the flight takes over, at the speed the knockback has reached
 local HOOK_STRIKE = 0.16 -- AnimClips HookLeft/HookRight `strike`
+local HOOK_HOLD = 0.09 -- and `hold`: the arm drawn back
+local HOOK_CONTACT = 0.025 -- the hook's fist is centred on the target 0.025 s after its strike (measured)
+local HOOK_RELEASE = BLOW - 0.07 -- kits-8n: drawn back until here, then snapped forward (like the haymaker's 0.07 s)
+local HOOK_FROM = 3 -- kits-8o: where they reappear (root to root), clear of the target while the hook winds up
 local HAYMAKER_HOLD = 0.38 -- AnimClipsUltimate HaymakerUp `hold` (the dive pose, the fist cocked)
 local HAYMAKER_STRIKE = 0.45 -- and its `strike` (the contact)
 -- root to root when the running hook lands on a standing target. Measured in play (kits-7f): at 3.0 the hook's fist
@@ -262,8 +299,25 @@ local REACH = 1.5
 -- torso floating just above and in front of the striker's head (they overlap on screen), the striker punching up
 -- from a wide low stance. So: 2.6 ahead and 3.2 up (about a body height root to root, the B7 pick), the body
 -- upright with only small head-snap tilts (kits-7i's big pitch-back laid them flat over the striker's head).
-local UP_REACH = 2.6
-local JUGGLE_Y = 3.2
+-- kits-8l, the owner: "position the target more above the player, right now it looks like the barrage is hitting the
+-- head instead of the torso". Measured (lune/flurry_check, the baked BarrageUp on the posed bodies): the fists landed
+-- 1.0-2.1 studs in FRONT of the chest, so from behind the attacker they met the head on screen. The target now hangs
+-- 1.6 ahead (nearly overhead) and 2.7 up: every punch reaches the torso (on average 0.5 below the chest's centre, the
+-- belly to mid chest) and no part of the two bodies overlaps. The hook still knocks them out to JUGGLE_OUT; the
+-- attacker steps in under them for the flurry, so everything from the set on stays where it was.
+-- kits-8p, the owner (with lines drawn on a screenshot, the body low and diagonal over the attacker's head): "i want the
+-- target to be rotated a bit forward so the torso is facing directly towards the punches, might need some
+-- repositioning too". Searched on the rig (lean, height, reach; lune/flurry_check): pitched 60 deg forward (it was 30),
+-- 0.3 lower and 0.3 closer, the fists stop 0.25 studs from the torso on average (was 0.48), drive 44 deg off straight
+-- into the chest (was 57) and the bodies never overlap. BarrageUp's two high punches (its 3rd and 8th) go up and out
+-- and meet the shoulder at any height; lower, they ride up past it toward the head.
+-- kits-8q, the owner: "the target needs to be a bit farther back, but the angle is good": 0.4 farther (1.7 ahead) and
+-- 0.2 higher (farther back alone, the leaning head came down over the first punches); the fists stop 0.56 short on
+-- average (0.92 at most), none on the head, still no overlap.
+local JUGGLE_OUT = 2.6
+local UP_REACH = 1.7
+local JUGGLE_Y = 2.6
+local JUGGLE_LEAN = -60
 -- each punch knocks them up this much and they sink back into the next (kits-7k: Garou vs Stinger holds the one in the
 -- air at ONE height for the whole 1.5 s, measured; 0.45 read as twitching)
 local JUGGLE_BOB = 0.12
@@ -330,7 +384,7 @@ local SINK_DROP_SOAK = 0.4
 local SINK_DROP_SLOW = 0.5
 
 -- where the dash starts and the launch parks them (anchor space; the same numbers rushKeys builds), for the dash shot
-local CAUGHT_Z = REACH - UP_REACH - FLURRY_HITS * JUGGLE_BACK - 0.1
+local CAUGHT_Z = REACH - JUGGLE_OUT - FLURRY_HITS * JUGGLE_BACK - 0.1
 local DASH_STAND = Vector3.new(UPPER_SIDE, 0, CAUGHT_Z + UPPER_REACH)
 local DASH_HIGH = Vector3.new(0, UPPER_CATCH + LAUNCH_UP, CAUGHT_Z - LAUNCH_BACK)
 
@@ -346,13 +400,24 @@ local function rushKeys(): { Key }
 	local keys: { Key } = {
 		{ t = 0, target = Vector3.new(0, 0, 0) },
 		-- the charge: where they were (no attacker key = their own place)
-		{ t = DASH, target = Vector3.new(0, 0, 0) },
-		-- the launch crouch holds them in place 0.08 s (RushIn), then the rush covers the gap at FULL SPEED from the
-		-- next frame (kits-7j, B8: the gap study: no reference eases into a rush; the eased-in start crept ~4 % in its
-		-- first 0.15 s and read as slow)
-		{ t = DASH + RUSH_LAUNCH, target = Vector3.new(0, 0, 0) },
-		-- kits-8a: an explosive start (up to full speed in the first fifth), then flat out into the hook: never a
-		-- slow creep and never braking before the blow
+		-- kits-8m, the flash step: crouched where they were until they vanish; carried while hidden (the body is
+		-- hidden from VANISH to APPEAR, `vanish`), so on screen they are simply there
+		{ t = VANISH, target = Vector3.new(0, 0, 0) },
+		-- kits-8o (the owner: "the player is too close to the target, they are clipping inside of them during the
+		-- windup"; measured on the rig: at REACH the drawn-back hook overlaps the target's body, from 3 studs nothing
+		-- does): they reappear HOOK_FROM out, creep in a little through the pause, and LUNGE in to the hook's reach on
+		-- the snap forward
+		{
+			t = APPEAR,
+			attacker = Vector3.new(0, 0, HOOK_FROM),
+			target = Vector3.new(0, 0, 0),
+		},
+		{
+			t = HOOK_RELEASE,
+			attacker = Vector3.new(0, 0, HOOK_FROM - 0.2),
+			target = Vector3.new(0, 0, 0),
+			ease = "out",
+		},
 		{
 			t = BLOW,
 			attacker = Vector3.new(0, 0, REACH),
@@ -375,7 +440,7 @@ local function rushKeys(): { Key }
 		},
 	}
 	-- the hook KNOCKS them up and back to a body height off; the attacker stays planted where the hook landed
-	local z = REACH - UP_REACH
+	local z = REACH - JUGGLE_OUT
 	table.insert(keys, {
 		t = BLOW + BLOW_FREEZE + 0.24,
 		attacker = Vector3.new(0, 0, REACH),
@@ -392,7 +457,7 @@ local function rushKeys(): { Key }
 		-- the reaction (kits-7m, the owner: "the torso should be facing the players fists"): the body pitched FORWARD
 		-- over the fists below (minus is forward), limp (the Dangle pose on top), rocked toward the side each fist came
 		-- from; each catch tips it a little further over, the bob lifts it back
-		local lean = -30
+		local lean = JUGGLE_LEAN
 		table.insert(keys, {
 			t = hit,
 			attacker = Vector3.new(sway, 0, z + UP_REACH - lurch),
@@ -500,7 +565,8 @@ end
 local function rushCues(): { { t: number, name: string } }
 	local cues = {
 		{ t = 0, name = "charge" },
-		{ t = DASH, name = "dash" },
+		{ t = VANISH, name = "vanish" },
+		{ t = APPEAR, name = "appear" },
 		{ t = BLOW, name = "flash" },
 		{ t = BLOW, name = "blow" },
 		-- the one barrage sound, from the first rising punch
@@ -511,15 +577,19 @@ local function rushCues(): { { t: number, name: string } }
 	end
 	for _, cue in
 		{
+			-- kits-8k: the cut on the hit, the ink burst the moment after it lands
 			{ t = UPPERCUT, name = "flash" },
 			{ t = UPPERCUT, name = "uppercut" },
+			{ t = UPPER_FRAMES, name = "burst" },
 			-- the load in the crouch: the charge glows on the held fist through the whole dash (no arm turning)
 			{ t = LOAD, name = "windup" },
 			{ t = TAKEOFF, name = "leap" },
 			{ t = DIP, name = "dip" },
-			{ t = CONTACT_FLASH, name = "impact" },
+			-- kits-8k: the heavy hit's front on the contact, the fist plunge the moment after it lands
+			{ t = HAYMAKER, name = "impact" },
 			{ t = HAYMAKER, name = "haymaker" },
-			{ t = PLUNGE, name = "plunge" },
+			{ t = HAY_FRAMES, name = "plunge" },
+			{ t = BLAST - RELEASE_RISE, name = "releaseRise" },
 			{ t = BLAST, name = "blast" },
 			{ t = THROWN, name = "launch" },
 		}
@@ -538,7 +608,19 @@ end
 local function rushSwings(): { Swing }
 	return {
 		-- the hook's fist is centred on the target 0.02 s after its strike (measured)
-		{ t = BLOW - HOOK_STRIKE, side = "Right", windup = HOOK_STRIKE, contact = 0.025 },
+		-- kits-8n (the owner: "a short pause before the hit lands, so the punch shouldnt finish winding up until a moment
+		-- after the tp and will keep going back until it brings it forward after the pause"): from the reappear the arm
+		-- draws back all through the pause, reaching its drawn-back pose (HookRight `hold`) only at HOOK_RELEASE, then
+		-- snaps forward to the contact
+		{
+			t = APPEAR,
+			side = "Right",
+			windup = BLOW - APPEAR,
+			contact = HOOK_CONTACT,
+			loaded = HOOK_RELEASE,
+			release = HOOK_RELEASE,
+			holdShare = HOOK_HOLD / (HOOK_STRIKE + HOOK_CONTACT),
+		},
 		-- the uppercut meets the torso at 0.075 s of its clip, a little before its strike (0.089, measured)
 		{ t = UPPERCUT - 0.1, side = "Uppercut", windup = 0.1, contact = UPPER_CONTACT },
 		-- the haymaker on the shared clock (kits-8a): LOADED in the crouch (HaymakerUp 0-0.25 by LOADED, the take-off
@@ -612,26 +694,43 @@ local HAYMAKER_RUSH: Timeline = {
 			insert = true,
 			ease = "smooth",
 		},
-		-- 0.40 the rush in (kits-8a: the owner's pick C5-A from the gap study, built at last; kits-7e's camera behind
+		-- 0.48 the rush in (kits-8a: the owner's pick C5-A from the gap study, built at last; kits-7e's camera behind
 		-- the runner foreshortened the lean and stride away, measured): over the TARGET's left shoulder, the attacker
 		-- charging AT the lens, growing from about a third of the frame to filling it, the aim following them
 		-- (`lookRel`) and the camera creeping in. Garou vs Stinger 0.90-2.73 (head-on), Human Battery F3 (ends lunging at
 		-- the lens), Jotaro (the dive at the lens). It crops the target's shoulder on purpose (an insert).
+		-- kits-8p, the owner: "keep the perspective on the player before the hit ... i want it to not change perspective,
+		-- just show the back of where the player was before dashing (turned to look at the target) and just zoom in when
+		-- the player reappears" (kits-8m cut over the target's shoulder, then kits-8o behind the attacker: two changes of
+		-- side). Now ONE camera place, behind the attacker's start on their right (rel = "start", facing the target): it
+		-- sees them crouched with their back to it, the vanish, and at the reappear the lens snaps narrower on where they
+		-- are now (aim on them, `lookRel`), pushing in a little more through the pause.
 		{
 			t = DASH,
-			cam = Vector3.new(3.4, 2.6, -5),
-			look = Vector3.new(0, 0.6, 0),
-			lookRel = "attacker",
+			cam = Vector3.new(2, 1.8, 5),
+			look = Vector3.new(0, 0.6, -6),
+			rel = "start",
 			fov = 56,
 			insert = true,
 			cut = true,
 		},
 		{
-			t = BLOW,
-			cam = Vector3.new(3.1, 2.4, -4.4),
-			look = Vector3.new(0, 0.9, 0),
+			t = APPEAR,
+			cam = Vector3.new(2, 1.8, 5),
+			look = Vector3.new(0, 0.4, -0.6),
+			rel = "start",
 			lookRel = "attacker",
-			fov = 54,
+			fov = 30,
+			insert = true,
+			cut = true,
+		},
+		{
+			t = BLOW,
+			cam = Vector3.new(2, 1.8, 5),
+			look = Vector3.new(0, 0.4, -0.6),
+			rel = "start",
+			lookRel = "attacker",
+			fov = 26,
 			insert = true,
 			ease = "smooth",
 		},
@@ -738,34 +837,24 @@ local HAYMAKER_RUSH: Timeline = {
 		-- THE DRAWN VIEW (kits-8h, the owner: "the camera zoom should match the impact frame, and also the arm
 		-- posiitoning should match the impact frame too, at least before the impact frame hits"). The plunge drawing has a
 		-- measurable eye: a real camera fitted to the drawing's own projection (lune/drawn_fit, tests/support/DrawnView):
-		-- above the target's left front, 3 studs from the torso, FOV 30.8, rolled with the folded torso. The camera zooms onto the contact ALONG that same line of
-		-- sight (1.9 times as far), so the ink burst flashes out of the fist, then pushes in along it through the whole sink
-		-- and arrives at the drawing's own eye as the plunge frames flash: the live arm and torso lie where the drawn ones
-		-- do. Offsets from the target's root (rel = "target"), printed by lune/plunge_view; the test "the camera sees the
-		-- haymaker as the drawn plunge does" fails if the pose moves and these go stale.
+		-- above the target's left front, 3 studs from the torso, FOV 30.8, rolled with the folded torso. kits-8k: the camera
+		-- whips from the pair onto the contact and arrives at the drawing's own eye as the fist lands, so the plunge frames
+		-- flash a moment later over the live arm and torso where the drawn ones are. Offsets from the target's root
+		-- (rel = "target"), printed by lune/plunge_view; the test "the camera sees the haymaker as the drawn plunge does"
+		-- fails if the pose moves and these go stale.
 		{
-			t = CONTACT_FLASH,
-			cam = Vector3.new(3.07, 1.4, 4.16),
-			look = Vector3.new(0.96, 0.08, 1.03),
+			t = HAYMAKER,
+			cam = Vector3.new(1.61, 0.32, 2.55),
+			look = Vector3.new(-0.49, -1.01, -0.59),
 			fov = 30.8,
 			roll = 6.2,
 			rel = "target",
 			insert = true,
 			ease = "whip",
 		},
-		-- held under the drawn contact frames
+		-- the sink: the eye stays on the drawing's line as the fist works in and the fold deepens
 		{
-			t = HAYMAKER + HAY_CARDS,
-			cam = Vector3.new(3.07, 1.4, 4.16),
-			look = Vector3.new(0.96, 0.08, 1.03),
-			fov = 30.8,
-			roll = 6.2,
-			rel = "target",
-			insert = true,
-		},
-		-- the sink: pushing in along the drawing's line of sight to its eye as the plunge frames flash
-		{
-			t = PLUNGE,
+			t = SINK_EYE,
 			cam = Vector3.new(1.68, -0.5, 2.66),
 			look = Vector3.new(-0.51, -1.21, -0.61),
 			fov = 30.8,
@@ -810,9 +899,11 @@ local HAYMAKER_RUSH: Timeline = {
 		{ t = TAKEOFF, studs = 0.55, x = -0.3, y = -1, seconds = 0.16 },
 		{ t = SLOW_TO, studs = 1.3, x = 1, y = 0.45, seconds = 0.26 },
 	},
-	-- the drawn view's close-ups, from the contact frames to the blast: only the striking arm of the attacker, as the
-	-- drawn plunge (the owner, kits-8h: "Hide body, keep arm"; the camera there sits beside the attacker's shoulder)
-	soloArm = { from = CONTACT_FLASH, to = BLAST, part = "Right Arm" },
+	-- the drawn view's close-ups, from the whip onto the contact to the blast: only the striking arm of the attacker, as
+	-- the drawn plunge (the owner, kits-8h: "Hide body, keep arm"; the camera there sits beside the attacker's shoulder)
+	soloArm = { from = RELEASE, to = BLAST, part = "Right Arm" },
+	-- kits-8i/8j paused the clock under the drawn runs; kits-8k (the runs right after the hits) has no pauses
+	holds = {},
 	swings = rushSwings(),
 	-- the rising flurry loop, started so its first fist lands on the first punch, stopped after the last
 	barrage = {
@@ -820,15 +911,15 @@ local HAYMAKER_RUSH: Timeline = {
 		to = LAST_PUNCH + BARRAGE_STRIKE + 0.03,
 		clip = "BarrageUp",
 	},
-	-- the sprint while the body is carried in: its legs and torso under RushRun's arms (kits-8a)
-	dash = { from = DASH + RUSH_LAUNCH, to = BLOW },
+	-- kits-8m: the flash step: the attacker's body hidden on every screen while it is carried to the hook (no run any
+	-- more: kits-8a's RushRun sprint and `dash` are retired)
+	vanish = { from = VANISH, to = APPEAR },
 	-- the attacker's whole-body pose clips (kits-7j; AnimController.SyncClip, each held on its last frame until the
-	-- next): the lock-in and launch crouch, the run's arms (the Sprint legs under them), the uppercut's set crouch;
-	-- from LOAD the haymaker swing has the whole body (kits-8a: nothing else plays under it, no LeapUp overlap)
+	-- next): the lock-in and launch crouch (held until they reappear), the uppercut's set crouch; from LOAD the
+	-- haymaker swing has the whole body (kits-8a: nothing else plays under it, no LeapUp overlap)
 	clips = {
 		{ t = 0, name = "RushIn" },
-		{ t = DASH + RUSH_LAUNCH, name = "RushRun" },
-		{ t = BLOW, name = "" },
+		{ t = APPEAR, name = "" },
 		{ t = LAST_PUNCH + 0.14, name = "UpperSet" },
 		{ t = LOAD, name = "" },
 	},
@@ -844,6 +935,9 @@ local HAYMAKER_RUSH: Timeline = {
 	blows = rushBlows(),
 }
 
+-- kits-8m: where the flash step lands the attacker (anchor space), for Fx/FlashStepFx's path
+Ultimates.FLASH_TO = Vector3.new(0, 0, HOOK_FROM)
+
 Ultimates.TIMELINES = {
 	Base = HAYMAKER_RUSH,
 } :: { [string]: Timeline }
@@ -851,6 +945,32 @@ Ultimates.TIMELINES = {
 --- The timeline for a kit: its own, or Base's "Haymaker Rush", the default ultimate, until it has one.
 function Ultimates.timeline(kitId: string?): Timeline?
 	return Ultimates.TIMELINES[kitId or "Base"] or Ultimates.TIMELINES.Base
+end
+
+--- kits-8i: the cutscene time `real` seconds after the start, with the timeline's pauses (`holds`) in: the clock
+--- stands at a hold's `t` for its `seconds`, then runs on.
+function Ultimates.clock(line: Timeline, real: number): number
+	local t = real
+	for _, hold in line.holds or {} do
+		if t <= hold.t then
+			break
+		elseif t < hold.t + hold.seconds then
+			return hold.t
+		end
+		t -= hold.seconds
+	end
+	return t
+end
+
+--- The real seconds after the start at which the cutscene's clock reaches `t` (the pauses before it added in).
+function Ultimates.realAt(line: Timeline, t: number): number
+	local real = t
+	for _, hold in line.holds or {} do
+		if hold.t < t then
+			real += hold.seconds
+		end
+	end
+	return real
 end
 
 --- The swings and blows that fall between `from` (exclusive) and `to` (inclusive).
