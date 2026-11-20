@@ -5078,7 +5078,7 @@ The owner's asks this sitting, with his words, in order:
   frame cost (pieces per burst went from about 84 Frames to about 42 on the class name).
 - A local server (python http.server, port 8765, folder work/) was left running for the mockups.
 
-## lobby-6 (2026-11-20): training as FOUR ZONES in a 2 x 2 grid; the obby over the training cross and out to BELL ROCK. IN THE PLACE (saved v582), NOT COMMITTED.
+## lobby-6 (2026-11-20): training as FOUR ZONES in a 2 x 2 grid; the obby over the training cross and out to BELL ROCK. IN THE PLACE (saved v582), COMMITTED.
 Owner: "in the lobby, the OBBY should use the extra space in the training area, ALSO maybe make it lead to another
 island behind them where u get there with floating island platforms, make it creative. and ALSO revamp the training
 area, there SHOULD four distinct areas, one is arena where u can 1v1 a bot, one just a row of dummies to be hit, one
@@ -5155,6 +5155,9 @@ where ring-outs count; "clashing dummy" = a steady beat with a warning flash; th
   CombatService}.luau, src/client/Controllers/{BarrierController,LobbyFlightController}.luau,
   tests/{Lobby,TrainingGrounds}.spec.luau, design/lobby/out/village/*. Several of these also hold train-1, lobby-5
   and quest-1 work that was never committed.
+- **COMMITTED (2026-11-20, on his "Just commit now"):** the code, tests, game.json and this section went in with
+  1453daa (another session's commit of the working tree); the Blender sources and build outputs as 5f64b2a, pushed.
+  Not committed: `design/lobby/out/village/textures/` (15 MB, never committed before) and the scratch builds.
 
 ## kits-8i..8s (2026-11-19/20): impact frames on their hits, flash step, barrage and release VFX, release bass (patched by hash)
 Build stamp `kits-8s+village-4+ui-20e`. Every step was patched into the place by find/replace hunks and checked by FNV hash
