@@ -4954,7 +4954,9 @@ the standing section sign boards (the floor numbers and the pad's name stay).
 - **KNOWN SMALL THINGS:** obby Decks 3 and 8 overhang the outer 2 studs of the Combo and Attacker mats, 9 studs up.
   The dummies keep DummyService's orange / blue colours; the two bots are teal (spar) and coral (attacker).
 
-## quest-1 (2026-11-19/20): daily quests on a CLIPBOARD at the notice board; icons over every station. IN THE PLACE, NOT COMMITTED.
+## quest-1 (2026-11-19/20): daily quests on a CLIPBOARD at the notice board; icons over every station. IN THE PLACE (v566), COMMITTED.
+COMMITTED AND PUSHED in 1453daa (another session's commit of the whole working tree, 2026-11-20): every quest-1 file in
+it was checked equal to what was tested and written into the place. Where a line below says NOT COMMITTED, that was before it.
 Owner: "can u make me a quest system so like when ppl go up to the quest board they'll be able to see" and "make my
 billboard guis icons ... on top of the quest board maybe ... a paper icon ... do that for everything". Shown on the
 website first (artifact https://claude.ai/artifact/MSvNUtnd77ZiiSWgK2Vnif, private); his notes there: "make it so it
