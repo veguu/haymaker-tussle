@@ -212,9 +212,10 @@ return {
 						(a1 - a2).Magnitude < 1e-3 and (t1 - t2).Magnitude < 1e-3,
 						`bodies move in the freeze at {blow.t}`
 					)
+					-- (kits-8i: or under the drawn frames in the pause right before it lands)
 					local cut = false
 					for _, shot in line.shots do
-						if shot.cut and math.abs(shot.t - blow.t) < 1e-6 then
+						if shot.cut and shot.t <= blow.t + 1e-6 and shot.t >= blow.t - 0.05 then
 							cut = true
 						end
 					end
@@ -252,7 +253,8 @@ return {
 		-- through the whole flurry (minus is forward)
 		for _, at in { barrage.from + 0.2, (barrage.from + barrage.to) / 2, barrage.to - 0.2 } do
 			local tilt = Ultimates.tilt(line, at)
-			assert(tilt.X < -20 and tilt.X > -45, `facing the fists at {at} (pitch {tilt.X})`)
+			-- kits-8p, the owner: "rotated a bit forward so the torso is facing directly towards the punches"
+			assert(tilt.X < -45 and tilt.X > -75, `facing the fists at {at} (pitch {tilt.X})`)
 		end
 		-- the side they rock to changes hit to hit
 		local a = Ultimates.tilt(line, barrage.from + 0.3)
@@ -273,50 +275,116 @@ return {
 		assert(most >= 180, "a flip somewhere")
 	end,
 
-	["the rush in is a real run at the lens: it never slows, and it grows toward the camera (kits-8a)"] = function()
-		-- kits-7d, the user: "an animation of the rush itself ... right now it just teleports"; kits-8a, the owner: "the
-		-- opening rush animation looks strange and does not read clearly as a rush" (measured: a held stride sliding,
-		-- filmed from straight behind). Now the Sprint legs run under RushRun's arms, and the camera is over the
-		-- TARGET's shoulder (the owner's C5-A pick), the attacker charging at the lens.
+	["the rush in is a flash step:there, gone a moment, there by the target, zoomed in, a drawn-back pause (kits-8n)"] = function()
+		-- the owner: "instead of having a running animation towards the target at the start, i think itd be better if the
+		-- player just vanishes and reappears at the location" (it replaces kits-8a's run at the lens)
 		local line = Ultimates.TIMELINES.Base
-		local dash = line.dash
-		assert(dash, "the attacker sprints while carried in")
-		assert(dash.to - dash.from >= 0.6, "long enough to see (it was 0.34 s)")
-		local running = false
+		local gone = line.vanish
+		assert(gone, "the attacker vanishes")
+		assert(line.dash == nil, "the run is retired")
 		for _, clip in line.clips or {} do
-			if clip.name == "RushRun" and math.abs(clip.t - dash.from) < 1e-6 then
-				running = true
+			assert(clip.name ~= "RushRun", "the run's arms are retired")
+		end
+		-- gone for an instant (Bleach's flash step: 1-3 frames)
+		local length = gone.to - gone.from
+		assert(length >= 0.05 and length <= 0.15, `gone {length} s`)
+		local at: { [string]: number } = {}
+		for _, cue in line.cues do
+			at[cue.name] = at[cue.name] or cue.t
+		end
+		assert(
+			at.vanish and math.abs(at.vanish - gone.from) < 1e-6,
+			"the vanish effect plays as they go"
+		)
+		assert(
+			at.appear and math.abs(at.appear - gone.to) < 1e-6,
+			"the arrival effect plays as they come back"
+		)
+		-- they reappear already winding up: the hook lands after a SHORT pause (kits-8n)
+		local hook = math.huge
+		for _, blow in line.blows do
+			if blow.t > gone.to then
+				hook = math.min(hook, blow.t)
 			end
 		end
-		assert(running, "the run's arms start with the sprint")
-		for _, start in { Vector3.new(0, 0, 6), Vector3.new(4, 0, 14), Vector3.new(-8, 0, 20) } do
-			local lastSpeed = 0
-			local step = 1 / 30
-			local t = dash.from + step
-			local firstDistance, lastDistance
-			while t <= dash.to - step do
-				local before = Ultimates.pose(line, t - step, start)
-				local now = Ultimates.pose(line, t, start)
-				local speed = (now - before).Magnitude / step
-				assert(speed >= lastSpeed - 1e-3, `slows at {t} from {start}`)
-				lastSpeed = speed
-				-- the camera IN FRONT of them (their own -Z), on their right of the line, looking at them
-				local attackerAt, targetAt = Ultimates.pose(line, t, start)
-				local cam, look = Ultimates.shot(line, t, attackerAt, targetAt, start)
-				local frame = Ultimates.attackerFrame(attackerAt, targetAt)
-				local inFrame = frame:PointToObjectSpace(cam)
-				assert(inFrame.Z < -2, `camera not ahead of them at {t} from {start}`)
-				local aim = (look - cam).Unit:Dot((attackerAt - cam).Unit)
-				assert(aim > 0.95, `camera not on them at {t} from {start}`)
-				local distance = (attackerAt - cam).Magnitude
-				firstDistance = firstDistance or distance
-				lastDistance = distance
-				t += step
+		assert(hook - gone.to <= 0.45, `they wait {hook - gone.to} s before the hook lands`)
+		for _, start in { Vector3.new(0, 0, 6), Vector3.new(0, 0, 14), Vector3.new(0, 0, 30) } do
+			-- still where they were until they go, at the hook's spot as they come back
+			local before = Ultimates.pose(line, gone.from - 0.01, start)
+			assert((before - start).Magnitude < 1e-3, `they move before they vanish from {start}`)
+			local after = Ultimates.pose(line, gone.to, start)
+			assert(
+				(after - Ultimates.FLASH_TO).Magnitude < 1e-3,
+				`they reappear off the hook's spot from {start}`
+			)
+			-- one camera from before they go until the hook, aimed so both spots are in the frame
+			for _, t in { gone.from - 0.01, gone.to + 0.01 } do
+				local a, tg = Ultimates.pose(line, t, start)
+				local cam, look = Ultimates.shot(line, t, a, tg, start)
+				local off =
+					math.deg(math.acos(math.clamp((look - cam).Unit:Dot((a - cam).Unit), -1, 1)))
+				assert(off < 22, `the attacker is {off} deg off the aim at {t} from {start}`)
 			end
-			assert(lastSpeed > 0, "they move")
-			-- charging at the lens: a third closer at least, even from the nearest start (6 studs)
-			assert(lastDistance < firstDistance * 0.65, `not charging at the lens from {start}`)
 		end
+		-- kits-8n, the owner: after the tp "the same perspective before the tp", "zoomed in to match the current position":
+		-- one cut, as they reappear, from the same camera place with a narrower lens
+		local before, after
+		for _, shot in line.shots do
+			if shot.cut and shot.t <= gone.from then
+				before = shot
+			elseif shot.cut and shot.t > gone.from and shot.t < hook then
+				assert(after == nil, "one cut after the vanish, not more")
+				after = shot
+			end
+		end
+		assert(before and after, "the shot before the step and the zoom after it")
+		assert(math.abs(after.t - gone.to) < 1e-6, "the zoom comes as they reappear")
+		-- kits-8p, the owner: "i want it to not change perspective, just show the back of where the player was before
+		-- dasshing (turned to look at the target) and just zoom in when the player reappears"
+		assert(
+			before.rel == "start" and after.rel == "start",
+			"the camera stays behind where they started"
+		)
+		assert(before.cam.Z > 2 and before.cam.X > 0, "behind the start, on the attacker's right")
+		assert((after.cam - before.cam).Magnitude < 1e-3, "the same camera place after the step")
+		assert(after.lookRel == "attacker", "aimed at where they are now")
+		assert(after.fov < before.fov - 15, "zoomed in")
+		-- kits-8o, the owner: "the player is too close to the target, they are clipping inside of them during the windup":
+		-- through the wind-up the attacker stands clear (measured on the rig: from 3 studs root to root nothing overlaps)
+		local releaseAt = hook
+		for _, swing in line.swings do
+			if math.abs(swing.t + swing.windup - hook) < 0.011 and swing.release then
+				releaseAt = swing.release
+			end
+		end
+		local t = gone.to
+		while t < releaseAt do
+			local a, tg = Ultimates.pose(line, t, Vector3.new(0, 0, 12))
+			assert(
+				(a - tg).Magnitude >= 2.75,
+				`the attacker stands {(a - tg).Magnitude} from the target at {t}`
+			)
+			t += 0.02
+		end
+		-- kits-8n, the owner: "a short pause before the hit lands ... will keep going back until it brings it forward":
+		-- the hook draws back from the reappear until shortly before it lands, then snaps forward
+		local hookSwing
+		for _, swing in line.swings do
+			if math.abs(swing.t + swing.windup - hook) < 0.011 then
+				hookSwing = swing
+			end
+		end
+		assert(
+			hookSwing and hookSwing.release and hookSwing.loaded,
+			"the hook is drawn back, then let go"
+		)
+		assert(math.abs(hookSwing.t - gone.to) < 1e-6, "the wind-up starts as they reappear")
+		assert(
+			hookSwing.loaded >= hookSwing.release - 1e-6,
+			"still drawing back through the pause, never still"
+		)
+		assert(hookSwing.release - gone.to >= 0.2, "a pause before it comes forward")
+		assert(hook - hookSwing.release <= 0.1, "then it snaps forward")
 	end,
 
 	["the fist lands square on the chest front at the uppercut and the haymaker (kits-8a)"] = function()
@@ -551,7 +619,16 @@ return {
 				)
 			end
 		end
-		for _, case in { { at.haymaker, 1.9, "contact" }, { at.plunge, 1, "plunge" } } do
+		-- kits-8k: at the drawing's eye as the fist lands (the plunge frames flash a moment later), and still on its line at
+		-- the end of the sink (the last drawn-view shot)
+		local sinkEye = 0
+		for _, s in line.shots do
+			if s.rel == "target" then
+				sinkEye = s.t
+			end
+		end
+		assert(sinkEye > at.haymaker + 1, "the drawn view stays through the sink")
+		for _, case in { { at.haymaker, 1, "contact" }, { sinkEye, 1, "sink" } } do
 			local t, scale, name = case[1], case[2], case[3]
 			local cam, look, roll = DrawnView.view(line, t, scale, start)
 			local shot
@@ -574,6 +651,57 @@ return {
 		end
 	end,
 
+	["the flurry's fists reach the juggled torso, not short of it under the head (kits-8l)"] = function()
+		-- the owner: "it looks like the barrage is hitting the head instead of the torso": measured, the fists landed 1.0-2.1
+		-- studs in front of the chest (lune/flurry_check prints each punch and checks the bodies don't overlap)
+		local Rig = require("./support/Rig")
+		local UltimateClips = require("../src/shared/Config/AnimClipsUltimate")
+		local line = Ultimates.TIMELINES.Base
+		local barrage = line.barrage
+		assert(barrage and barrage.clip, "a barrage clip")
+		local clip = UltimateClips[barrage.clip]
+		local dangleFrom = 0
+		for _, c in line.targetClips or {} do
+			if c.name == "Dangle" and c.t < (barrage.to or 0) then
+				dangleFrom = c.t
+			end
+		end
+		local index, total, square = 0, 0, 0
+		for _, cue in line.cues do
+			if cue.name == "flurryHit" then
+				index += 1
+				local a, tg = Ultimates.pose(line, cue.t, Vector3.new(0, 0, 12))
+				local root = Ultimates.attackerFrame(a, tg)
+				local arm = Rig.parts(
+					root,
+					Rig.sample(clip, (cue.t - barrage.from) % (clip.seconds or 1))
+				)[if index % 2 == 1 then "Right Arm" else "Left Arm"]
+				local tRoot = Ultimates.targetCFrame(
+					tg,
+					tg + Vector3.new(0, 0, 1),
+					Ultimates.tilt(line, cue.t)
+				)
+				local parts = Rig.parts(tRoot, Rig.sample(UltimateClips.Dangle, cue.t - dangleFrom))
+				local torso = parts.Torso
+				local tip = Rig.fist(arm)
+				local gap = Rig.torsoGap(torso, tip)
+				assert(gap < 1, `flurry punch {index} stops {gap} studs short of the torso`)
+				-- never on the head (the clip's two high punches meet the shoulder, beside it)
+				local h = parts.Head:PointToObjectSpace(tip)
+				assert(
+					not (math.abs(h.X) < 0.8 and math.abs(h.Y) < 0.7 and math.abs(h.Z) < 0.7),
+					`flurry punch {index} lands on the head`
+				)
+				total += gap
+				square += Rig.squareness(torso, select(2, Rig.fist(arm)))
+			end
+		end
+		assert(index >= 12, "a real flurry")
+		assert(
+			total / index < 0.6,
+			`the flurry's fists stop {total / index} studs short on average`
+		)
+	end,
 	["the barrage sound lasts the whole flurry (kits-8g)"] = function()
 		-- the owner: "the barrage sound doesnt play until the end of the animation" (a 1.02 s file over 1.875 s of punches)
 		local SoundCandidates = require("../src/shared/Config/SoundCandidates")
@@ -640,10 +768,10 @@ return {
 			local l = torso:PointToObjectSpace(tip)
 			return l.Z + 0.5, l.Y
 		end
-		local from = hit + Ultimates.drawnLength("contact")
+		local from = hit + 0.1 -- (kits-8i: the drawn runs are in pauses before the hits now; the sink from a frame on)
 		local step = 0.05
 		local last = depth(from)
-		assert(last > 0.15, `the fist is out of the chest as the contact frames end ({last})`)
+		assert(last > 0.15, `the fist is out of the chest 0.1 s after the contact ({last})`)
 		-- kits-8g, the owner: "the target should be getting hit in the center of the torso not the top"
 		-- (kits-8h: the centre the drawn plunge hits: the chest's true centre, the owner's pick. Measured live at ~40 fps the game
 		-- matches this rig; a 0.35 offset seen at ~14 fps was a measuring artefact)
@@ -669,8 +797,10 @@ return {
 		assert(last - depth(from) > 0.15, "the fist works visibly deeper over the sink")
 	end,
 
-	["two drawn impact runs: contact on the hit, the plunge ending on the blast (kits-8e)"] = function()
-		-- the owner: "there should only be 2 impact frames, the initial connection and then right before the knockback"
+	["two drawn impact runs, each the moment after its blow lands (kits-8k)"] = function()
+		-- the owner: "there should only be 2 impact frames"; kits-8i: "both impact frames come wayy to late, like a whole
+		-- second or so after the hit itself"; kits-8k: "the frames should be right after the animation lands, not right
+		-- before. but not like a lot after but like immediately"
 		local line = Ultimates.TIMELINES.Base
 		local at: { [string]: number } = {}
 		for _, cue in line.cues do
@@ -678,26 +808,41 @@ return {
 				cue.name ~= "soak" and cue.name ~= "release",
 				`the old card run "{cue.name}" is still cued`
 			)
-			at[cue.name] = cue.t
+			if not at[cue.name] or cue.name ~= "flash" then
+				at[cue.name] = cue.t
+			end
 		end
-		assert(at.haymaker and at.plunge and at.blast, "haymaker, plunge and blast are all cued")
-		-- kits-8h, the owner: "you should see the frame before you ssee the punch hit"
+		assert(#(line.holds or {}) == 0, "the drawn runs are not paused any more")
+		for _, case in { { "burst", "uppercut", "contact" }, { "plunge", "haymaker", "plunge" } } do
+			local cue, blow, run = case[1], case[2], case[3]
+			assert(at[cue] and at[blow], `{cue} and {blow} are both cued`)
+			local after = at[cue] - at[blow]
+			assert(after > 0 and after <= 0.12, `the {run} run is {after} s after the {blow} lands`)
+		end
 		assert(
-			at.impact and at.impact < at.haymaker,
-			"the contact frames flash before the fist lands"
+			at.uppercut < at.haymaker and at.haymaker < at.blast,
+			"uppercut, haymaker, blast in order"
 		)
+		-- the heavy hit's front sound on the contact
 		assert(
-			at.impact + Ultimates.drawnLength("contact") > at.haymaker,
-			"and are still up as it lands"
+			math.abs(at.impact - at.haymaker) < 1e-6,
+			"the heavy hit's front is not on the contact"
 		)
+		-- the pause mechanism (kits-8i) still works for a timeline that has one
+		local paused = { holds = { { t = 1, seconds = 0.1 }, { t = 2, seconds = 0.05 } } } :: any
+		assert(math.abs(Ultimates.clock(paused, 0.5) - 0.5) < 1e-6, "the clock before a pause")
+		assert(math.abs(Ultimates.clock(paused, 1.05) - 1) < 1e-6, "the clock runs in a pause")
+		assert(math.abs(Ultimates.clock(paused, 1.6) - 1.5) < 1e-6, "the clock after a pause")
 		assert(
-			math.abs(at.plunge + Ultimates.drawnLength("plunge") - at.blast) < 1e-6,
-			"the plunge ends as the knockback goes full speed"
+			math.abs(Ultimates.clock(paused, 2.12) - 2) < 1e-6,
+			"the clock runs in the second pause"
 		)
-		assert(
-			at.plunge - (at.haymaker + Ultimates.drawnLength("contact")) >= 0.8,
-			"the slow sink shows between the two runs"
-		)
+		for _, t in { 0.5, 1.5, 3 } do
+			assert(
+				math.abs(Ultimates.clock(paused, Ultimates.realAt(paused, t)) - t) < 1e-6,
+				"clock and realAt disagree"
+			)
+		end
 		-- kits-8g, the owner: an impact frame is "an instant" (Azure Flames: each drawing 1-3 frames at 30 fps)
 		for name, run in Ultimates.DRAWN do
 			local length = Ultimates.drawnLength(name)

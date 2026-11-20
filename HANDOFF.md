@@ -4737,3 +4737,28 @@ middle moved; training exclusive to one person (everyone else disappears); the b
   village-4 in it. Left out of the commit on purpose: README.md and src/client/Ui/PosterKit.luau (someone else's
   uncommitted work), CLAUDE.md, tools/, the map outputs, and the scratch builds `design/lobby/out/village_dry` and
   `village_big_archive`.
+
+## kits-8i..8s (2026-11-19/20): impact frames on their hits, flash step, barrage and release VFX, release bass (patched by hash)
+Build stamp `kits-8s+village-4+ui-20e`. Every step was patched into the place by find/replace hunks and checked by FNV hash
+against disk (memory "haymaker-place-ahead-of-git"); the teammate's unpushed lobby scripts (GameConfig, LobbyLayout,
+MapEnvironments, TrainingGrounds, DummyService, LobbyService) were left as they are, DummyService got one hunk.
+
+- **Impact frames (8i..8k):** the ink burst belongs to the UPPERCUT (the owner's "gut punch"), the fist plunge to the
+  haymaker. After pauses before the hits ("too early") the owner settled on: each run 2-3 frames AFTER its fist lands
+  (`UPPER_FRAMES` +0.03, `HAY_FRAMES` +0.1 after kits-8p). `Ultimates.clock`/`realAt` and `holds` stay (empty).
+- **Juggle (8l, 8p, 8q):** measured with `lune/flurry_check`: the target 1.7 ahead, 2.6 up, pitched 60 deg forward
+  (`JUGGLE_LEAN`); fists 0.56 short on average, none on the head, no overlap.
+- **Flash step (8m..8p):** the run is gone. Lock-in to 0.48, the camera behind the attacker's START (`rel = "start"`) until
+  the hook; vanish 0.68, gone 0.1 s (body hidden on every screen, `vanish`), reappear 3 studs out with a white flash; the
+  same camera zooms (FOV 56 -> 30 -> 26); the hook draws back through a 0.29 s pause and lunges in to 1.5 on the snap.
+  `Fx/FlashStepFx` (black copies, a band of lines, puffs). Study: `design/cutscene-study/17-flash-step.md`.
+- **Barrage hits (8r):** `Fx/BarrageHitFx`, black and white, from the striking fist's real tip.
+- **Release (8r):** `Fx/ReleaseFx`, the Shockwave-Punch shape (body flash, white cone, spiral arcs, rings, wind arcs, mist).
+- **Release bass (8r, 8s):** role `ult_release` in Config/SoundCandidates (sound picker, P). Round 8 (A/B/C, uploaded
+  80095578441457 / 84880153310920 / 97481582534056, aimed at the Kakyoin hit) is in the game now; the owner: "none really
+  sound like the references", favourite = Benimaru's Crimson Moon. Round 9 (`sfx-lab/build_round9.ps1`, D/E/F) is shaped
+  like it (swell, boom at 1.6 s, drone) and NOT uploaded yet; it needs the cue moved to the haymaker's contact so the
+  boom lands on the release. Sources: 16 files fetched from the Sonniss 2015-2020 bundles on ftpmirror.your.org into
+  `C:\Users\spicy\SFX Library\Sonniss GDC 2015-2020 picks` (downloads.sonniss.com has a Cloudflare check; 2021-2024
+  not reachable). Study: `design/cutscene-study/18-barrage-release-bass.md`.
+- Gates at this commit: 565 tests, selene 0, stylua clean, rojo build OK.

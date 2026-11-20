@@ -33,10 +33,11 @@ export type Option = {
 -- (ORDER, ABOUT, OPTIONS, and AUDITION if it plays as a rhythm) to offer choices again.
 
 -- What each role is for, in the order the picker shows them.
-SoundCandidates.ORDER = { "ult_barrage" } :: { string }
+SoundCandidates.ORDER = { "ult_barrage", "ult_release" } :: { string }
 
 SoundCandidates.ABOUT = {
 	ult_barrage = "Haymaker Rush's flurry: ONE rapid-punches sound over the whole 1.9 s barrage (kits-7d)",
+	ult_release = "Haymaker Rush's release, as the target is thrown: a deep bass instead of the heavy hit again (kits-8r)",
 } :: { [string]: string }
 
 -- How the picker plays each role, so it sounds the way the game plays it: `options` as Sfx.play takes them,
@@ -67,6 +68,18 @@ local function barrage(
 		takes = { { id = id, length = length, start = 0, volume = 1 } },
 	}
 end
+-- ult_release (kits-8r, 2026-11-19, the owner: "having the punch sound twice isnt good, instead i want something bassy",
+-- references: Kakyoin's death 2.5 s and Benimaru's Crimson Moon). Built from Sonniss GDC 2026 recordings by
+-- sfx-lab/build_round8.ps1 and measured against the Kakyoin hit (design/cutscene-study/18-barrage-release-bass.md);
+-- uploaded to the game's group 2026-11-20.
+local function bass(label: string, id: number, name: string): Option
+	return {
+		label = label,
+		name = name,
+		creator = "Haymaker Tussle (Sonniss GDC 2026 sources)",
+		takes = { { id = id, length = 2, start = 0, volume = 1.2 } },
+	}
+end
 SoundCandidates.OPTIONS = {
 	-- kits-8g, the owner: "the barrage sound doesnt play until the end of the animation". The flurry's punches run 1.875 s
 	-- (1.70 to 3.575) and the default, the first option, was 1.02 s long: the last 0.85 s of punches had no sound. Only
@@ -77,6 +90,11 @@ SoundCandidates.OPTIONS = {
 		barrage("A", 114289646726161, 2.12, "Rapid punches sfx", "isiahjen8"),
 		barrage("B", 102850005066154, 3.51, "Multi Punch / Barrage", "Kaaizarr"),
 		barrage("C", 95801559782723, 1.83, "one punch man barrage hit sfx", "Axellatic"),
+	},
+	ult_release = {
+		bass("A", 80095578441457, "HT release bass A: thump + roar"),
+		bass("B", 84880153310920, "HT release bass B: deep body"),
+		bass("C", 97481582534056, "HT release bass C: sinking"),
 	},
 } :: { [string]: { Option } }
 return SoundCandidates
