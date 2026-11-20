@@ -152,7 +152,9 @@ function SoundPicker.start()
 	toggleGui.ResetOnSpawn = false
 	toggleGui.DisplayOrder = 50
 	local toggle = Instance.new("TextButton")
-	toggle.Position = UDim2.fromOffset(80, 12)
+	-- bottom left: at the top left it lay over the first three tiles of the fighters' row (seen 2026-11-19)
+	toggle.AnchorPoint = Vector2.new(0, 1)
+	toggle.Position = UDim2.new(0, 12, 1, -12)
 	toggle.Size = UDim2.fromOffset(130, 30)
 	toggle.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
 	toggle.BackgroundTransparency = 0.08

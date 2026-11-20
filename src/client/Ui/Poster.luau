@@ -30,7 +30,8 @@ local Poster = {}
 export type Face = "display" | "label"
 
 local ROLE: { [string]: string } = { display = "poster.display", label = "poster.label" }
-local FACTOR: { [string]: number } = { display = 1.463, label = 1.508 }
+-- (label was 1.508 while it was Titillium Web; it is Oswald like display since 2026-11-19, so the same factor)
+local FACTOR: { [string]: number } = { display = 1.463, label = 1.463 }
 
 --- Roblox's TextSize for a text the mockup sets at `css` pixels in `face`.
 function Poster.px(css: number, face: Face): number

@@ -22,7 +22,7 @@ EDGE = [
     r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
 ]
-INK, CREAM = "#1A1236", "#FFFBEF"
+INK, CREAM = "#43365A", "#FFF9EC"  # the soft palette (2026-11-19); were #1A1236, #FFFBEF
 ROUND = 'stroke-linecap="round" stroke-linejoin="round"'
 
 # name -> (width, height, the whole svg's inside)

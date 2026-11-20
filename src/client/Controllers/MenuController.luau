@@ -75,7 +75,7 @@ local NAV_RIGHT = 26 + 44 + 18 + 250 * 1.02 + 12
 -- the blur behind the open window: its size, and how long it takes to come and go
 local BLUR = { Size = 10, In = 0.25, Out = 0.18 }
 local BODY = Vector2.new(836, 580) -- the contents' box, 84 right and 8 down inside the border
-local TILT = -0.6
+local TILT = 0 -- straight since 2026-11-19 (the owner: less angular); the paper leaned 0.6 degrees before
 
 -- the mockup lays the classes out as one sweep of colour, warm to cool
 local SWEEP = { "Base", "Bruiser", "Inferno", "Beast", "Trickster", "Dragon", "Frost", "Tempest" }
@@ -288,7 +288,7 @@ function MenuController:KnitStart()
 		BackgroundTransparency = 1,
 		Position = UDim2.fromScale(-0.12, -0.34),
 		Size = UDim2.fromScale(1.7, 2),
-		Rotation = -14,
+		Rotation = 0, -- (the word wall leaned 14 degrees until 2026-11-19: less angular)
 		ZIndex = 2,
 	})
 	local words = make("ImageLabel", wordsTurn, {
@@ -307,10 +307,6 @@ function MenuController:KnitStart()
 		Visible = false,
 		ZIndex = 3,
 	})
-	-- the cream slash down the left: full height, 12 % of the width at the top and 4 % at the bottom, with a
-	-- thin ink line along its edge
-	local inner = SHEET - Vector2.new(2 * BORDER, 2 * BORDER)
-	local slashTop, slashBottom = inner.X * 0.12, inner.X * 0.04
 	-- (it lies over the dots, the word and the wipe, inside the same clipped group: the group cuts the ink
 	-- line's two ends flush with the border, where a turned bar's square ends used to stop short or stick out)
 	-- Things that stay upright but must keep their place on the leaning paper (the X) are told the lean too.
@@ -321,50 +317,42 @@ function MenuController:KnitStart()
 			follow(degrees)
 		end
 	end
+	-- THE SPINE (2026-11-19; the owner had the slanted cream slash removed from every window: "remove that ...
+	-- and fill in the spot with something else. YOU decide"). The window is the coach's notebook, so the left
+	-- edge is its binding: a STRAIGHT cream strip with a straight ink line and a column of round punch holes.
+	local SPINE = 52
 	local slash = make("Frame", back, {
-		Name = "Slash",
-		BackgroundTransparency = 1,
-		Size = UDim2.new(0, inner.X, 1, 0),
+		Name = "Spine",
+		BackgroundColor3 = colour("ivory.50"),
+		BorderSizePixel = 0,
+		Size = UDim2.new(0, SPINE, 1, 0),
 		ZIndex = 4,
 	})
 	make("Frame", slash, {
-		BackgroundColor3 = colour("ivory.50"),
-		BorderSizePixel = 0,
-		Size = UDim2.new(0, slashBottom + 0.5, 1, 0),
-	})
-	Shapes.image(slash, "wedgeEnd", "ivory.50", {
-		Name = "Edge",
-		Position = UDim2.fromOffset(slashBottom, 0),
-		Size = UDim2.new(0, slashTop - slashBottom, 1, 0),
-	})
-	-- the thin ink line along its edge: one turned bar. (Not Shapes.slant: a slanted PLATE can't be thinner than
-	-- its own lean, and asked for one it drew a wide ink band; first run, 2026-11-17.)
-	local lineLean = slashTop - slashBottom
-	local lineWide = inner.X * 0.009
-	local slashLine = make("Frame", slash, {
 		Name = "Line",
 		BackgroundColor3 = colour("ink.900"),
 		BorderSizePixel = 0,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		ZIndex = 2,
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.new(0, 4, 1, 0),
 	})
+	for hole = 1, 6 do
+		local dot = make("Frame", slash, {
+			Name = "Hole",
+			BackgroundColor3 = colour("stone.300"),
+			BorderSizePixel = 0,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, (hole - 0.5) / 6),
+			Size = UDim2.fromOffset(16, 16),
+		})
+		make("UICorner", dot, { CornerRadius = UDim.new(1, 0) })
+		make("UIStroke", dot, { Color = colour("ink.900"), Thickness = 2 })
+	end
 	-- The window's height. It is the mockup's 612 in the lobby and SHORT in a round, where its pages are a few
 	-- rows and the room between the strip and the skill tiles is small: a shorter window can be drawn larger.
 	local sheetTall = SHEET.Y
 	local function setTall(tall: number)
 		sheetTall = tall
 		holder.Size = UDim2.fromOffset(SHEET.X, tall)
-		local innerTall = tall - 2 * BORDER
-		local lineTurn = math.atan(lineLean / innerTall)
-		slashLine.Position =
-			-- (1.5 units onto the cream: with its edge exactly on the wedge's, the wedge's soft edge showed as a
-			-- pale hairline between the cream and the ink; seen enlarged, 2026-11-18)
-			UDim2.fromOffset(slashBottom + lineLean / 2 + lineWide / 2 - 1.5, innerTall / 2)
-		slashLine.Size = UDim2.fromOffset(
-			lineWide * math.cos(lineTurn),
-			innerTall / math.cos(lineTurn) + 4 * lineWide
-		)
-		slashLine.Rotation = math.deg(lineTurn)
 	end
 	setTall(SHEET.Y)
 
@@ -380,13 +368,13 @@ function MenuController:KnitStart()
 	local titleBox, setTitle = PosterKit.title(body, 84, {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Size = UDim2.fromOffset(802, 84),
-		Rotation = -3,
+		Rotation = 0, -- (turned 3 degrees until 2026-11-19)
 		ZIndex = 3,
 	})
 	do
 		-- turning about the bottom-left corner is turning about the centre and then moving the centre
 		local half = Vector2.new(401, -42)
-		local angle = math.rad(-3)
+		local angle = math.rad(0)
 		local turned = Vector2.new(
 			half.X * math.cos(angle) - half.Y * math.sin(angle),
 			half.X * math.sin(angle) + half.Y * math.cos(angle)
@@ -470,7 +458,7 @@ function MenuController:KnitStart()
 		Size = UDim2.fromScale(0, 1),
 		AutomaticSize = Enum.AutomaticSize.X,
 	})
-	toastText.FontFace = Font.new(Tokens.family.text, Enum.FontWeight.Bold)
+	-- (it set Titillium Web by hand until 2026-11-19; now it keeps the label face, Oswald, like everything else)
 	make("UIPadding", toastText, { PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16) })
 	local TOAST = { Gap = 10, Bigger = 1.3 }
 	local toastToken = 0
@@ -1674,7 +1662,8 @@ function MenuController:KnitStart()
 		end)
 		setTilt(TILT)
 	end
-	Poster.text(closeCut.face, "display", 28, "ivory.50", {
+	-- (ink since the soft palette, 2026-11-19: cream on the pastel pink was too faint)
+	Poster.text(closeCut.face, "display", 28, "ink.900", {
 		Size = UDim2.fromScale(1, 1),
 		Text = "X",
 		TextXAlignment = Enum.TextXAlignment.Center,

@@ -44,12 +44,12 @@ return {
 
 	["the palette's measured contrasts hold (to 0.1)"] = function()
 		local expect = {
-			{ "ivory.50", "ink.900", 17.1 },
-			{ "coral.300", "ink.900", 14.3 },
-			{ "coral.500", "ink.900", 12.4 },
-			{ "teal.400", "ink.900", 10.1 },
-			{ "gold.400", "ink.900", 12.4 },
-			{ "stone.500", "ink.900", 5.5 },
+			{ "ivory.50", "ink.900", 10.5 },
+			{ "coral.300", "ink.900", 9.4 },
+			{ "coral.500", "ink.900", 8.3 },
+			{ "teal.400", "ink.900", 7.5 },
+			{ "gold.400", "ink.900", 8.3 },
+			{ "stone.500", "ink.900", 4.5 },
 			{ "danger.600", "ink.900", 5.8 },
 		}
 		for _, e in expect do

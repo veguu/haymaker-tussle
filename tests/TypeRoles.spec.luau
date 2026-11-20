@@ -64,7 +64,9 @@ return {
 		assert(TypeRoles.snap("text", "Heavy") == "Heavy")
 		assert(TypeRoles.snap("text", "Bold") == "Bold")
 		assert(TypeRoles.snap("text", "Medium") == "SemiBold") -- a tie goes heavier
-		assert(TypeRoles.snap("display", "ExtraBold") == "Heavy") -- and so does this one
+		-- (display is Oswald since 2026-11-19: its heaviest face is Bold, so heavier requests come down to it)
+		assert(TypeRoles.snap("display", "ExtraBold") == "Bold")
+		assert(TypeRoles.snap("display", "Heavy") == "Bold")
 		assert(TypeRoles.snap("display", "Thin") == "ExtraLight")
 		assert(TypeRoles.snap("mono", "SemiBold") == "Bold")
 		assert(TypeRoles.snap("mono", "Medium") == "Regular")

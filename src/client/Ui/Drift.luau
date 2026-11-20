@@ -153,7 +153,8 @@ function Drift.add(
 	end
 	local key = #group * 13 + index
 	local period = 2.5 + (key * 37 % 7) * 0.14
-	local turning = turn ~= nil and turned ~= nil and not Drift.lite
+	-- (no turning at all since 2026-11-19: the owner wants the UI less angular, so things only rise and fall)
+	local turning = false and turn ~= nil and turned ~= nil and not Drift.lite
 	items[layer] = {
 		group = group,
 		height = math.max(height, 1),

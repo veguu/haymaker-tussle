@@ -4090,6 +4090,137 @@ asks while it was being built. Gates: stylua clean, selene 0, 558 tests, rojo bu
 - OPEN: the small ink tags (OWNED, PLANNED, FIGHTERS) and the toast were left as they are; the CONTROLS chip and
   panel are cream already and were not touched; the mockup does not show the loud feed, the word cards or the
   TUSSLE! pop (it is behind the game now).
+- LOOKED AT IN A PLAY TEST, 2026-11-19 (no code changed, place not saved, stills only; states forced by setting
+  HT_RoundState's attributes on the CLIENT, which the server overwrites at its next change):
+  - FINE: ROUND OVER (pink card, cream words), the SPECTATING chip (cream), ARENA CLOSING under the fighters' row,
+    the Ranked, More and Settings pages, the spectate panel. The lobby jump: four jumps 1.1 to 2.0 s apart
+    against the round's 3 s cooldown (one of five Space presses made no jump; cause not looked for).
+  - FOUND, NOT FIXED, the owner has not ruled: (1) the pink count cards read "2 / 25 FINAL TWO" and
+    "1 / 25 LAST ONE" (the number said twice); they show only with the Fighter row off or a window open.
+    (2) With a window open, ARENA CLOSING lies half under the window's top edge. (3) The dev SOUNDS (P) button
+    covers the first three tiles of the fighters' row (not UI work's piece). (4) The spectate panel with no
+    match: both arrows are dark tiles and "No active match" is pale purple, hard to read.
+  - ALL FOUR FIXED on his "Yes, fix them" (2026-11-19; place saved v532; NOT COMMITTED; patched into Studio by
+    plain-text splices through `execute_luau`, `--check` then showed only `Fx.DrawnImpact` differing, not mine;
+    stylua clean, selene the one known error in UltimateController, 564 tests, rojo build OK). Each SEEN in a
+    play test (stills): (1) `HudController.refreshStrip`: FINAL TWO and LAST ONE stand alone on the pink card,
+    no count and no "/ 25" (`HudLogic.strip` unchanged). (2) `HudController`: ARENA CLOSING is not shown while
+    a menu window is open (`refreshShrink` and the `MenuController.Changed` handler); it shows again at the
+    next shrink once the window is shut. (3) `Ui/SoundPicker`: the Studio-only SOUNDS (P) button is at the
+    bottom left. (4) `SpectateController`: the arrows that cannot turn are cream with a dim sign (no dark
+    tile), and the who-line is always cream.
+  - STILL NOT SEEN: the motion of anything (TUSSLE!, the final-two pop, the count's bump), a phone, a gamepad,
+    Reduced Motion.
+
+## ui-20a (2026-11-19): THE SOFT LOOK: pastel palette, rounded rectangles, no tilt, a notebook spine. IN THE PLACE, NOT COMMITTED. START HERE.
+COMMITTED AND PUSHED on his "Yes, commit mine" (2026-11-19), in ONE commit with ui-20b to ui-20e and the four ui-19d
+fixes: where a heading or line below says NOT COMMITTED, that was before it. NOT in that commit: the lobby barrier's
+colour (`design/game.json` and the generated `GameConfig.luau` hold the training session's changes too).
+The owner, with a picture of the window's slanted cream side panel and two colour clips (a butter-yellow flower, a
+pastel toy room): "revamp everything ... all the ui, make everything LESS ANGULAR, LESS VIBRANT AND EASIER ON THE
+EYES. Ui should be less angular or more squarish, rectanglish. [the slanted panel] remove that for every ui and
+fill in the spot with something else. YOU decide. ... Instead of vibrant and sharp, [colours] should be lighter."
+THIS REPLACES the old taste rule "vibrant"; "simple, few boxes, no dark plates, number with its label" still hold.
+Built straight in the game (he asks for the website only when he says so). Gates: stylua clean, selene the one
+known UltimateController error, 564 tests, rojo build OK. Place saved after it; `--check` shows only
+`Fx.DrawnImpact` differing (not mine).
+- COLOURS, ONE FILE (`shared/Tokens.luau`, `Tokens.hex`; names and jobs unchanged, only the paint): ink is a DUSTY
+  PLUM (#43365A, was near-black violet), cream #FFF9EC, yellow is BUTTER #FADF7F, cyan #A5DFEC, pink #F5A6C0,
+  green #A3E2BB, red #F29A9A, lavender #DAD3F7, the eight class colours and the meter as pastels. Ink text on every
+  accent stays above 4.5:1; `tests/Tokens.spec.luau` has the new measured numbers.
+- SHAPES, ONE FUNCTION (`Ui/Shapes.luau`, `Shapes.image`): every rough-cut or slanted quad (tile, badge, navA/B/D,
+  gear, close, class, act, slab) is drawn as ONE rounded rectangle, the 9-slice `Tokens.cut.fill` (already
+  uploaded for Ringside; NO new upload), corner about 7 units (`ROUND_SCALE`). Empty the `ROUND` table to get the
+  old quads back.
+- NO TILT: the window stands straight (`TILT = 0`), its title too, the word wall behind a page is level (was 14
+  degrees), the idle drift no longer turns anything (`Ui/Drift.luau`), a menu strip's word no longer rocks.
+  LEFT TILTED ON PURPOSE, he has not seen it yet: the pop-ups' letter cards (TUSSLE!, last players, class name)
+  and the motion of things popping in.
+- THE WINDOW'S SIDE PANEL: the slanted cream slash is gone; in its place a STRAIGHT cream notebook SPINE, 52 wide,
+  with a straight ink line and six round punch holes (`MenuController`, "THE SPINE"). My pick, not yet his.
+- INK LETTERS ON PINK: the window's X and the pink strip card (ROUND OVER, FINAL TWO, LAST ONE) had cream letters,
+  too faint on pastel pink.
+- SEEN in a play test (stills): lobby strips and tools, Coins, the strip, Classes, Shop, Moves, Ranked, the fight
+  HUD, the fighters' row, TUSSLE!, ROUND OVER, the feed. NOT SEEN: Settings and More pages, the spectate panel,
+  the 3, 2, 1 numbers, last-players and ultimate pop-ups, a phone, a gamepad, Reduced Motion, any motion.
+- STILL IN THE OLD COLOURS, because they are baked into uploaded pictures: the window TITLES (cream with a
+  near-black outline: the most visible one), the 3, 2, 1 numbers, the last-players numbers, the stopwatch, the
+  crown, the skill icons. Redrawing them means new uploads: ask him first with count, names and sizes.
+- HOW IT WAS PUT IN THE PLACE: not `rojo_push.py` (someone else's DrawnImpact differs). A small script wrote only
+  my scripts' sources through the same `studio_mcp.py` the sync tool uses (strip ONE trailing newline, or
+  `--check` is one character off). Scripts written: Tokens, Shapes, Drift, MenuController, NavController,
+  HudController (SpectateController and SoundPicker were patched earlier the same day).
+
+## ui-20b (2026-11-19): area sign, warm lobby barrier, soft images REDRAWN ON DISK (not uploaded). IN THE PLACE, NOT COMMITTED.
+Three asks from the owner while ui-20a was being finished. Gates as ui-20a (564 tests). Place saved after it.
+- THE AREA SIGN (his words: "when entering the training area, there should be a distinct [sign] to know you've
+  transferred area in the lobby"). FIRST BUILD REJECTED: the class-name letter cards saying TRAINING / LOBBY
+  ("you dont NEED text animations ... say TRAINING AREA / LOBBY AREA ... make the popup QUICK"). NOW: one card,
+  TRAINING AREA (cyan) or LOBBY AREA (yellow), ink lettering 24, popping in 0.14 s where ARENA CLOSING stands and
+  gone after 1.3 s (`HudController`, `areaShow`, two `PosterKit.chip`s in the strip's HOLDER). It follows the
+  SERVER's mark `HT_TrainingFree` (LobbyService: behind the training wall, on foot), not the client's line.
+  `Ui/UltimateNotice`: in free practice the big ULTIMATE notice and its sound are skipped, only the badge shows
+  (the meter fills as you walk in, and the notice's cards landed on the sign). SEEN: TRAINING AREA in a still.
+  NOT SEEN: LOBBY AREA, the pop's motion. FOUND, NOT FIXED: in training the ULT READY badge touches the AFK tile.
+- THE LOBBY BARRIER (his words: "make the barriers vfx in the lobby match the lobby map, rn its blue"): warm cream
+  gold in `design/game.json` Barrier (FillColor FFC98A, LineColor FFE2B8, GlowColor FFF4DC; were 3CC4FF, 86DDFF,
+  D2F8FF), `GameConfig.luau` regenerated with `tools/gen_config.py` (--check ok; only those 3 lines differ).
+  SEEN from inside the lobby in one still. NOTE: GameConfig.luau is on the never-commit list; ask him.
+- SOFT IMAGES, REDRAWN ON DISK ONLY, WAITING FOR HIS YES TO UPLOAD (10 files; the old ones are copied to
+  `work/before-soft/`): `assets/ui/poster_titles_1..3.png` (1024 x 1024; 92514, 101955, 99792 bytes),
+  `assets/icons/poster/countdown_sheet.png` (1024 x 600, 33459), `assets/ui/poster_last.png` (1024 x 400, 40150),
+  `assets/icons/poster/stopwatch.png` (272 x 272, 9711), `crown_pixel.png` (336 x 240, 960),
+  `assets/icons/ringside/dash.png`, `punch.png`, `jump.png` (256 x 256; 3892, 7634, 2490). The tools hold the new
+  colours (`poster_lettering.html`, `poster_countdown.html`, `poster_last_digits.html`, `make_note_marks.py`,
+  `make_crown.py`); the three skill icons were recoloured from the old files by a throwaway script (outline to
+  plum, colours 38 % toward white). `poster_titles_4.png` (the unused MENU title) was redrawn too and needs no
+  upload. After upload: new ids into `Shapes.letters.titles`, `Shapes.ids.count`, `last`, `stopwatch`,
+  `crownPixel`, `Icons.ids.dash`, `punch`, `jump`. A sheet of them: `work/soft-images-check.png`.
+
+## ui-20c (2026-11-19): the ten soft images UPLOADED and wired. IN STUDIO, PLACE NOT SAVED AFTER IT, NOT COMMITTED.
+On his "Yes, upload" (10 files, listed in ui-20b). Gates as before (564 tests).
+- GROUP-OWNED (Open Cloud Image, group 2970443, from the approved folder `assets/icons/poster`): countdown_sheet
+  94526405306326 (Approved), stopwatch 136415911847198 ("Reviewing" at upload), crown_pixel 115985638632070
+  (Approved).
+- NOT GROUP-OWNED (Studio `upload_image` from a local http server, as these files' first versions were:
+  `assets/ui` and `assets/icons/ringside` are NOT approved Open Cloud upload folders): poster_titles_1
+  78958349726285, _2 121477646655774, _3 93708484056207, poster_last 108683290339266, dash 81201255540202,
+  punch 128200783139350, jump 83962124185633. If he wants them group-owned: he approves those two folders in
+  Assistant Settings -> MCP Permissions, then upload again.
+- WIRED: `Ui/Shapes.luau` (`letters.titles`, `ids.count`, `last`, `crownPixel`, `stopwatch`) and `Ui/Icons.luau`
+  (`dash`, `punch`, `jump`); the old ids are in the comments beside them. Both written into Studio; `--check`
+  shows only DrawnImpact differing.
+- SEEN: the soft crown in a fight. NOT SEEN: the new titles, 3 2 1, last-players numbers, stopwatch, the three
+  icons at rest (the owner was playing in the running test, so it was left alone). THE PLACE IS NOT SAVED since
+  these two scripts went in (v537 holds everything before them): save it once Studio is in Edit mode.
+
+## ui-20d (2026-11-19): ONE FONT for every label and number of the poster UI. IN THE PLACE (saved), NOT COMMITTED.
+The owner (relayed by the training session, with a picture of the fight HUD): "Keep the numbers and words for
+everything [at] consistent quality ... the stagger frame looks more bolded than the rest. fix this and fix
+EVERYTHING that has the same inconsistencies". CAUSE: two faces side by side. Numbers, key caps, ULT READY and
+big words were Oswald Bold (heavy, condensed; many as images); the labels (STAGGER, SPEED, DASH, CONTROLS, JUMP,
+tool names, tags, Settings rows) were Titillium Web Bold (lighter, wider). On the stagger plate the two stood on
+one card.
+- FIX, TWO LINES: `Tokens.type["poster.label"].face` is "poster" (Oswald) and `Poster.FACTOR.label` is 1.463 like
+  display. Every `Poster.text(..., "label", ...)` in the game follows. The coach's notes (Kalam) are unchanged
+  on purpose. 573 tests (the training session added some), stylua clean, rojo build OK.
+- SEEN enlarged in a play test: the fight HUD (STAGGER 7 . 1.4x, SPEED, DASH, UPPERCUT, READY, H . CONTROLS, JUMP,
+  PUNCH, key caps) now one weight. NOT SEEN after it: the lobby strips, tools, window pages, feed, spectate
+  panel, pop-ups (same function, but labels are narrower now, so look for words that sit oddly in their box).
+- NOT CHANGED, still the older Titillium roles of `Typography`: the clash bar, the kick meter, the kick prompt,
+  the tutorial, the training panel, world labels, the Studio-only tools. Ask him before touching those.
+
+## ui-20e (2026-11-19): the OLDER pieces on the one font too. IN THE PLACE (saved), NOT COMMITTED.
+On his "Yes, those too" (clash bar, kick meter, kick prompt, tutorial, training panel). `Tokens.family.display` is
+Oswald (was Titillium Web), `Core/TypeRoles` display weights are Oswald's (Heavy snaps to Bold), and
+`tests/TypeRoles.spec.luau` expects that. The toast no longer sets Titillium by hand (`MenuController`). The
+"text" face (sentences: Body; world labels: World) is still Titillium Web. 573 tests, stylua clean, rojo build OK.
+Written into Studio after he reopened the place (Tokens, TypeRoles, MenuController only; `--check` then showed
+only the training session's GameConfig, MapEnvironments, LobbyService and DrawnImpact differing).
+- PROVEN BY A SCAN in a play test, not by eye: every text object in PlayerGui is Oswald Bold except the coach's
+  notes (Kalam) and the Studio-only sound picker; the roles Announce, Key, Action, Button, Label and Stat resolve
+  to Oswald Bold. NOT SEEN: the clash bar, kick meter, kick prompt, tutorial and toast with the new font on
+  screen (Oswald is narrower and has no slanted face: check words that were italic or tightly boxed).
 
 ## kits-7d..7f (2026-11-17): Haymaker Rush rush-in, flurry, camera study, gap study, stage A (NOT PLAY-TESTED: the place kept being overwritten)
 Build stamp `kits-7f+lobby-4+ui-13c`. Spec chain: `design/haymaker-rush-v3-beats.md` (camera study and the owner's picks), then

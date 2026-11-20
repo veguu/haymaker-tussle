@@ -269,7 +269,12 @@ function UltimateNotice.start()
 	local wasReady = false
 	local function changed()
 		local now = ready()
-		if now and not wasReady then
+		if now and not wasReady and player:GetAttribute("HT_TrainingFree") == true then
+			-- Free practice keeps the meter full, so it is "earned" the moment you walk in and after every use:
+			-- only the badge there, no big notice and no sound (2026-11-19: the notice's cards landed on top of
+			-- the TRAINING AREA sign).
+			show(made)
+		elseif now and not wasReady then
 			-- its sound, once (the owner's pick: left to glow 2.6 s, nothing under it); the spoken line takes
 			-- its place when there is one, so the two never play together
 			local spoken = VoiceLines.UltimateLineReplacesSound and VoiceLines.has("ultimate-ready")

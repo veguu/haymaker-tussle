@@ -210,13 +210,14 @@ function SpectateController:KnitStart()
 		mineTab.label.Text = if pov then "MY VIEW" else "MY VIEW  ON"
 		povTab.cut.fill.ImageColor3 = colour(if pov then "coral.500" else "ivory.50")
 		povTab.label.Text = if pov then "FIGHTER POV  ON" else "FIGHTER POV"
-		-- the arrows: light violet when there is someone else to turn to, dark and dim when not
+		-- the arrows: light violet when there is someone else to turn to, cream with a dim sign when not (a dark
+		-- tile until 2026-11-19: the owner wants no dark plates)
 		local canCycle = pov and #list > 1
 		for _, arrow in { prevArrow, nextArrow } do
 			if arrow.cut.button then
 				arrow.cut.button.Active = canCycle
 			end
-			arrow.cut.fill.ImageColor3 = colour(if canCycle then "violet.400" else "poster.dark")
+			arrow.cut.fill.ImageColor3 = colour(if canCycle then "violet.400" else "ivory.50")
 			arrow.label.TextColor3 = colour(if canCycle then "ink.900" else "stone.300")
 			Drift.hold(arrow.cut.body, not canCycle)
 		end
@@ -229,7 +230,8 @@ function SpectateController:KnitStart()
 		else
 			who.Text = "No active match"
 		end
-		who.TextColor3 = colour(if pov and not notice then "ivory.50" else "stone.300")
+		-- (always cream: the dim tone read as pale purple on the world and was hard to read, seen 2026-11-19)
+		who.TextColor3 = colour("ivory.50")
 	end
 
 	local function restore()

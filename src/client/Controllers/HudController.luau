@@ -682,7 +682,8 @@ function HudController:KnitStart()
 		stripCount.Text = count or ""
 		stripCountSlot.LayoutOrder = if countFirst then 1 else 3
 		stripWords.Text = words
-		local tone = colour(if loud then SS.Word else "ink.900")
+		-- (ink on the pink card too since the soft palette, 2026-11-19: cream on pastel pink was too faint)
+		local tone = colour("ink.900")
 		stripWords.TextColor3 = tone
 		stripCount.TextColor3 = tone
 		stripFill.ImageColor3 = colour(if loud then SS.Warning else SS.Word)
@@ -700,6 +701,44 @@ function HudController:KnitStart()
 			Visible = false,
 		})
 	local closingScale = make("UIScale", closing, {})
+	-- THE AREA SIGN (the owner, 2026-11-19): one card that says TRAINING AREA or LOBBY AREA as you cross between
+	-- them, where ARENA CLOSING stands. It POPS and is gone: no letter-by-letter cards, lines or shards (the
+	-- first build used the class-name pop-up: "you dont need text animations ... say TRAINING AREA / LOBBY AREA
+	-- ... make the popup quick"). In the strip's holder, not its fading panel, so it shows with no strip up too.
+	local areaChips: { [boolean]: { chip: Frame, scale: UIScale } } = {}
+	for _, spec in
+		{
+			{ free = true, words = "TRAINING AREA", fill = "teal.400" },
+			{ free = false, words = "LOBBY AREA", fill = "coral.500" },
+		}
+	do
+		local chip = PosterKit.chip(strip.holder, spec.words, 24, spec.fill, "ink.950", 44, {
+			Name = "Area",
+			AnchorPoint = Vector2.new(0.5, 0),
+			Visible = false,
+		})
+		areaChips[spec.free] = { chip = chip, scale = make("UIScale", chip, {}) }
+	end
+	local areaToken = 0
+	local function areaShow(free: boolean)
+		areaToken += 1
+		local mine = areaToken
+		for key, made in areaChips do
+			made.chip.Visible = key == free
+		end
+		local made = areaChips[free]
+		-- under ARENA CLOSING when that is up, so the two never overlap
+		local at = closing.Position
+		made.chip.Position = if closing.Visible
+			then UDim2.new(at.X.Scale, at.X.Offset, at.Y.Scale, at.Y.Offset + L.Chip + 6)
+			else at
+		HudMotion.pop(made.scale, 1.35, 0.14)
+		task.delay(1.3, function()
+			if areaToken == mine then
+				made.chip.Visible = false
+			end
+		end)
+	end
 
 	-- Y: you --------------------------------------------------------------------------------------------
 	-- THE SPEED DIAL (the owner, 2026-11-17: "a speed bar instead of a stagger ... centered at the bottom ... like
@@ -1349,9 +1388,10 @@ function HudController:KnitStart()
 		local loud = info.title == "ROUND OVER"
 			or info.title == "FINAL TWO"
 			or info.title == "LAST ONE"
+		-- FINAL TWO and LAST ONE stand alone: "2 / 25 FINAL TWO" said the number twice (seen 2026-11-19)
 		stripSet(
-			if fightingNow or counting then info.count else nil,
-			if info.total then `/ {info.total} {info.title}` else info.title,
+			if (fightingNow and not loud) or counting then info.count else nil,
+			if info.total and not loud then `/ {info.total} {info.title}` else info.title,
 			loud,
 			not counting
 		)
@@ -1424,7 +1464,8 @@ function HudController:KnitStart()
 			-- each time a shrink begins: the chip, for a moment
 			closingToken += 1
 			local mine = closingToken
-			closing.Visible = true
+			-- (not under the open menu window: the chip lay half under its top edge, seen 2026-11-19)
+			closing.Visible = not menuOpen
 			if fromEvent and HudLogic.emphasize(promptActive, HudMotion.reduced()) then
 				HudMotion.pop(closingScale, T.EmphasisScale, T.Emphasis)
 			end
@@ -1705,6 +1746,20 @@ function HudController:KnitStart()
 			refreshGroups()
 		end)
 	end
+	-- A distinct sign that you have crossed into (or out of) the training area (the owner, 2026-11-19): one
+	-- quick card, TRAINING AREA or LOBBY AREA (`areaShow`). It follows the SERVER's mark
+	-- (LobbyService sets HT_TrainingFree once you stand behind the training wall), so it shows exactly when the
+	-- free practice starts and stops.
+	local wasFree = player:GetAttribute("HT_TrainingFree") == true
+	player:GetAttributeChangedSignal("HT_TrainingFree"):Connect(function()
+		local free = player:GetAttribute("HT_TrainingFree") == true
+		if free ~= wasFree then
+			wasFree = free
+			if not menuOpen and player:GetAttribute("HT_InLobby") == true then
+				areaShow(free)
+			end
+		end
+	end)
 	-- The practice end of the lobby: looked at four times a second, and only while you stand in the lobby.
 	if GameConfig.Round.Enabled and GameConfig.Lobby.Enabled then
 		task.spawn(function()
@@ -1738,6 +1793,9 @@ function HudController:KnitStart()
 	Knit.GetController("MenuController").Changed:Connect(function(entry: string?)
 		menuOpen = entry ~= nil
 		feed.holder.Visible = not menuOpen
+		if menuOpen then
+			closing.Visible = false
+		end
 		rosterShow()
 	end)
 

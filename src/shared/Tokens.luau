@@ -18,57 +18,62 @@
 --   danger   MAGENTA = critical, warnings, close line.*  500 = outline ink, 300 = the faint inner edge
 --   violet   LIGHT VIOLET = the gamepad focus ring and quiet controls
 
+-- SOFT PALETTE (the owner, 2026-11-19: "less vibrant and easier on the eyes ... lighter", from two reference
+-- clips: a butter-yellow flower and a pastel toy room). Every name keeps its job; only the paint changed: the
+-- ink is a dusty plum instead of near-black violet, the cream is the same paper, and yellow, cyan, magenta and
+-- the class sweep are pastels at even lightness. Ink text on every accent stays above 4.5:1 (Tokens.spec).
+
 local Tokens = {}
 
 Tokens.hex = {
-	["ink.950"] = "#120C28",
-	["ink.900"] = "#1A1236",
-	["ink.800"] = "#211845",
-	["ink.700"] = "#2A2054",
-	["ink.600"] = "#130D2B",
-	["ink.500"] = "#3A2E6B",
-	["stone.500"] = "#9189BA",
-	["stone.300"] = "#B8B1DA",
-	["ivory.200"] = "#EDE7D6",
-	["ivory.50"] = "#FFFBEF",
-	["coral.700"] = "#B38F00",
-	["coral.500"] = "#FFD426",
-	["coral.300"] = "#FFE680",
-	["teal.700"] = "#0E8FB3",
-	["teal.400"] = "#21D4FD",
-	["teal.200"] = "#A6ECFF",
+	["ink.950"] = "#3A2E4D",
+	["ink.900"] = "#43365A",
+	["ink.800"] = "#4A3D62",
+	["ink.700"] = "#52456B",
+	["ink.600"] = "#3D3151",
+	["ink.500"] = "#6B5D86",
+	["stone.500"] = "#A9A1C4",
+	["stone.300"] = "#CFC9E2",
+	["ivory.200"] = "#F2EADB",
+	["ivory.50"] = "#FFF9EC",
+	["coral.700"] = "#C9A84C",
+	["coral.500"] = "#FADF7F",
+	["coral.300"] = "#FDEDB4",
+	["teal.700"] = "#62AABB",
+	["teal.400"] = "#A5DFEC",
+	["teal.200"] = "#D6F2F8",
 	-- the Equip button alone (the owner, 2026-11-17: a vibrant, cool green, easier to notice than the cyan)
-	["go.400"] = "#1FE38C",
+	["go.400"] = "#A3E2BB",
 	-- its opposite: the Equipped button under the pointer, where it offers to take the class off
-	["stop.400"] = "#FF4444",
-	["gold.600"] = "#B38F00",
-	["gold.400"] = "#FFD426",
-	["gold.200"] = "#FFEE99",
-	["danger.600"] = "#FF4D9E",
-	["line.500"] = "#120C28",
-	["line.300"] = "#4A3F7A",
-	["violet.400"] = "#C9BEFF",
+	["stop.400"] = "#F29A9A",
+	["gold.600"] = "#C9A84C",
+	["gold.400"] = "#FADF7F",
+	["gold.200"] = "#FDF1C4",
+	["danger.600"] = "#F5A6C0",
+	["line.500"] = "#3A2E4D",
+	["line.300"] = "#8A7EA8",
+	["violet.400"] = "#DAD3F7",
 	-- the fight-poster mockup's own darks, used as drawn there: a skill tile that is cooling or can't be used,
 	-- its stripes, and an unlit stagger segment
-	["poster.dark"] = "#2B2924",
-	["poster.stripe"] = "#4A463D",
-	["poster.unlit"] = "#3A372F",
+	["poster.dark"] = "#6E667D",
+	["poster.stripe"] = "#8A8299",
+	["poster.unlit"] = "#7D758C",
 	-- one colour per class, as ONE sweep from warm to cool at even brightness (Base yellow, Bruiser orange,
 	-- Inferno red-orange, Beast red-pink, Trickster pink, Dragon violet, Frost blue, Tempest teal), so any two
 	-- sit well together. Marks and card art only, never state.
-	["class.Base"] = "#FFD426",
-	["class.Tempest"] = "#2EE0C8",
-	["class.Inferno"] = "#FF6B3D",
-	["class.Frost"] = "#4DB8FF",
-	["class.Beast"] = "#FF4D6D",
-	["class.Dragon"] = "#A97BFF",
-	["class.Bruiser"] = "#FF9F2E",
-	["class.Trickster"] = "#FF5CC8",
+	["class.Base"] = "#FADF7F",
+	["class.Tempest"] = "#97E0D3",
+	["class.Inferno"] = "#F7AC92",
+	["class.Frost"] = "#A3CEF5",
+	["class.Beast"] = "#F4A0AE",
+	["class.Dragon"] = "#C8B0F5",
+	["class.Bruiser"] = "#F9C488",
+	["class.Trickster"] = "#F5ABDB",
 	-- the timing meter's own scale
-	["meter.red"] = "#E5484D",
-	["meter.orange"] = "#F0883A",
-	["meter.yellow"] = "#EFC94C",
-	["meter.green"] = "#4CC273",
+	["meter.red"] = "#EC8A8C",
+	["meter.orange"] = "#F3B07A",
+	["meter.yellow"] = "#F4DB84",
+	["meter.green"] = "#8FD6A6",
 }
 
 -- Text tokens that may sit under 4.5:1 because what they carry is never essential (Color Palette section 5).
@@ -184,8 +189,11 @@ Tokens.type = {
 		lineHeight = 1.0,
 		case = "upper",
 	},
+	-- ONE FACE since 2026-11-19 (the owner: "keep the numbers and words for everything [at] consistent quality
+	-- ... the stagger frame looks more bolded than the rest"): labels were Titillium Web Bold, lighter and wider
+	-- than the Oswald Bold of the numbers, key caps and big words beside them. Now both roles are Oswald Bold.
 	["poster.label"] = {
-		face = "text",
+		face = "poster",
 		weight = "Bold",
 		size = 23,
 		lineHeight = 1.0,
@@ -253,7 +261,10 @@ Tokens.type = {
 
 -- Font families for the faces above.
 Tokens.family = {
-	display = "rbxasset://fonts/families/TitilliumWeb.json",
+	-- Oswald since 2026-11-19 (was TitilliumWeb.json): the owner wants ONE weight of lettering everywhere, so the
+	-- older pieces (clash bar, kick meter, kick prompt, tutorial, training panel) follow the poster UI. Oswald has
+	-- no Heavy face: a role asking for Heavy gets its Bold.
+	display = "rbxasset://fonts/families/Oswald.json",
 	poster = "rbxasset://fonts/families/Oswald.json", -- the fight-poster look's numbers and big words
 	text = "rbxasset://fonts/families/TitilliumWeb.json",
 	mono = "rbxasset://fonts/families/BuilderMono.json",

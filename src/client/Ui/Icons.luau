@@ -34,9 +34,9 @@ Icons.ids = {
 	toolSpectate = "rbxassetid://137196821444275",
 	toolAfk = "rbxassetid://113101514810430",
 	-- skills: one generic drawing per slot until each class skill has its own
-	dash = "rbxassetid://94822682143267", -- Q, mobility
-	punch = "rbxassetid://110847993507835", -- R, attack
-	jump = "rbxassetid://132051153313434",
+	dash = "rbxassetid://81201255540202", -- soft palette, 2026-11-19 (was 94822682143267) -- Q, mobility
+	punch = "rbxassetid://128200783139350", -- soft palette, 2026-11-19 (was 110847993507835) -- R, attack
+	jump = "rbxassetid://83962124185633", -- soft palette, 2026-11-19 (was 132051153313434)
 	-- class emblems, by kit id
 	class_Base = "rbxassetid://129522498789082",
 	class_Tempest = "rbxassetid://75604246553728",

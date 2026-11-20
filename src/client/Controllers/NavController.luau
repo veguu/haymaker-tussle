@@ -315,7 +315,7 @@ function NavController:KnitStart()
 		Poster.run(strip.word, 0.5, function(t: number)
 			local e = PosterEase.easeInOut(t)
 			local share = if out then e else 1 - e
-			strip.word.Rotation = -2 + 4 * share
+			-- (it rocked 2 degrees each way until 2026-11-19; now it only swells: less angular)
 			strip.wordScale.Scale = 1 + 0.05 * share
 		end, function()
 			rock(strip, not out)

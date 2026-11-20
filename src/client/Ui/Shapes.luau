@@ -35,7 +35,7 @@ Shapes.ids = {
 	stripes = "rbxassetid://98179049591933",
 	digits = "rbxassetid://73013783840248",
 	badge = "rbxassetid://101402484359518",
-	last = "rbxassetid://134576604933482",
+	last = "rbxassetid://108683290339266", -- soft palette, 2026-11-19 (was 134576604933482)
 	-- the lobby (assets/ui/poster_nav_*.png and friends): each is the mockup's own clip-path polygon, stretched
 	navA = "rbxassetid://136856775817076", -- Classes, Ranked, More
 	navB = "rbxassetid://124539778494442", -- Shop
@@ -49,10 +49,10 @@ Shapes.ids = {
 	dots = "rbxassetid://99839905290934", -- one cell of the window's dot pattern, four times its size
 	-- the kill leader's crown in the fighters' row: pixel art, 21 x 15 cells at 16 px (design/ui/make_crown.py);
 	-- drawn with ResampleMode Pixelated. NOT tinted: it carries its own colours.
-	crownPixel = "rbxassetid://112758624871088",
+	crownPixel = "rbxassetid://115985638632070", -- soft palette, 2026-11-19 (was 112758624871088)
 	-- the round-start countdown's lettering (assets/icons/poster/countdown_sheet.png, 1024 x 600, from
 	-- design/ui/poster_countdown.html): see `Shapes.count`
-	count = "rbxassetid://101250510173451",
+	count = "rbxassetid://94526405306326", -- soft palette, 2026-11-19 (was 101250510173451)
 	-- the letter cards' letters, A to Z and "!" (assets/icons/poster/card_letters.png, 1024 x 720, from
 	-- design/ui/poster_cards.html): see `Shapes.cards`
 	cards = "rbxassetid://103788059570384",
@@ -61,7 +61,7 @@ Shapes.ids = {
 	-- colours, a cream face and an ink line, and is shown untinted.
 	noteArrow = "rbxassetid://99511529578400",
 	noteRing = "rbxassetid://89833043727802",
-	stopwatch = "rbxassetid://130771830611628",
+	stopwatch = "rbxassetid://136415911847198", -- soft palette, 2026-11-19 (was 130771830611628)
 } :: { [string]: string }
 
 -- The round-start countdown's sheet (ui-16a). TOP ROW: the numbers 3, 2, 1 in cells of `cell`, each in its own
@@ -112,9 +112,9 @@ Shapes.words = {
 -- uploading the sheet again. Anything long or changing stays real text.
 Shapes.letters = {
 	titles = {
-		"rbxassetid://87365915153934",
-		"rbxassetid://118820953416670",
-		"rbxassetid://139550002196137",
+		"rbxassetid://78958349726285", -- soft palette, 2026-11-19 (were 87365915153934,
+		"rbxassetid://121477646655774", -- 118820953416670,
+		"rbxassetid://93708484056207", -- 139550002196137)
 	},
 	words = { "rbxassetid://140543979882744" },
 } :: { [string]: { string } }
@@ -174,6 +174,24 @@ Shapes.digits = {
 	tracking = 0.02,
 }
 
+-- SOFT RECTANGLES (the owner, 2026-11-19: "less angular ... more squarish, rectanglish"). Every box that used a
+-- rough-cut or slanted quad of its own is drawn as ONE rounded rectangle instead: the white 9-slice of
+-- Tokens.cut (uploaded for Ringside, 96 px, a 24 px corner), sliced so the corner stays `ROUND_SCALE` of that
+-- whatever the box's size. The old quads' ids stay above, so the look can be put back by emptying this table.
+local ROUND_SCALE = 0.3 -- a corner of about 7 units
+local ROUND: { [string]: boolean } = {
+	tile = true,
+	badge = true,
+	navA = true,
+	navB = true,
+	navD = true,
+	gear = true,
+	close = true,
+	class = true,
+	act = true,
+	slab = true,
+}
+
 --- A stretched shape image in a colour token, filling its parent until sized.
 function Shapes.image(
 	parent: Instance?,
@@ -185,7 +203,15 @@ function Shapes.image(
 	image.Name = name
 	image.BackgroundTransparency = 1
 	image.Size = UDim2.fromScale(1, 1)
-	image.Image = Shapes.ids[name] or ""
+	if ROUND[name] then
+		local slice = Tokens.cut.slice
+		image.Image = Tokens.cut.fill
+		image.ScaleType = Enum.ScaleType.Slice
+		image.SliceCenter = Rect.new(slice[1], slice[2], slice[3], slice[4])
+		image.SliceScale = ROUND_SCALE
+	else
+		image.Image = Shapes.ids[name] or ""
+	end
 	image.ImageColor3 = Tokens.colour(tone)
 	for key, value in props or {} do
 		(image :: any)[key] = value
