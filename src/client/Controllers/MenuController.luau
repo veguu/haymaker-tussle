@@ -975,7 +975,7 @@ function MenuController:KnitStart()
 			local key = if device == "touch"
 				then nil
 				elseif device == "gamepad" then (if slot == "mobility" then "B" else "L2")
-				elseif slot == "mobility" then "Q"
+				elseif slot == "mobility" then "T"
 				else "R"
 			-- (PLACEHOLDER text for now, the owner, 2026-11-18: the moves are not final, so their real
 			-- descriptions, still in Config/Abilities as each skill's `blurb`, are not shown here yet)

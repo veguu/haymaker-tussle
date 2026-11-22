@@ -48,7 +48,12 @@ local function isWide(line: any, t: number): boolean
 	return not current.insert and not pushingIn and not (t >= haymaker and t < haymaker + 0.3)
 end
 
--- A point's place on screen: -1..1 across and up, and its depth (+ in front).
+-- A point's place on screen: -1..1 across and up, and its depth (+ in front). As the game builds the camera
+-- (UltimateController: CFrame.lookAt(cam, look) * CFrame.Angles(0, 0, roll), vertical FOV): the roll turns the
+-- camera's right toward its up (right cos + up sin), so a point lands at x cos + y sin, y cos - x sin, turned in the
+-- picture's own square units and only then narrowed by the aspect. cam-1: before 2026-11-21 this turned the other way
+-- and after the aspect; checked against Lune's CFrame.fromMatrix * CFrame.Angles (Lune 0.8.9's CFrame.lookAt is wrong
+-- for most directions: its LookVector misses the target, so don't check cameras with it).
 local function project(
 	point: any,
 	cam: any,
@@ -62,11 +67,11 @@ local function project(
 	local up = right:Cross(forward)
 	local rel = point - cam
 	local depth = rel:Dot(forward)
-	local half = math.tan(math.rad(fov) / 2)
-	local x = rel:Dot(right) / (math.max(depth, 1e-3) * half * aspect)
-	local y = rel:Dot(up) / (math.max(depth, 1e-3) * half)
+	local half = math.max(depth, 1e-3) * math.tan(math.rad(fov) / 2)
+	local x = rel:Dot(right) / half
+	local y = rel:Dot(up) / half
 	local r = math.rad(roll)
-	return x * math.cos(r) - y * math.sin(r), x * math.sin(r) + y * math.cos(r), depth
+	return (x * math.cos(r) + y * math.sin(r)) / aspect, y * math.cos(r) - x * math.sin(r), depth
 end
 
 local function inside(x: number, y: number, depth: number): boolean
@@ -269,6 +274,121 @@ return {
 			end
 			error(`{#problems} problems, first ones:\n` .. table.concat(lines, "\n"))
 		end
+	end,
+
+	-- cam-1: the leap-and-dash camera is a track baked from Blender (Config/CameraTracks, animations/camera).
+	["the baked dash camera fits its window, keeps both fighters whole on every screen, and lands on the drawn eye"] = function()
+		local line = Ultimates.TIMELINES.Base
+		local track = line.track
+		assert(track, "Haymaker Rush plays a baked dash track")
+		local haymaker = 0
+		for _, cue in line.cues do
+			if cue.name == "haymaker" then
+				haymaker = cue.t
+			end
+		end
+		-- it runs from the cut to the dash shot up to the contact: if the timeline is retimed, export it again
+		local dashCut = false
+		for _, shot in line.shots do
+			dashCut = dashCut or (shot.cut == true and math.abs(shot.t - track.from) < 1e-4)
+		end
+		assert(dashCut, `the track starts at {track.from}, where no shot cuts: export it again`)
+		assert(
+			math.abs(track.to - haymaker) < 1e-4,
+			`the track ends at {track.to}, the haymaker lands at {haymaker}`
+		)
+		local rows = track.frames
+		assert(
+			math.abs(rows[1][1] - track.from) < 1e-4 and math.abs(rows[#rows][1] - track.to) < 1e-4,
+			"first and last rows"
+		)
+		for index = 2, #rows do
+			local step = rows[index][1] - rows[index - 1][1]
+			assert(
+				step > 0 and step <= 1 / 60 + 1e-4,
+				`rows {index - 1} and {index} are {step} s apart`
+			)
+			-- one cut only, onto the last row; before it the camera stays put and its aim never jumps
+			assert((rows[index][10] == 1) == (index == #rows), `a cut at row {index}`)
+			if index < #rows then
+				local a, b = rows[index - 1], rows[index]
+				local moved = (Vector3.new(b[2], b[3], b[4]) - Vector3.new(a[2], a[3], a[4])).Magnitude
+				local aimA = (Vector3.new(a[5], a[6], a[7]) - Vector3.new(a[2], a[3], a[4])).Unit
+				local aimB = (Vector3.new(b[5], b[6], b[7]) - Vector3.new(b[2], b[3], b[4])).Unit
+				local turned = math.deg(math.acos(math.clamp(aimA:Dot(aimB), -1, 1)))
+				assert(moved < 0.01, `the camera moves {moved} studs at row {index}`)
+				assert(turned < 1, `the aim turns {turned} degrees in one frame at row {index}`)
+			end
+		end
+		-- the game plays it: inside the window Ultimates.shot returns the track, whatever the attacker's start
+		for _, start in STARTS do
+			local t = track.from
+			while t < track.to do
+				local attackerAt, targetAt = Ultimates.pose(line, t, start)
+				local cam, look, fov, roll = Ultimates.shot(line, t, attackerAt, targetAt, start)
+				for who, root in { attacker = attackerAt, target = targetAt } do
+					assert(
+						toBody(cam, root) >= 1.5,
+						string.format("%.3f s: the camera is inside the %s", t, who)
+					)
+				end
+				for aspectName, aspect in ASPECTS do
+					local ax = project(attackerAt, cam, look, fov, roll, aspect)
+					local tx = project(targetAt, cam, look, fov, roll, aspect)
+					assert(
+						ax < tx,
+						string.format(
+							"%.3f s: the attacker is not left of the target (%s)",
+							t,
+							aspectName
+						)
+					)
+					for who, root in { attacker = attackerAt, target = targetAt } do
+						for part, point in
+							{
+								root = root,
+								head = root + Vector3.new(0, ROOT_TO_HEAD, 0),
+								feet = root - Vector3.new(0, ROOT_TO_FEET, 0),
+							}
+						do
+							local x, y, depth = project(point, cam, look, fov, roll, aspect)
+							assert(
+								inside(x, y, depth),
+								string.format(
+									"%.3f s: %s %s off screen (%.2f, %.2f) on %s",
+									t,
+									who,
+									part,
+									x,
+									y,
+									aspectName
+								)
+							)
+						end
+					end
+				end
+				t += 1 / 60
+			end
+		end
+		-- the last row IS the drawn plunge's eye, the shot the game cuts to on the contact
+		local start = STARTS[1]
+		local attackerAt, targetAt = Ultimates.pose(line, track.to, start)
+		local cam, look, fov, roll = Ultimates.shot(line, track.to, attackerAt, targetAt, start)
+		local last = rows[#rows]
+		local lastCam = Vector3.new(last[2], last[3], last[4])
+		local lastAim = (Vector3.new(last[5], last[6], last[7]) - lastCam).Unit
+		assert(
+			(lastCam - cam).Magnitude < 0.01,
+			`the last row is {(lastCam - cam).Magnitude} studs from the drawn eye`
+		)
+		assert(
+			math.deg(math.acos(math.clamp(lastAim:Dot((look - cam).Unit), -1, 1))) < 0.1,
+			"the last row's aim"
+		)
+		assert(
+			math.abs(last[8] - fov) < 0.1 and math.abs(last[9] - roll) < 0.1,
+			"the last row's lens and roll"
+		)
 	end,
 
 	["every Haymaker Rush camera stays on the attacker's right, in every frame it uses"] = function()

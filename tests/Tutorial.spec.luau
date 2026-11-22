@@ -100,13 +100,13 @@ return {
 		end
 	end,
 
-	["phones and gamepads are never told to click or press Q"] = function()
+	["phones and gamepads are never told to click or press T"] = function()
 		for step = 1, #Tutorial.STEPS + 1 do
 			for _, device: Tutorial.Device in { "touch", "gamepad" } :: { Tutorial.Device } do
 				local objective, hint = Tutorial.text(reach(step), CFG, device)
 				local all = (objective .. " " .. hint):lower()
 				assert(not all:find("click"), `{device} told to click: {all}`)
-				assert(not all:find("press q"), `{device} told to press Q: {all}`)
+				assert(not all:find("press t%f[%W]"), `{device} told to press T: {all}`)
 				assert(not all:find("hold w"), `{device} told to hold W: {all}`)
 			end
 		end

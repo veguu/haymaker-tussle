@@ -5189,3 +5189,33 @@ MapEnvironments, TrainingGrounds, DummyService, LobbyService) were left as they 
   swell 127775643599037) and is now the `ult_release` choice (D default). A new `releaseRise` cue starts it 1.6 s before
   the release (`RELEASE_RISE`, on the haymaker's contact) so its boom lands as the target is thrown; the blast plays no
   sound of its own. Replay: D loaded and started at 5.0 s. Build stamp `kits-8t+village-4+ui-20e`; 566 tests.
+
+## keys-1 (2026-11-21): the class move (dash) is on T, Q is free (patched by hash)
+The owner, starting a combat rework: "move the Q dash for all the classes, to the T key, leaving the Q key open". Build stamp
+`keys-1+kits-8t+village-4+ui-20e`.
+- The mobility slot's one binding (`HaymakerPropel` in AbilityController) is T + gamepad B; gamepad and the touch button are
+  unchanged. Every class's move follows, since they all go through that slot. Nothing is bound to Q now.
+- Labels: HudTheme (the HUD tile's key cap and the Moves guide), MenuController (the class page's move row), Core/Tutorial
+  ("Press T to propel") and its test. Older comments that still say "Q" mean the mobility slot.
+- Patched into the place by find/replace (6 scripts: Abilities, Tutorial, Server, AbilityController, MenuController, HudTheme),
+  nothing written until all six patched hashes matched disk. The teammate's 12 unpushed scripts and `Shared.MapExtras` were
+  left alone (the place is ahead of Git again: no Rojo Connect from this folder).
+- Gates: rojo build OK, 607 tests, selene 0, stylua clean. PLAY (simulated keys): `HaymakerPropel` bound to T and ButtonB only;
+  the HUD cap reads T; running, T took 14 -> 84 studs/s in 0.2 s; standing, Q moved nothing and T did. Not seen on screen.
+- Also from the owner the same day: all VFX, animations, models and cutscenes are made in Blender from now on, and every build
+  goes one piece at a time with questions first.
+
+## jab-3, cam-1, puff-1 (2026-11-21 to 2026-11-22): the first three pieces made in Blender (patched by hash)
+Build stamp `cam-1+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. Each was approved by the owner in Studio ("Looks right").
+- jab-3: a hand-keyed JabRight (`animations/hand/`, exported by `animations/export_hand_clips.py` to
+  `src/shared/Config/AnimClipsHand.luau`). AnimController merges those clips in STUDIO ONLY (none is uploaded). The J test key
+  is removed.
+- cam-1: the ultimate's leap-and-dash shot is a baked camera track (`animations/camera/` -> `Config/CameraTracks.luau`, 38
+  rows, played by `Ultimates.shot`); the scene is rebuilt from the game's maths by `lune/camera_scene.luau`.
+- puff-1: the dash dust is ONE drawn puff (`FxKit.Tex.SwirlPuff`, 72521547682766; `design/vfx/smoke/smoke_swirl.py`, metaballs):
+  upright, 0.9 s, no spin, no fade, `FlipbookBlendFrames` false, unlit. The shared `Tex.Smoke` is unchanged in every other
+  effect. `GameConfig.Effects.DashDustCount` is unused now. Known: the white puff nearly vanishes on the lobby's pale floor.
+- Logs with every number and the owner's words: `design/vfx/smoke-study/session-log-2026-11-21.md` and `-22.md`; the report
+  for the Blender tutorial notes: `report-smoke-flipbook-2026-11-22.md`.
+- The place still holds the teammate's unpushed scripts (its GameConfig differs from disk): no Rojo Connect from this folder.
+- Gates: rojo build OK, 608 tests, selene 0, stylua clean, fx_smoke 7 of 7.

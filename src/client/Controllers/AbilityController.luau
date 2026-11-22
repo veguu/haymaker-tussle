@@ -1,5 +1,5 @@
 --!strict
--- AbilityController - the two ability keys and the kit behind them. Q (gamepad B) is the equipped
+-- AbilityController - the two ability keys and the kit behind them. T (gamepad B) is the equipped
 -- kit's MOBILITY skill, R (gamepad L2) its ATTACK skill; see Config/Abilities. A press goes to that
 -- skill's handler below. A skill with no handler yet (a placeholder kit) says so instead.
 --
@@ -336,7 +336,8 @@ function AbilityController:KnitStart()
 		end)
 	end
 
-	-- Q / B: mobility. High priority and sunk, as the dash always was, so nothing under it also fires.
+	-- T / B: mobility. It was Q until keys-1 (the owner, 2026-11-21: Q is kept free for the combat rework).
+	-- High priority and sunk, as the dash always was, so nothing under it also fires.
 	ContextActionService:BindActionAtPriority(
 		SLOT_ACTIONS.mobility,
 		function(_name: string, inputState: Enum.UserInputState)
@@ -349,7 +350,7 @@ function AbilityController:KnitStart()
 		end,
 		true,
 		Enum.ContextActionPriority.High.Value,
-		Enum.KeyCode.Q,
+		Enum.KeyCode.T,
 		Enum.KeyCode.ButtonB
 	)
 	-- R / L2: attack. HELD (2026-11-15): pressing winds it up, letting go throws it (by itself after

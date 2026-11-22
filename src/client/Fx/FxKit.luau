@@ -42,6 +42,9 @@ FxKit.Tex = {
 	Circle = "rbxassetid://75527705961320", -- a circle outline, a thinner one inside
 	Glow = "rbxassetid://119052464621710", -- a soft round glow
 	Smoke = "rbxassetid://97818702295807", -- flipbook, 4 x 4, a puff fraying into wisps
+	-- flipbook, 4 x 4, flat white (design/vfx/smoke/smoke_swirl.py): a wisp curls up into a swirl, splits into
+	-- beans and shrinks to dots. Stands upright: its foot is 37.8 % of the image below the image's middle.
+	SwirlPuff = "rbxassetid://72521547682766",
 	Wisp = "rbxassetid://140573434581662", -- flipbook, 4 x 4, flame tongues rising and fraying
 	Dust = "rbxassetid://122673105804911", -- soft streaks fanning out from an empty middle
 	Star = "rbxassetid://124927142938107", -- a four-point glint

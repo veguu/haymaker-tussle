@@ -26,6 +26,15 @@ if Vector3 == nil then
 	Vector3, CFrame = roblox.Vector3, roblox.CFrame
 end
 
+-- Baked camera tracks (Config/CameraTracks, generated from Blender by animations/camera/export_camera_track.py).
+local CameraTracks: any
+if script then
+	CameraTracks = require((script :: any).Parent.Parent.Config.CameraTracks)
+else
+	local beside = "../Config/CameraTracks"
+	CameraTracks = (require :: any)(beside)
+end
+
 export type Key = {
 	t: number,
 	attacker: Vector3?, -- nil on the first key: where they really were
@@ -132,6 +141,9 @@ export type Timeline = {
 	-- kits-8h: while `from` <= t < `to`, on the fighters' screens, the attacker shows only `part` (the drawn view's
 	-- close-ups, where the camera sits beside the attacker's shoulder and the drawing shows only the striking arm)
 	soloArm: { from: number, to: number, part: string }?,
+	-- cam-1: a BAKED camera track (designed in Blender), played instead of the shots from `from` up to `to`: one row
+	-- per frame of { t, camX, camY, camZ, lookX, lookY, lookZ, fov, roll, cut } in the anchor's space
+	track: { from: number, to: number, frames: { { number } } }?,
 	-- kits-8m: while `from` <= t < `to` the attacker's whole body is hidden on every screen (a flash step)
 	vanish: { from: number, to: number }?,
 	-- kits-8i: PAUSES. At each `t` the cutscene's clock stops for `seconds` of real time (a drawn impact run plays over
@@ -775,7 +787,8 @@ local HAYMAKER_RUSH: Timeline = {
 			t = LAST_PUNCH + 0.14,
 			cam = Vector3.new(8.77, -0.8, 0.26),
 			look = Vector3.new(0, 0.4, -0.1),
-			fov = 60,
+			-- cam-1: 60.4, not 60, so the floor under the attacker stays in the safe frame with the game's roll
+			fov = 60.4,
 			roll = 8,
 			ease = "smooth",
 		},
@@ -901,7 +914,13 @@ local HAYMAKER_RUSH: Timeline = {
 	},
 	-- the drawn view's close-ups, from the whip onto the contact to the blast: only the striking arm of the attacker, as
 	-- the drawn plunge (the owner, kits-8h: "Hide body, keep arm"; the camera there sits beside the attacker's shoulder)
-	soloArm = { from = RELEASE, to = BLAST, part = "Right Arm" },
+	-- cam-1: from the CONTACT (it was RELEASE, when the camera whipped onto the fist during the dash): the dash camera
+	-- now stays put and shows the whole attacker until its cut onto the drawn eye, on the contact
+	soloArm = { from = HAYMAKER, to = BLAST, part = "Right Arm" },
+	-- cam-1 (the owner's storyboard picks, 2026-11-21: "Stay put, then cut", "Low and close (Azure)", "Settle just
+	-- before", "Dutch from the start"): the leap-and-dash camera, PLAYER_SHOT to HAYMAKER, baked from Blender. The
+	-- shots above for that window stay as the record of what it replaced (and for anything that reads the table).
+	track = CameraTracks.HaymakerDash,
 	-- kits-8i/8j paused the clock under the drawn runs; kits-8k (the runs right after the hits) has no pauses
 	holds = {},
 	swings = rushSwings(),
@@ -1102,6 +1121,31 @@ function Ultimates.shot(
 	targetAt: Vector3?,
 	attackerStart: Vector3?
 ): (Vector3, Vector3, number, number, number)
+	-- cam-1: inside a baked track's window the track IS the camera (already in the anchor's space)
+	local track = line.track
+	if track and t >= track.from and t < track.to then
+		local rows = track.frames
+		local index = 1
+		for i = 1, #rows do
+			if rows[i][1] <= t then
+				index = i
+			end
+		end
+		local a = rows[index]
+		local b = rows[index + 1]
+		local share = 0
+		-- blend toward the next frame, unless it starts on a cut: then this one is held
+		if b and b[10] ~= 1 then
+			share = math.clamp((t - a[1]) / math.max(b[1] - a[1], 1e-6), 0, 1)
+		else
+			b = a
+		end
+		return Vector3.new(a[2], a[3], a[4]):Lerp(Vector3.new(b[2], b[3], b[4]), share),
+			Vector3.new(a[5], a[6], a[7]):Lerp(Vector3.new(b[5], b[6], b[7]), share),
+			a[8] + (b[8] - a[8]) * share,
+			a[9] + (b[9] - a[9]) * share,
+			0
+	end
 	local frame = if attackerAt and targetAt
 		then Ultimates.attackerFrame(attackerAt, targetAt)
 		else nil

@@ -1,5 +1,5 @@
 --!strict
--- Abilities - every ability kit in the game. A kit is two skills: a MOBILITY skill on Q (gamepad B)
+-- Abilities - every ability kit in the game. A kit is two skills: a MOBILITY skill on T (gamepad B)
 -- and an ATTACK skill on R (gamepad L2). Everyone owns the Base kit; the rest are bought in the menu's
 -- shop with Coins. One kit is equipped at a time. The rules are in Shared/Core/AbilityKit (tested),
 -- the saving in Server/Services/PlayerDataService, the keys in Client/Controllers/AbilityController.
