@@ -5219,3 +5219,18 @@ Build stamp `cam-1+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. Each was appro
   for the Blender tutorial notes: `report-smoke-flipbook-2026-11-22.md`.
 - The place still holds the teammate's unpushed scripts (its GameConfig differs from disk): no Rojo Connect from this folder.
 - Gates: rojo build OK, 608 tests, selene 0, stylua clean, fx_smoke 7 of 7.
+
+## ice-1 (2026-11-22): the Frost ice remade in Blender (patched by hash, NOT COMMITTED)
+Build stamp `cam-1+ice-1+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. The owner approved it in Studio ("Looks right").
+- The look is the owner's pick from their own references: blades from one centre (Niagara-Ice, YouTube `dIWMbXMnwqc`) and
+  broken chunks for the freeze block and debris (ARC, `hAUY_cFofLw`); flat facets, vertex colours only, pale glass tones.
+- New ice: package `124516489464164` ("HT Ice Kit v2", group 2970443) at `ReplicatedStorage.HT_KitModels.IceKit`, same five
+  names. The old one (package `94341799888558`) is kept at `ServerStorage.HT_KitModels_Old.IceKit_kits2`.
+- `Fx/FrostFx.luau`: ICE colours (125,162,198) to (213,239,251), `ICE_SEE` 0.25, a 23-row GLACIER table with a yaw column
+  (one flower, centre 8), `crystal(..., yaw)`. Frostbite's and the freeze's crystals still turn at random.
+- Source of truth: `design/kits/ice-study/` (`ice_pieces.py`, `ice_layout.py`, `export_kit.py`, checks and previews) and
+  `design/kits/out/export/ice_kit_v2.glb`. Report and numbers: `report-ice-kit-2026-11-22.md`, `session-log-2026-11-22.md`.
+- Not changed: KitModels' ERUPT (the ice still sinks; the reference shatters). The client's own stamp line still says
+  `kits-8h+lobby-4+ui-19d` (old, not touched).
+- The place still holds the teammate's unpushed scripts: no Rojo Connect from this folder.
+- Gates: rojo build OK, 608 tests, selene 0, stylua clean, fx_smoke 7 of 7.

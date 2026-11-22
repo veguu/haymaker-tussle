@@ -39,13 +39,18 @@ local P = Common.Palettes.Frost
 local INK = Color3.fromRGB(14, 30, 92) -- the dark shade: saturated navy, never grey
 local ACCENT = Color3.fromRGB(196, 172, 255) -- pale violet
 local TWINKLE = curve(0, 0, 0, 0.3, 0.6, 0.25, 1, 0, 0)
--- What the solid ice is made of: four blues, dark to pale, and a white-blue that glows.
+-- What the solid ice is made of: four pale glass blues, dark to pale, and a white-blue that glows.
+-- ice-1 (2026-11-22): the tones of the owner's reference (Niagara-Ice, YouTube dIWMbXMnwqc: its ice
+-- measures (125,162,198) to (213,239,251) from the 5th to the 75th percentile), and a little more
+-- see-through. The meshes carry only pale facet tones (never below 0.64, 0.79, 0.88), so the white-hot
+-- flash is white: darker vertex colours turn Neon navy.
 local ICE = {
-	Color3.fromRGB(84, 156, 255),
-	Color3.fromRGB(128, 204, 255),
-	Color3.fromRGB(184, 232, 255),
-	Color3.fromRGB(240, 251, 255),
+	Color3.fromRGB(125, 162, 198),
+	Color3.fromRGB(154, 196, 225),
+	Color3.fromRGB(182, 224, 244),
+	Color3.fromRGB(213, 239, 251),
 }
+local ICE_SEE = 0.25 -- how see-through a standing crystal is
 local GLOW = Color3.fromRGB(170, 236, 255)
 
 -- THE LAYERS, each made the same way wherever it is used.
@@ -202,6 +207,7 @@ local function rays(add: FxKit.Add, host: BasePart, count: number, big: number)
 end
 
 -- SOLID ICE: one crystal, leaning away from `centre`. Tone 1 (dark) to 4 (pale); 0 is a glowing one.
+-- `yaw` turns it about its own length (degrees); left out, it is turned at random.
 local function crystal(
 	name: string,
 	height: number,
@@ -210,9 +216,10 @@ local function crystal(
 	lean: number,
 	delay: number,
 	hold: number,
-	tone: number
+	tone: number,
+	yaw: number?
 )
-	local base = KitModels.rooted(position, position - centre, lean, math.random(0, 359))
+	local base = KitModels.rooted(position, position - centre, lean, yaw or math.random(0, 359))
 	if tone == 0 then
 		KitModels.erupt(name, height, base, delay, hold, GLOW, Enum.Material.Neon, 0.2)
 	else
@@ -224,7 +231,7 @@ local function crystal(
 			hold,
 			ICE[tone],
 			Enum.Material.SmoothPlastic,
-			0.1
+			ICE_SEE
 		)
 	end
 end
@@ -501,31 +508,42 @@ local bursts = FxKit.pool("HT_FrostGlacierFx", 2, function(parent, add)
 end)
 
 -- The Glacier's crystals, in the thrower's own frame: right, ahead, height, lean in degrees, wave
--- (each wave arrives two frames after the one before), which piece, and its tone (1 dark to 4 pale;
--- 0 a glowing one).
+-- (each wave arrives two frames after the one before), which piece, its tone (1 dark to 4 pale;
+-- 0 a glowing one), and its turn about its own length in degrees.
+-- ice-1 (2026-11-22): ONE FLOWER, after the owner's reference: every crystal stands within 3 studs of
+-- one centre and leans away from it, tall broad blades inside (wave 1), long low ones outside (wave
+-- 2). Made and checked in Blender (design/kits/ice-study: ice_layout.py is this table, fit_yaws.py
+-- chose each turn). The limits it keeps are the old layout's: no ice further ahead than 18.3 studs,
+-- wider than 16.4 to a side, behind the thrower, or nearer the camera than 13.2; and no blade lying
+-- flatter than 70 degrees or only just poking out of the floor. Each turn is set, not random: a
+-- leaning piece turned the wrong way puts a side blade flat on the floor.
 local GLACIER: { { any } } = {
-	{ 0, 7, 16, 0, 0, "Ice_Clump", 2 },
-	{ -1.4, 6.4, 13, 6, 0, "Ice_SpikeTall", 0 },
-	{ 1.6, 7.6, 12, 6, 0, "Ice_SpikeTall", 0 },
-	{ -4, 5.5, 11.5, 20, 1, "Ice_SpikeThick", 3 },
-	{ 4, 5.5, 11, 20, 1, "Ice_SpikeThick", 1 },
-	{ -3, 10, 12.5, 16, 1, "Ice_SpikeThick", 2 },
-	{ 3.2, 10.4, 10.5, 16, 1, "Ice_SpikeThick", 4 },
-	{ 0, 3.4, 8, 14, 1, "Ice_SpikeTall", 0 },
-	{ -8, 3.5, 8, 26, 2, "Ice_Clump", 1 },
-	{ 8, 3.5, 7.5, 26, 2, "Ice_Clump", 3 },
-	{ 0, 13.5, 9, 22, 2, "Ice_Clump", 4 },
-	{ -11, 7, 7.5, 30, 2, "Ice_SpikeTall", 2 },
-	{ 11, 7, 8, 30, 2, "Ice_SpikeTall", 3 },
-	{ -8.5, 11.5, 8.5, 30, 2, "Ice_SpikeThick", 4 },
-	{ 8.5, 11.5, 9, 30, 2, "Ice_SpikeThick", 1 },
-	{ -5, 14.5, 6.5, 34, 2, "Ice_SpikeTall", 2 },
-	{ 5, 14.5, 7, 34, 2, "Ice_SpikeTall", 3 },
-	{ -13.5, 4, 5.5, 30, 2, "Ice_SpikeTall", 4 },
-	{ 13.5, 4, 5.5, 30, 2, "Ice_SpikeTall", 2 },
+	{ 0, 8, 10, 0, 0, "Ice_Clump", 3, 30 },
+	{ -0.21, 8.77, 14, 8, 0, "Ice_SpikeTall", 0, 345 },
+	{ 0.51, 8.61, 12, 12, 0, "Ice_SpikeTall", 0, 165 },
+	{ -0.75, 9.3, 19, 20, 1, "Ice_SpikeThick", 4, 180 },
+	{ 0.75, 9.3, 18, 22, 1, "Ice_SpikeThick", 2, 165 },
+	{ -1.48, 8.26, 16.5, 34, 1, "Ice_SpikeThick", 2, 195 },
+	{ 1.49, 8.13, 16, 36, 1, "Ice_SpikeThick", 3, 150 },
+	{ 0, 9.5, 16, 10, 1, "Ice_SpikeThick", 1, 165 },
+	{ 0, 6.5, 8, 20, 1, "Ice_SpikeTall", 3, 165 },
+	{ -0.96, 6.85, 11, 30, 1, "Ice_SpikeTall", 4, 0 },
+	{ 0.96, 6.85, 11, 32, 1, "Ice_SpikeTall", 1, 150 },
+	{ -2.05, 9.43, 15, 40, 2, "Ice_SpikeThick", 3, 315 },
+	{ 2.05, 9.43, 15, 40, 2, "Ice_SpikeThick", 4, 165 },
+	{ -2.35, 7.14, 13, 42, 2, "Ice_SpikeThick", 1, 15 },
+	{ 2.35, 7.14, 13, 42, 2, "Ice_SpikeThick", 2, 150 },
+	{ -2.9, 8.78, 14, 66, 2, "Ice_SpikeTall", 3, 30 },
+	{ 2.85, 8.93, 13.5, 64, 2, "Ice_SpikeTall", 4, 75 },
+	{ -1.27, 10.72, 10, 56, 2, "Ice_SpikeTall", 2, 345 },
+	{ 1.12, 10.78, 9.5, 56, 2, "Ice_SpikeTall", 3, 165 },
+	{ -2.95, 7.48, 12, 70, 2, "Ice_SpikeTall", 1, 240 },
+	{ 2.97, 7.58, 12, 70, 2, "Ice_SpikeTall", 1, 45 },
+	{ -1.41, 6.59, 9, 40, 2, "Ice_SpikeTall", 4, 15 },
+	{ 1.49, 6.66, 9, 40, 2, "Ice_SpikeTall", 2, 135 },
 }
 local GLACIER_HOLD = 0.9
-local GLACIER_CENTRE = 7 -- how far ahead of the thrower the middle of the cluster is
+local GLACIER_CENTRE = 8 -- how far ahead of the thrower the middle of the cluster is
 
 -- THE KIT'S OWN PUNCH: a small ice burst where a punch lands -------------------------------------------------
 local punches = FxKit.pool("HT_FrostPunchFx", 4, function(parent, add)
@@ -796,7 +814,8 @@ function FrostFx.strike(root: BasePart, direction: Vector3)
 				spec[4],
 				spec[5] * 2 * FxKit.FRAME,
 				GLACIER_HOLD,
-				spec[7]
+				spec[7],
+				spec[8]
 			)
 		end
 	end
