@@ -78,3 +78,14 @@
 - NOT seen: the puff from a real T dash on screen (the dash ran and the emitter fired, but the game camera faced
   away). Full speed is the owner's to judge.
 - Docs fact for later: FlipbookLayout Custom + FlipbookSizeX/Y would allow more than 16 drawings (the reference has 23).
+
+## Housekeeping after the owner's "Looks right" (puff-1)
+- Owner picks (dialog): commit "Code and scripts"; J test key "Remove it"; roll sign "Fix and reframe".
+- J key removed from AnimController on disk and in the place (hash 1954554253 both). The Studio-only merge of the
+  hand clips stays.
+- Roll sign: ALREADY fixed on disk by the 2026-11-21 session after it wrote its handoff note (project() turns as the
+  game does; the flurry's side shot at LAST_PUNCH + 0.14 went fov 60 -> 60.4 so the floor under the attacker stays
+  inside the tablet's safe frame). The place had not been given the reframe: patched now, Ultimates hash 3416957725
+  on both sides. Lesson: check an "open question" in a handoff against the files before asking the owner about it.
+- Commit 32f76ac on main (52 files, 1.5 MB; .blend files, renders, previews and reference frames ignored). Not pushed.
+- A stray `git stash` on AnimController (my mistake) was popped at once; nothing lost.
