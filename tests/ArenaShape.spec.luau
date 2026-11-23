@@ -12,6 +12,9 @@ local BASE: any = GameConfig.Arena
 local LOBBY: any = GameConfig.Lobby
 local BOT: any = GameConfig.TestBot
 local GNOMON: any = Round.arenaFor(BASE, (Envs :: any).Maps.gnomon, (MapObstacles :: any).gnomon)
+-- Map 1, "Grassy Plains": a CIRCLE since 2026-11-22 (the owner's size, 180)
+local MEADOW: any = Round.arenaFor(BASE, (Envs :: any).Maps.meadow, nil)
+local MEADOW_RADIUS = 180
 
 return {
 	["Gnomon is the original oval doubled exactly once, as absolute numbers"] = function()
@@ -20,12 +23,17 @@ return {
 		assert(shape.semiX == 213 and shape.semiZ == 176, "426 x 352 studs")
 	end,
 
-	["a map with its own oval has Gnomon's (the suite's shared surface, owner 2026-11-20); the rest keep the circle"] = function()
+	["a map with its own shape has Gnomon's oval (owner 2026-11-20) until it is rebuilt as a circle (Map 1 is); the rest keep the base circle"] = function()
 		local g = (Envs :: any).Maps.gnomon.arena
 		for id, entry in (Envs :: any).Maps do
 			if id ~= "gnomon" then
 				local a: any = Round.arenaFor(BASE, entry, nil)
-				if entry.arena then
+				if id == "meadow" then
+					assert(
+						a.SemiX == MEADOW_RADIUS and a.SemiZ == MEADOW_RADIUS,
+						"Map 1 is a circle of 180"
+					)
+				elseif entry.arena then
 					assert(a.SemiX == g.semiX and a.SemiZ == g.semiZ, id)
 				else
 					assert(a.SemiX == nil and a.StartRadius == BASE.StartRadius, id)
@@ -48,6 +56,42 @@ return {
 		assert(not Round.isOut(GNOMON, cx, cy, cz + 176 + m - 1))
 		assert(Round.isOut(GNOMON, cx, cy, cz - 176 - m - 1))
 		assert(Round.isOut(GNOMON, cx, cy - BASE.EliminationDepth - 1, cz), "below the line is out")
+	end,
+
+	["Map 1's ring-out line is its circle plus the margin, the same in every direction"] = function()
+		local cx, cy, cz = BASE.CenterX, BASE.CenterY, BASE.CenterZ
+		local out = MEADOW_RADIUS + BASE.PlayAreaMargin
+		for step = 0, 359, 5 do
+			local c, s = math.cos(math.rad(step)), math.sin(math.rad(step))
+			local edge = MEADOW_RADIUS - 0.5
+			assert(not Round.isOut(MEADOW, cx + c * edge, cy, cz + s * edge), "on the floor")
+			assert(
+				not Round.isOut(MEADOW, cx + c * (out - 1), cy, cz + s * (out - 1)),
+				`in at {step}`
+			)
+			assert(Round.isOut(MEADOW, cx + c * (out + 1), cy, cz + s * (out + 1)), `out at {step}`)
+		end
+		-- the oval's long end is not floor here: 213 + margin - 1 was in on Gnomon, it is out on the circle
+		assert(Round.isOut(MEADOW, cx + 213 + BASE.PlayAreaMargin - 1, cy, cz))
+		assert(Round.isOut(MEADOW, cx, cy - BASE.EliminationDepth - 1, cz), "below the line is out")
+		local a, b = Round.semiAxes(MEADOW)
+		assert(a == MEADOW_RADIUS and b == MEADOW_RADIUS and MEADOW.StartRadius == MEADOW_RADIUS)
+	end,
+
+	["Map 1's 25 spawns sit on a circle inside the floor, facing the middle, spread out"] = function()
+		local pts = Round.spawnPoints(MEADOW, 25, 0.3)
+		for _, p in pts do
+			local dx, dz = p.x - BASE.CenterX, p.z - BASE.CenterZ
+			local r = math.sqrt(dx * dx + dz * dz)
+			assert(math.abs(r - MEADOW_RADIUS * 0.65) < 1e-6, "on the spawn circle")
+			assert(dx * p.faceX + dz * p.faceZ < 0, "faces the middle")
+		end
+		for i = 1, #pts do
+			for j = i + 1, #pts do
+				local d = math.sqrt((pts[i].x - pts[j].x) ^ 2 + (pts[i].z - pts[j].z) ^ 2)
+				assert(d > 20, `spawns {i} and {j} only {d} apart`)
+			end
+		end
 	end,
 
 	["25 spawns sit on the oval inside the floor, facing the middle, spread out"] = function()
@@ -90,9 +134,23 @@ return {
 		end
 	end,
 
-	["the lobby's viewing edge is past the out line, so its wall never catches a fighter"] = function()
+	["the lobby's viewing edge is past every map's out line, so its wall never catches a fighter"] = function()
 		local outZ = BASE.CenterZ + 176 + BASE.PlayAreaMargin
 		assert(LOBBY.ViewEdgeZ > outZ, `lobby edge {LOBBY.ViewEdgeZ} inside the out line {outZ}`)
+		-- every map with its own shape, whatever it is (a circle of 194 would put the line at 254, past the edge)
+		for id, entry in (Envs :: any).Maps do
+			if entry.arena then
+				local shape = entry.arena
+				assert(
+					type(shape.semiX) == "number" and type(shape.semiZ) == "number",
+					`{id}: semi-axes`
+				)
+				local line = BASE.CenterZ + shape.semiZ + BASE.PlayAreaMargin
+				assert(LOBBY.ViewEdgeZ > line, `{id}: lobby edge inside the out line {line}`)
+			end
+		end
+		-- Map 1's circle also clears the lobby's rock front, 8.3 studs before the edge (design/lobby/out/village)
+		assert(LOBBY.ViewEdgeZ - 8.3 > BASE.CenterZ + MEADOW_RADIUS + BASE.PlayAreaMargin)
 		assert(
 			LOBBY.FloorY > BASE.CenterY,
 			"a little above the arena, so its floor is seen from above"
