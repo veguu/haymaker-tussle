@@ -5190,6 +5190,560 @@ MapEnvironments, TrainingGrounds, DummyService, LobbyService) were left as they 
   the release (`RELEASE_RISE`, on the haymaker's contact) so its boom lands as the target is thrown; the blast plays no
   sound of its own. Replay: D loaded and started at 5.0 s. Build stamp `kits-8t+village-4+ui-20e`; 566 tests.
 
+## lobby-7 (2026-11-21): Bell Rock a picnic-lawn hangout with real seats; no banners, no benches; the stall roof gaps (inside-out faces) fixed; the lobby-6 review's nine findings fixed. IN THE PLACE (saved v588), NOT COMMITTED.
+Owner, in order: "make the end of an obby like a chill area, with a picnic, tables, etc. make it look like a hangout place"
+(shown a sheet of three, `design/lobby/out/bellrock_options/bellrock_hangout_options.png`; he picked A, the PICNIC
+LAWN); "remove the banners and the benches on the lobby map, i dont really mess with it"; "also fix these random gaps
+in the stalls" (a screenshot of a shop roof you could see through).
+- **PICNIC LAWN** (new `design/lobby/hangout.py`, exec'd by village.py and by the mockup script
+  `bellrock_options.py`): two picnic tables by the tree, three checked blankets with a basket and a cushion each,
+  string lights on five posts round the back, kit plants round the back edge kept off every prop. The front half
+  stays open (the landing, the bell, the glove). The summit flag is now 44 tall (it shows over the training wall
+  from the side of the square; NOT from spawn's centre line, the great tree is in the way). 15 SEATS: hangout.py
+  lists every bench place and cushion (out/village/seats.json -> apply_sections -> Lobby.Sky.Seats); LobbyService
+  `spawnSeats` puts an invisible anchored Seat (HT_LobbySeat) at each. The game switches Roblox's jump off, so
+  LobbyFlightController binds a STAND action while you sit (Space, gamepad A/Y, an on-screen button) that fires
+  the no-argument remote LobbyStand; the server breaks the weld.
+- **NO BANNERS, NO BENCHES**: every banner() pole, the main gate's hanging cloths and the side gates' cloths
+  (arch(hangings=False)), and the balcony / square / tree benches are gone. The three bunting strings tied to the
+  square's banner poles went with them. Kept (my reading, stated to him): bunting, awnings, the summit flag, the
+  picnic tables.
+- **THE GAPS**: at() turns d into -y, which mirrors faces listed in (u, d) order, and Roblox draws only the front
+  of a face. Measured on the built blend with bmesh recalc_face_normals: the shop roofs had 177 of 354 faces
+  inside-out (one slope of every roof), and EVERY ring_tiles mesh (the spawn medallion, the shops' rugs, the
+  arena's rim and top rings, the zone marks) was fully inside-out (it showed as outlines in Studio). Fixed at the
+  source: ring_tiles wound outward, each roof course recalculated before joining the roof, the gables built both
+  sides (new mesh Lobby_Shops_Gable). Checked with back faces hidden in Blender and in Studio (roofs solid from
+  outside and from under the eaves, medallion and rims filled).
+- **REVIEW** (a fresh agent, the system rubric): 5.0 (a failing test capped it; 5.8 otherwise). Fixed: F1 a round
+  starting mid-flight now cancels it (Release -> settle; token; client unbinds on LobbyFlight(nil) and any
+  BodyReset); F2 seats applied; F3/F4 seats (server unseat + Seat disabled 1.2 s, client told to stand, seats all
+  off for the last 1.2 s of a countdown, Stand unbinds only on Seated false / CharacterRemoving); F5 one
+  challenger at a time on the ring; F6 the cliff's air wider (Out/2 along the side) plus a last catch round the
+  lobby; F7 the clash flash goes off when the dummy is stunned and the beat restarts with a warning; F8 pads
+  cached, ring and pads skipped when nobody trains, client mesh lists cached; F9 checkpoints cleared on
+  Release/Enter/flight. RE-REVIEW: 8.75 (passes); its leftovers N1-N5 also fixed (dead `flying == true` clause, the new
+  timings moved to config: Lobby.Sky.SeatRules, Lobby.LastCatch, Training.Bots.Clash SkipSeconds/WarnPad; doc comment;
+  a 0.25 s rate limit on LobbyStand; the unused HT_Flight attribute removed).
+- **MODEL**: 96,301 triangles in 102 meshes, 108 colliders, 91 kit pieces. Uploaded on his "Yes, upload" (group
+  2970443, Approved): `village_1.glb` = 91152662827397 (72 meshes, 12.26 MB), `village_2.glb` = 139595891639581
+  (30, 7.82 MB). Assembled 102 of 102, worst 0.002. An in-between upload (109056670151484, 134407980178027: the
+  hangout and no banners, faces NOT fixed) was in the place for testing and is now unused, as are lobby-6's
+  (99340522747040, 98938637149415). lobby-6's model is kept as `HT_LobbyArchive.Village_lobby6_20261120`.
+- **SEEN in Play**: sitting on a bench seat works; Stand bound with a touch button while seated, unseats and
+  unbinds; seated when a round started -> placed on the arena, the Seat did not move; a round starting 2.8 s
+  into a glove flight cancelled it and the body stayed on its arena spawn; a faked countdown switched every seat
+  off within 0.05 s and back on after. Frame time (PC, Studio): training 176 to 188 fps (worst 14 to 20 ms), Bell
+  Rock 168 fps with one 76 ms hitch on arrival. No script errors seen (the console was flooded with "asset
+  content representation is being generated" from the fresh uploads).
+- **NOT VERIFIED**: two players on the ring (F5 is reasoned, not played); a real launch steered out along the cliff
+  (F6); the clash flash after a real stun (F7 is reasoned); the Stand button on a real phone; sounds by ear;
+  phones' frame time.
+- **CAUTION (lesson)**: my temporary preview copy of the lobby (for Edit-mode screenshots) was left in the
+  workspace this morning and overlapped the real lobby in his play test; removed (LESSONS.md).
+- **LOOK REVIEW (three blind reviewers, world rubric, on the v588 Studio captures): 6.3, 6.3, 6.3 (identical points:
+  W1 2, W2 1, W3 1, W4 1, W5 1, W6 1).** Below 8.5. Common findings: the obby decks read as tables and the
+  Crossroads post stands in the walkway; Bell Rock's lawn two-thirds empty, the hangout at the back; the recovery
+  cliff reads as a flat pad; lighting plain (MapEnvironments belongs to the maps session: NOT touched); the great
+  tree blocks spawn's view of the training gate (NOT changed: the owner hasn't asked); all three asked whether
+  "banners" meant the bunting too (my reading: no; the owner was asked).
+- **FIX ROUND 1 (village.py, IN PROGRESS when this was written):** decks with a GOLD TRIM on stacked-stone pillars
+  (hop_deck posts "centre", "sides", "corners", "back"; Turn deck "back", Crossroads "corners"); the ramp's first
+  and top planks gold; Bell Rock regrouped near the landing (tree (2, 576), tables (-12, 570) and (15, 577), three
+  blankets, a log seat, string lights in a ring, a stepping-stone path from the landing, darker "leaf_moss" grass
+  patches, kit flowers across the lawn), a timber cradle under the glove; the cliff: red/cream hazard stripes on
+  the open edge, rocks at both ends, pads radius 4.5 with chevrons. Dry build: 99,221 triangles, 109 meshes, 119
+  colliders, obby 0 failing. The full painted build was started in the background (writes out/village).
+- **STATE**: the place (v588) has the faces-fixed model and the scripts up to standBeforeRound. NOT yet in the place:
+  the N1-N5 leftovers (LobbyService, DummyService) and the regenerated GameConfig (SeatRules, LastCatch, Clash
+  SkipSeconds/WarnPad, pad radius 4.5), and the fix-round model. Gates on disk: 608 tests, selene 0, stylua clean,
+  gen_config OK (gen_layout must be rerun after the build). NOTHING COMMITTED since 90baefa.
+- **NEXT**: when the build's log ends with SAVED: `python design/lobby/apply_sections.py --apply` (new seats from
+  seats.json), `python design/lobby/gen_layout.py`, all gates; ask the owner before the upload (count, names, sizes);
+  upload with Studio's open_cloud_invoke (group 2970443); archive nothing (lobby6 is archived); insert as
+  VillageImport_1/_2; `python design/lobby/studio_lobby.py village Village` then run its luau with studio_mcp.py;
+  fetch-and-diff then push GameConfig, LobbyLayout, LobbyService, DummyService; captures from the same 8 camera
+  spots (remove the temporary preview copy right after); one blind reviewer for the fix round, three for the final
+  pass; save; append to this section; commit only when the owner says.
+
+## suite-1 (2026-11-20/22): Map 1 "Grassy Plains" (Gnomon revamped) IN THE PLACE (saved v599); field grass you run through. NOT IN THE ROTATION.
+Owner brief 2026-11-20: a six-map arena suite in the Village lobby's visual language. His rulings this session (each
+from a rejected build; also in `../Arena Maps.md` rules and memory): every suite map uses Gnomon's live oval (426 x
+352, semi 213 x 176); NO lobby pieces on an arena (the centre medallion was removed: "every map unique to their own");
+"grass plains" means a grassy look, NOT land: arenas float in OPEN SKY, the background is distant floating islands of
+detail only ("ur ruining the point of the arena if theres land below"); background must be full, houses and windmill
+from the modelling study, the windmill "a lot bigger"; he wants the feel of running through a grass field, never
+taller than a fighter, wind blowing on it (he disliked the old very low tufts).
+
+- **Files:** `design/maps/suite/` (`base.py` shared by all six maps: oval, courses, painted floor tiles, voronoi,
+  export, collision.json, kit placements, review scene with the live lobby; `meadow.py` Map 1; `field_grass.py` the
+  grass clumps; `grass_preview.py` the clumps planted by the game's rules in Blender; `studio_map.py <map>` writes
+  `out/suite/<map>/studio_<map>.luau`). Outputs in `design/maps/out/suite/meadow/` (not committed).
+- **Map 1:** a clean grass floor (6 painted tiles, 1024 px), a wavy grass lip and soil band, the island's jumbled rock
+  to a keel; floating islands north: the village (12 storybook houses, chapel with a spire, barn, well), the
+  windmill's island (about 240 studs to the sail tips; sails are `Map_Meadow_WindmillSails_*`, hub in
+  `landmarks.json`, NOT turning yet), the farm island (striped fields, hedgerows, bales, farmhouse, barn), two tree
+  islets beside the arena, three far islands. 129k triangles, 96 meshes (none over 20k or 2,048 studs), 85 kit
+  clones. Backdrop parts carry `HT_Far = true` and no shadows; NOTHING hides them on phones yet.
+- **Uploaded** (owner: "import the actual arena now"): meadow_1/2/3 = 73242095693801, 89406515470664,
+  107162819932180; field grass v1 = 73512601843859 (`out/suite/meadow/upload_ids.json`). Assembled as
+  `ServerStorage.HT_Maps.Meadow`: every mesh within 0.0016 studs of its place, 256 invisible wedges for the floor
+  (`HT_Collision`, top exactly on the surface), 85 kit clones (`HT_Dressing`), PivotOffsets reset.
+- **Code (all in the place, checksum-verified against the files):** `Core/FieldGrass` (pure: clumpAt, windLean,
+  gustLean, leanAngle, sinkAt, ease; `tests/FieldGrass.spec.luau`), `Shared/FieldGrassField` (the ring of clumps round
+  the camera, wind gusts rolling across, parting round every character with a slow-closing wake), `EnvironmentKit`
+  hook, `MapEnvironments.Maps.meadow` (Gnomon's environment, `fieldGrass` config). `tests/ArenaShape.spec` now says a
+  map with its own oval has Gnomon's. Code review: two findings (parting used 0.2 s old positions; new clumps a frame
+  late), both fixed. My first grass and config files under src (not design/maps/suite, still untracked) were swept into another session's commit 1453daa.
+- **MEASURED in Studio Play (this PC):** moving a clump costs about 5 microseconds a frame (BulkMoveTo: 100 parts 0.58
+  ms, 200 parts 1.1 ms); the maths is a tenth of that. Grass v1 (4-stud grid, 1,314 clumps in the ring): 1.68 ms a
+  frame median even with tiers, 0.73 ms with the phone settings. TOO MUCH. Grass v2 is BUILT, NOT UPLOADED: bigger,
+  fuller clumps (228-252 triangles, 7-8 studs wide) on a 6-stud grid (about 560 clumps, about 80 moves a frame), and
+  lighter roots (v1's dark roots read as black stubble in Studio). `field_grass.glb` 49 KB; root offsets in
+  `out/suite/meadow/grass/roots_v2.json`. The repo's config already says `cell = 6`; the PLACE still has v1 and cell
+  4 (they go together). Templates are DoubleSided (one-sided blades vanished from behind).
+- **To test:** in Play, server: `workspace:SetAttribute("HT_MapRequest", "meadow")` (Studio only; the rotation is
+  unchanged). `screen_capture` with `camera_position` works in Play; a Scriptable camera gets taken back.
+- **NOT DONE:** upload grass v2 (ask first), set its PivotOffsets (roots_v2.json) and DoubleSided, write the config,
+  re-measure (target under about 0.5 ms on PC); turn the windmill's sails; a phone path that hides `HT_Far`; the
+  floor's textures had not finished processing when last looked at (judge the look again); a fresh reviewer for the
+  map; owner's approval; then rotation (`design/game.json` Maps.Rotation) and commit when he says. Maps 2-6 next.
+
+## suite-1b (2026-11-22): grass v2 in the place; the floor fixed; the grass ring follows the fighter. Saved v601. NOT IN THE ROTATION.
+- **Grass v2 uploaded** on the owner's "Yes, upload": 96166413156870 (v1's templates are kept in
+  `ServerStorage.HT_MapsArchive.HT_FieldGrass_v1`). `ReplicatedStorage.HT_FieldGrass` holds FieldGrass_A..D with
+  PivotOffsets = their roots (`out/suite/meadow/grass/roots_v2.json`) and DoubleSided on.
+- **Cost, MEASURED in Studio Play on this PC** (a second field timed on its own): moving a clump costs about 5
+  microseconds, so the tiers decide the cost. Config now: 6-stud grid, ring 66 (phones 36), fade 24 (phones 14),
+  tiers 14 / 30 studs, mid every 6th frame, far every 16th. PC: 0.48 ms a frame median, 0.58 average, 410 clumps;
+  phone settings on this PC: 0.27 ms median, 131 clumps. NOT measured on a real phone (expect 2 to 3 times slower).
+- **The floor faced down.** `floor_tiles` built the oval clockwise seen from above, so Roblox culled it and the cream
+  stone under it showed. The stored map's six floor tiles are DoubleSided now (no re-upload); `base.py` builds the
+  polygon the other way for maps 2-6.
+- **The ring now follows the camera's subject** (the fighter, or the one spectated), not the camera: at full speed
+  the camera pulls 30-40 studs back and the fighter was at the ring's thin edge (seen in a recording).
+- **Seen in a recording** (`out/suite/meadow/recording/grass_run_3.mp4`, a round on Meadow with bots): the field
+  fills the arena round the fighters, sways in gusts, parts where they run. Not yet seen: a phone-size view, Reduced
+  Motion (the grass ignores it), a real phone.
+- **Tests:** 610 pass (FieldGrass.spec: fast forms equal the readable ones; each ring's fade fits it). Lune
+  compile, selene, stylua on my files, rojo build: OK. All four scripts in the place match the files by checksum.
+- **Still open:** the windmill's sails don't turn; nothing hides `HT_Far` on phones; Reduced Motion setting for the
+  sway; a fresh reviewer's findings (running); the owner's approval; then rotation and commit.
+
+## suite-1c (2026-11-22): the fresh review's fix round, no re-upload. In the place, saved v603. NOT IN THE ROTATION.
+A fresh reviewer (world rubric) scored Map 1 5.4/10, capped at 5.0 by gates. Fixed in this round:
+- **Gates:** anchoring and collision checked in the place: 564 parts anchored, no visual part collides, queries or
+  touches; 256 floor colliders right. **33 of 85 kit pieces floated or sank** (up to 3.4 studs; they were placed from
+  a height function): re-seated from a Blender raycast on the real island meshes (each keeps `PreSeat_Pivot`), the
+  four flowers that landed on a roof removed, the four hedgerow trees put on the ground under the hedge. `base.py`
+  now seats every kit piece by raycast at build time (`seat_placements`), so maps 2-6 can't float.
+- **Grass:** a staggered grid with wide jitter (no rows); shorter (scale 0.6-0.9: 1 to 2.3 studs, feet show); the
+  parting lookup reaches one cell further (the stagger moved roots); Reduced Motion: a steady lean, no gusts.
+- **Air and floor:** Meadow has its own lighting (Gnomon's, with clearer air: atmosphere density 0.2, haze 0.5,
+  exposure -0.1, a little more saturation and contrast); the floor reads rich green in game, no milky wash.
+- **New `Shared/MapExtras`** (hooked in EnvironmentKit, config `spinners` and `phoneHide` per map): the windmill's
+  sails turn about their hub (MEASURED 35.5 degrees in 2 s = 3 rpm; a third of that with Reduced Motion, eased); on
+  phones the far islands, far trees, crops, hedges and the far farmhouse come out of that client's copy.
+- Code review of MapExtras and the grass changes: 3 findings (the parting lookup, the sails snapping on a Reduced
+  Motion switch, a phoneHide note), all fixed. 610 tests, compile, selene, stylua, rojo build OK; five scripts in the
+  place match the files by checksum.
+- **Not fixed (needs a rebuild and a re-upload of the three map files, about 30 MB; ask first):** a bigger windmill
+  with thicker sail bars (the reviewer: tree-high from the lobby, lattice will shimmer); rock and soil edges with a
+  painted hue shift and edge light (bevels); a smaller warm patch on the east half of the floor; the dark line along
+  the lip's top; the first ring of rocks bulging past the lip on the west. Also open: the sky's deeper-blue horizon
+  band under the islands still reads a little like sea (sky or atmosphere colour); a phone-size view and a real phone.
+
+## suite-2 (2026-11-21): maps 2-6 build started; RANDOM ROTATION DONE (in the place, saved v606, NOT COMMITTED)
+Owner 2026-11-21 (after approving the design sheet `design/maps/out/suite/design_2-6/suite_2-6_design_sheet.png`):
+"build all of them on Roblox Studio"; Map 1 grass: cover the whole arena without per-step work, or remove it; each
+round a random map, never the same twice in a row. Maps join the rotation only when he approves each one.
+- **ROTATION (done, seen in Play):** `Core/Environment.randomMap(rotation, last, roll)` (pure; skips every copy of
+  the last map; 1 map repeats; empty -> nil), `MapService` `following()` uses it when `Maps.Order == "random"`
+  (first round too, since `Maps.StartMap` is now ""), Studio "next" too. game.json `Maps.Order = "random"`,
+  `StartMap = ""`; GameConfig regenerated (only those two lines are mine; the file also carries others' unsynced
+  lobby config). Specs in `tests/Environment.spec.luau`. Gates: 612 tests, selene 0 on my files, stylua, rojo
+  build, luau.compile; /code-review: 2 findings fixed. INTO THE PLACE by `multi_edit` of only my hunks (Studio's
+  MapService/Environment equalled HEAD; Studio's GameConfig is OLDER than the file, so only my 2 lines were
+  patched in, NOT the whole file). Play: 10 "next" draws, random, 0 repeats. Saved v606.
+- **BUILD PIPELINE:** `sketch_kit.py`: `BUILD` (not --dry) makes `sketch_run` do a real `base.run` (bake, 1024 px
+  floor, export, Cycles review renders) and write `build_stats.json`; `beam_chain()` records Beams (waterfalls,
+  streamers) into landmarks.json instead of meshes (NOT yet used by saltbasin/steppe: still meshes); `map_data(near,
+  floor colour, material)`. quarry.py calls map_data (Floor, Bench, Core, Scaffold; 166,125,83 Sandstone).
+- **QUARRY FULL BUILD RUNNING/RAN** to `design/maps/out/suite/quarry_build/` (log build.log; ~188 meshes, ~20 s each).
+  Check `BUILD DONE` in the log, the review renders, `export/*.glb`, manifest.json.
+- **NEXT:** (1) `studio_map.py`: read landmarks.json `near` (far = other elements; meadow keeps its FAR tuple),
+  `floor` colour/material for the wedges, `beams` -> Beam chains on an anchor part (FxKit Ribbon texture
+  rbxassetid://136226108329170, FaceCamera); original kept at scratchpad only, Map 1's output must stay identical.
+  (2) ASK THE OWNER before upload: count, names, sizes (group 2970443). (3) assemble as HT_Maps.Quarry, add
+  `MapEnvironments.Maps.quarry` (copy meadow's shape: arena 213/176, spawnShare 0.65; spinners for
+  `Map_Quarry_DerrickBoom_*`: MapExtras needs a `swing` mode; phoneHide far islands). (4) Play check: fighter's-eye
+  recording, phone view, frame cost. (5) fresh reviewer. Then steppe, salt (switch waterfalls to beam_chain when
+  BUILD), sundial, orchard. MapExtras also needs `bob` (kite); bees/armillary are plain spinners.
+- **MAP 1 GRASS:** not started. Options in the brief: static merged full-floor grass meshes, terrain Grass
+  decoration under a thin floor, or remove (code, fieldGrass config, clumps) and repaint the floor richer.
+- `design/maps/suite/` is ENTIRELY untracked (Map 1's base.py/meadow.py too): tell the owner.
+- **QUARRY BUILD FINISHED (2026-11-21):** `design/maps/out/suite/quarry_build/`: BUILD DONE, 188 meshes, 50,456
+  triangles, none over the limits; 4 GLBs (quarry_1..3 about 12.4-12.7 MB each, quarry_4 2.3 MB); Cycles review
+  renders quarry_{over,gameplay,fighter,edge,recovery,lobby}.png NOT YET LOOKED AT. Derrick 413 tall, 510 boom reach.
+  Next: look at the renders, then studio_map.py, then ASK the owner before uploading the 4 GLBs.
+
+## suite-2b (2026-11-21): Map 2 "The Limestone Pit" (Quarry) UPLOADED and IN THE PLACE (ServerStorage.HT_Maps.Quarry). NOT IN THE ROTATION.
+- **Split with another session:** a "Map 1 Grassy Plains continuation" session owns Map 1 (meadow.py, field_grass.py,
+  out/suite/meadow/, HT_Maps.Meadow, HT_FieldGrass, MapEnvironments.Maps.meadow) AND the owner's Map 1 grass ruling.
+  It agreed: its rebuild changes stay in meadow.py (base.py untouched), it adds to MapExtras only and tells this
+  session before syncing MapExtras or MapEnvironments.
+- **Renders looked at** (quarry_{over,gameplay,fighter,edge}.png): as designed. A thin diagonal seam line shows on the
+  floor in the Cycles fighter view (tile edge); check it in Studio.
+- **Far textures cut to 512 px before upload** (new `design/maps/suite/retex.py`: shrinks meshes centred past 1,100
+  studs, re-exports from quarry.blend with no re-bake, checks the GLBs' PNGs against the disk): 44 of 78 1024 px
+  textures were far islands; now 34 x 1024, 83 x 512, 71 x 256, about a third less texture memory; 3 GLBs, 27.6 MB
+  (was 4, 40 MB). Originals: `quarry_build/textures_full/`, pre-shrink GLBs + manifest `quarry_build/export_full/`.
+  `base.py` now caps far meshes at 512 px at bake time (FAR_TEX = 1100), so maps 3-6 need no retex.
+- **UPLOADED** on the owner's "Yes, upload" (group 2970443, all Approved): quarry_1 = 74104450107124 (62 meshes,
+  12.11 MB), quarry_2 = 129877594134055 (97, 12.65 MB), quarry_3 = 138632963818536 (29, 2.88 MB)
+  (`quarry_build/upload_ids.json`).
+- **studio_map.py generalized:** `python studio_map.py quarry quarry_build` (2nd arg = the build's folder); far = every
+  element NOT in landmarks.json "near" (checked against each mesh's own element); floor collider colour and material
+  from landmarks.json "floor" (checked against a list of Enum.Material names); "beams" -> HT_Beams (camera-facing
+  Beam chains on one invisible anchor, FxKit Ribbon texture; every beam checked first: point/width counts, colour,
+  transparency). Map 1's output is BYTE-IDENTICAL (cmp). Beams: compiled and refused-when-bad only, NOT yet run in
+  Studio (first use: Salt Basin).
+- **Assembled** (studio_quarry.luau): 188 of 188 meshes (worst 0.0018 studs, each import turned 180), 256 floor
+  wedges (Sandstone, 166,125,83), 17 near (floor, benches, core, scaffold) + 171 far (HT_Far, no shadows), 0 kit pieces.
+- **Code (in the place, checksums equal to the files):** new pure `Core/MapMotion` (pose: spin / swing / bob with
+  tilt; advance: the Reduced Motion clock; problems: config check) + `tests/MapMotion.spec.luau` (every map's movers
+  checked); `Shared/MapExtras` moves spinners through it (Map 1's sails: same maths); `MapEnvironments.Maps.quarry`
+  (a DEEP copy of Map 1's environment with a warmer sun 255,228,190 x 2.5 and tint 255,249,240; the derrick boom's 5
+  parts SWING 12 degrees each way, 60 s a swing, about the MAST at arena (560, -760), not the boom foot; phoneHide
+  `_FarN`, `_Ledge`). quarry.py now also records the mast in landmarks.json (next rebuild). /code-review: 7 findings
+  (1 important: unchecked beam data could stop the luau after the imports are gone), all fixed. Gates: 620 tests,
+  selene 0, stylua, rojo build, luau.compile.
+- **Seen in Play:** the map loads by `workspace:SetAttribute("HT_MapRequest", "quarry")` (server); the boom moved
+  13.8 studs in 5 s at a constant 307.9 from the mast; the map's light and air apply. Textures were STILL PROCESSING
+  ("Asset content representation is being generated"), so the look and frame cost were not judged yet. A first
+  still (placeholder textures) showed the same deep-blue horizon band under the islands as Map 1 ("reads as sea").
+- **PLAY CHECK (owner stopped his test, 2026-11-21):** textures loaded. A round on Quarry (bots), fighter's eye:
+  the derrick reads as the landmark, the strata show. FOUND: (a) THIN SEAM LINES along the floor tiles' edges (one
+  across at z=0, one along each x tile edge; also faint in the Cycles render): textures wrap, and each tile was painted
+  edge to edge. FIXED IN THE BUILD, NOT UPLOADED: `base.floor_tiles(pad=16)` paints 16 texels past each edge with UVs
+  inside (neighbours' margins match exactly, checked); new `design/maps/suite/floor_only.py` rebuilt just the 6 tiles:
+  `design/maps/out/suite/quarry_floor/export/quarry_floor.glb` (1.83 MB, 6 meshes, same centres and triangles).
+  (b) THE "SEA" BAND under the islands is the place's SKY texture (rbxassetid://6444884337 sides, Dn 6444884785, Up
+  6412503613): with the Sky removed it vanished; atmosphere changes (pale decay, offset 0, density 0.3) did not remove
+  it and washed out the islands. Suite-wide (Map 1 too): the owner's choice.
+  MEASURED (this PC, fixed fighter's-eye camera, median of 6 s; `design/maps/suite/measure_client.luau`): render CPU
+  Quarry 8.28 / 7.87 ms (two runs) vs Gnomon 12.04 ms; graphics texture memory 281 / 239 MB with Quarry vs 221 with
+  Gnomon; mesh memory 8 vs 18 MB; the boom's swing 10.4 microseconds a frame (5 parts). Phone path applied on this
+  client (61 meshes out, 127 kept): 8.54 ms, within noise (the far blocks are cheap here; not a real phone). The
+  recording: `quarry_build/recording/quarry_run_1.mp4` (17 s; frames f0-f5 + sheet, darkened by Blender's colour
+  handling on extraction). True device emulation: not possible through the MCP.
+  Studio was closed and reopened by someone during the check (new studio id): whether the place was saved with Quarry
+  and my three scripts in it was not yet checked (Edit was busy with another test).
+- **BLOCKED EARLIER (2026-11-21, ~45 min after upload):** Studio was in someone else's play test (not the Map 1 session's;
+  restarted twice, character moving); two stops returned "Game Stopped" but Studio stayed in Play, and its Server
+  datamodel was not reachable through the MCP. Nothing of mine is running; the place is NOT SAVED since Quarry went in
+  (HT_Maps.Quarry, the three scripts): save once Studio is back in Edit.
+- **NEXT (Quarry):** (1) in Edit, check the textures are done (`ContentProvider:PreloadAsync` on the map's MeshId /
+  TextureID: 26 of 376 were ready at first); (2) Play, server `workspace:SetAttribute("HT_MapRequest", "quarry")`,
+  stills from the fighter's eye (camera ~(3000,106,120) looking north), the floor seam the Cycles render showed, the
+  horizon band (try a paler atmosphere decay for Quarry only), a `video_capture` of a round on it (bots) with the boom
+  swinging, the phone path (phoneHide hides 61 of 188 meshes: 127 left, 43,010 triangles, 52.4 megapixels of texture;
+  Map 1 whole: 96 meshes, 128,825 triangles, 40.1 MP), frame cost with `design/maps/suite/measure_client.luau` (run in the Client)
+  (Stats.RenderCPU/GPUFrameTime medians from a fixed camera, Quarry vs a rotation map; the swing's own microseconds);
+  (3) save the place; (4) a fresh reviewer (world rubric, the owner's Arena Maps rules), fix, then show the owner. Then
+  Steppe: switch its streamers to beam_chain, full build (base.py's 512 px far cap applies), ask before upload.
+
+## suite-1d (2026-11-22): Map 1 REBUILT AND RE-UPLOADED: static full-arena grass, the 1.7x windmill, the edge fixes. In the place, saved v613. NOT IN THE ROTATION.
+Owner 2026-11-22: grass "Still full-arena grass" (static, baked into the map; his 2026-11-21 ruling to the maps session:
+cover the whole arena without per-step work, or remove it), then "Upload this build now".
+- **Build:** `design/maps/out/suite/meadow_r2/` (the old build stays in `meadow/`). 4 GLBs, 45 MB, 297k triangles
+  (169k of them grass), 120 meshes, 81 kit pieces. Uploaded to group 2970443: meadow_1..4 = 115186889701196,
+  135274500875628, 125361326979881, 116209640409470 (`meadow_r2/upload_ids.json`). Assembled with
+  `python design/maps/suite/studio_map.py meadow meadow_r2` (120 of 120 matched, worst 0.002 studs, 256 colliders),
+  THEN `meadow_r2/studio_meadow_after.luau` (grass CastShadow off; studio_map.py does not know it). The old Meadow is
+  `ServerStorage.HT_MapsArchive.Meadow_before_202611220627`.
+- **meadow.py changes (all Meadow-only; base.py untouched, the maps 2-6 session agreed):**
+  - `field_grass()`: 84k single-triangle blades, two-sided (front and back faces, no DoubleSided), 2 to 4 per site on a
+    1.9-stud jittered grid, 1 to 2.4 studs tall, one prevailing lean (GRASS_WIND), normals mostly UP (custom split
+    normals: lit like the floor). One 64x64 gradient image, 8 colour columns. Layers A and B (half each), 4x3 tiles per
+    layer = 24 meshes (`Map_Meadow_FieldGrass_A_11`..). Phones drop B (`phoneHide "_FieldGrass_B_"`).
+  - WINDMILL_SCALE 1.7 (about 400 studs to the sail tips), thicker stocks, rails and bars, 7 bars a sail.
+  - The dark line on the lip: the lip's roll now starts at the floor's edge (floor painted to FLOOR_OUT 0.1 past the
+    oval, lip top 0.02 under it), its hidden top strip repainted light after the bake.
+  - Painted edge light: `bake_paint_lit_edges` wraps the shared baker in this process: crag, the arena's soil and the
+    lip get light within 1.2 studs of convex creases (KD tree over crease points, per pixel). Real bevels tripled the
+    crag's triangles (21k -> 62k) and the shared mask barely lit them, so they were dropped.
+  - Hue shift: stone_rock / stone_deep lit warmer, shade toward lavender; the arena's soil is `stone_soil` (stone treatment).
+  - Smaller warm swaths, smaller again on the east half; every crag rock clamped to the soil's face (LIP_REACH).
+- **Code (synced into Studio by a checksum-guarded block swap, Studio == file, h 654763935):** `MapEnvironments` meadow
+  entry: no `fieldGrass` (the moving ring is off for Meadow), the spinner hub { -375.39, 228.69, -797.7 }, phoneHide
+  adds `_FieldGrass_B_`. The ring's config is PARKED as `MapEnvironments.FieldGrassRing` (used by no map; FieldGrass.spec
+  reads it). Gates: stylua, selene (0 errors), 620 tests, rojo build, gen_config --check, luau.compile. /code-review:
+  4 nits; fixed the stale comment and a silent normals skip (now stops the build); the shadow step is the after-luau
+  above; HT_FieldGrass still replicates (remove with the ring's code once the static grass is approved).
+- **Not yet seen in game:** the meshes were still "being generated" right after upload (black view). TO DO: fighter's-eye
+  stills and a recording, the grass lighting (do the up normals survive import?), a phone-size view, Reduced Motion,
+  frame cost before/after (before: the ring cost 0.48 ms; the old map 129k triangles), a fresh reviewer.
+- **The owner's new note (to the maps session, for ALL maps):** floors must feel walkable, islands packed with detail.
+  The maps session makes a floor-options sheet on Quarry; the picked method comes to Meadow too. Meadow's islands
+  still need packing. The sea-like band is the place's Sky texture (maps session raising it suite-wide; don't touch
+  the Sky).
+
+## suite-2c (2026-11-21): Quarry FAILED the fresh review (5.4/10); owner's new rulings (WALKABLE FLOOR = D FLAGSTONES, PACKED ISLANDS); rework prepared, NOT built. NOT IN THE ROTATION.
+- **The place** (saved by someone after Studio was closed and reopened): HT_Maps.Quarry and my three scripts (MapMotion,
+  MapExtras, MapEnvironments as of suite-2b) are in it (checksums matched the files). The Map 1 session has since
+  re-uploaded Meadow and synced its own MapEnvironments hunks (see suite-1d).
+- **Fresh review** (`design/maps/out/suite/quarry_build/review.md`, a reviewer agent that did not build it): 5.4/10,
+  hard gates pass. Islands sit at floor height on a "sea" band and E/S/W are empty; tile seams; the floor is the
+  fighters' hue (orange on orange, skin tones too); the approved chalk-dust feel was never built; clouds cross the
+  derrick; floor 6-7 px a stud; islands near blockout; texture memory (52 MP on the phone path).
+- **OWNER (2026-11-21), in his words:** "i want all the MAPS FLOOR texture feel like a texture that you can walk on,
+  there are places that feel TOO open, like in the background islands try to make sure the islands are kinda packed
+  with stuff so it adds detail, and makes it so players fighting can catch a glimpse of the amount of detail that went
+  into the background ... the floor textures is just NOT it, like i said it doesn't look like a map floor that I would
+  walk on." Recorded in `../Arena Maps.md` (suite rules) and memory.
+- **FLOOR PICK: D, BIG FLAGSTONES** from `design/maps/out/suite/floor_options/floor_options_sheet.png` (A setts,
+  B sawn slabs, C bedrock, D flagstones; made by `design/maps/suite/floor_options.py`, rendered by
+  `floor_options_render.py`, sheet `floor_options_sheet.py`). METHOD for every map: a seamless 1024 px RGBA detail
+  image as a Roblox `Texture` (Face Top) on each floor tile, over a CALM colour map. Tested in Studio: a Texture renders
+  on our floor MeshParts' top face; Roblox's own Sandstone material looked like beach sand; a MeshPart's material
+  tiles once per UV square (useless on these tiles).
+- **DONE ON DISK (not built, not uploaded, not synced):**
+  - `patterns/flagstones_d.png` (option D, 40-stud tile, 25.6 px a stud, alpha 0.92) in `design/maps/suite/`.
+  - quarry.py: `calm_floor` painter (mean sRGB 182,168,147, range 171-191 / 156-174 / 137-152: checked with
+    floor_only.py) replaces the orange strata; `map_data(..., CALM["stone"], "Slate", floor_detail={image, tile 40,
+    transparency 0})`; `PX["Scaffold"] = 512`; the mast recorded in landmarks.json; the docstring's floor updated.
+  - base.py: `floor_tiles(pad=16)` (the seam fix); `FAR_TEX = 600` (was 1100; Map 1 session told).
+  - sketch_kit.map_data takes `floor_detail`; studio_map.py lays it (asset id from `<build>/upload_ids.json`
+    "floor_detail"; warns and skips without one). **UNVERIFIED: the tile offset sign** (`FLOOR_SIGN_U/_V = 1` in the
+    generated luau): after assembly, look straight down at a tile edge (x = 2929 or 3071, or z = 0) and flip a sign if
+    the flags jump; then record it in studio_map.py's docstring. Fallback idea if offsets fight: one transparent
+    elliptical Cylinder part (426 x 352) just above the floor carrying a single Texture (decals render on transparent
+    parts; check z-fighting).
+  - MapEnvironments `quarry`: `quarryEnvironment.landmarks = { Great Derrick x 430, y 210, z -720, r 230 }` and its OWN
+    drift lanes (the lobby side's 5 from Map 1 + 3 north lanes at across -650/-900/-1300, y 700/800/950: a scan showed
+    only lanes about 700+ up clear the derrick's view on that side). 620 tests, selene, stylua, compile, rojo build OK.
+    **NOT SYNCED** (Studio's MapEnvironments now has the Map 1 session's hunks: fetch, diff, patch only the quarry
+    block); needs /code-review with the rest before syncing.
+  - Earlier tools: `floor_only.py` (rebuilds only a map's floor tiles to one GLB), `retex.py` (shrinks far textures,
+    safe swap), `measure_client.luau`.
+- **NEXT (a fresh session; one rebuild + one upload):**
+  1. ISLANDS (quarry.py `islands()` / `works()`): (a) PACK every island top edge to edge with things big enough to read
+     at 800-1300 studs: more houses / workshops / sheds with awnings, block stacks and piles, carts, scaffolds and
+     ladders, cranes, tents, washing lines, lantern posts, cypress groves (the kit's pieces are 1-10 studs: specks at
+     that range; use them only near the rim). (b) LIFT them into the sky: most island tops about 40-200 studs above
+     the floor line at 800-1300 studs so their stepped undersides show, one or two low for depth; BlocksE/BlocksW up
+     to tops about +80 to +150. (c) FILL the empty arcs: 3-4 new islands in the E, SE, SW and W bearings (about +-90 to
+     150 degrees), clear of the lobby's view (south). Move the rope bridges with their islands. Dry-run views from the
+     fighter's eye N/E/S/W before the full build. Say plainly to the owner this goes beyond the approved sheet's low
+     layout (his sky rule).
+  2. Full build: `blender -b --factory-startup -P quarry.py -- <out>` (about 1-1.5 h at 20 s a mesh); check renders,
+     build_stats, no over-limit meshes; texture megapixels on the phone path (target well under Map 1's 40).
+  3. ASK THE OWNER before uploading: the map GLBs (count, names, sizes) + `patterns/flagstones_d.png` (1 Image,
+     0.6 MB), group 2970443. Put the image's id in upload_ids.json "floor_detail", regenerate the luau, assemble
+     (archives the old Quarry), verify the Texture offsets (above).
+  4. The SEA BAND is the place's Sky (rbxassetid 6444884337 sides; with the Sky removed it vanished; atmosphere
+     settings could not hide it without washing out the islands): ASK THE OWNER (suite-wide, the lobby too): keep it; a
+     pale-bottomed painted sky per map (EnvironmentKit change + 3-6 image uploads); or a bank of soft clouds far below
+     each arena (meshes; "fighting above the clouds"). Map 1 session will not touch the Sky.
+  5. Chalk dust feel (approved design, code only): pale puffs in the floor's colour on landings and knockback slides,
+     pooled, phone cap; measure ms.
+  6. Sync (fetch + diff + patch only mine; /code-review first), Play check (fighter's eye N/E/S/W, a recording, the
+     phone path, frame cost with measure_client.luau vs Gnomon), a fresh reviewer, then show the owner. Rotation only on
+     his approval. Then Steppe (Map 3: its floor gets its own D-method pattern; its kite uses MapMotion "bob").
+- **Map 1 session** (`local_845f9cf2`): owns Meadow and its grass; uses floor_tiles(pad), FAR_TEX, studio_map as is;
+  asked to tell this side if its owner gives a different floor direction.
+
+## suite-1e (2026-11-22): Map 1 fix round UPLOADED AND ASSEMBLED (saved v615), then PAUSED BY THE OWNER: a whole new style is coming. NOT IN THE ROTATION.
+- **OWNER, 2026-11-22: "pause ... i want you to change the ENTIRE MAP style for the arena and the lobby"**, and the UI,
+  font, model texture, environment and lighting, from three TikTok videos (@xanx_bs 7709314680312827166,
+  7709312470573272351, 7709560038448254239). Study first, then discuss. So Map 1 below may be reworked or dropped:
+  do NOT polish it further, put it in the rotation or commit it until he says.
+- **In the place (v615):** `HT_Maps.Meadow` from `design/maps/out/suite/meadow_r3/` (5 GLBs 73313384048036,
+  100446841443343, 96656719006352, 101979660532937, 73990160613360; floor image 138647704805579; group 2970443):
+  159 of 159 meshes matched (worst 0.0014), 256 colliders, 78 kit pieces, 6 floor Textures (`HT_FloorDetail`), grass
+  CastShadow off. The r2 Meadow is `HT_MapsArchive.Meadow_before_202611220945`.
+- **What the round did (meadow.py, all Meadow-only):** owner's floor pick B, MOSSY FLAGSTONES + GRASS DRIFTS (sheet
+  `out/suite/meadow_floor/meadow_floor_sheet.png`, `meadow_floor_options.py`, `meadow_floor_render.py`,
+  `meadow_floor_sheet.py`; pattern `patterns/meadow_mossy_flags.png`; calm 512 px colour map); blades restyled (wider,
+  the islands' green, 38.6k triangles in drifts); every island lifted (tops 20 to 210 over the floor line), four new
+  islands (Orchard E, Hamlet W, Pasture SE, Dovecote SW), all packed (`pack()`); meshes grouped by direction
+  (`GROUP`: _N, _E, _W, _FarNEN, _FarNW): 266k triangles, 159 meshes.
+- **Config synced:** MapEnvironments meadow spinner: parts `Map_Meadow_WindmillSails_Timber_N` / `_Cream_N`, hub
+  { -375.39, 292.69, -797.7 }. Studio's copy differs from disk only by the Map 2 session's unsynced Quarry lines.
+- **NOT CHECKED:** right after upload the flagstone image and some textures still failed to fetch ("being generated":
+  one floor tile black, no flags drawn), so the floor, the FLOOR_SIGN_U/V tile-edge check, E/S/W views in game, frame
+  cost, the sails on the new hub and a fresh review are all still open. Nothing committed.
+
+## style-0 (2026-11-22): the owner's restyle, NARROWED THE SAME DAY TO THE FLOORS ONLY (see the CORRECTION at this section's end before acting on the rest)
+- **Owner, 2026-11-22:** "i want you to change the ENTIRE MAP style for the arena and the lobby ... ui, font, model
+  texture, environment, lighting, ETC", after the Roblox game Racket Strikeout (study: `../Style Study - Racket
+  Strikeout.md`, frames `../Style References/racket-strikeout/`). Asked whether the other sessions should hold: "yes
+  hold, we're going to completely revamp them". So: no more building, polishing, uploading, rotation or commits of the
+  painted storybook maps (Meadow v615, Quarry), the village lobby's look, or the retro-comic UI's look, until he
+  approves the new look. Code that is not about looks is not affected.
+- **His rulings the same day:** (1) arenas ALWAYS sit in the SKY, never over an ocean (the reference's sea is not
+  wanted); (2) no lobby pieces on arenas (stays); (3) the arena becomes a CIRCLE, not an oval ("it should be more circle
+  than oval so fix that ... well now its a circle"): radius NOT yet agreed (same area as 213 x 176 would be 194), and
+  it is a gameplay change (MapEnvironments `arena`, Round.isOut, spawns, specs, colliders) for after the look is
+  approved; (4) REBUILD the same themes and structures in the new style; (5) first a MOCK SHEET of everything: arena,
+  lobby, fight HUD, lobby icons, menus. Nothing is built until he picks from it.
+- **Where it stands:** the Map 1 session is making the mock sheets (`design/style/`). Next after his pick: a plan for
+  the rebuild order (UI tokens and HUD, arena 1, lobby), each piece in its own session.
+- **CORRECTION, later 2026-11-22 (owner, on the first mock scenes): "thats NOT how it looks like, it looks more like the
+  raise a fairy style, and ALSO only implement it to the FLOOR, everything else should still be normal, so the arena
+  floor, the lobby floor."** The restyle is the FLOORS ONLY (arena floor, lobby floor): a studded flat-colour floor like
+  Raise a Fairy's ground (Parts with `TopSurface = Studs`; my reading, to be confirmed). The painted storybook islands,
+  buildings and props STAY. So the "hold" above no longer covers the world's models; whether it still covers the UI,
+  and whether the circle and the floor's colours stand, were asked and are NOT answered yet. The blocky mock scenes
+  in `design/style/` are rejected.
+- **His answers (2026-11-22):** the UI restyle is STILL wanted (mocks first); Grassy Plains' floor is ONE flat studded colour with some dirt where it makes sense and maybe stud-like flowers, mocked in Blender first; maps whose floor has a pattern keep it (studded); the arena is a CIRCLE. So: UI sessions hold their look work until the UI mocks are picked; map sessions keep their islands and props and wait for the floor mock.
+
+## style-1 (2026-11-22): MOCKS MADE for the owner's floor restyle and the new UI look. NOTHING BUILT, NOTHING IN STUDIO. WAITING FOR HIS VERDICT.
+The scope, in his words that day (full trail in `../Style Study - Racket Strikeout.md`): the new look goes on the FLOORS
+ONLY (arena floor, lobby floor), everything else stays; the UI is ALSO restyled after the videos; the arena is a
+CIRCLE; models are ALWAYS made in Blender; use Raise a Fairy's notes for the stud style.
+- **Floor mock, Map 1** (`design/style/floor_mock.py` -> `design/style/out/floor/floor_sheet.png`; Play, Ankle, Feet,
+  Over, Lobby, Top): a circular arena (radius 194 = the oval's area, NOT agreed yet), ONE flat green (100, 180, 86) with
+  his own stud texture (`Raise a Fairy/Attachments/Style/stud-texture.png`) at ONE raised square per stud (his
+  correction: my first try at 2 studs was too big); dirt (172, 130, 92) cut on a 2-stud grid where fighters wear the
+  ground (the middle, the spawn ring; 13% of the floor); stud-like flowers at REAL proportions (his correction:
+  "slightly below the roblox character's ankle"): 0.14-stud blocks, nothing over 0.42 studs, 1,809 flowers in drifts,
+  38.7k triangles as modelled (too many for one mesh: split or thin for the game). The lip, soil and crag are
+  meadow.py's own rebuilt on the circle; the islands are meadow_r3's, unchanged. It patches `A, B` in memory only:
+  base.py is NOT changed.
+- **Floor mock, lobby** (`design/style/lobby_floor_mock.py`, run on `out/floor/floor_mock.blend` ->
+  `out/floor/lobby_floor_sheet.png`): the lobby's own floor paint kept (paving, walks, mats, zones, medallion, Bell
+  Rock's lawn: 30 materials), the stud texture printed over it at one square per stud. Nothing else touched.
+- **UI mocks** (`design/style/mock_ui.py` -> `design/style/out/ui/ui_fight.png`, `ui_lobby.png`, `ui_parts.png`,
+  `ui_window.png`): Montserrat Black Italic, white with an ink outline; round ability buttons (ink halftone disc,
+  colour ring that drains on cooldown, white icon, the key in a tab that is part of the ring); the speed dial as the
+  big circle with the stagger in a slanted tag under it; slanted halftone banners with a sparkle (countdown, FINAL 2,
+  KNOCKOUT!, NEXT ROUND, YOU WIN!); fighter cards in each colour; a slanted ultimate cut-in card; lobby menu buttons
+  (circle + slanted name plate, sparkles), coins in one plate, round station icons; a Classes window. Class names,
+  prices and descriptions in the window are PLACEHOLDERS. His standing rules kept: no overlap, key and count inside
+  their piece, nothing full-screen (so the videos' full-screen impact tint is NOT in the mock: ask if he wants it).
+- **REJECTED the same day:** `design/style/mock_scenes.py` (a whole blocky world: he meant floors only).
+- **Open, for him:** the verdict on each sheet; the circle's radius; how the stud floor is made in the game (a tiled
+  stud Texture over a flat-colour floor mesh, as Quarry's floor_detail step does, is the cheap way; the stud image
+  would be one small upload: ask first); other maps' floor patterns; whether the full-screen impact frame is wanted.
+- **Map 1 in Studio is still the suite-1e build (v615, oval, flagstones + grass drifts), unchecked.** It will be
+  rebuilt once he approves the floor. Nothing committed. The PC was shut down at his request after this.
+
+## style-2 (2026-11-22): THE OWNER'S VERDICT ON THE MOCKS: floor and icons APPROVED; build the ENTIRE HUD in the new look.
+His words: "looks good ... 1. I'll confirm the size, make it a circle. 2. Thats good as placeholders. 3. wdym by full
+screen flash? 4. yeah do what you want. 5. I approve the floor AND the icon, however, I'd like you to build the ENTIRE
+hud in it, cuz rn it looks like only parts of the game."
+- APPROVED: the studded floor (arena and lobby) and the icons. The arena becomes a CIRCLE; he will confirm the SIZE
+  (mocked at radius 194): ask before the gameplay change. The Classes window's placeholder names and prices are fine
+  as placeholders. The flowers' triangle count: "do what you want" (thin or split them).
+- THE HUD: build ALL of it in the new look, every piece on screen (the mock showed only some). My reading: the real
+  HUD in the game, every piece in `../UI Map.md`'s table, not another partial mock; pieces the mock did not cover get
+  designed in the same language and shown first.
+- NOT answered yet: the full-screen colour flash on big hits (he asked what it means; explained with the two
+  reference frames `../Style References/racket-strikeout/03_impact_frame_teal.jpg` and `16_impact_frame_gold.jpg`).
+- Two new sessions were started for this: the HUD build and the floor build (Map 1 circle + stud floors).
+- **ANSWERED (2026-11-22): the full-screen colour flash on big hits: "Yes, add it".** It overrides the older "no full-screen flashes" rule for this one effect; passed to the HUD session (`hud-new-look`), which designs it (which hits, how long, colours), with Reduced Motion and phone paths.
+
+## floor-1 (2026-11-22): THE STUD FLOORS. Map 1 rebuilt in Blender as a CIRCLE with the approved floor; the stud layer proven in Studio. NOTHING UPLOADED, NOTHING IN THE PLACE YET: waiting for the owner's radius and his yes to the upload.
+The floors session (started from style-2). Rules it works to: `../Arena Maps.md` "The arena suite" (the new floor rules are at its top), `../Style Study - Racket Strikeout.md`.
+- **How studs are drawn in the game (PROVEN in Studio, no upload):** a tiled `Texture` named `HT_FloorStuds` on the floor mesh's Top face, an OVERLAY image (clear where flat, white on lit bevels, black on shaded ones) made from the owner's own stud texture by `design/maps/suite/stud_overlay.py` -> `patterns/stud_overlay.png` (256 px, 4 x 4 squares, 4.6 KB), `StudsPerTileU/V = 4` = ONE square per stud. One image for every floor and colour. Vault: [[Textures Decals and Texture Memory]] "A tiling overlay that adapts to every colour".
+  - I added a faint contact shadow round each square (`RING` in stud_overlay.py): on the lobby's pale paving the lit bevels vanished (white cannot get whiter) and only the two shaded sides showed, reading as tick marks. With it they read as squares. The texture's own shading is untouched. TOLD the owner; his to veto.
+  - **Texture offsets on a MeshPart (MEASURED, a marked test tile from an EditableImage on four floor tiles):** the tiles start at the PART'S CENTRE, u along -RightVector, v along LookVector, OffsetStuds slide the image back. `OffsetStudsU = (p.Position - origin):Dot(-p.CFrame.RightVector) % tile`, V with LookVector. studio_map.py's old floor_detail formula (a corner, FLOOR_SIGN +1) was WRONG (tiles did not line up); the generator is fixed. **Quarry in the place still has the old offsets** (its session's to re-lay). In SYMPTOMS.md.
+- **Map 1 in Blender (`design/maps/suite/meadow.py`, out `design/maps/out/suite/meadow_r4/`, sheet `r4_sheet.png`):**
+  - the circle: `RADIUS` (194 for now; `--radius=<studs>` rebuilds). base.py is NOT changed: meadow.py swaps `A, B = 213.0, 176.0` for its radius as it reads base.py (an assert guards the line), so the lip, soil, rock, collider and cameras follow.
+  - the floor: TWO flat meshes on one plane that never overlap (no flicker): `Map_Meadow_Floor_Grass` (1,298 triangles, the circle with the dirt cut out) and `Map_Meadow_Floor_Dirt` (926; 3,806 cells of 2 studs, 12.9% of the floor: the middle and the spawn ring, the mock's own field). No texture, no UVs: each is a flat colour set in Studio (grass 100,180,86; dirt 172,130,92: retune without an upload), SmoothPlastic, the stud Texture over it.
+  - the stud flowers: `Map_Meadow_FloorFlowers_A_11..22` (phones keep: 715 flowers, 14,758 triangles) and `_B_11..22` (1,062 flowers, 21,944 triangles; phones drop it), 2 x 2 tiles a layer, biggest mesh 6,320 triangles, ONE 256 x 128 palette image (8 colours, a stud printed per block face), nothing over 0.42 studs, the approved mock's layout (seed 404), no shadows. They replace the grass blades at the same triangle count (36.7k against 38.6k) in 8 draws instead of 24.
+  - gone: the flagstone Texture (`FLOOR_DETAIL`), the grass blades (`field_grass`), the floor's painted colour map (`turf`).
+  - kept as they were, on the circle: the lip, the soil, the rock (`edge()`, `crag()`), every island (not rebuilt: `--near`).
+  - `--near` builds and exports ONLY the arena's own pieces: ONE GLB `meadow_r4/export/meadow_1.glb`, 8.45 MB, 16 meshes, 70,132 triangles. `near_merge.py meadow_r4 meadow_r3` then writes manifest, placements, landmarks and `studio_islands_prep.luau` so `studio_map.py meadow meadow_r4` assembles the whole map with the 123 island meshes CLONED from the live HT_Maps.Meadow (no re-upload). `studio_meadow.luau` is generated and compiles; it lays "colours only" until `meadow_r4/upload_ids.json` has `"floor_studs": <id>`.
+- **The lobby floor:** `design/lobby/studio_floor_studs.luau` (set `STUD_IMAGE`, run in Edit): adds `HT_FloorStuds` to the 27 floor meshes of HT_Lobby.Village (paving, walks, mats, zones, medallion, Bell Rock's lawn, the 1v1 ring), a tile corner on the lobby's pivot; nothing else touched; safe to repeat; MUST be run again after any lobby re-assembly. Previewed in Studio on a temporary copy with an EditableImage (removed): pattern kept, squares line up across layers.
+- **THE RADIUS AND THE LOBBY (found here):** the ring-out line is the radius + `Arena.PlayAreaMargin` (60); the lobby's viewing edge is at z 250 and its rock front at 241.7. The oval's 176 gave 236. A circle of 194 gives 254: the lobby's parapet and front paving would be INSIDE the out line (a fighter knocked that way could land on the lobby and not be out). 180 keeps everything outside; 185 keeps `tests/ArenaShape.spec`'s rule (250) but not the rock front. Put to the owner with the size question.
+- **NEXT (after his answers):** rebuild at his radius if not 194; upload the GLB and the stud image (group 2970443); `studio_islands_prep.luau`, insert the GLB as `MeadowImport_2`, `studio_meadow.luau`; the lobby script; play test (`HT_MapRequest` = "meadow"): four directions from a fighter's eye, phone size, frame cost before/after, the ring-out edge on the circle. Then the code: `MapEnvironments.Maps.meadow.arena` semiX = semiZ = the radius, `phoneHide` "_FieldGrass_B_" -> "_FloorFlowers_B_", `tests/ArenaShape.spec` (its "every map has Gnomon's oval" test must let Map 1 be a circle; add the lobby rule for Map 1). Round.isOut, spawns and bots already read each map's own shape, so every other map keeps its oval. A fresh review, the gates, `/code-review`, then sync only those hunks. Nothing committed.
+
+## hud-1 (2026-11-22): THE WHOLE HUD MOCKED in the new look, as a WEB PAGE and six picture sheets. NOTHING BUILT IN THE GAME. WAITING FOR THE OWNER'S PICK.
+The owner's words that day: "build the ENTIRE hud in it" (style-2), then, while the mock was being made, "also make the
+ui in ur own official website too" (my reading: the published web-page mock, like the earlier fight-poster prototype) and
+"when making the hud keep in mind there WILL be animations pertaining to the style".
+- **The mock:** `design/style/hud_page/hud.src.html` + `build.py` -> `design/style/out/hud/haymaker-hud.html` (one
+  self-contained page; the floor mock's two renders are embedded) and, with `--shots`, `hud_fight.png`, `hud_lobby.png`,
+  `hud_popups.png`, `hud_windows.png`, `hud_pieces.png`, `hud_phone.png` (headless Edge). Published as the artifact
+  https://claude.ai/artifact/S46N1hQY5WgjDMvTdzQrUk (republish the same file to keep the link). `?selftest=1` on the
+  local copy presses every play button and reports errors (24 buttons, OK).
+- **Tabs:** Fight (a live 1920 x 1080 screen; buttons play the countdown, 5 left, final 2, ultimate ready, use ultimate,
+  knockout, arena closing, clash, air kick, R's cooldown, the speed dial, 25 fighters, stunned, the controls panel),
+  Lobby (the menu buttons open the six window pages; daily quests, AFK toast, area sign, spectate panel), Pop-ups,
+  Windows (Classes, Shop, Ranked, Moves, More, Settings, Shop asking twice, the quests clipboard), Pieces and choices,
+  Phone (844 x 390: fight on touch, lobby, Classes). A Reduced Motion switch.
+- **INVENTORY (UI Map's table against the four approved mocks).** Covered by the approved mocks: fighters' row (as
+  cards), Q and R, Jump and Punch, the speed dial with its stagger tag, the countdown, one last-players banner, ULT
+  READY, the cut-in card, the feed, the name tag, NEXT ROUND, the five menu buttons, Coins, the three tools, station
+  icons, the Classes page, the cog. NOT covered, designed now in the same language: the strip's other states (standing
+  count, FINAL TWO, LAST ONE, ROUND OVER), the row at 25, a fighter going out, 4 / 3 / FINAL 2, the ULTIMATE READY
+  notice, PRESS with its running line, the toast, TRAINING AREA / LOBBY AREA, ARENA CLOSING, SPECTATING and the spectate
+  panel, the CONTROLS chip and panel, the can't-use state of an ability, touch buttons, the lock-on target tag, the clash
+  bar and its results, the kick prompt and meter, the tutorial, the training panel, the stats line, the Bots button,
+  Shop (and its asking twice), Ranked, Moves, More, Settings, the quests clipboard, AFK ON, every phone layout.
+  Left as they are (not HUD pieces of this look): the lock-on reticle on the body, the lobby barrier and training
+  curtain (world surfaces), the map-change fade, spicycaik's ultimate impact frames and cutscene grade.
+- **READINGS I TOOK (say them to him):** (1) 25 cards do not fit, so cards only while 8 or fewer stand; above that a
+  round head shot in a ring of the fighter's colour with the knockouts in a tab of the ring. (2) Everything real is
+  real: class names, prices, moves, controls, page words are the game's; fighter names, Coins 700, FPS and ping, quest
+  counts and the 60-Coin reward, cooldown seconds are samples. (3) The class-name card has NO dark bars and nothing
+  full-screen. (4) The quests keep his clipboard (board, clip, sheet) with the new lettering. (5) The page titles are
+  slanted banners on the window's top-left corner. (6) On a phone nothing is under 12 px: the row's chips drop the
+  knockout count, class tiles show state by icon.
+- **MOTION in the mock (his word: there WILL be animations in the style):** banners and signs slam in from the left
+  along their slant and slide out right; countdown numbers hit toward you with speed pills; halftone dots drift on
+  every plate; sparkles twinkle on the lobby's main buttons only; ability rings drain and refill and a ready button
+  pops; the dial's ring, number and colour follow the speed; windows slide in and their title slams; a knocked-out
+  card gets a red cross drawn, sinks, the row closes up; Reduced Motion shows and hides without moving.
+- **THE BIG-HIT FLASH: ANSWERED "Yes, add it"** (asked by the Map 1 session with the two reference frames; recorded in UI Map's rules as the one exception to no full-screen flashes). DESIGNED in the mock (Fight tab: Big-hit flash / Hold the flash; frozen on the Pop-ups tab in two colours): one tint of the whole screen in the HITTER's colour for about 0.1 s, two broad lighter bands, a white outline round the one who was hit, a halftone corner with a sparkle, UNDER the HUD. PROPOSED, waiting for his yes: only on a fully charged class attack that lands, a PERFECT air kick and a clash win; only on the two fighters' screens; never twice within 2 s; Reduced Motion none; phones and low graphics one flat tint with no bands or outline; ultimates keep spicycaik's impact frames. In Roblox: one full-screen Frame, two images or turned frames for the bands, a Highlight on the hit character for those frames (skipped on phones): measure the cost.
+- **ASKED, NOT ANSWERED:** (b) three older rules the approved
+  pictures break: no slanted panels, a white or black top strip, sparkles only on the lobby's main UI (I followed the
+  pictures); (c) PICK small text: A heavy italic / B the coach's handwriting; (d) PICK Coins: A the dark plate of the
+  approved mock / B a gold plate (he once banned dark slanted plates).
+- **HOW IT GETS BUILT (plan, nothing started):** almost no uploads. Circles are UICorner 0.5; the draining ring is
+  two half discs with a stepped UIGradient turned by Rotation; slanted plates reuse `Shapes.slant` (the wedge images
+  already uploaded); halftone is the tiled dot image `Ui/Texture` already uses; the font is Roblox's Montserrat Black
+  Italic with a UIStroke (keep the stroke near 10% of the size: `56 Field Notes/UIStroke on Text`). NEW art needed, to
+  ask him for: one sheet of white icons (the skill, menu and tool icons; today's are the old outlined placeholders)
+  and a four-point sparkle if the uploaded sparkle sheet does not hold one. Order of work, one piece a session: tokens
+  and the shared kit (`Tokens.hex`, a new `Ui/Kit` beside PosterKit: plate, banner, round button, card, chip), then the
+  fight HUD (HudController, Roster, Callouts, UltimateNotice), then the lobby (NavController, LobbyMarkerController,
+  SpectateController), then the window pages (MenuController, QuestClipboard), then the older pieces (ClashBar,
+  KickMeterBar, KickPromptController, TutorialController, TrainingPanel, PerfController, BotsFreezeController).
+- **FRESH REVIEW (a subagent that did not build it, against UI Map's rules), found and FIXED in the mock:** the open
+  controls panel overlapped the ULT READY badge by 14 px; the speed pills were plain bars (now tapered lines pulled into
+  their tips with a pop at each); the red cross ran over a knocked-out fighter's name (now over the PICTURE only, his
+  own words); a quest at 2 / 3 showed CLAIM; "NEXT ROUND 8" read as round eight (now a clock, "NEXT ROUND 0:08": the
+  game's own strip prints the bare seconds, so CHANGE THAT IN THE BUILD); key tabs under 19 px; touch buttons had no
+  word (names under them now); wrong station colours on one board; Shop's Confirm ran edge to edge; ARENA CLOSING's
+  mark was pale; six fighters under "5 LEFT". NOT drawn, said to him: every pop-up at phone size, Moves for touch and
+  gamepad, the owner's F8 stats detail. Its list of old rules the look breaks is the question in (b) below, plus:
+  SPECTATING, the toast and the CONTROLS chip are SLATE slanted plates (he banned dark slanted plates in 2026-11-18).
+- **NOT CHECKED:** the page in a real phone browser; the motion by the owner's eye; nothing of it exists in Roblox, so
+  no frame cost, no Studio look. The mock's lettering is the browser's Montserrat Black Italic, which is the same
+  family Roblox ships but may sit a pixel differently.
+
+## floor-1b (2026-11-22): THE STUD FLOORS ARE IN THE PLACE (saved v626). Map 1 a CIRCLE OF 180, the lobby floor studded, Map 1's shape synced. Play-checked. NOT IN THE ROTATION, NOTHING COMMITTED: waiting for the owner's eyes in game.
+Follows floor-1 (read it for the method). What changed since:
+- **Owner, 2026-11-22: radius "180"** (the choice put to him: at 194 the ring-out line, radius + 60, lands at 254, past the lobby's front at 242 to 250) **and "Yes, upload both".**
+- **Uploaded (group 2970443):** the stud overlay `design/maps/suite/patterns/stud_overlay.png` = Image **138641708728811**; the arena pieces `design/maps/out/suite/meadow_r5/export/meadow_1.glb` (8.35 MB, 16 meshes, 70,316 triangles) = Model **117208096211519**. `meadow_r5/upload_ids.json`. (`meadow_r4` is the 194 trial: not uploaded, safe to delete.)
+- **Map 1 in the place:** `ServerStorage.HT_Maps.Meadow` from `meadow_r5` (`meadow.py --near --radius=180`, now the default radius): 139 meshes = 123 island meshes cloned from the old model (matched 0.0008) + the 16 new ones (matched 0.0006), 256 colliders on the circle, 78 kit pieces, 2 `HT_FloorStuds` Textures (offsets 0,0 and 2,2), flowers CastShadow off. The old oval build is `HT_MapsArchive.Meadow_before_202611222252`. Floor: grass 1,117 triangles, dirt 749 (3,207 cells, 12.6%); flowers A 768 / 15,898 triangles, B 1,136 / 23,376 (phones drop B).
+  - Assembled with `meadow_r5/studio_meadow.luau`'s code, two of its tables derived in Studio instead of pasted (the islands' centres read from the clones; the 128-gon computed): same result, less to send.
+  - **Colours tuned in two play tests, measured on screenshots from the mock's own camera:** with the mock's numbers the floor came out lime (105,211,93 on screen against the mock's 99,176,102) and the lit bevels too strong. In the place and in `meadow.py` (`GRASS_GAME`, `DIRT_GAME`, FLOOR_STUDS transparency): green 96,148,89, dirt 141,114,92, studs 20% clear, which read 98,177,100 and 167,129,106 on screen (the mock: 99,176,102 and 164,130,108). His to retune (part Color and Texture.Transparency, no upload).
+- **The lobby:** `design/lobby/studio_floor_studs.luau` run on `HT_Lobby.Village`: 27 Textures laid, 45% clear (`STUD_CLEAR`: at 0 the squares on the pale paving were far heavier than the mock). Nothing else touched. Run it again after any lobby re-assembly.
+- **Code (synced to Studio by patching ONLY my hunks into its copy of MapEnvironments; Studio's copy still differs from disk by the Quarry session's unsynced lines):** `MapEnvironments.Maps.meadow`: `arena` semiX = semiZ = 180, `phoneHide` "_FloorFlowers_B_" (was "_FieldGrass_B_"), comments. `tests/ArenaShape.spec.luau`: Map 1 is a circle (its out line in every direction, its 25 spawns), every map's out line stays before the lobby's edge, Map 1's also before the rock front. No Core change was needed: Round.arenaFor / isOut / spawnPoints, the bots and the ultimates already read each map's own shape, so Gnomon and Quarry keep the oval. Gates: stylua on my two files, selene 0 errors, 622 specs pass, rojo build, gen_config --check, luau.compile; `/code-review` (6 findings: meadow.py's default radius fixed to 180, a nil-safe assert added, a stale comment fixed; "sync the config together with the model" followed; the spec's hard-coded 8.3 for the lobby's rock front left, noted). Origin has 2 newer commits (keys-1 / puff-1; they touch HANDOFF.md, not my files): NOT pulled.
+- **Play test (Studio, this PC, `HT_MapRequest` = "meadow", a bot round running on it):**
+  - the map loads as "meadow", semi-axes 180/180; the collider matches the circle (120 of 120 rays hit the floor at radius 179.5, none at 180.6); Round.isOut false at 239, true at 241 on both axes;
+  - stills from a fighter's eye N, E, S, W, a flower close-up and the lobby floor: `meadow_r5/ingame_sheet.png` (only its first picture has the final colours);
+  - frame cost, the same fixed camera, A/B in one session: Map 1 with studs and flowers 6.5 to 6.7 ms render CPU, without both 6.1 to 6.9: no difference outside the noise. Phone path (62 parts hidden, 4 of 8 flower meshes kept): 5.3 against 5.5 full. The lobby: with its 27 stud Textures 5.8 to 6.4, without 5.2 to 5.5: about +0.3 to +0.7 ms on this PC; total frame time unchanged (17.3 to 18.5 ms either way). Stats.RenderGPUFrameTime read 0 here (no GPU number).
+- **Fresh review (a subagent that did not build it, against the rules and `skills/quality-score/rubrics/world.md`): 7.9/10 before its fixes, hard gates pass.** Its findings and what was done: the floor was lime and louder than the islands, and no screenshot showed the shipped values (FIXED: retuned and measured, above; `meadow_r5/ingame_sheet.png` is at the final values); the lobby's studs far heavier than the mock (FIXED: 45% clear); `near_merge.py` reused stale `near_*` copies on a rebuild into the same folder (FIXED: a fresh build's files always win; merged landmarks carry "merged_from"); the dirt mask's corner fill had no guard (FIXED: it stops the build); the overlay's lit bevels ADD white while the mock multiplied, so they are strong on saturated floors and invisible on pale ones (TRUE and inherent to an overlay: handled by the Texture's transparency per floor and the contact shadow; a MaterialVariant would multiply properly on untextured floors: a later option); the stud Textures have no phone path and no phone was measured (OPEN, below); the dark band under the horizon reads as a sea (NOT this piece: the place's Sky, HANDOFF suite-2b; a follow-up); the spec names Map 1 by id and hard-codes 180 and 8.3 (kept: the next circle map edits it; the rock front clears the out line by only 1.7 studs). Not re-scored after the fixes.
+- **NOT CHECKED:** a real phone or a phone-size viewport (I cannot resize Studio's viewport; the phone path was only simulated by hiding its parts); the old oval build's frame cost for a before number (the A/B above stands in for it); a recording (nothing in the piece moves); the final colours from E, S, W (north, a close-up and the lobby were captured at the final values); the lobby from more than one spot; the lobby's frame cost again at 45% clear; Quarry's HT_FloorDetail offsets (still the old wrong rule: the Quarry session's).
+- **Open for the owner:** his yes on the look in game; the green and dirt tones; the contact shadow added round each stud (floor-1); whether the lobby's +0.3 to 0.7 ms is acceptable (it could be cut by studding fewer layers); the rotation; a commit (`design/maps/suite/`, `design/lobby/studio_floor_studs.luau`, MapEnvironments, the spec: his word first).
+- **OWNER, 2026-11-22, on the in-game sheet (floor-1b): "Looks good".** The stud floors are APPROVED as built (Map 1 a circle of 180, green 96,148,89, dirt 141,114,92, studs 20% clear; the lobby studs 45% clear; the contact shadow stays). Still his to say: the rotation and the commit. Still unchecked: a real phone.
+
 ## keys-1 (2026-11-21): the class move (dash) is on T, Q is free (patched by hash)
 The owner, starting a combat rework: "move the Q dash for all the classes, to the T key, leaving the Q key open". Build stamp
 `keys-1+kits-8t+village-4+ui-20e`.

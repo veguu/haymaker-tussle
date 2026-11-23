@@ -636,16 +636,20 @@ MapEnvironments.Maps = {
 }
 
 -- MAP 1 OF THE ARENA SUITE, "Grassy Plains" (owner brief 2026-11-20; design/maps/suite/meadow.py): Gnomon revamped.
--- The same oval as Gnomon, clean (no pond, no obstacles), floating in open sky with floating islands for a
--- background. Gnomon's light and wind for now. NOT IN THE ROTATION until the owner approves it (game.json
+-- A CIRCLE of radius 180 since 2026-11-22 (owner: "more circle than oval"; his size), clean (no pond, no obstacles),
+-- floating in open sky with floating islands for a background. Gnomon's light and wind for now. NOT IN THE ROTATION until the owner approves it (game.json
 -- Maps.Rotation); until its model is at ServerStorage.HT_Maps.Meadow a stand-in floor is built.
 MapEnvironments.Maps.meadow = {
 	name = "Grassy Plains",
 	model = "Meadow",
 	codeObstacles = false,
+	-- THE CIRCLE (owner 2026-11-22): both semi-axes are its radius, 180 studs (design/maps/suite/meadow.py RADIUS,
+	-- the floor's collider in the map model). 180, not the mock's 194: the ring-out line is this plus
+	-- Arena.PlayAreaMargin (60), and at 240 the whole lobby (its rock front 242 out, its edge Lobby.ViewEdgeZ 250)
+	-- stays past it, so nobody knocked that way lands on the lobby still in the round (tests/ArenaShape.spec).
 	arena = {
-		semiX = 213,
-		semiZ = 176,
+		semiX = 180,
+		semiZ = 180,
 		spawnShare = 0.65,
 	},
 	environment = MapEnvironments.Maps.gnomon.environment,
