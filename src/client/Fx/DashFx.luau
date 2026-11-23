@@ -37,7 +37,13 @@ local WARM_TAIL = Color3.fromRGB(224, 227, 232)
 local HOT_HEAD = Color3.fromRGB(255, 255, 255)
 local HOT_TAIL = Color3.fromRGB(238, 240, 244)
 local STREAK_TEXTURE = FxKit.Tex.Needle -- the plain white spike, laid along its flight
-local DUST_TEXTURE = FxKit.Tex.Smoke -- flipbook, 4 x 4
+local DUST_TEXTURE = FxKit.Tex.SwirlPuff -- flipbook, 4 x 4: one drawn puff, upright, played once
+-- The puff (the owner's pick, 2026-11-22: "One puff"). A particle is drawn twice its Size across, and the
+-- puff's foot is PUFF_FOOT of the image below its middle, so the emitter sits that far above the floor.
+local PUFF_SIZE = 2.75 -- the image is 5.5 studs across; the swirl at its biggest about 4
+local PUFF_SECONDS = 0.9 -- the reference plays in 0.93 s
+local PUFF_FOOT = 0.378
+local ROOT_TO_FLOOR = 3 -- R6: the root's middle is 3 studs above the soles
 local PARK = CFrame.new(0, -1000, 0)
 local FIRST_GHOST_DELAY = 0.03
 local GHOST_SHOW_DELAY = 0.045 -- at dash speed the body is about 4 studs clear by then
@@ -165,30 +171,28 @@ local function buildKit(root: BasePart): Kit
 	streaks.Enabled = false
 	streaks.Parent = root
 
-	-- A puff of dust kicked back from the feet as it starts.
-	local feet = attachmentAt(root, "HT_DashFeet", Vector3.new(0, -cfg.FootDrop + 0.4, 0.6))
+	-- One puff of dust standing where the dash starts. It is a drawn flipbook: it never spins, grows or fades.
+	local feet = attachmentAt(
+		root,
+		"HT_DashFeet",
+		Vector3.new(0, -ROOT_TO_FLOOR + 2 * PUFF_SIZE * PUFF_FOOT, 0.6)
+	)
 	local dust = Instance.new("ParticleEmitter")
 	dust.Name = "HT_DashDust"
 	dust.Texture = DUST_TEXTURE
 	dust.FlipbookLayout = Enum.ParticleFlipbookLayout.Grid4x4
 	dust.FlipbookMode = Enum.ParticleFlipbookMode.OneShot
-	dust.EmissionDirection = Enum.NormalId.Back
-	dust.Lifetime = NumberRange.new(0.35, 0.6)
-	dust.Speed = NumberRange.new(6, 14)
-	dust.SpreadAngle = Vector2.new(50, 18)
-	dust.Drag = 3
-	dust.Rotation = NumberRange.new(0, 360)
-	dust.RotSpeed = NumberRange.new(-60, 60)
-	dust.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.9),
-		NumberSequenceKeypoint.new(1, 2.2),
-	})
+	dust.FlipbookBlendFrames = false -- the drawings swap; cross-fading shows two of them as ghosts
+	dust.Orientation = Enum.ParticleOrientation.FacingCameraWorldUp -- upright: its foot stays on the floor
+	dust.Lifetime = NumberRange.new(PUFF_SECONDS)
+	dust.Speed = NumberRange.new(0)
+	dust.Rotation = NumberRange.new(0)
+	dust.RotSpeed = NumberRange.new(0)
+	dust.Size = NumberSequence.new(PUFF_SIZE)
 	dust.Color = ColorSequence.new(PALE)
-	dust.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.55),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-	dust.LightEmission = 0.3
+	dust.Transparency = NumberSequence.new(0)
+	dust.LightEmission = 0
+	dust.LightInfluence = 0 -- flat white as drawn, in sun and in shade
 	dust.Rate = 0
 	dust.Enabled = false
 	dust.Parent = feet
@@ -479,7 +483,7 @@ function DashFx.play(character: Model, seconds: number, power: number?)
 	kit.streaks.Enabled = true
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if humanoid and humanoid.FloorMaterial ~= Enum.Material.Air then
-		kit.dust:Emit(math.max(2, math.floor(cfg.DashDustCount * QUALITY + 0.5)))
+		kit.dust:Emit(1)
 	end
 
 	kit.ghosting = distance <= cfg.DashGhostRange

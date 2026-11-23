@@ -176,7 +176,7 @@ HudTheme.Strip = {
 -- The HUD's four action icons, by action id, from the one icon list (Ui/Icons; all placeholders there).
 HudTheme.Icons = {
 	punch = Icons.id("classes"), -- the glove
-	propel = Icons.id("dash"), -- Q, the class's move
+	propel = Icons.id("dash"), -- T, the class's move
 	kick = Icons.id("jump"),
 	uppercut = Icons.id("punch"), -- R, the class's attack
 }
@@ -198,7 +198,7 @@ HudTheme.Actions = {
 	{
 		id = "propel",
 		name = "Dash",
-		keys = { mouse = "Q", gamepad = "B" },
+		keys = { mouse = "T", gamepad = "B" },
 		touchAction = "HaymakerPropel",
 	},
 	{
@@ -223,7 +223,7 @@ HudTheme.Guide = {
 			action = "Your class's attack. Hold it for up to 3 seconds, let go to throw it.",
 		},
 		{
-			key = "Q",
+			key = "T",
 			action = "Your class's move. Can't be used while stunned.",
 		},
 		{

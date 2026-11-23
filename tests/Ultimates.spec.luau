@@ -183,7 +183,11 @@ return {
 			end
 		end
 		assert(wide, "a shot frames them both")
-		local wideCam = Ultimates.shot(line, wide.t, at, target)
+		-- (cam-1: the one pair shot sits inside the baked dash track's window now, so the shot maths is asked directly,
+		-- on a copy of the timeline without the track)
+		local bare = table.clone(line)
+		bare.track = nil
+		local wideCam = Ultimates.shot(bare, wide.t, at, target)
 		assert(near(wideCam.Z, 6 + wide.cam.Z, 0.001), "pair midpoint")
 	end,
 

@@ -46,3 +46,20 @@ design/vfx/study/out/*
 design/vfx/impact/out/*
 !design/vfx/impact/out/*_sheet.png
 !design/vfx/impact/out/impact_preview*.mp4
+
+# Blender test pieces (jab, dash camera, smoke flipbooks; 2026-11-21/22): the scripts, the final sheet, the logs and
+# the study notes are kept. The .blend files (rebuilt by the scripts), renders, previews and reference frames stay local.
+animations/hand/*.blend
+animations/hand/*.blend1
+animations/hand/out/
+animations/camera/*.blend
+animations/camera/*.blend1
+animations/camera/out/
+design/vfx/smoke/*.blend
+design/vfx/smoke/*.blend1
+design/vfx/smoke/out/*
+!design/vfx/smoke/out/smoke_swirl.png
+!design/vfx/smoke/out/smoke_swirl_on_dark.png
+design/vfx/smoke-study/*.png
+design/vfx/smoke-study/refs-2026-11-22/*
+!design/vfx/smoke-study/refs-2026-11-22/*.py

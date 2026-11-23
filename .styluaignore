@@ -1,2 +1,4 @@
 src/shared/Config/AnimClips.luau
 src/shared/Config/GrassLayouts/*.luau
+src/shared/Config/AnimClipsHand.luau
+src/shared/Config/CameraTracks.luau

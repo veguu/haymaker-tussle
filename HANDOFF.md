@@ -5743,3 +5743,48 @@ Follows floor-1 (read it for the method). What changed since:
 - **NOT CHECKED:** a real phone or a phone-size viewport (I cannot resize Studio's viewport; the phone path was only simulated by hiding its parts); the old oval build's frame cost for a before number (the A/B above stands in for it); a recording (nothing in the piece moves); the final colours from E, S, W (north, a close-up and the lobby were captured at the final values); the lobby from more than one spot; the lobby's frame cost again at 45% clear; Quarry's HT_FloorDetail offsets (still the old wrong rule: the Quarry session's).
 - **Open for the owner:** his yes on the look in game; the green and dirt tones; the contact shadow added round each stud (floor-1); whether the lobby's +0.3 to 0.7 ms is acceptable (it could be cut by studding fewer layers); the rotation; a commit (`design/maps/suite/`, `design/lobby/studio_floor_studs.luau`, MapEnvironments, the spec: his word first).
 - **OWNER, 2026-11-22, on the in-game sheet (floor-1b): "Looks good".** The stud floors are APPROVED as built (Map 1 a circle of 180, green 96,148,89, dirt 141,114,92, studs 20% clear; the lobby studs 45% clear; the contact shadow stays). Still his to say: the rotation and the commit. Still unchecked: a real phone.
+
+## keys-1 (2026-11-21): the class move (dash) is on T, Q is free (patched by hash)
+The owner, starting a combat rework: "move the Q dash for all the classes, to the T key, leaving the Q key open". Build stamp
+`keys-1+kits-8t+village-4+ui-20e`.
+- The mobility slot's one binding (`HaymakerPropel` in AbilityController) is T + gamepad B; gamepad and the touch button are
+  unchanged. Every class's move follows, since they all go through that slot. Nothing is bound to Q now.
+- Labels: HudTheme (the HUD tile's key cap and the Moves guide), MenuController (the class page's move row), Core/Tutorial
+  ("Press T to propel") and its test. Older comments that still say "Q" mean the mobility slot.
+- Patched into the place by find/replace (6 scripts: Abilities, Tutorial, Server, AbilityController, MenuController, HudTheme),
+  nothing written until all six patched hashes matched disk. The teammate's 12 unpushed scripts and `Shared.MapExtras` were
+  left alone (the place is ahead of Git again: no Rojo Connect from this folder).
+- Gates: rojo build OK, 607 tests, selene 0, stylua clean. PLAY (simulated keys): `HaymakerPropel` bound to T and ButtonB only;
+  the HUD cap reads T; running, T took 14 -> 84 studs/s in 0.2 s; standing, Q moved nothing and T did. Not seen on screen.
+- Also from the owner the same day: all VFX, animations, models and cutscenes are made in Blender from now on, and every build
+  goes one piece at a time with questions first.
+
+## jab-3, cam-1, puff-1 (2026-11-21 to 2026-11-22): the first three pieces made in Blender (patched by hash)
+Build stamp `cam-1+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. Each was approved by the owner in Studio ("Looks right").
+- jab-3: a hand-keyed JabRight (`animations/hand/`, exported by `animations/export_hand_clips.py` to
+  `src/shared/Config/AnimClipsHand.luau`). AnimController merges those clips in STUDIO ONLY (none is uploaded). The J test key
+  is removed.
+- cam-1: the ultimate's leap-and-dash shot is a baked camera track (`animations/camera/` -> `Config/CameraTracks.luau`, 38
+  rows, played by `Ultimates.shot`); the scene is rebuilt from the game's maths by `lune/camera_scene.luau`.
+- puff-1: the dash dust is ONE drawn puff (`FxKit.Tex.SwirlPuff`, 72521547682766; `design/vfx/smoke/smoke_swirl.py`, metaballs):
+  upright, 0.9 s, no spin, no fade, `FlipbookBlendFrames` false, unlit. The shared `Tex.Smoke` is unchanged in every other
+  effect. `GameConfig.Effects.DashDustCount` is unused now. Known: the white puff nearly vanishes on the lobby's pale floor.
+- Logs with every number and the owner's words: `design/vfx/smoke-study/session-log-2026-11-21.md` and `-22.md`; the report
+  for the Blender tutorial notes: `report-smoke-flipbook-2026-11-22.md`.
+- The place still holds the teammate's unpushed scripts (its GameConfig differs from disk): no Rojo Connect from this folder.
+- Gates: rojo build OK, 608 tests, selene 0, stylua clean, fx_smoke 7 of 7.
+
+## ice-1 (2026-11-22): the Frost ice remade in Blender (patched by hash, NOT COMMITTED)
+Build stamp `cam-1+ice-1+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. The owner approved it in Studio ("Looks right").
+- The look is the owner's pick from their own references: blades from one centre (Niagara-Ice, YouTube `dIWMbXMnwqc`) and
+  broken chunks for the freeze block and debris (ARC, `hAUY_cFofLw`); flat facets, vertex colours only, pale glass tones.
+- New ice: package `124516489464164` ("HT Ice Kit v2", group 2970443) at `ReplicatedStorage.HT_KitModels.IceKit`, same five
+  names. The old one (package `94341799888558`) is kept at `ServerStorage.HT_KitModels_Old.IceKit_kits2`.
+- `Fx/FrostFx.luau`: ICE colours (125,162,198) to (213,239,251), `ICE_SEE` 0.25, a 23-row GLACIER table with a yaw column
+  (one flower, centre 8), `crystal(..., yaw)`. Frostbite's and the freeze's crystals still turn at random.
+- Source of truth: `design/kits/ice-study/` (`ice_pieces.py`, `ice_layout.py`, `export_kit.py`, checks and previews) and
+  `design/kits/out/export/ice_kit_v2.glb`. Report and numbers: `report-ice-kit-2026-11-22.md`, `session-log-2026-11-22.md`.
+- Not changed: KitModels' ERUPT (the ice still sinks; the reference shatters). The client's own stamp line still says
+  `kits-8h+lobby-4+ui-19d` (old, not touched).
+- The place still holds the teammate's unpushed scripts: no Rojo Connect from this folder.
+- Gates: rojo build OK, 608 tests, selene 0, stylua clean, fx_smoke 7 of 7.

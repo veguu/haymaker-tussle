@@ -37,6 +37,13 @@ local Clips: any = AnimVariants.all(AnimClips :: any)
 for name, clip in require(ReplicatedStorage.Shared.Config.AnimClipsUltimate) :: any do
 	Clips[name] = clip
 end
+-- Hand-keyed clips (the .blend files in animations/hand, written by animations/export_hand_clips.py). STUDIO ONLY
+-- for now (jab-1, a test piece): none is uploaded, so in a live game they could not play.
+if RunService:IsStudio() then
+	for name, clip in require(ReplicatedStorage.Shared.Config.AnimClipsHand) :: any do
+		Clips[name] = clip
+	end
+end
 
 -- The kit a fighter is wearing, for the punches it throws. Nil for bots and bodies with no player.
 local function kitOf(model: Model): string?

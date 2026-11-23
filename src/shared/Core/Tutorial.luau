@@ -88,7 +88,7 @@ function Tutorial.advice(inside: boolean, why: string?, canPunch: boolean): Advi
 end
 
 local PRESS = {
-	mouse = { punch = "Click", prompt = "CLICK NOW!", propel = "Press Q to propel" },
+	mouse = { punch = "Click", prompt = "CLICK NOW!", propel = "Press T to propel" },
 	touch = { punch = "Tap Punch", prompt = "TAP PUNCH!", propel = "Tap Propel" },
 	gamepad = { punch = "Press R2", prompt = "PRESS R2!", propel = "Press B to propel" },
 }
