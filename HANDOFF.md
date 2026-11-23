@@ -5247,3 +5247,30 @@ Build stamp `cam-1+ice-2+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. The owne
 - Place = disk by hash: KitModels 1960330748, FrostFx 2583156735, Server 3789150400.
 - OPEN: the Frostbite trail's MELT. The owner will send a reference; build nothing for it before that.
 - Gates: rojo build OK, 608 tests, selene 0, stylua clean, fx_smoke 7 of 7.
+
+## ice-3 to ice-12 (2026-11-22): textured glowing ice, reference-style break (patched by hash)
+Build stamp `cam-1+ice-12+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. Place = disk by hash for KitModels, FrostFx,
+KnockbackService and Server.
+- THE OWNER'S RULES FROM THIS RUN: all art incl. TEXTURES is made in Blender (three script-computed frost textures were
+  thrown away); models stay default grey with NO vertex colours, colour comes from textures and VFX; a texture must wrap
+  the model without stretching. The per-crystal particle aura was tried four ways and DROPPED ("drop the aura idea").
+- ICE NOW: package `116591693926374` ("HT Ice Kit v4 gloss test") at `ReplicatedStorage.HT_KitModels.IceKit`: the same five
+  meshes, each with a SurfaceAppearance (colour, roughness, metalness baked in Blender by
+  `design/kits/ice-study/bake_frost2.py` -> `design/kits/out/export/ice_kit_v4.glb`). In the place each SurfaceAppearance
+  also has `EmissiveMaskContent` = its roughness map, `EmissiveStrength` 4, `EmissiveTint` (200,235,255): the frost glows
+  (the owner picked "Strong"). These three are set IN THE PLACE on the package instance, not in code or the GLB.
+  Older kits are kept in `ServerStorage.HT_KitModels_Old`: IceKit_kits2, IceKit_v2 (vertex colours), IceKit_v3 (textured).
+- `Fx/KitModels.luau`: `textured(part, on)` takes the SurfaceAppearance off while a piece is white-hot (it hides Material
+  and Color) and puts it back; `KitModels.preload()` (called by FrostFx.preload) loads the kit's images, else the first
+  cast of a session is untextured; `erupt(..., breaks, glow)`; `addGlow` (the dropped aura) is still there, unused.
+  BREAK: 2 to 8 small Ice_Shard pieces a crystal burst away from the cluster's middle, drag to a hang, white-hot 0.2 s,
+  then textured ice, shrinking away (0.9-1.4 s). Physics chunks (ice-9..11) were replaced by this at the owner's pick.
+- `Fx/FrostFx.luau`: ICE tones are now ignored by the textured pieces; ICE_SEE 0; GLACIER_HOLD 1.4; ONE floor ring;
+  break extras at 93 f (sparks, lingering mist, snow, a pale frost patch for 2.2 s).
+- SEEN by me in play (slow motion, lobby stone): glowing textured flower; break = white burst, then ice pieces hanging
+  and shrinking. NOT SEEN by the owner yet: the ice-12 break. The frost patch is hard to see on the pale stone.
+- OPEN: the Frostbite trail's MELT (the owner picked both effects of YouTube `mOqFQpsmBeQ`: dissolve into sparkles, and a
+  floor patch that breaks into fading tiles); the single ring's texture (Tex.Circle) is a double line; the freeze block
+  glows too and may hide the fighter; Lighting.EnvironmentSpecularScale is 0.1, so gloss reflections are weak.
+- Studio screenshots sometimes come back black showing a window of the owner's other account ("rungstig").
+- Gates: rojo build OK, 608 tests, selene 0, stylua clean, fx_smoke 7 of 7 (it needed a ContentProvider stand-in).

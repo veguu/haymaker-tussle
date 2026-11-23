@@ -28,6 +28,7 @@ local services = {
 			return {}
 		end,
 	},
+	ContentProvider = { PreloadAsync = function() end },
 	UserInputService = { TouchEnabled = false, KeyboardEnabled = true },
 	ReplicatedStorage = dataModel:GetService("ReplicatedStorage"),
 	RunService = {
