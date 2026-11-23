@@ -5796,3 +5796,43 @@ Build stamp `cam-1+ice-1+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. The owne
 - **floor-1d (2026-11-23): the open checks closed, as far as this PC can (owner: "complete everything ... like checking it on a phone").** (1) THE ROTATION PICKS MAP 1 LIVE: a play test with no map request went kitestead > lobby > meadow at 77 s; the round ran on it as a circle of 180 with studs, 25 of 26 fighters in play. (2) PHONE PATH, simulated (the 62 parts in phoneHide hidden, viewport 928 x 536): Map 1 render CPU 6.97 ms with studs, 7.01 without: the stud layer costs nothing measurable. (3) THE LOBBY at its shipped 45% clear: 7.79 / 6.43 ms with studs against 6.63 / 7.07 without: no difference outside the noise (the +0.3 to 0.7 of floor-1b was at full strength, or noise). (4) Final colours seen from the east and with the phone path on: fine. (5) Quarry: HT_Maps.Quarry has NO HT_FloorDetail Textures now, so there was nothing to re-lay. COULD NOT DO: the lowest graphics level (setting SavedQualityLevel is refused from a script) and a REAL PHONE (memory, thermals, touch): only the owner can, by joining a test on his phone. Still uncommitted: the rotation line (game.json holds other sessions' changes), the earlier Map 1 / Quarry config.
 
 - **suite COMMITTED (2026-11-23, owner: "Yes, commit it"): 521a55c.** The earlier Map 1 / Quarry work: MapEnvironments whole, MapExtras, Core/MapMotion, MapService + Core/Environment (random rotation), EnvironmentKit, FieldGrass / FieldGrassField, their specs, all of `design/maps/suite/`, the floor mocks in `design/style/`, and Maps.Rotation with "meadow" (game.json and GameConfig: ONLY that line on top of the committed files). The staged snapshot was tested on its own (622 specs, selene clean). NOT committed, still in the folder: the lobby / training work (LobbyService, LobbyFlightController, LobbyLayout, Core/Lobby, TrainingGrounds, DummyService, Net, Lobby.spec, the rest of game.json and GameConfig, design/lobby), design/maps/out, design/style UI mocks.
+
+## ice-2 (2026-11-22): Frost ice breaks instead of sinking (patched by hash, NOT COMMITTED)
+Build stamp `cam-1+ice-2+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. The owner approved it in Studio ("Looks right").
+- The owner: "all crystals like the glacier and frozen fighter should break, but i think the frostbite trail should melt
+  instead." The Glacier's crystals and the ones round a frozen fighter now BREAK; the Frostbite trail still sinks.
+- `Fx/KitModels.luau`: `erupt(..., breaks)`. A breaking piece stands white-hot 0.10 s (swelling 5 %), then 1 to 4
+  `Ice_Shard` chunks fly away from the cluster's middle and up (gravity 70, 0.55-0.85 s, white-hot for 0.20 s, then the
+  piece's colour). Nothing is random; `design/kits/ice-study/ice_scene.py` does the same sums for the Blender preview.
+- `Fx/FrostFx.luau`: `crystal(..., yaw, index)`; with an index the crystal breaks. Glacier rows and the freeze's foot
+  crystals pass one.
+- Place = disk by hash: KitModels 1960330748, FrostFx 2583156735, Server 3789150400.
+- OPEN: the Frostbite trail's MELT. The owner will send a reference; build nothing for it before that.
+- Gates: rojo build OK, 608 tests, selene 0, stylua clean, fx_smoke 7 of 7.
+
+## ice-3 to ice-12 (2026-11-22): textured glowing ice, reference-style break (patched by hash)
+Build stamp `cam-1+ice-12+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. Place = disk by hash for KitModels, FrostFx,
+KnockbackService and Server.
+- THE OWNER'S RULES FROM THIS RUN: all art incl. TEXTURES is made in Blender (three script-computed frost textures were
+  thrown away); models stay default grey with NO vertex colours, colour comes from textures and VFX; a texture must wrap
+  the model without stretching. The per-crystal particle aura was tried four ways and DROPPED ("drop the aura idea").
+- ICE NOW: package `116591693926374` ("HT Ice Kit v4 gloss test") at `ReplicatedStorage.HT_KitModels.IceKit`: the same five
+  meshes, each with a SurfaceAppearance (colour, roughness, metalness baked in Blender by
+  `design/kits/ice-study/bake_frost2.py` -> `design/kits/out/export/ice_kit_v4.glb`). In the place each SurfaceAppearance
+  also has `EmissiveMaskContent` = its roughness map, `EmissiveStrength` 4, `EmissiveTint` (200,235,255): the frost glows
+  (the owner picked "Strong"). These three are set IN THE PLACE on the package instance, not in code or the GLB.
+  Older kits are kept in `ServerStorage.HT_KitModels_Old`: IceKit_kits2, IceKit_v2 (vertex colours), IceKit_v3 (textured).
+- `Fx/KitModels.luau`: `textured(part, on)` takes the SurfaceAppearance off while a piece is white-hot (it hides Material
+  and Color) and puts it back; `KitModels.preload()` (called by FrostFx.preload) loads the kit's images, else the first
+  cast of a session is untextured; `erupt(..., breaks, glow)`; `addGlow` (the dropped aura) is still there, unused.
+  BREAK: 2 to 8 small Ice_Shard pieces a crystal burst away from the cluster's middle, drag to a hang, white-hot 0.2 s,
+  then textured ice, shrinking away (0.9-1.4 s). Physics chunks (ice-9..11) were replaced by this at the owner's pick.
+- `Fx/FrostFx.luau`: ICE tones are now ignored by the textured pieces; ICE_SEE 0; GLACIER_HOLD 1.4; ONE floor ring;
+  break extras at 93 f (sparks, lingering mist, snow, a pale frost patch for 2.2 s).
+- SEEN by me in play (slow motion, lobby stone): glowing textured flower; break = white burst, then ice pieces hanging
+  and shrinking. NOT SEEN by the owner yet: the ice-12 break. The frost patch is hard to see on the pale stone.
+- OPEN: the Frostbite trail's MELT (the owner picked both effects of YouTube `mOqFQpsmBeQ`: dissolve into sparkles, and a
+  floor patch that breaks into fading tiles); the single ring's texture (Tex.Circle) is a double line; the freeze block
+  glows too and may hide the fighter; Lighting.EnvironmentSpecularScale is 0.1, so gloss reflections are weak.
+- Studio screenshots sometimes come back black showing a window of the owner's other account ("rungstig").
+- Gates: rojo build OK, 608 tests, selene 0, stylua clean, fx_smoke 7 of 7 (it needed a ContentProvider stand-in).

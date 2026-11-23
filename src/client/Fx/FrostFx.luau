@@ -45,12 +45,12 @@ local TWINKLE = curve(0, 0, 0, 0.3, 0.6, 0.25, 1, 0, 0)
 -- see-through. The meshes carry only pale facet tones (never below 0.64, 0.79, 0.88), so the white-hot
 -- flash is white: darker vertex colours turn Neon navy.
 local ICE = {
-	Color3.fromRGB(125, 162, 198),
-	Color3.fromRGB(154, 196, 225),
 	Color3.fromRGB(182, 224, 244),
-	Color3.fromRGB(213, 239, 251),
+	Color3.fromRGB(205, 236, 250),
+	Color3.fromRGB(225, 244, 253),
+	Color3.fromRGB(245, 252, 255),
 }
-local ICE_SEE = 0.25 -- how see-through a standing crystal is
+local ICE_SEE = 0 -- solid: the reference ice is not see-through (the owner, ice-8)
 local GLOW = Color3.fromRGB(170, 236, 255)
 
 -- THE LAYERS, each made the same way wherever it is used.
@@ -207,7 +207,8 @@ local function rays(add: FxKit.Add, host: BasePart, count: number, big: number)
 end
 
 -- SOLID ICE: one crystal, leaning away from `centre`. Tone 1 (dark) to 4 (pale); 0 is a glowing one.
--- `yaw` turns it about its own length (degrees); left out, it is turned at random.
+-- `yaw` turns it about its own length (degrees); left out, it is turned at random. With `index` (its
+-- number in its cluster) it leaves by breaking into chunks that fly away from `centre`; without, it sinks.
 local function crystal(
 	name: string,
 	height: number,
@@ -217,11 +218,15 @@ local function crystal(
 	delay: number,
 	hold: number,
 	tone: number,
-	yaw: number?
+	yaw: number?,
+	index: number?
 )
 	local base = KitModels.rooted(position, position - centre, lean, yaw or math.random(0, 359))
+	local breaks: KitModels.Break? = if index
+		then { index = index, middle = centre, chunk = "Ice_Shard" }
+		else nil
 	if tone == 0 then
-		KitModels.erupt(name, height, base, delay, hold, GLOW, Enum.Material.Neon, 0.2)
+		KitModels.erupt(name, height, base, delay, hold, GLOW, Enum.Material.Neon, 0.2, breaks)
 	else
 		KitModels.erupt(
 			name,
@@ -231,7 +236,8 @@ local function crystal(
 			hold,
 			ICE[tone],
 			Enum.Material.SmoothPlastic,
-			ICE_SEE
+			ICE_SEE,
+			breaks
 		)
 	end
 end
@@ -472,14 +478,13 @@ local bursts = FxKit.pool("HT_FrostGlacierFx", 2, function(parent, add)
 	local high = FxKit.attach(ground, Vector3.new(0, 9, 0))
 	local area = FxKit.hiddenPart("HT_FrostGlacierArea", Vector3.new(24, 12, 16), parent)
 
-	-- 0 f. The white flash the ice arrives in, and the floor: a navy stain, frost, three rings.
+	-- 0 f. The white flash the ice arrives in, and the floor: a navy stain, frost, ONE shockwave ring
+	-- (three until ice-9; the owner: "only one shockwave when the ice erupts instead of a bunch of rings").
 	local flash = add(low, "Flash", Tex.Glow, 1, 0, keys(0, 9, 0.3, 13, 1, 5))
 	Common.flash(flash, 0.1)
 	flash.Color = ramp(P.white, P.bright)
 	stain(add, onFloor, 17, 1.8)
-	floorRing(add, onFloor, "Ring", 0, 4, 17, ramp(P.white, P.bright))
-	floorRing(add, onFloor, "SecondRing", 4, 3, 13, ramp(P.bright, P.body))
-	floorRing(add, onFloor, "ThirdRing", 9, 4, 20, ramp(P.body, P.deep))
+	floorRing(add, onFloor, "Ring", 0, 4, 20, ramp(P.white, P.bright))
 
 	-- 0 f. Navy smoke behind the ice and pale mist over it.
 	darkSmoke(add, low, 12, 0, 4.5)
@@ -496,13 +501,28 @@ local bursts = FxKit.pool("HT_FrostGlacierFx", 2, function(parent, add)
 	snow(add, area, 16, 40, 0.7)
 	motes(add, low, 22, 2)
 
-	-- 62 f. The ice leaving: a second flash, mist and falling chips.
-	local last = add(low, "LastFlash", Tex.Glow, 1, 62, keys(0, 8, 1, 4))
+	-- 93 f (1.55 s: the rise, then GLACIER_HOLD). The ice breaking: a second flash, mist and falling chips.
+	local last = add(low, "LastFlash", Tex.Glow, 1, 93, keys(0, 8, 1, 4))
 	Common.flash(last, 0.1)
 	last.Color = ramp(P.white, P.bright)
-	mist(add, low, 8, 64, 3.5)
-	local falling = chips(add, area, 22, 64, 180, NumberRange.new(4, 14), 1)
-	falling.Acceleration = Vector3.new(0, -70, 0)
+	-- After the reference's break (ice-12): mist that lingers, a burst of small bright sparks that
+	-- slow and die, snow, and a pale frost patch that stays on the floor for two seconds.
+	mist(add, low, 10, 95, 4)
+	mist(add, low, 8, 110, 4.5)
+	local sparks = add(low, "BreakSparks", Tex.Glow, 70, 93, curve(0, 0.5, 0.25, 1, 0, 0), {
+		speed = NumberRange.new(18, 50),
+	})
+	Common.embers(sparks, 0.5, 1.1)
+	sparks.Color = ramp(P.white, P.bright)
+	snow(add, area, 24, 96, 0.8)
+	local patch = add(onFloor, "BreakFrost", Tex.Glow, 1, 93, keys(0, 12, 0.15, 17, 1, 18), {
+		flat = true,
+		onFloor = true,
+	})
+	patch.Lifetime = NumberRange.new(2.2)
+	patch.LightEmission = 0.5
+	patch.Color = ramp(P.white, P.bright)
+	patch.Transparency = fade(0, 0.3, 0.6, 0.5, 1, 1)
 
 	return { ground = ground, area = area }
 end)
@@ -542,7 +562,7 @@ local GLACIER: { { any } } = {
 	{ -1.41, 6.59, 9, 40, 2, "Ice_SpikeTall", 4, 15 },
 	{ 1.49, 6.66, 9, 40, 2, "Ice_SpikeTall", 2, 135 },
 }
-local GLACIER_HOLD = 0.9
+local GLACIER_HOLD = 1.4 -- seconds the flower stands before it breaks (0.9 until ice-4: the owner wanted longer)
 local GLACIER_CENTRE = 8 -- how far ahead of the thrower the middle of the cluster is
 
 -- THE KIT'S OWN PUNCH: a small ice burst where a punch lands -------------------------------------------------
@@ -712,7 +732,9 @@ function FrostFx.freeze(character: Model, seconds: number)
 			30,
 			0,
 			math.max(seconds - 0.2, 0.2),
-			1 + index % 4
+			1 + index % 4,
+			nil,
+			index
 		)
 	end
 	-- If the thaw is never heard (they left, or were moved), the block still goes.
@@ -801,7 +823,7 @@ function FrostFx.strike(root: BasePart, direction: Vector3)
 	area.CFrame = CFrame.lookAt(middle + Vector3.yAxis * 6, middle + Vector3.yAxis * 6 + way)
 	FxKit.fire(rig, 1, nil, nil, ground ~= nil)
 
-	for _, spec in GLACIER do
+	for index, spec in GLACIER do
 		local spot = feet + right * spec[1] + way * spec[2]
 		-- Each crystal stands on the floor that is really under it, or isn't made (off an edge).
 		local under = FxKit.floorUnder(spot + Vector3.yAxis * 4, 9)
@@ -815,7 +837,8 @@ function FrostFx.strike(root: BasePart, direction: Vector3)
 				spec[5] * 2 * FxKit.FRAME,
 				GLACIER_HOLD,
 				spec[7],
-				spec[8]
+				spec[8],
+				index
 			)
 		end
 	end
@@ -890,6 +913,7 @@ function FrostFx.landing(position: Vector3)
 end
 
 function FrostFx.preload()
+	task.spawn(KitModels.preload)
 	starts.preload()
 	freezes.preload()
 	shatters.preload()

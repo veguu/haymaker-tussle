@@ -85,14 +85,18 @@ sheets, `studio/` the Studio captures, `ref/` the downloaded clips.
 
 GLB: one colour set (COLOR_0, (0.64, 0.79, 0.88) to (1, 1, 1)), NORMAL, POSITION, TEXCOORD_0; Y up, min y 0, max y 1.
 
-## The new Glacier (Look 3), numbers from `check_features.py`
+## The new Glacier (Look 3), FINAL numbers from `check_features.py` (after the flat-blade fixes)
 
-- 23 pieces (1 Clump, 10 SpikeTall, 12 SpikeThick), 4798 triangles (today 1114).
-- 29.6 studs wide, 17.6 tall (1.68 : 1; the reference is 2.5 : 1), from 0.4 to 18.2 studs ahead (today -1.5 to
-  18.3), nearest ice to the camera 14.3 (today 13.2), to the camera-to-chest line 3.09 (today 2.02).
-- 49 blades of 8 studs or longer; leans 3 to 78 degrees, median 36 (reference 4 to 95, median 58).
-- Each crystal's yaw is set in the table (fit_yaws.py: the yaw that shows the most ice to the game camera inside
-  today's limits), instead of the game's `math.random(0, 359)`.
-- What the game code must change for Look 3 (`src/client/Fx/FrostFx.luau`, after the owner's yes): the four ICE
-  colours -> (125,162,198) (154,196,225) (182,224,244) (213,239,251); crystal Transparency 0.1 -> 0.25; the
-  GLACIER table -> `ice_layout.FLOWER` (with a yaw column); GLACIER_CENTRE 7 -> 8.
+- 23 pieces (1 Clump, 13 SpikeTall, 9 SpikeThick), 4558 triangles (today 1114).
+- 29.6 studs wide, 18.1 tall (1.64 : 1; the reference is 2.5 : 1), from 2.4 to 18.2 studs ahead (the old ice -1.5 to
+  18.3), nearest ice to the camera 15.0 (old 13.2), to the camera-to-chest line 3.92 (old 2.02).
+- 49 blades of 8 studs or longer; leans 3 to 70 degrees, median 42 (reference 4 to 95, median 58).
+- Blades flatter than 70 degrees: 0. Blades only just poking out of the floor: 0. Blades surfacing more than 30 % of
+  their length from their root: 0. (Added after the owner pointed at a strip on the ground: "what is this part?")
+- Each crystal's yaw is set in the table (`fit_yaws.py`), instead of the game's `math.random(0, 359)`.
+- In the game since ice-1 (commit 0292270): `FrostFx.luau` has the ICE colours (125,162,198) (154,196,225)
+  (182,224,244) (213,239,251), `ICE_SEE` 0.25, the 23-row GLACIER table with a yaw column, GLACIER_CENTRE 8.
+- New package `124516489464164`; mesh ids SpikeTall `139040606692395`, SpikeThick `138248884273130`, Clump
+  `109784265225411`, Block `117185791164626`, Shard `127428084982135`. Old package kept at
+  `ServerStorage.HT_KitModels_Old.IceKit_kits2`.
+- OWNER: preview "Yes, try in Studio"; in Studio "Looks right"; the preview showed what Studio did: "Yes".
