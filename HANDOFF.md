@@ -5234,3 +5234,16 @@ Build stamp `cam-1+ice-1+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. The owne
   `kits-8h+lobby-4+ui-19d` (old, not touched).
 - The place still holds the teammate's unpushed scripts: no Rojo Connect from this folder.
 - Gates: rojo build OK, 608 tests, selene 0, stylua clean, fx_smoke 7 of 7.
+
+## ice-2 (2026-11-22): Frost ice breaks instead of sinking (patched by hash, NOT COMMITTED)
+Build stamp `cam-1+ice-2+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. The owner approved it in Studio ("Looks right").
+- The owner: "all crystals like the glacier and frozen fighter should break, but i think the frostbite trail should melt
+  instead." The Glacier's crystals and the ones round a frozen fighter now BREAK; the Frostbite trail still sinks.
+- `Fx/KitModels.luau`: `erupt(..., breaks)`. A breaking piece stands white-hot 0.10 s (swelling 5 %), then 1 to 4
+  `Ice_Shard` chunks fly away from the cluster's middle and up (gravity 70, 0.55-0.85 s, white-hot for 0.20 s, then the
+  piece's colour). Nothing is random; `design/kits/ice-study/ice_scene.py` does the same sums for the Blender preview.
+- `Fx/FrostFx.luau`: `crystal(..., yaw, index)`; with an index the crystal breaks. Glacier rows and the freeze's foot
+  crystals pass one.
+- Place = disk by hash: KitModels 1960330748, FrostFx 2583156735, Server 3789150400.
+- OPEN: the Frostbite trail's MELT. The owner will send a reference; build nothing for it before that.
+- Gates: rojo build OK, 608 tests, selene 0, stylua clean, fx_smoke 7 of 7.

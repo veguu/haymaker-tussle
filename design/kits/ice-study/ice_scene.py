@@ -342,23 +342,92 @@ def place(mesh, base_r, height, grown=1.0, wide=1.0, name="Piece"):
     return obj
 
 
-def glacier(kit, t, feet=(0, 0, 0), table=None, attribute=None, centre=GLACIER_CENTRE, transparency=None):
-    """The Frost Glacier at `t` seconds after the stomp, built from `kit` ({name: mesh}). Returns its objects."""
+# SHATTER (ice-2, after reference C's leaving: one white flash about 0.17 s long while the ice breaks, then
+# white-hot chunks fly up and out and fall for about 0.7 s). KitModels does the same sums, so the preview is
+# the game: every number below is repeated in src/client/Fx/KitModels.luau.
+BREAK = 0.10          # a crystal stands white-hot this long, swelling 5 %, then is gone and its chunks fly
+CHUNK_HOT = 0.20      # a chunk is white-hot this long, then the crystal's own colour
+CHUNK_GRAVITY = 70.0
+
+
+def _frac(v):
+    return v - math.floor(v)
+
+
+def chunk_specs(index, height):
+    """The chunks crystal number `index` (`height` studs long) breaks into; nothing is random.
+    Each: how far up the crystal it starts (0-1), two fixed numbers 0-1 that set its speed, size and life."""
+    count = max(1, min(4, int(height / 4.5 + 0.5)))
+    out = []
+    for k in range(1, count + 1):
+        u1 = _frac(math.sin(index * 12.9898 + k * 78.233) * 43758.5453)
+        u2 = _frac(math.sin(index * 39.346 + k * 11.135) * 24634.6345)
+        out.append(((k - 0.4) / count, u1, u2))
+    return out
+
+
+def chunk_objects(kit, index, base, middle, height, tone, tc, transparency):
+    """The flying chunks of one broken crystal, `tc` seconds after it broke (Roblox space in, objects out)."""
+    made = []
+    shard = kit["Ice_Shard"]
+    low, high = bounds(shard)
+    centre = (low + high) / 2
+    axis = (base.to_3x3() @ Vector((0, 1, 0))).normalized()
+    for k, (along, u1, u2) in enumerate(chunk_specs(index, height), start=1):
+        life = 0.55 + 0.30 * u2
+        if tc >= life:
+            continue
+        start = base @ Vector((0, along * height, 0))
+        out = Vector((start.x - middle.x, 0, start.z - middle.z))
+        if out.length < 0.05:
+            out = Vector((math.cos(u1 * math.tau), 0, math.sin(u1 * math.tau)))
+        out.normalize()
+        velocity = out * (6 + 10 * u1) + axis * (6 * along) + Vector((0, 12 + 12 * u2, 0))
+        position = start + velocity * tc + Vector((0, -0.5 * CHUNK_GRAVITY * tc * tc, 0))
+        size = (1.8 + 2.2 * u1) * max(0.6, min(1.2, height / 14))
+        share = tc / life
+        shrink = 1.0 if share <= 0.6 else max(0.05, 1 - (share - 0.6) / 0.4)
+        spin = Matrix.Rotation(u1 * math.tau, 4, "Y") @ Matrix.Rotation(u2 * math.tau, 4, "Z") @ Matrix.Rotation(
+            math.radians(300 + 300 * u2) * tc, 4, Vector((u1 - 0.5, u2 - 0.5, 0.31)).normalized())
+        obj = bpy.data.objects.new(f"C{index:02d}_{k}", shard.copy())
+        local = Matrix.Translation(position) @ spin @ Matrix.Scale(size * shrink, 4)
+        obj.matrix_world = M4 @ local @ M4 @ Matrix.Translation(-centre)
+        obj.data.materials.clear()
+        hot = tc < CHUNK_HOT
+        obj.data.materials.append(material_for(shard["paint"], tone if tone else 3, "hot" if hot else "own", 0.05))
+        obj.visible_shadow = False
+        bpy.context.scene.collection.objects.link(obj)
+        made.append(obj)
+    return made
+
+
+def glacier(kit, t, feet=(0, 0, 0), table=None, attribute=None, centre=GLACIER_CENTRE, transparency=None, leave="sink"):
+    """The Frost Glacier at `t` seconds after the stomp, built from `kit` ({name: mesh}). Returns its objects.
+    leave: "sink" (KitModels' ERUPT as it is) or "shatter" (breaks into flying chunks)."""
     made = []
     feet_r = M4 @ Vector(feet)
     way = Vector((0, 0, -1))
     right = Vector((1, 0, 0))
     middle = feet_r + way * centre
+    leave_at = RISE + SETTLE + GLACIER_HOLD
     for index, spec in enumerate(table or GLACIER, start=1):
         r, a, height, lean, wave, name, tone = spec[:7]
         yaw = spec[7] if len(spec) > 7 else (index * 137) % 360   # the game: math.random(0, 359) unless the row sets it
-        state = erupt_state(t - wave * 2 / 60)
-        if state is None:
-            continue
-        grown, wide, hot = state
+        own = t - wave * 2 / 60
         mesh = kit[name]
         spot = feet_r + right * r + way * a
         base = rooted(spot, spot - middle, lean, yaw)
+        if leave == "shatter" and own >= leave_at:
+            since = own - leave_at
+            if since >= BREAK:
+                made += chunk_objects(kit, index, base, middle, height, tone, since - BREAK, transparency)
+                continue
+            state = (1.0 + 0.05 * since / BREAK, 1.0, True)
+        else:
+            state = erupt_state(own)
+        if state is None:
+            continue
+        grown, wide, hot = state
         obj = place(mesh, base, height, grown, wide, f"G{index:02d}_{name}")
         attr = attribute or mesh["paint"]
         obj.data = mesh.copy()   # its own material slot

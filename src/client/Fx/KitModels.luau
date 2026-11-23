@@ -13,6 +13,11 @@
 --           back, stands for a while, then flashes white again and sinks (DonutLee1 "ICE ERUPTION",
 --           YouTube nOloysSOoGY: the cluster is a white silhouette first and last).
 --   THROW   a piece is thrown as debris: it flies on an arc, turning, and shrinks away.
+--   BREAK   (ice-2) an erupted piece can leave by breaking instead of sinking: it stands white-hot
+--           for a moment, swelling a little, then is gone and its chunks fly up and out and fall
+--           (the owner's reference, "Niagara-Ice", YouTube dIWMbXMnwqc: one white flash about
+--           0.17 s long while the ice breaks, chunks in the air for about 0.7 s). Nothing in it is
+--           random: design/kits/ice-study/ice_scene.py does the same sums for the Blender preview.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -27,6 +32,9 @@ local FLASH_SECONDS = 0.06 -- how long a piece is white-hot as it arrives, and a
 local RISE_SECONDS = 0.08 -- from nothing to past full size
 local SETTLE_SECONDS = 0.07 -- and back to full size
 local SINK_SECONDS = 0.26
+local BREAK_SECONDS = 0.10 -- a breaking piece stands white-hot this long, then its chunks fly
+local CHUNK_HOT_SECONDS = 0.20 -- a chunk is white-hot this long, then the piece's own colour
+local CHUNK_GRAVITY = 70
 
 export type Erupt = {
 	part: BasePart,
@@ -38,6 +46,27 @@ export type Erupt = {
 	material: Enum.Material,
 	transparency: number,
 	phase: number, -- 0 waiting, 1 white-hot, 2 standing, 3 leaving
+	breaks: Break?, -- set: it leaves by breaking into chunks instead of sinking
+}
+
+export type Break = {
+	index: number, -- which piece of its cluster this is (fixes how its chunks fly)
+	middle: Vector3, -- the cluster's middle: chunks fly away from it
+	chunk: string, -- the piece its chunks are made of
+}
+
+type Chunk = {
+	part: BasePart,
+	from: Vector3,
+	velocity: Vector3,
+	turn: CFrame,
+	axis: Vector3,
+	rate: number,
+	size: Vector3,
+	startAt: number,
+	life: number,
+	colour: Color3,
+	hot: boolean,
 }
 
 type Throw = {
@@ -70,6 +99,7 @@ local holder: Folder? = nil
 local erupting: { Erupt } = {}
 local thrown: { Throw } = {}
 local swept: { Sweep } = {}
+local chunks: { Chunk } = {}
 local connection: RBXScriptConnection? = nil
 
 local function folder(): Folder
@@ -124,6 +154,49 @@ function KitModels.piece(name: string, height: number): (BasePart, Vector3)
 	return part, size
 end
 
+local function fraction(value: number): number
+	return value - math.floor(value)
+end
+
+-- The chunks a broken piece flies apart into: one for about every 4.5 studs of its length, each from
+-- its own place along the piece, away from the cluster's middle and up.
+local function breakApart(item: Erupt, now: number)
+	local breaks = item.breaks :: Break
+	local height = item.size.Y
+	local count = math.clamp(math.floor(height / 4.5 + 0.5), 1, 4)
+	local axis = item.base.UpVector
+	for k = 1, count do
+		local u1 = fraction(math.sin(breaks.index * 12.9898 + k * 78.233) * 43758.5453)
+		local u2 = fraction(math.sin(breaks.index * 39.346 + k * 11.135) * 24634.6345)
+		local along = (k - 0.4) / count
+		local from = (item.base * CFrame.new(0, along * height, 0)).Position
+		local out = Vector3.new(from.X - breaks.middle.X, 0, from.Z - breaks.middle.Z)
+		if out.Magnitude < 0.05 then
+			out = Vector3.new(math.cos(u1 * math.pi * 2), 0, math.sin(u1 * math.pi * 2))
+		end
+		local big = (1.8 + 2.2 * u1) * math.clamp(height / 14, 0.6, 1.2)
+		local part, size = KitModels.piece(breaks.chunk, big)
+		part.Material = Enum.Material.Neon
+		part.Color = WHITE
+		part.Transparency = 0
+		table.insert(chunks, {
+			part = part,
+			from = from,
+			velocity = out.Unit * (6 + 10 * u1)
+				+ axis * (6 * along)
+				+ Vector3.new(0, 12 + 12 * u2, 0),
+			turn = CFrame.Angles(0, u1 * math.pi * 2, 0) * CFrame.Angles(0, 0, u2 * math.pi * 2),
+			axis = Vector3.new(u1 - 0.5, u2 - 0.5, 0.31).Unit,
+			rate = math.rad(300 + 300 * u2),
+			size = size,
+			startAt = now,
+			life = 0.55 + 0.30 * u2,
+			colour = item.colour,
+			hot = true,
+		})
+	end
+end
+
 local function step()
 	local now = os.clock()
 	local slow = FxKit.slowness()
@@ -161,7 +234,16 @@ local function step()
 					part.Transparency = 0
 				end
 			end
-			if t >= leaveAt + SINK_SECONDS then
+			if item.breaks and t >= leaveAt + BREAK_SECONDS then
+				breakApart(item, now)
+				part:Destroy()
+				table.remove(erupting, index)
+			elseif item.breaks and t >= leaveAt then
+				-- Standing white-hot, swelling a little, about to break.
+				local tall = item.size.Y * (1 + 0.05 * (t - leaveAt) / BREAK_SECONDS)
+				part.Size = Vector3.new(item.size.X, tall, item.size.Z)
+				part.CFrame = item.base * CFrame.new(0, tall / 2, 0)
+			elseif t >= leaveAt + SINK_SECONDS then
 				part:Destroy()
 				table.remove(erupting, index)
 			else
@@ -221,7 +303,29 @@ local function step()
 			part.CFrame = item.from:Lerp(item.to, eased)
 		end
 	end
-	if #erupting == 0 and #thrown == 0 and #swept == 0 and connection then
+	for index = #chunks, 1, -1 do
+		local item = chunks[index]
+		local part = item.part
+		local t = (now - item.startAt) / slow
+		if part.Parent == nil or t >= item.life then
+			part:Destroy()
+			table.remove(chunks, index)
+		else
+			if item.hot and t >= CHUNK_HOT_SECONDS then
+				item.hot = false
+				part.Material = Enum.Material.SmoothPlastic
+				part.Color = item.colour
+				part.Transparency = 0.05
+			end
+			local share = t / item.life
+			local shrink = if share <= 0.6 then 1 else math.max(1 - (share - 0.6) / 0.4, 0.05)
+			part.Size = item.size * shrink
+			part.CFrame = CFrame.new(
+				item.from + item.velocity * t + Vector3.new(0, -0.5 * CHUNK_GRAVITY * t * t, 0)
+			) * item.turn * CFrame.fromAxisAngle(item.axis, item.rate * t)
+		end
+	end
+	if #erupting == 0 and #thrown == 0 and #swept == 0 and #chunks == 0 and connection then
 		connection:Disconnect()
 		connection = nil
 	end
@@ -235,7 +339,8 @@ end
 
 --- Bursts the piece `name` out of the floor. `base` is where its root sits, with +Y the way it
 --- points. It arrives `delay` seconds from now, stands `hold` seconds, then sinks. Between its two
---- white flashes it has `colour`, `material` and `transparency`.
+--- white flashes it has `colour`, `material` and `transparency`. With `breaks` it leaves by breaking
+--- into flying chunks instead of sinking.
 function KitModels.erupt(
 	name: string,
 	height: number,
@@ -244,7 +349,8 @@ function KitModels.erupt(
 	hold: number,
 	colour: Color3,
 	material: Enum.Material?,
-	transparency: number?
+	transparency: number?,
+	breaks: Break?
 )
 	local part, size = KitModels.piece(name, height)
 	table.insert(erupting, {
@@ -257,6 +363,7 @@ function KitModels.erupt(
 		material = material or Enum.Material.SmoothPlastic,
 		transparency = transparency or 0.1,
 		phase = 0,
+		breaks = breaks,
 	})
 	run()
 end

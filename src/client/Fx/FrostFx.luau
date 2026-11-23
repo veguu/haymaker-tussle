@@ -207,7 +207,8 @@ local function rays(add: FxKit.Add, host: BasePart, count: number, big: number)
 end
 
 -- SOLID ICE: one crystal, leaning away from `centre`. Tone 1 (dark) to 4 (pale); 0 is a glowing one.
--- `yaw` turns it about its own length (degrees); left out, it is turned at random.
+-- `yaw` turns it about its own length (degrees); left out, it is turned at random. With `index` (its
+-- number in its cluster) it leaves by breaking into chunks that fly away from `centre`; without, it sinks.
 local function crystal(
 	name: string,
 	height: number,
@@ -217,11 +218,15 @@ local function crystal(
 	delay: number,
 	hold: number,
 	tone: number,
-	yaw: number?
+	yaw: number?,
+	index: number?
 )
 	local base = KitModels.rooted(position, position - centre, lean, yaw or math.random(0, 359))
+	local breaks: KitModels.Break? = if index
+		then { index = index, middle = centre, chunk = "Ice_Shard" }
+		else nil
 	if tone == 0 then
-		KitModels.erupt(name, height, base, delay, hold, GLOW, Enum.Material.Neon, 0.2)
+		KitModels.erupt(name, height, base, delay, hold, GLOW, Enum.Material.Neon, 0.2, breaks)
 	else
 		KitModels.erupt(
 			name,
@@ -231,7 +236,8 @@ local function crystal(
 			hold,
 			ICE[tone],
 			Enum.Material.SmoothPlastic,
-			ICE_SEE
+			ICE_SEE,
+			breaks
 		)
 	end
 end
@@ -712,7 +718,9 @@ function FrostFx.freeze(character: Model, seconds: number)
 			30,
 			0,
 			math.max(seconds - 0.2, 0.2),
-			1 + index % 4
+			1 + index % 4,
+			nil,
+			index
 		)
 	end
 	-- If the thaw is never heard (they left, or were moved), the block still goes.
@@ -801,7 +809,7 @@ function FrostFx.strike(root: BasePart, direction: Vector3)
 	area.CFrame = CFrame.lookAt(middle + Vector3.yAxis * 6, middle + Vector3.yAxis * 6 + way)
 	FxKit.fire(rig, 1, nil, nil, ground ~= nil)
 
-	for _, spec in GLACIER do
+	for index, spec in GLACIER do
 		local spot = feet + right * spec[1] + way * spec[2]
 		-- Each crystal stands on the floor that is really under it, or isn't made (off an edge).
 		local under = FxKit.floorUnder(spot + Vector3.yAxis * 4, 9)
@@ -815,7 +823,8 @@ function FrostFx.strike(root: BasePart, direction: Vector3)
 				spec[5] * 2 * FxKit.FRAME,
 				GLACIER_HOLD,
 				spec[7],
-				spec[8]
+				spec[8],
+				index
 			)
 		end
 	end

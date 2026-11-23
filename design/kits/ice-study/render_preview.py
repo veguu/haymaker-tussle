@@ -17,7 +17,7 @@ from ice_layout import FLOWER, FLOWER_CENTRE, GAME_BLUES, PALE_GLASS  # noqa: E4
 args = sys.argv[sys.argv.index("--") + 1:]
 SIDE, FLOOR, OUT, WIDTH, HEIGHT = args[0], args[1], args[2], int(args[3]), int(args[4])
 FPS, LEAD = 60, 20
-LAST_T = 2 * 2 / 60 + S.RISE + S.SETTLE + S.GLACIER_HOLD + S.SINK     # the last wave has sunk
+LAST_T = 2 * 2 / 60 + S.RISE + S.SETTLE + S.GLACIER_HOLD + max(S.SINK, S.BREAK + 0.85)   # the last wave has sunk, or its chunks have gone
 FRAMES = LEAD + int(LAST_T * FPS) + 2 + LEAD
 FIRST = int(args[5]) if len(args) > 5 else 0
 LAST = int(args[6]) if len(args) > 6 else FRAMES - 1
@@ -32,6 +32,8 @@ else:
     S.ICE = PALE_GLASS
     kit = P.build_kit()
     setup = {"table": FLOWER, "centre": FLOWER_CENTRE, "transparency": 0.25}
+    if SIDE == "shatter":      # the new ice, leaving by breaking instead of sinking
+        setup["leave"] = "shatter"
 S.floor(FLOOR)
 S.fighter()
 S.game_camera()
@@ -51,6 +53,8 @@ def moment(t):
     for spec in table:
         state = S.erupt_state(t - spec[4] * 2 / 60)
         states.append(None if state is None else (round(state[0], 4), round(state[1], 4), state[2]))
+    if SIDE == "shatter" and t >= S.RISE + S.SETTLE + S.GLACIER_HOLD:
+        return ("leaving", round(t, 4)) if t < LAST_T else "empty"     # chunks in flight: every frame differs
     return "empty" if all(s is None for s in states) else tuple(states)
 
 
