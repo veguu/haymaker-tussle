@@ -5,7 +5,8 @@
 local FieldGrass = require("../src/shared/Core/FieldGrass")
 local Envs = require("../src/shared/Config/MapEnvironments")
 
-local CFG = Envs.Maps.meadow.fieldGrass
+-- the parked ring's config (no map uses it since 2026-11-22; Map 1's grass is static, in its meshes)
+local CFG = Envs.FieldGrassRing
 local ARENA = Envs.Maps.meadow.arena
 local WIND = Envs.Default.wind
 local FIGHTER = 5 -- an R6 fighter's height, studs
@@ -73,6 +74,31 @@ return {
 		assert(math.abs(a - b) < 1e-9, "the same crest, moved downwind")
 		-- a gust peak stays a lean, never a flattening: under 45 degrees
 		assert(math.atan(hi) < math.rad(45), `peak lean {math.deg(math.atan(hi))} degrees`)
+	end,
+
+	["the game's fast forms agree with the readable ones: gustLean with windLean, leanAngle with atan"] = function()
+		local wx, wz = 0.96, 0.29
+		for i = 0, 40 do
+			local x, z, t = i * 7.3 - 120, i * 3.1 - 50, i * 0.37
+			local slow = FieldGrass.windLean(WIND, CFG.gustBoost, wx, wz, x, z, t, 0.3)
+			local fast = FieldGrass.gustLean(
+				WIND,
+				CFG.gustBoost,
+				(x * wx + z * wz) / WIND.gustLength,
+				t,
+				0.3
+			)
+			assert(math.abs(slow - fast) < 1e-9)
+		end
+		for i = 0, 100 do -- up to a lean of 1 (a full gust is 0.8)
+			local l = i / 100
+			assert(math.abs(FieldGrass.leanAngle(l) - math.atan(l)) < 0.006, `lean {l}`)
+		end
+	end,
+
+	["each ring's fade fits inside it, on PC and on phones"] = function()
+		assert(CFG.fade < CFG.radius * 0.5, "PC fade")
+		assert(CFG.fadeTouch and CFG.fadeTouch < CFG.radiusTouch * 0.5, "phone fade")
 	end,
 
 	["the ring's edge: nothing sinks inside it, the biggest clump is fully under at its edge"] = function()

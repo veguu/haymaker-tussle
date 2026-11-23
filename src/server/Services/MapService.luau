@@ -22,7 +22,9 @@
 -- is destroyed behind the fade and every client applies the lobby's environment. The templates in
 -- ServerStorage.HT_Maps are never touched. The next arena is loaded only when the next round is actually
 -- starting (ChangeForNextRound, as the intermission countdown runs out, before any fighter is placed); the
--- rotation moves on every Maps.ChangeEveryRounds rounds. Too few players -> no round -> the lobby state stays.
+-- rotation moves on every Maps.ChangeEveryRounds rounds: with Maps.Order "random" to any map but the last one
+-- (never the same map twice in a row; Core/Environment.randomMap), otherwise to the next in the list. An empty
+-- Maps.StartMap lets the first round draw too. Too few players -> no round -> the lobby state stays.
 -- One change at a time: a change in flight makes RoundEnded and ChangeForNextRound do nothing, and only the
 -- latest token ever swaps, so nothing is cleaned up or loaded twice.
 -- With LobbyBetweenRounds off, the finished map stays up through the intermission as it used to.
@@ -61,6 +63,20 @@ local token = 0
 local pending: string? = nil
 local roundsSinceChange = 0
 local lastArena: string? = nil -- the last real arena that was up: the rotation carries on from it
+local rng = Random.new()
+
+-- The arena after `current`: with Maps.Order "random" any map in the rotation but `current` (owner, 2026-11-21:
+-- never the same map twice in a row; with one map it repeats), otherwise the next one in the list. The rule holds
+-- per change, so it means "never twice in a row" only with Maps.ChangeEveryRounds = 1. Nil on an empty rotation.
+local function following(current: string?): string?
+	if #cfg.Rotation == 0 then
+		return nil
+	end
+	if cfg.Order == "random" then
+		return Environment.randomMap(cfg.Rotation, current, rng:NextNumber())
+	end
+	return Environment.nextMap(cfg.Rotation, current)
+end
 
 -- Is `id` the lobby's state: an environment with no arena?
 local function isLobby(id: string?): boolean
@@ -269,17 +285,21 @@ function MapService:ChangeForNextRound(): boolean
 	if not onLobby and not due then
 		return false
 	end
-	local nextId: string
+	local nextId: string?
 	if lastArena == nil then
+		-- the first arena: Maps.StartMap when it names one, otherwise the rotation's own pick
 		nextId = if known(cfg.StartMap) and not isLobby(cfg.StartMap)
 			then cfg.StartMap
-			else cfg.Rotation[1]
+			else following(nil)
 		roundsSinceChange = 0
 	elseif due then
-		nextId = Environment.nextMap(cfg.Rotation, lastArena)
+		nextId = following(lastArena)
 		roundsSinceChange = 0
 	else
 		nextId = lastArena -- the same arena again, loaded fresh
+	end
+	if nextId == nil then
+		return false -- an empty rotation: nothing to load
 	end
 	self:ChangeTo(nextId)
 	return true
@@ -309,7 +329,10 @@ function MapService:KnitStart()
 	if not cfg.Enabled then
 		return
 	end
-	swap(lobbyState() or (if known(cfg.StartMap) then cfg.StartMap else cfg.Rotation[1]))
+	local first = lobbyState() or (if known(cfg.StartMap) then cfg.StartMap else following(nil))
+	if first then
+		swap(first)
+	end
 
 	if RunService:IsStudio() then
 		local attr = cfg.StudioSwitchAttribute
@@ -320,7 +343,11 @@ function MapService:KnitStart()
 			end
 			workspace:SetAttribute(attr, nil)
 			if want == "next" then
-				want = Environment.nextMap(cfg.Rotation, pending or active)
+				-- after an arena already on its way in, else after the last arena that was up
+				want = following(if pending and not isLobby(pending) then pending else lastArena)
+				if want == nil then
+					return
+				end
 			end
 			self:ChangeTo(want)
 		end)

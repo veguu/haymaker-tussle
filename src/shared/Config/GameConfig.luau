@@ -732,6 +732,7 @@ local GameConfig = {
 			"gnomon",
 			"kitestead",
 			"saltcrest",
+			"meadow",
 		},
 		StartMap = "gnomon",
 		ChangeEveryRounds = 1,

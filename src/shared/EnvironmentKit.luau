@@ -23,6 +23,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Environment = require(script.Parent.Core.Environment)
 local FieldGrassField = require(script.Parent.FieldGrassField)
 local GrassField = require(script.Parent.GrassField)
+local MapExtras = require(script.Parent.MapExtras)
 local PlantField = require(script.Parent.PlantField)
 local Envs = require(script.Parent.Config.MapEnvironments)
 
@@ -362,6 +363,8 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 	local grass: GrassField.Field? = nil
 	-- the field grass a fighter runs through (a map whose entry has `fieldGrass`; Shared/FieldGrassField)
 	local fieldGrass: FieldGrassField.Field? = nil
+	-- a map's spinners and phone path (Shared/MapExtras)
+	local extras: MapExtras.Extras? = nil
 	local plants: PlantField.Field? = nil
 	-- the lobby is always there (LobbyService), so its plants keep moving while an arena is up, for everyone
 	-- waiting or spectating in it; out of the camera's range they cost a distance check 4 times a second
@@ -488,6 +491,9 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 				lobbyPlants = PlantField.new(lobbyModel, lobbyWind)
 			end
 		end
+		if extras then
+			extras:step(t)
+		end
 		if grass or fieldGrass or plants or lobbyPlants then
 			local camera = workspace.CurrentCamera
 			local at = camera and camera.CFrame.Position
@@ -543,6 +549,11 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 			fieldGrass = nil
 		end
 		local fieldEntry = mapId and Envs.Maps[mapId :: string]
+		if extras then
+			extras:destroy()
+			extras = nil
+		end
+		extras = MapExtras.new(mapModel, fieldEntry)
 		if fieldEntry and fieldEntry.fieldGrass and fieldEntry.arena then
 			fieldGrass = FieldGrassField.new(
 				mapModel,
@@ -616,6 +627,10 @@ function EnvironmentKit.newScene(p: any, anchor: Vector3, mapId: string?): Scene
 		if fieldGrass then
 			fieldGrass:destroy()
 			fieldGrass = nil
+		end
+		if extras then
+			extras:destroy()
+			extras = nil
 		end
 		if plants then
 			plants:destroy()

@@ -639,6 +639,20 @@ MapEnvironments.Maps = {
 -- A CIRCLE of radius 180 since 2026-11-22 (owner: "more circle than oval"; his size), clean (no pond, no obstacles),
 -- floating in open sky with floating islands for a background. Gnomon's light and wind for now. NOT IN THE ROTATION until the owner approves it (game.json
 -- Maps.Rotation); until its model is at ServerStorage.HT_Maps.Meadow a stand-in floor is built.
+-- Gnomon's light, but clearer air: the fresh review (2026-11-22) found the game milky and the floor pale next to the
+-- Blender look, and the haze line under the arena reading as a sea.
+local meadowEnvironment = table.clone(MapEnvironments.Maps.gnomon.environment)
+meadowEnvironment.exposure = -0.1
+meadowEnvironment.grade =
+	{ saturation = 0.06, contrast = 0.18, brightness = 0, tint = { 255, 252, 246 } }
+meadowEnvironment.atmosphere = {
+	density = 0.2,
+	offset = 0.15,
+	colour = { 196, 222, 250 },
+	decay = { 132, 174, 230 },
+	glare = 0.05,
+	haze = 0.5,
+}
 MapEnvironments.Maps.meadow = {
 	name = "Grassy Plains",
 	model = "Meadow",
@@ -652,26 +666,147 @@ MapEnvironments.Maps.meadow = {
 		semiZ = 180,
 		spawnShare = 0.65,
 	},
-	environment = MapEnvironments.Maps.gnomon.environment,
-	-- FIELD GRASS (owner, 2026-11-20: "that feel of you running through a grass field, shouldn't be taller than the
-	-- character, wind should also blow on it"): knee-to-thigh clumps in a ring round the camera (Shared/FieldGrassField,
-	-- Core/FieldGrass), meshes ReplicatedStorage.HT_FieldGrass (design/maps/suite/field_grass.py).
-	fieldGrass = {
-		cell = 4, -- studs between clump roots
-		radius = 80, -- drawn this far round the camera
-		radiusTouch = 44, -- phones
-		fade = 28, -- the ring's last studs: clumps sink into the floor (long and soft, so no line shows)
-		margin = 2.5, -- kept clear inside the edge
-		variants = 4,
-		scale = { 0.85, 1.15 },
-		-- the floor's greens, a shade lighter (the meshes are dark at the root, light at the tip)
-		colours = { { 112, 172, 84 }, { 98, 160, 80 }, { 128, 178, 88 }, { 104, 164, 96 } },
-		gustBoost = 2.2, -- tall grass waves harder than the map's wind numbers
-		bendRadius = 4.2, -- studs round a character that part the grass
-		bendMax = 55, -- degrees at a character's feet
-		sink = 0.15,
-		height = 2.6, -- the tallest clump at scale 1 (field_grass.py), under a fighter's 5
+	environment = meadowEnvironment,
+	-- Shared/MapExtras: the windmill's sails turn about their hub (arena-local; design/maps/out/suite/meadow_r3/
+	-- landmarks.json; the axis points at the arena), slowly
+	spinners = {
+		{
+			parts = { "Map_Meadow_WindmillSails_Timber_N", "Map_Meadow_WindmillSails_Cream_N" },
+			hub = { -375.39, 292.69, -797.7 }, -- the 1.7x mill on its lifted island (meadow.py, out/suite/meadow_r3)
+			axis = { 0.4258, 0, 0.9048 },
+			rpm = 3,
+		},
 	},
+	-- the phone path: far islands and small far detail come out of a phone's copy of the map, and so does the floor
+	-- flowers' B layer (meadow.py floor_flowers: phones keep layer A, 40% of the flowers)
+	phoneHide = {
+		"_FarN",
+		"_FarNE",
+		"_FarNW",
+		"_Trees_",
+		"_Crops_",
+		"_Hedges_",
+		"_FarHouse_",
+		"_FloorFlowers_B_",
+	},
+	-- THE FLOOR (owner 2026-11-22, the stud style): one flat green with dirt patches and small stud flowers, all in
+	-- the map's own meshes (Map_Meadow_Floor_*, Map_Meadow_FloorFlowers_*), the studs a Texture on the floor
+	-- (HT_FloorStuds). The grass blades of the old style are gone; no `fieldGrass` entry, no per-frame cost.
+}
+
+-- PARKED, used by no map (2026-11-22): the moving grass ring round the fighter (Shared/FieldGrassField,
+-- Core/FieldGrass, ReplicatedStorage.HT_FieldGrass; design/maps/suite/field_grass.py). Map 1's static grass, which
+-- replaced it, was itself replaced by the stud floor on 2026-11-22, so nothing waits on this any more: it and its
+-- code can be removed when the owner says. To bring it back on a map, set that map's entry
+-- `fieldGrass = MapEnvironments.FieldGrassRing`.
+-- Owner, 2026-11-20: "that feel of you running through a grass field, shouldn't be taller than the character, wind
+-- should also blow on it": knee-to-thigh clumps in a ring round the camera.
+MapEnvironments.FieldGrassRing = {
+	cell = 6, -- studs between clump roots (big, full clumps: fewer parts to move; field_grass.py v2)
+	-- MEASURED 2026-11-22 in Studio Play on this PC (a second field timed on its own): ring 66, these tiers: 0.48 ms
+	-- a frame median, 0.58 average, 410 clumps; the phone ring 36: 0.27 ms median here, 131 clumps
+	radius = 66, -- drawn this far round the camera
+	radiusTouch = 36, -- phones
+	fade = 24, -- the ring's last studs: clumps sink into the floor (long and soft, so no line shows)
+	fadeTouch = 14,
+	margin = 2.5, -- kept clear inside the edge
+	variants = 4,
+	scale = { 0.6, 0.9 }, -- 1 to 2.3 studs: knee to hip, so feet and landings still show (fresh review)
+	-- the tips' greens: the meshes shade from 0.62 at the root to 1 at the tip, so a root sits just under the painted
+	-- floor (92, 154, 76) and a tip a little lighter
+	colours = { { 124, 194, 98 }, { 112, 182, 92 }, { 138, 198, 102 }, { 118, 188, 108 } },
+	gustBoost = 2.2, -- tall grass waves harder than the map's wind numbers
+	-- how often clumps move (MEASURED 2026-11-22 in Studio: moving a clump costs about 3 microseconds, so the
+	-- frame cost is the number moved each frame): within tierNear of the camera every frame, out to tierMid every
+	-- midEvery-th frame, beyond that every farEvery-th (their sway is slow; the ring's edge still sinks smoothly).
+	-- Any clump being parted moves every frame. Phones (touch) use the *Touch numbers.
+	tierNear = 14,
+	tierMid = 30,
+	midEvery = 6,
+	farEvery = 16,
+	tierNearTouch = 10,
+	tierMidTouch = 22,
+	bendRadius = 4.2, -- studs round a character that part the grass
+	bendMax = 55, -- degrees at a character's feet
+	sink = 0.15,
+	height = 2.6, -- the tallest clump at scale 1 (field_grass.py), under a fighter's 5
+}
+
+-- MAP 2 OF THE ARENA SUITE, "The Limestone Pit" (Sunbaked Quarry; owner's pick 2026-11-21 from the design sheet
+-- design/maps/out/suite/design_2-6/; design/maps/suite/quarry.py): the freshly sawn top of a sandstone block in open
+-- sky, the quarry's works floating round it, the Great Derrick for its landmark. Map 1's clear air with a warmer sun.
+-- NOT IN THE ROTATION until the owner approves it (game.json Maps.Rotation).
+-- A DEEP copy: Quarry owns every table in it, so tuning Map 1's air (meadowEnvironment) never changes Map 2's.
+local function deepCopy(t: any): any
+	local out = {}
+	for k, v in t do
+		out[k] = if type(v) == "table" then deepCopy(v) else v
+	end
+	return out
+end
+local quarryEnvironment = deepCopy(meadowEnvironment)
+quarryEnvironment.sun =
+	{ clockTime = 14.6, latitude = 50, colour = { 255, 228, 190 }, brightness = 2.5 }
+quarryEnvironment.grade =
+	{ saturation = 0.06, contrast = 0.18, brightness = 0, tint = { 255, 249, 240 } }
+-- the clouds keep out of the view to the Great Derrick (mast at 560, -760, 416 tall; the boom and its block swing out
+-- to about x 265): Gnomon's landmarks (sundial, balloons) don't exist here (fresh review 2026-11-21: a cloud crossed
+-- the mast head)
+quarryEnvironment.landmarks =
+	{ { name = "Great Derrick", x = 430, y = 210, z = -720, radius = 230 } }
+-- so the north side's drift lanes fly HIGH, over the derrick's head (Map 1's six north lanes at 210-350 studs all
+-- crossed its view); the lobby side's lanes are Map 1's
+do
+	local lanes = {}
+	for _, lane in quarryEnvironment.clouds.drift.lanes do
+		if lane.across > 0 then
+			table.insert(lanes, lane)
+		end
+	end
+	for _, high in
+		{
+			-- high over the derrick (a scan of across x height on 2026-11-21: on this side only lanes about 700+ studs up
+			-- clear its view, which the check sweeps as a box out to twice its distance)
+			{ across = -650, y = 700, length = 150, speed = 1.0, phase = 0.15, stretched = 0.5 },
+			{ across = -900, y = 800, length = 160, speed = 0.9, phase = 0.6, stretched = 0.6 },
+			{ across = -1300, y = 950, length = 150, speed = 1.1, phase = 0.85, stretched = 0.5 },
+		}
+	do
+		table.insert(lanes, high)
+	end
+	quarryEnvironment.clouds.drift.lanes = lanes
+end
+MapEnvironments.Maps.quarry = {
+	name = "The Limestone Pit",
+	model = "Quarry",
+	codeObstacles = false,
+	arena = {
+		semiX = 213,
+		semiZ = 176,
+		spawnShare = 0.65,
+	},
+	environment = quarryEnvironment,
+	-- Shared/MapExtras: the derrick's boom, its ropes and its hanging block swing slowly round the mast (5 parts).
+	-- The hub is the mast's foot (quarry.py DERRICK, arena-local; the boom's own foot, landmarks.json "pivot", sits
+	-- 16.9 studs off it), so the stay from the mast head stays on the mast.
+	spinners = {
+		{
+			mode = "swing",
+			parts = {
+				"Map_Quarry_DerrickBoom_Crane_Derrick",
+				"Map_Quarry_DerrickBoom_Honey_Derrick",
+				"Map_Quarry_DerrickBoom_Lantern_Derrick",
+				"Map_Quarry_DerrickBoom_Rope_Derrick",
+				"Map_Quarry_DerrickBoom_Rose_Derrick",
+			},
+			hub = { 560, 31.4, -760 },
+			axis = { 0, 1, 0 },
+			amp = 12, -- degrees each way: the hanging block sweeps about 60 studs
+			period = 60, -- seconds a full swing
+		},
+	},
+	-- the phone path: the three far blocks and the far ledge come out of a phone's copy of the map
+	phoneHide = { "_FarN", "_Ledge" },
 }
 
 return MapEnvironments

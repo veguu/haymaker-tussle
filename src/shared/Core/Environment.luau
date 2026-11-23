@@ -100,6 +100,25 @@ function Environment.nextMap(rotation: { string }, current: string?): string
 	return rotation[1]
 end
 
+--- A random map from the rotation that is never `last` (owner, 2026-11-21: "each map randomized, but it can't be the
+--- same one twice in two rounds in a row"). `roll` is a number in [0, 1) the caller draws (pure: no RNG in here).
+--- With one map it repeats; with none it returns nil; a `last` outside the rotation (the lobby, a map taken out)
+--- leaves every map in play.
+function Environment.randomMap(rotation: { string }, last: string?, roll: number): string?
+	local others = {}
+	for _, id in rotation do
+		if id ~= last then
+			table.insert(others, id) -- every copy of the last map is left out, even if the list repeats one
+		end
+	end
+	local pool = if #others > 0 then others else rotation -- only the last map left: it repeats
+	local count = #pool
+	if count == 0 then
+		return nil
+	end
+	return pool[math.clamp(math.floor(roll * count) + 1, 1, count)]
+end
+
 --- The wind as a flat unit vector.
 function Environment.wind(wind: { number }?): (number, number)
 	local x, z = 1, 0

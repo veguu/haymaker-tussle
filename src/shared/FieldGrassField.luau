@@ -14,11 +14,14 @@
 --   meshes draw as GPU instances; no texture (vertex shade x the part's Color). Built on this client only (Archivable
 --   false), no shadows, no physics, no queries.
 -- * Each clump is modelled round its ROOT: wind and parting are one rotation about it. One BulkMoveTo per frame.
---   Clumps near the camera move every frame; the rest take turns (TIER_EVERY), except any clump being parted.
+--   Moving a part is the cost (MEASURED 2026-11-22: about 3 microseconds a clump; the maths is a tenth of that), so
+--   few move each frame: clumps near the camera every frame, mid-range ones every few, far ones about 5 times a
+--   second (config tiers), and any clump being parted every frame.
 -- * Parting: each frame only the grid cells under each character are looked up, so the cost grows with the number of
 --   characters near the camera, not with the grass.
 -- If the templates are missing, nothing is built and nothing errors.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -29,8 +32,6 @@ local FieldGrass = require(script.Parent.Core.FieldGrass)
 local FieldGrassField = {}
 
 local REFRESH = 0.2 -- seconds between re-finding the ring's cells and the characters
-local TIER_NEAR = 28 -- studs: clumps this close to the camera move every frame
-local TIER_EVERY = 3 -- the rest take turns
 local BEND_IN = 14 -- 1/s: parted quickly
 local BEND_OUT = 2.0 -- and closing slowly (the wake)
 local BEND_HEIGHT = 6 -- a root more than this above the floor (in the air) doesn't part the grass
@@ -48,12 +49,15 @@ type Entry = {
 	part: MeshPart,
 	variant: number,
 	root: Vector3,
-	turn: CFrame,
+	turn: CFrame, -- its yaw, then from its root to the part's centre (a MeshPart's CFrame is its middle)
 	scale: number,
 	phase: number,
+	along: number, -- its place downwind, in gust lengths (worked out once)
+	tier: number, -- 0 near, 1 mid, 2 far: how often it moves (set at each refresh)
 	bx: number,
 	bz: number,
 	last: number,
+	fresh: boolean, -- placed this refresh: moved on its first step whatever its tier
 }
 
 local function keyOf(ix: number, iz: number): number
@@ -77,12 +81,15 @@ function FieldGrassField.new(
 		return nil
 	end
 	local templates: { MeshPart } = {}
+	-- each template's PivotOffset is set (studio_map.py) to its ROOT, the point the clump bends about
+	local pivots: { Vector3 } = {}
 	for i = 1, cfg.variants do
 		local t = kit:FindFirstChild("FieldGrass_" .. LETTERS[i])
 		if not (t and t:IsA("MeshPart")) then
 			return nil
 		end
 		templates[i] = t
+		pivots[i] = t.PivotOffset.Position
 	end
 	local colours: { Color3 } = {}
 	for i, c in cfg.colours do
@@ -91,6 +98,12 @@ function FieldGrassField.new(
 	local centre = (model :: Model):GetPivot().Position
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	local radius: number = if touch then cfg.radiusTouch else cfg.radius
+	-- the ring's sinking edge, with the phone's own fade (its ring is smaller)
+	local ring = table.clone(cfg)
+	ring.fade = if touch then cfg.fadeTouch or cfg.fade else cfg.fade
+	local near2 = (if touch then cfg.tierNearTouch else cfg.tierNear) ^ 2
+	local mid2 = (if touch then cfg.tierMidTouch else cfg.tierMid) ^ 2
+	local midEvery: number, farEvery: number = cfg.midEvery, cfg.farEvery
 	local cell: number = cfg.cell
 	local wx, wz = Environment.wind(wind.direction)
 	local bendR: number = cfg.bendRadius
@@ -129,7 +142,7 @@ function FieldGrassField.new(
 	local entries: { Entry } = {}
 	local byKey: { [number]: Entry } = {}
 	local hidden: { MeshPart } = {} -- released this refresh: moved out of sight with the next BulkMoveTo
-	local roots: { Vector3 } = {}
+	local roots: { BasePart } = {} -- characters near the ring; their positions are read every frame
 	local nextRefresh = 0
 	local frame = 0
 	local alive = true
@@ -141,8 +154,8 @@ function FieldGrassField.new(
 			if root and root:IsA("BasePart") then
 				local p = root.Position
 				local dx, dz = p.X - at.X, p.Z - at.Z
-				if dx * dx + dz * dz < reach2 and p.Y - centre.Y < BEND_HEIGHT then
-					table.insert(roots, p)
+				if dx * dx + dz * dz < reach2 then
+					table.insert(roots, root)
 				end
 			end
 		end
@@ -170,7 +183,9 @@ function FieldGrassField.new(
 		while i <= #entries do
 			local e = entries[i]
 			local dx, dz = e.root.X - at.X, e.root.Z - at.Z
-			if dx * dx + dz * dz > keep2 then
+			local d2 = dx * dx + dz * dz
+			e.tier = if d2 < near2 then 0 elseif d2 < mid2 then 1 else 2
+			if d2 > keep2 then
 				byKey[e.key] = nil
 				table.insert(free[e.variant], e.part)
 				table.insert(hidden, e.part)
@@ -199,12 +214,16 @@ function FieldGrassField.new(
 								part = part,
 								variant = c.variant,
 								root = centre + Vector3.new(c.x, -cfg.sink, c.z),
-								turn = CFrame.Angles(0, c.yaw, 0),
+								turn = CFrame.Angles(0, c.yaw, 0)
+									* CFrame.new(-pivots[c.variant] * c.scale),
 								scale = c.scale,
 								phase = c.phase,
+								along = (c.x * wx + c.z * wz) / wind.gustLength,
+								tier = 0,
 								bx = 0,
 								bz = 0,
 								last = t,
+								fresh = true,
 							}
 							byKey[key] = e
 							table.insert(entries, e)
@@ -220,21 +239,46 @@ function FieldGrassField.new(
 	local frames: { CFrame } = {}
 	local targets: { [Entry]: Vector3 } = {}
 
+	-- The ring is centred on whoever the camera follows (the local fighter, or the one being spectated), not on the
+	-- camera: at full speed the game's camera pulls back 30-40 studs, which left the fighter at the ring's thinning
+	-- edge (seen in a recording, 2026-11-22). With no subject near, the camera itself.
+	local function ringCentre(cameraAt: Vector3): Vector3
+		local cam = workspace.CurrentCamera
+		local subject = cam and cam.CameraSubject
+		local part: BasePart? = nil
+		if subject and subject:IsA("Humanoid") then
+			part = subject.RootPart
+		elseif subject and subject:IsA("BasePart") then
+			part = subject
+		end
+		if part and (part.Position - cameraAt).Magnitude < 150 then
+			return part.Position
+		end
+		return cameraAt
+	end
+
 	local self = {} :: any
 
-	function self.step(_self: Field, t: number, camera: Vector3?)
-		if not alive or not camera then
+	function self.step(_self: Field, t: number, cameraAt: Vector3?)
+		if not alive or not cameraAt then
 			return
 		end
+		local camera = ringCentre(cameraAt)
 		if t >= nextRefresh then
 			nextRefresh = t + REFRESH
 			refresh(camera, t)
 		end
 		frame += 1
+		local calm = GuiService.ReducedMotionEnabled
 		-- parting targets: only the cells under each character
 		table.clear(targets)
-		local reach = math.ceil(bendR / cell)
-		for _, r in roots do
+		-- one cell more than the bend radius: the staggered grid puts a root up to about 1.45 cells from its cell's corner
+		local reach = math.ceil(bendR / cell) + 1
+		for _, rootPart in roots do
+			local r = rootPart.Position
+			if r.Y - centre.Y >= BEND_HEIGHT then
+				continue -- in the air: it doesn't touch the grass
+			end
 			local ix0, iz0 =
 				math.floor((r.X - centre.X) / cell), math.floor((r.Z - centre.Z) / cell)
 			for ix = ix0 - reach, ix0 + reach do
@@ -261,11 +305,12 @@ function FieldGrassField.new(
 		table.clear(hidden)
 		local cx, cz = camera.X, camera.Z
 		for n, e in entries do
-			local dx, dz = e.root.X - cx, e.root.Z - cz
-			local dist = math.sqrt(dx * dx + dz * dz)
 			local target = targets[e]
 			local bent = target ~= nil or math.abs(e.bx) + math.abs(e.bz) > 0.01
-			if dist < TIER_NEAR or bent or (n + frame) % TIER_EVERY == 0 then
+			local due = e.tier == 0
+				or (n + frame) % (if e.tier == 1 then midEvery else farEvery) == 0
+			if e.fresh or bent or due then
+				e.fresh = false
 				local dt = math.min(t - e.last, 0.25)
 				e.last = t
 				local tx, tz = 0, 0
@@ -276,28 +321,26 @@ function FieldGrassField.new(
 				end
 				e.bx = FieldGrass.ease(e.bx, tx, dt, BEND_IN, BEND_OUT)
 				e.bz = FieldGrass.ease(e.bz, tz, dt, BEND_IN, BEND_OUT)
-				local lean = math.atan(
-					FieldGrass.windLean(
-						wind,
-						cfg.gustBoost,
-						wx,
-						wz,
-						e.root.X - centre.X,
-						e.root.Z - centre.Z,
-						t,
-						e.phase
+				-- Reduced Motion: a steady lean, no gusts or shiver (the parting stays: it answers the player)
+				local lean = if calm
+					then wind.lean
+					else FieldGrass.leanAngle(
+						FieldGrass.gustLean(wind, cfg.gustBoost, e.along, t, e.phase)
 					)
-				)
 				local ax, az = wx * lean + e.bx, wz * lean + e.bz
 				local angle = math.sqrt(ax * ax + az * az)
-				local sink = FieldGrass.sinkAt(cfg, dist, radius, e.scale)
-				local base = CFrame.new(e.root.X, e.root.Y - sink, e.root.Z)
-				if angle > 1e-4 then
-					-- leaning toward (ax, az) is a turn about (az, 0, -ax)
-					base *= CFrame.fromAxisAngle(Vector3.new(az / angle, 0, -ax / angle), angle)
-				end
+				local root = e.root
+				local dx, dz = root.X - cx, root.Z - cz
+				local sink = FieldGrass.sinkAt(ring, math.sqrt(dx * dx + dz * dz), radius, e.scale)
+				local pos = Vector3.new(root.X, root.Y - sink, root.Z)
+				-- leaning toward (ax, az) is a turn about (az, 0, -ax); then the clump's own turn, then its place
+				local frameCf = if angle > 1e-4
+					then CFrame.fromAxisAngle(Vector3.new(az / angle, 0, -ax / angle), angle)
+							* e.turn
+						+ pos
+					else e.turn + pos
 				table.insert(parts, e.part)
-				table.insert(frames, base * e.turn)
+				table.insert(frames, frameCf)
 			end
 		end
 		if #parts > 0 then

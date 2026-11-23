@@ -83,6 +83,56 @@ return {
 		assert(Environment.nextMap(r, "zz") == "a")
 	end,
 
+	["a random rotation never picks the same map twice in a row"] = function()
+		-- a repeatable stand-in for the server's Random: rolls spread over [0, 1)
+		local seed = 12345
+		local function roll(): number
+			seed = (seed * 16807) % 2147483647 -- Park-Miller: exact in doubles
+			return seed / 2147483647
+		end
+		for _, size in { 2, 3, 6 } do
+			local r = {}
+			for i = 1, size do
+				table.insert(r, `m{i}`)
+			end
+			local seen: { [string]: number } = {}
+			local last: string? = nil
+			for _ = 1, 3000 do
+				local id = Environment.randomMap(r, last, roll())
+				assert(id ~= nil and id ~= last, `size {size}: {id} came twice in a row`)
+				seen[id :: string] = (seen[id :: string] or 0) + 1
+				last = id
+			end
+			for _, id in r do
+				-- every map gets a fair share (each of n maps about 1/n of the draws)
+				local share = (seen[id] or 0) / 3000
+				assert(share > 0.6 / size, `size {size}: {id} came {share} of the time`)
+			end
+		end
+		-- two maps simply take turns
+		assert(Environment.randomMap({ "a", "b" }, "a", 0.99) == "b")
+		assert(Environment.randomMap({ "a", "b" }, "b", 0) == "a")
+	end,
+
+	["a random rotation with one map repeats it, and copes with no map and a stranger"] = function()
+		assert(Environment.randomMap({ "only" }, "only", 0.5) == "only")
+		assert(Environment.randomMap({ "only" }, nil, 0) == "only")
+		assert(Environment.randomMap({}, "x", 0.5) == nil)
+		-- a last map outside the rotation (the lobby's state, a map taken out) leaves every map in play
+		local r = { "a", "b", "c" }
+		assert(Environment.randomMap(r, "lobby", 0) == "a")
+		assert(Environment.randomMap(r, "lobby", 0.999) == "c")
+		-- the ends of the roll stay inside the list
+		assert(Environment.randomMap(r, "a", 0) == "b")
+		assert(Environment.randomMap(r, "a", 0.9999) == "c")
+		assert(Environment.randomMap(r, "c", 0.9999) == "b")
+		assert(Environment.randomMap(r, "b", 1) == "c", "a roll of exactly 1 is clamped")
+		-- a list that names a map twice still never repeats it
+		for k = 0, 99 do
+			assert(Environment.randomMap({ "a", "b", "a" }, "a", k / 100) == "b")
+		end
+	end,
+
 	["the same time gives the same sky: clouds and leaves are pure functions of time"] = function()
 		local p = Environment.resolve(Envs, "gnomon")
 		local wx, wz = Environment.wind(p.wind.direction)

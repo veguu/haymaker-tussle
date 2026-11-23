@@ -17,11 +17,18 @@ export type Config = {
 	radius: number, -- grass is drawn this far round the camera
 	radiusTouch: number, -- and this far on phones
 	fade: number, -- over the ring's last studs, clumps sink into the floor
+	fadeTouch: number?, -- the same on phones (their ring is smaller)
 	margin: number, -- studs kept clear inside the oval's edge
 	variants: number, -- clump meshes: FieldGrass_A, _B, ... in ReplicatedStorage.HT_FieldGrass
 	scale: { number }, -- size range { min, max }
 	colours: { { number } }, -- tints, sRGB, picked per clump (the meshes are greyscale)
 	gustBoost: number, -- how much harder a gust leans field grass than the map's wind numbers
+	tierNear: number, -- studs from the camera: clumps inside move every frame
+	tierMid: number, -- out to here every midEvery-th frame, beyond every farEvery-th
+	midEvery: number,
+	farEvery: number,
+	tierNearTouch: number, -- the same on phones
+	tierMidTouch: number,
 	bendRadius: number, -- studs round a character's root that part the grass
 	bendMax: number, -- degrees at a character's feet
 	sink: number, -- studs a clump's root sits under the floor's top
@@ -65,8 +72,9 @@ function FieldGrass.clumpAt(
 	semiX: number,
 	semiZ: number
 ): Clump?
-	local x = (ix + 0.1 + 0.8 * hash(ix, iz, 1)) * cfg.cell
-	local z = (iz + 0.1 + 0.8 * hash(ix, iz, 2)) * cfg.cell
+	-- every other row shifted half a cell and a wide jitter, so no rows show (a fresh review saw rows, 2026-11-22)
+	local x = (ix + (iz % 2) * 0.5 + 0.05 + 0.9 * hash(ix, iz, 1)) * cfg.cell
+	local z = (iz + 0.05 + 0.9 * hash(ix, iz, 2)) * cfg.cell
 	local a, b = semiX - cfg.margin, semiZ - cfg.margin
 	if a <= 0 or b <= 0 or (x / a) ^ 2 + (z / b) ^ 2 >= 1 then
 		return nil
@@ -95,11 +103,27 @@ function FieldGrass.windLean(
 	t: number,
 	phase: number
 ): number
-	local along = x * wx + z * wz
-	local g = math.sin((along / wind.gustLength - t / wind.gustSeconds) * TAU)
+	return FieldGrass.gustLean(wind, boost, (x * wx + z * wz) / wind.gustLength, t, phase)
+end
+
+--- windLean with the clump's place along the wind already worked out (`along`: its distance downwind in gust
+--- lengths), so the per-frame cost is two sines. The game calls this one; windLean is the readable form.
+function FieldGrass.gustLean(
+	wind: Wind,
+	boost: number,
+	along: number,
+	t: number,
+	phase: number
+): number
+	local g = math.sin((along - t / wind.gustSeconds) * TAU)
 	local band = if g > 0 then g * g else 0
 	local flutter = wind.flutter * math.sin((t / wind.flutterSeconds + phase) * TAU)
 	return wind.lean + wind.strength * boost * band + flutter
+end
+
+--- A cheap atan for leans (tan of the angle) from 0 to 1 (a full gust here is 0.8): within 0.005 radians of math.atan.
+function FieldGrass.leanAngle(lean: number): number
+	return lean / (1 + 0.28 * lean * lean)
 end
 
 --- How far (studs) a clump of size `scale` sinks at `dist` from the camera when the ring is `radius` wide: none
