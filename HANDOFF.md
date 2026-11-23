@@ -5836,3 +5836,237 @@ KnockbackService and Server.
   glows too and may hide the fighter; Lighting.EnvironmentSpecularScale is 0.1, so gloss reflections are weak.
 - Studio screenshots sometimes come back black showing a window of the owner's other account ("rungstig").
 - Gates: rojo build OK, 608 tests, selene 0, stylua clean, fx_smoke 7 of 7 (it needed a ContentProvider stand-in).
+
+## ice-13 (2026-11-23): the break goes up, hangs, and pieces split instead of shrinking (patched by hash, NOT COMMITTED)
+Build stamp `cam-1+ice-13+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. Place = disk by hash: KitModels 1705188480,
+Server 1065068254.
+- The owner on ice-12 at full speed: "our shatter spreads quite wide and drops very fast", "the pieces shrink at an
+  unnaturally fast pace", then "the ice pieces in the reference dont shrink, they gradually break into smaller pieces".
+- `Fx/KitModels.luau`: chunks fly mostly UP (`side * 0.45 + up`, speed 22-50, `CHUNK_DRAG_SECONDS` 0.3: 6.6 to 15 studs),
+  `CHUNK_GRAVITY` 3 (was 10). No shrink: `splitChunk` breaks a chunk into 2 pieces of 0.62 x its size after 0.3-0.65 s,
+  twice (`CHUNK_SPLITS`); on the last break every other chunk leaves 1. Only the last pieces shrink, for 0.12 s.
+  Whole break about 0.9-1.95 s. Nothing random (`seed`).
+- SEEN by me in play at 1/12 speed (arena): a tall narrow burst over the flower, pieces getting smaller and more
+  numerous; 179 parts at 0.55 s, 306 at 1.0 s; no errors. Captures `design/kits/ice-study/studio/ice13_break_t*.jpg`.
+  NOT SEEN at full speed, NOT judged by the owner. The peak part count is not tested on a phone.
+- `design/kits/ice-study/ice_scene.py` still has the ice-2 sums (gravity 70): the Blender preview no longer matches.
+- Gates: rojo build OK, 622 tests, selene 0, stylua clean, fx_smoke 7 of 7.
+
+## ice-14 (2026-11-23): chunks drop slowly, split in place, stop turning (patched by hash, NOT COMMITTED)
+Build stamp `cam-1+ice-14+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. Place = disk by hash: KitModels 2949804792,
+Server 882647827.
+- The owner on ice-13: "the floating pieces isnt good, they should slowly drop instead of going out to the side ...
+  instead of falling down they just cut in half and go opposite directions sideways and the pieces look like theyre
+  constantly rotating".
+- `Fx/KitModels.luau`: `CHUNK_GRAVITY` gone. A chunk's fall grows to `fall` (`CHUNK_FALL_SPEED` 8 x 0.8-1.2 studs/s)
+  over `CHUNK_FALL_SECONDS` 0.5 and stays there; pieces carry on the parent's fall (`fell`), what is left of its burst
+  and of its turning. No sideways push at a split: the two start side by side (a quarter of the parent's size apart)
+  and differ only in fall speed (x 0.85-1.2). Turning dies away (`CHUNK_SPIN_SECONDS` 0.3).
+- MEASURED in play at 1/12 speed (lobby): mean height of the pieces 8.8 studs at 0.3 s, 11.3 at 0.6, 10.6 at 0.9,
+  9.9 at 1.2, 6.9 at 1.5; furthest piece from the middle 16 to 18 studs throughout (one reading of 26 at 0.9 s, not
+  explained); pieces 140 / 190 / 281 / 347 / 254 / 48 at 0.3 / 0.6 / 0.9 / 1.2 / 1.5 / 1.8 s. No errors.
+  NOT SEEN at full speed, NOT judged by the owner.
+- Gates: rojo build OK, 622 tests, selene 0, stylua clean, fx_smoke 7 of 7.
+
+## ice-15 (2026-11-23): split pieces start in place and drift apart (patched by hash, NOT COMMITTED)
+Build stamp `cam-1+ice-15+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. Place = disk by hash: KitModels 257762206,
+Server 2661339660.
+- The owner on ice-14: "when the ice breaks instead of teleporting apart, the pieces should slowly drift apart".
+- `Fx/KitModels.luau`: a new piece starts at the parent's exact place and facing (no offset, no twist) and has a
+  `drift` (parent's drift + its own size x 0.7-1.3 studs/s, the two in opposite directions).
+- FOUND AND FIXED: `splitChunk` left a new piece at y -1000 for one frame (the chunk loop runs backwards and does not
+  reach pieces appended during it), so every split blinked. It now sets `part.CFrame = at` when it makes the piece.
+- MEASURED in play at 1/12 speed: 660 new pieces, each first seen within 0.04 studs of the piece that vanished that
+  frame, none seen off-screen; mean sideways distance from the birth place 0.10 studs at 0.05 s, 0.43 at 0.25 s,
+  0.81 at 0.55 s. No errors. NOT SEEN at full speed, NOT judged by the owner.
+- Gates: rojo build OK, 622 tests, selene 0, stylua clean, fx_smoke 7 of 7.
+
+## ice-16 (2026-11-23): fewer, later, quieter breaks (patched by hash, NOT COMMITTED)
+Build stamp `cam-1+ice-16+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. Place = disk by hash: KitModels 882712096,
+Server 2996445593.
+- The owner on ice-15: "the pieces should break less, theres too much now. in the reference, the pieces break very
+  slowly and dont move too much, making it somewhat hard to notice unless you pay attention".
+- `Fx/KitModels.luau`: `CHUNK_SPLITS` 1 (was 2); only every other chunk (even `k`) breaks, once, 0.7-1.1 s in, into
+  two pieces of 0.7 x its size that last 0.5-0.9 s; the others stay whole for 1.2-1.8 s. Drift apart 0.25-0.45 x the
+  piece's size a second (was 0.7-1.3). A piece shrinks only over its last 0.25 s (`CHUNK_END_SECONDS`, was 0.12).
+- MEASURED in play at 1/10 speed: pieces 140 / 140 / 146 / 182 / 165 / 60 / 1 at 0.3 / 0.6 / 0.9 / 1.2 / 1.5 / 1.8 /
+  2.1 s (peak was 347); mean height 8.8, 10.8, 10.7, 10.2, 7.8, 4.4 studs. No errors.
+  NOT SEEN at full speed, NOT judged by the owner.
+- Gates: rojo build OK, 622 tests, selene 0, stylua clean, fx_smoke 7 of 7.
+
+## ice-17 (2026-11-23): chunks follow launch and gravity; the leftover chip throw at the break removed (patched by hash, NOT COMMITTED)
+Build stamp `cam-1+ice-17+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. Place = disk by hash: KitModels 2202384380,
+FrostFx 1945666404, Server 3591767018.
+- The owner on ice-16: "they shouldnt drag down too much, i want it to follow physics so they should go wherever they
+  are launched at, of course but in a curve since theyre effected by gravity ... the initial launch shouldnt be
+  powerful enough for them to scatter a lot ... maybe we can check the ref again".
+- REFERENCE re-read on a grid, every frame (`design/kits/ice-study/sheets/C_track_a.jpg` 5.0-5.37 s, `C_track_b.jpg`
+  5.4-6.13 s): top pieces climb about 11 studs over the flower in 0.15 s and then barely rise; from 5.67 s one piece
+  moves out at a steady ~11 studs/s while its fall grows from ~7 to ~11 studs/s in 0.4 s (a gravity of roughly 15).
+- `Fx/KitModels.luau`: a chunk is now `from + velocity * t - gravity * t^2 / 2`, nothing else. `CHUNK_GRAVITY` 30,
+  `CHUNK_UP` 16-30, `CHUNK_OUT` 2-7 (away from the cluster's middle, flat). Drag, fall speed, `fell`, `drift` are gone.
+  A chunk is gone by the time it reaches the floor (`floor` = `breaks.middle.Y`, `secondsToFloor`), and one that would
+  land before its break time does not break. Pieces of a break take the parent's speed at that moment plus the small
+  parting push. Turning still dies away in 0.3 s.
+- `Fx/FrostFx.luau` strike: the second `debris(middle, 8, 30, 1.2)` at the break is REMOVED. It threw 8 random chips at
+  gravity 150 with a constant random spin and no floor (seen at 57 studs under the floor). It was very likely part of
+  what the owner called "spreads quite wide and drops very fast" and "constantly rotating" on ice-12 to ice-14.
+  The first `debris(middle, 14, 62, 1.6)` as the ice ARRIVES is unchanged (same rules: gravity 150, no floor).
+- MEASURED in play at 1/8 speed (lobby), seconds after the break: mean height 6.5 / 11.6 / 14.0 / 13.8 / 11.0 / 7.9
+  studs at 0.2 / 0.5 / 0.8 / 1.1 / 1.4 / 1.7; top piece 28.7 studs; lowest never under the floor; furthest from the
+  middle 15.1 at 0.2 s to 22.4 at 1.4 s; pieces 132 to 179. No errors. NOT SEEN at full speed, NOT judged by the owner.
+- Gates: rojo build OK, 622 tests, selene 0, stylua clean, fx_smoke 7 of 7.
+- OWNER, full speed, 2026-11-23: "Looks right" (ice-17 break). Still not committed.
+
+## melt-0 (2026-11-23): the Frostbite trail's melt, reference measured (NOTHING BUILT)
+Reference YouTube `mOqFQpsmBeQ` (30 fps, 1280x720; the effect is small in frame, so crop 440x260 at 420,250).
+Sheets in `design/kits/ice-study/sheets/`: `melt_track_A.jpg`, `melt_track_B.jpg` (whole frame, grid),
+`melt_close_A.jpg` (1.8-2.8 s, every 2nd frame), `melt_close_B.jpg` (5.5-7.4 s, every 4th frame).
+- A, DISSOLVE (1.8-2.8 s): spikes stand until 1.87. From 1.93 small bright flat TRIANGLES appear on the spikes,
+  starting at one side and crossing the cluster in about 0.25 s (the tallest spike last, its outline gone by ~2.4).
+  Each spike becomes a dense cloud of white-blue triangles that STAYS inside the spike's own volume (no flying out),
+  brightest 2.2-2.4, then fewer and dimmer; a few are left at 2.8. The floor ring fades 2.07-2.2.
+- B, FLOOR PATCH (5.5-7.4 s): a flat mid-blue patch of about 20-25 polygon tiles (mostly six-sided, one larger
+  four-sided one in the middle), with a rim of small dark fragments. Whole until ~5.9; then gaps open because EACH
+  TILE SHRINKS TOWARD ITS OWN MIDDLE and stays where it is; about half size at 6.4-6.6, a quarter and faint at
+  6.9-7.4; the rim goes first, the middle tile last. About 1.9 s in all.
+- TODAY (`FrostFx.frostbite`): one crystal of 3-6 studs every 0.06 s behind the body, alternating sides 1.2-2.6 studs
+  out, random yaw, stands 0.5 s, then SINKS (crystal() without an index).
+- NOT DECIDED: how A and B sit on a moving trail (per crystal or one strip), triangles as particles or meshes.
+- melt-0, later the same day: the owner picked ONE STRIP of tiles along the whole dash path (not a patch per crystal).
+  Look sheet made in Blender: `design/kits/ice-study/render_melt_strip.py` -> `out/melt_strip/*.png` ->
+  `sheets/melt_strip_looks.jpg` (Look 1 reference blue, Look 2 our pale ice; whole / melting 1.25 s / nearly gone
+  1.9 s / close). Strip: 47 studs (112 x 0.42), five columns 2.2 apart in a honeycomb, ragged rim, tiles whole 0.4 s,
+  shrink 1.5 s toward their own middles, the path's start first (0.42 s wave). AWAITING the owner's pick of a look.
+  A first run wrote to `C:\out\melt_strip` (Blender reads a bare relative path from the drive root): the files were
+  moved; the EMPTY folder `C:\out` is left (the harness blocks removing it).
+- melt-0, third note (2026-11-23): the owner on the first look sheet: tiles "should be more random instead of all
+  being hexagons"; "the trail should also have some dissolving spikes on the sides" (reference A: spikes that turn
+  into particle emitters); colour must "match the glacier so its consistent" (so neither of the two looks: the
+  Glacier's own blues 150,204,240 / 188,227,247, frost 246,252,255, glow tint 200,235,255). They also asked whether
+  the texture was made with Blender: yes, Blender material nodes, rendered in Blender; NOT yet baked to an image.
+  `render_melt_strip.py` rewritten: six flat tile shapes (4 to 7 uneven sides, low white rim, raised top), laid
+  over one another with fixed turns and sizes; fourteen side spikes from `ice_kit_v4.glb` (alternating sides, 5-6
+  studs out, 3.2-6.2 tall, leaning out 20-30 degrees) that turn into clouds of flat glowing triangles inside the
+  spike's own shape (0.25 s to cover, 0.65 s to thin), the path's start first; then the tiles shrink (start 0.4 s
+  after the dash, 1.5 s). Compositor Bloom added (Glare node, Blender 5.2: inputs "Type" = "Bloom", "Threshold",
+  "Strength", "Size"; `scene.compositing_node_group`). Sheet: `sheets/melt_strip_looks.jpg` (six pictures).
+  AWAITING the owner's verdict on this sheet. Nothing uploaded, nothing in the game.
+- melt-0, fourth note (2026-11-23): the owner on the second sheet: "the spikes should be placed more randomly, and
+  shouldnt be so long"; "the trail is supposed to be more full and thick before it melts"; "the crystals should
+  dissolve before the ice melts"; the crystals stand ON the trail. `render_melt_strip.py` now: tiles 0.32 studs thick
+  (was 0.1), a full bed of big tiles (1.5-1.95 x 2.2 studs) plus smaller ones piled on top; 26 crystals of 1.4-3.6
+  studs anywhere across the strip, unevenly spaced, leaning 6-28 degrees any way, standing on the tiles; a spot's
+  tiles start to shrink 0.1 s after its crystals are gone (crystal: stands 0.5 s, 0.25 s to turn to triangles,
+  0.65 s to thin; tile: 1.5 s). Whole melt ends about 3 s after the dash. Sheet `sheets/melt_strip_looks.jpg`.
+  AWAITING the owner's verdict. Nothing baked, uploaded or in the game.
+- melt-0, fifth note (2026-11-23): three more notes from the owner, all in `render_melt_strip.py` now.
+  (1) "by thicker i dont mean vertically thick": tiles are FLAT again (0.1 studs). A seven-column, 15-stud trail was
+  tried and NOT wanted ("you didnt need to make the trail wider horizontally ... my talk about the fullness was just
+  about the apparent gaps i saw"): five columns, about 11 studs, NO tile left out, every tile overlapping its
+  neighbours (inner 1.55-2.0 x 2.2 studs, rim 1.25-1.75 x), smaller tiles lying on top.
+  (2) Crystals "at the edges of the trail (but still ON the trail) and not inside of it (as in the path the player
+  forms)": 26 short crystals 3.4 to 5.0 studs from the path's middle, on either side by their own number; the middle
+  2.4 studs each side stays clear.
+  (3) "when the trail melts i want it to have a sorta glowy particle effect aura to mimick evaporation": three small
+  glowing motes per shrinking tile, rising 3.4 studs in 1.25 s and getting smaller as they climb (solid in the
+  preview; particles in the game). NOTE the Glacier's per-crystal glow aura was dropped on 2026-11-22 because soft
+  glows on overlapping pieces merged into one blob: keep these small, sparse and rising.
+  Sheet `sheets/melt_strip_looks.jpg`. AWAITING the owner's verdict. Nothing baked, uploaded or in the game.
+- melt-0, sixth note (2026-11-23): the rising motes were NOT wanted. The owner, with a picture of a soft round glow
+  (a fiery one, from a VFX pack): "not like a rising particle but rather a glowing white aura around each melting
+  piece kinda like this ref but not fiery", "it shouldnt be that big, just enough to wrap arround the pieces".
+  `render_melt_strip.py`: one soft white glow per shrinking tile, 1.24 x the tile's width, low, shrinking with it.
+  FIRST TRY WASHED THE STRIP WHITE: at the start of the melt the tiles still overlap, so many glows sit in one place
+  (the same blob problem as the Glacier's dropped aura). Fix kept: the glow is faint (0.12) while a tile is whole
+  and reaches full strength (0.55) only when the tile is at half size and stands alone. In the game this is one
+  glow particle per tile, sized to the tile, with the same ramp. Sheet `sheets/melt_strip_looks.jpg` (pictures 5, 6
+  at 2.15 s). AWAITING the owner's verdict. Nothing baked, uploaded or in the game.
+- melt-0, seventh note (2026-11-23): the round glow was NOT wanted ("it looks like a circle around the piece instead
+  of an aura"). The owner then sent YouTube `HihKVj8Tbwg` (velcrawl, "[ROBLOX STUDIO] Aura VFX", 10 s; sheets
+  `sheets/aura_ref_overview.jpg`, `aura_ref_12fps.jpg`): a bright line hugging the character's outline, thin
+  flame-like tongues licking out about a fifth of the body's width, a few small sparks; steady, flickering. Their
+  words: "this is just a general idea, dont copy the reference but use the style of surrounding the piece and having
+  a few sparks flying out". `render_melt_strip.py`: `aura_mesh` gives each of the six tile shapes a glow with the
+  tile's OWN OUTLINE (a skirt over the floor to 1.5 x, a short rising one), two thin wisps per side, bright at the
+  tile and nothing at the far side; one spark for every other tile, flying out 0.6 s. White (246,252,255), not
+  fiery. Faint while tiles overlap, full once a tile is at half size. Sheets `sheets/melt_strip_looks.jpg` and
+  `sheets/melt_aura_close.jpg`. AWAITING the owner's verdict. Nothing baked, uploaded or in the game.
+- melt-0, eighth note (2026-11-23): the outline aura was NOT wanted either: "i dont want it to be an outline, i want
+  it to surround the pieces. also i dont want any spikes coming out of it", with three pictures of real Roblox
+  particle auras (a soft cloud of many small glowing particles round and over an object; a fuzzy cyan halo born on
+  a block's faces). FOUR Blender tries at this aura missed (motes, ball, outline, wisps) because the thing is a
+  particle effect: it was then made with REAL ParticleEmitters in a play test, client side only, nothing saved
+  (`design/kits/ice-study/studio/melt_aura_particles_ABC.jpg`; flat blue Parts stand in for the tiles; back row a
+  whole tile 3.6 studs, front row a half-melted one 1.8).
+  Recipe, one emitter parented to the tile part: Texture `FxKit.Tex.Glow`; Shape Box, ShapeStyle Volume;
+  SpreadAngle 180,180; LockedToPart; LightEmission 1, LightInfluence 0; Rotation 0-360; Color white (246,252,255)
+  to (200,235,255); Size 0.5x -> 1x -> 0.35x; Transparency 1 -> c at 0.2 -> c+0.15 at 0.6 -> 1.
+    A tight: size 0.8, life 0.32-0.45, speed 0.6-1.5, rate 90, brightness 2, c 0.5.
+    B soft:  size 1.3, life 0.49-0.7, speed 0.4-1.0, rate 45, brightness 1.8, c 0.58.
+    C = B + sparks: second emitter, ShapeStyle Surface, EmissionDirection Top, spread 70, speed 2-5, drag 2, life
+      0.5-0.9, rate 6, brightness 5, size 0.2 -> 0.
+  Size and rate scale with the tile (size x (0.6 + 0.4 s), rate x (0.4 + 0.6 s), s = tile width / 3.6).
+  Tuning notes: c 0.15 with rate 160 is a solid white blob that hides the tile; c 0.72-0.8 cannot be seen on grass.
+  CAPTURE TRAP: `screen_capture` with `camera_position` showed NO particles: emitters the real camera is not looking
+  at are not simulated. Hold the real camera on them (RenderStep, Scriptable, for 25 s), wait 2.5 s, then capture
+  with no camera arguments.
+  AWAITING the owner's pick of A, B or C. 47 studs of trail is about 150 tiles: one emitter each at rate 45 is about
+  4700 particles alive at once if all melt together; needs a count check before building.
+- melt-1 (2026-11-23): the owner picked aura C (soft + sparks). ASSETS MADE IN BLENDER, NOT UPLOADED:
+  `design/kits/ice-study/bake_tiles.py` -> `design/kits/out/export/ice_tiles_v1.glb` (700 972 bytes): six flat tiles
+  `Ice_Tile1`..`Ice_Tile6` (4, 5, 5, 6, 6, 7 uneven sides; 20-38 triangles; 1 across at the widest, 0.035 thick,
+  underside on z = 0, bounding box centred in X and Y; one UV layer; no vertex colours), each with a 512 colour
+  texture and a 256 gloss texture baked in Blender from the Glacier's recipe (blues 150,204,240 / 188,227,247,
+  frost 246,252,255 on about a fifth, frost-white edges and sides, roughness 0.06 clear to 0.7 frost).
+  `design/kits/ice-study/out/tiles/`: the twelve PNGs, `tile_bake_strip.png` (the baked tiles laid as the trail),
+  `ice_triangle.png` (256 x 256, white uneven sharp triangle on clear: the particle a crystal dissolves into).
+  Check sheet `sheets/tile_bake_check.jpg`. TRAP: `S.new_scene()` resets Blender and deletes every mesh: export
+  before making another scene.
+  NEXT: ask to upload (one Model with six MeshParts, one image); then in the place: insert the kit beside IceKit, set
+  the three emissive values on its SurfaceAppearances (as on IceKit), and write the trail (tiles laid as the body
+  passes, crystals on the edges, dissolve to triangles, tiles shrink with aura C).
+
+## melt-1 (2026-11-23): the Frostbite trail: ice tiles, edge crystals that dissolve, a melt with a soft haze (patched by hash, NOT COMMITTED)
+Build stamp `cam-1+ice-17+jab-3+keys-1+kits-8t+melt-1+puff-1+village-4+ui-20e`. Place = disk by hash: KitModels
+2145723124, FrostFx 2030964782, FxKit 3183971954, Server 806148565.
+- UPLOADED on the owner's "Yes, upload" (Open Cloud, group 2970443, both Approved): Model `75962214621516`
+  ("HT Ice Tiles v1", `design/kits/out/export/ice_tiles_v1.glb`), Image `116944529241949` ("HT Ice Triangle",
+  `design/kits/out/export/ice_triangle.png`).
+- IN THE PLACE: package `ReplicatedStorage.HT_KitModels.IceTileKit` (six MeshParts `Ice_Tile1`..`6`, 1 x 0.035 x ~1,
+  each with a SurfaceAppearance). SET ON THE INSTANCE, not in code or the GLB (re-inserting loses them): Anchored,
+  CanCollide off, `EmissiveMaskContent` = its roughness map, `EmissiveTint` (200,235,255), `EmissiveStrength` 1.
+  WHY 1 AND NOT THE GLACIER'S 4: flat tiles face the sky; at 4 the whole trail blew out to white in the arena's sun
+  (`design/kits/ice-study/studio/tile_glow_4_1p5_0p5.jpg`: left 4, middle 1.5, right 0.5). Not asked of the owner yet.
+- `Fx/FxKit.luau`: `Tex.Triangle`. `Fx/KitModels.luau`: `erupt(..., vanish)` (gone at the end of its hold),
+  `KitModels.tile`, `KitModels.lay` and the `laid` list (pop in 0.08 s, lie, shrink flat toward the middle, `onMelt`
+  in its own thread, Size only set when it changes).
+- `Fx/FrostFx.luau`: `trail()` replaces the old "small crystals come up behind the body". A row every 1.3 studs the
+  body really covers; three columns 1.5 apart (about 6 studs: the owner, seeing the first version in play, "its
+  enough to cover 3 ppl even though it should only be for one person"; it was five columns 2.2 apart); every tile
+  over its neighbours; smaller tiles on top; a crystal of 1.4-3.6 studs on two rows of three, 1.6-2.6 studs from
+  the middle on either edge, standing on the tiles. Crystal: stands 0.5 s, turns to triangles over 0.25 s and is
+  gone, cloud thins 0.65 s. Tile: starts shrinking 0.1 s after that, 1.5 s, with `meltAura` (haze + sparks).
+- BUGS FOUND IN PLAY AND FIXED: (1) `NumberSequence.new(curve(...))` with PAIRS: `FxKit.curve` takes TRIPLES (time,
+  value, envelope), `keys`/`fade` take pairs. It threw on every melting tile inside KitModels' step, every frame.
+  (2) The haze at the single-tile test's strength made one white band over the overlapping tiles: now a sixth of the
+  rate (45 x 0.16), transparency 0.7/0.82, brightness 1.5. (3) The Triangle image said "Asset content representation
+  is being generated" for the first minutes after upload.
+- SEEN by me in play at 1/4 speed in the arena (`design/kits/ice-study/sheets/melt1_studio_stages.jpg`): 155 tiles and
+  28 crystals for a 47-stud dash; narrow ice trail with crystals on its edges; crystals become bright triangle clouds;
+  tiles separate and shrink in a soft haze with a few sparks; 56-59 fps in Studio; no errors in Output.
+  NOT SEEN at full speed, NOT judged by the owner, NOT tested on a phone. The dash in the test was my own tween of
+  the root, not the real ability.
+- Left behind: empty folder `C:\out` (first Blender run); `Studio HttpService` to localhost is NOT in the Assistant
+  allowlist (a local server cannot feed Studio: patches are typed as hunks and checked by hash).
+- Gates: rojo build OK, 622 tests, selene 0, stylua clean, fx_smoke 7 of 7.
+- melt-1, later (2026-11-23): the owner, after the narrow trail: "the crystals should be scaled down to match the
+  smaller trail", "i dont want them to be tall". `Fx/FrostFx.luau`: trail crystals 0.8-1.8 studs (were 1.4-3.6) and
+  their triangles scaled with them (`sliver`); the FOUR START CRYSTALS of `FrostFx.frostbite` were the tall ones in
+  view (4 to 5.5 studs, 2.6 out, sinking): now 1.45-2.2 studs, 1.8 out, and they dissolve into triangles like the
+  trail's. Place = disk by hash: FrostFx 410191479 (KitModels 2145723124, FxKit 3183971954, Server 806148565; the
+  stamp is still melt-1). Measured in play at 1/4 speed: 28 crystals, tallest 2.20 studs, 55 fps
+  (`design/kits/ice-study/studio/melt2_low_crystals_t050.jpg`). Gates: 622 tests, selene 0, stylua clean, fx_smoke
+  7 of 7. NOT judged by the owner at full speed. NOT COMMITTED.
+- OWNER, full speed, 2026-11-23: "Looks right" (melt-1 trail with the low crystals; tile glow 1). Still not committed.
+- COMMITTED AND PUSHED 2026-11-23 on the owner's "Yes, commit and push": ice-13 to ice-17 and melt-0/melt-1 in one commit (the "NOT COMMITTED" marks above are from before it). Left out on purpose: `design/kits/out/export/ice_kit_v3.glb`.

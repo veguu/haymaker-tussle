@@ -20,7 +20,9 @@
 --           random. Since ice-12 the break copies the reference frame by frame (the owner picked all
 --           four differences from a sheet): MANY SMALL pieces (2 to 8 a crystal, about 140 for the
 --           Glacier), which BURST outward and up from the cluster's middle, slow down and HANG in the
---           air, white-hot for only 0.2 s and then glowing ice, and shrink away where they hang.
+--           air, white-hot for only 0.2 s and then glowing ice. ice-13: they do not shrink; each
+--           one BREAKS INTO SMALLER PIECES where it hangs, twice, and the smallest go (the owner,
+--           from the reference).
 --           (ice-9 to ice-11 had them as real physics parts that dropped and lay on the floor.)
 --   GLOW    (ice-3) a piece can glow from inside: two particle emitters in it, a very faint soft
 --           glow and a few glints (the owner's idea, and their pick of two strengths in Studio; a
@@ -41,10 +43,25 @@ local FLASH_SECONDS = 0.06 -- how long a piece is white-hot as it arrives, and a
 local RISE_SECONDS = 0.08 -- from nothing to past full size
 local SETTLE_SECONDS = 0.07 -- and back to full size
 local SINK_SECONDS = 0.26
+local LAY_SECONDS = 0.08 -- a laid tile pops in over this long
 local BREAK_SECONDS = 0.10 -- a breaking piece stands white-hot this long, then its chunks fly
 local CHUNK_HOT_SECONDS = 0.2 -- a chunk is white-hot this long, then glowing ice (the reference: 0.2 s)
-local CHUNK_DRAG_SECONDS = 0.4 -- how quickly a chunk loses its speed: it travels speed x this, in all
-local CHUNK_GRAVITY = 10 -- a slow sag once it hangs
+-- ice-17: chunks FOLLOW PHYSICS (the owner: "they should go wherever they are launched at, of course but in
+-- a curve since theyre effected by gravity", and "the initial launch shouldnt be powerful enough for them to
+-- scatter a lot"). A chunk has a launch velocity and gravity, nothing else: no drag, no hang, no fall speed.
+-- The numbers are the reference's, read frame by frame on a grid (sheets/C_track_a.jpg, C_track_b.jpg): the
+-- top pieces climb about 11 studs over the flower, and late in the break a piece keeps a steady outward
+-- speed while its fall grows slowly (a weak gravity, far under Roblox's 196).
+local CHUNK_GRAVITY = 30 -- studs a second, each second
+local CHUNK_UP = NumberRange.new(16, 30) -- launch speed upward: it climbs 4 to 15 studs
+local CHUNK_OUT = NumberRange.new(2, 7) -- launch speed away from the cluster's middle, kept all the way
+local CHUNK_SPIN_SECONDS = 0.3 -- how quickly a chunk stops turning: it turns rate x this, in all
+-- ice-16: FEWER, LATER, QUIETER breaks (the owner: "the pieces should break less, theres too much now. in
+-- the reference, the pieces break very slowly and dont move too much, making it somewhat hard to notice").
+-- Every other chunk breaks, once, late in its fall, into two pieces that barely part; the rest stay whole.
+local CHUNK_SPLITS = 1 -- how many times a breaking chunk breaks into smaller ones
+local CHUNK_SPLIT_SIZE = 0.7 -- a smaller piece's size against the one it came from
+local CHUNK_END_SECONDS = 0.25 -- a piece shrinks only as it goes, for this long
 
 export type Erupt = {
 	part: BasePart,
@@ -58,6 +75,7 @@ export type Erupt = {
 	phase: number, -- 0 waiting, 1 white-hot, 2 standing, 3 leaving
 	breaks: Break?, -- set: it leaves by breaking into chunks instead of sinking
 	glow: boolean?, -- it glows from inside, and so do its chunks
+	vanish: boolean?, -- at the end of its hold it is simply gone (what it turns into is the caller's: melt-1)
 }
 
 export type Break = {
@@ -79,6 +97,24 @@ type Chunk = {
 	colour: Color3,
 	hot: boolean,
 	glow: boolean?,
+	name: string, -- which kit piece it is, for the smaller ones it breaks into
+	splits: number, -- how many more times it breaks into smaller pieces
+	seed: number, -- sets its pieces' directions and lives: nothing is random
+	floor: number, -- the height of the ground under the cluster: a chunk is gone by the time it gets there
+}
+
+-- A flat piece laid on the floor (melt-1: the Frost trail's tiles). It pops in, lies there, then shrinks
+-- toward its own middle where it lies; `onMelt` is called once, as the shrinking starts.
+type Laid = {
+	part: BasePart,
+	cframe: CFrame,
+	size: Vector3,
+	startAt: number,
+	hold: number,
+	shrink: number,
+	melting: boolean,
+	onMelt: ((BasePart) -> ())?,
+	share: number, -- the size it was last given (0 to 1), so a tile that is lying still is not touched
 }
 
 type Throw = {
@@ -112,6 +148,7 @@ local erupting: { Erupt } = {}
 local thrown: { Throw } = {}
 local swept: { Sweep } = {}
 local chunks: { Chunk } = {}
+local laid: { Laid } = {}
 local connection: RBXScriptConnection? = nil
 
 local function folder(): Folder
@@ -256,6 +293,14 @@ local function fraction(value: number): number
 	return value - math.floor(value)
 end
 
+-- How long a thing launched upward at `up` from `height` over the floor takes to come down to it.
+local function secondsToFloor(height: number, up: number): number
+	if height <= 0 then
+		return 0
+	end
+	return (up + math.sqrt(up * up + 2 * CHUNK_GRAVITY * height)) / CHUNK_GRAVITY
+end
+
 -- The chunks a broken piece bursts into: one for about every 2 studs of its length, each from its
 -- own place along the piece, thrown away from the cluster's middle and upward.
 local function breakApart(item: Erupt, now: number)
@@ -273,6 +318,10 @@ local function breakApart(item: Erupt, now: number)
 		if out.Magnitude < 0.05 then
 			out = Vector3.new(math.cos(u1 * math.pi * 2), 0.5, math.sin(u1 * math.pi * 2))
 		end
+		local side = Vector3.new(out.X, 0, out.Z)
+		side = if side.Magnitude < 0.05
+			then Vector3.new(math.cos(u1 * math.pi * 2), 0, math.sin(u1 * math.pi * 2))
+			else side.Unit
 		-- Mostly small; every fifth one a medium piece.
 		local big = (0.45 + 1.0 * u1) * math.clamp(height / 14, 0.6, 1.2)
 		if k % 5 == 0 then
@@ -283,19 +332,84 @@ local function breakApart(item: Erupt, now: number)
 		part.Color = WHITE
 		part.Transparency = 0
 		textured(part, false)
+		local up = CHUNK_UP.Min + (CHUNK_UP.Max - CHUNK_UP.Min) * u2
+		local away = CHUNK_OUT.Min + (CHUNK_OUT.Max - CHUNK_OUT.Min) * fraction(u1 * 5.3 + u2 * 3.7)
+		-- Every other chunk breaks once, 0.7 to 1.1 s in; the others last 1.2 to 1.8 s whole. One that
+		-- would reach the floor first is gone as it gets there, and does not break.
+		local wanted = if k % 2 == 0 then 0.7 + 0.4 * u1 else 1.2 + 0.6 * u1
+		local landing = secondsToFloor(from.Y - breaks.middle.Y, up)
 		table.insert(chunks, {
 			part = part,
 			from = from,
-			velocity = (out.Unit + Vector3.new(0, 0.35, 0)).Unit * (16 + 26 * u2),
+			velocity = side * away + Vector3.yAxis * up,
 			turn = CFrame.Angles(0, u1 * math.pi * 2, 0) * CFrame.Angles(0, 0, u2 * math.pi * 2),
 			axis = Vector3.new(u1 - 0.5, u2 - 0.5, 0.31).Unit,
 			rate = math.rad(200 + 300 * u2),
 			size = size,
 			startAt = now,
-			life = 0.9 + 0.5 * u1,
+			life = math.max(math.min(wanted, landing), 0.1),
 			colour = item.colour,
 			hot = true,
 			glow = item.glow,
+			name = breaks.chunk,
+			splits = if k % 2 == 0 and landing > wanted then CHUNK_SPLITS else 0,
+			seed = breaks.index * 10 + k,
+			floor = breaks.middle.Y,
+		})
+	end
+end
+
+-- Where a chunk is `t` seconds after it set off: where its launch and gravity put it. It turns as it
+-- sets off and then keeps the way it faces.
+local function chunkAt(item: Chunk, t: number): CFrame
+	local turned = CHUNK_SPIN_SECONDS * (1 - math.exp(-t / CHUNK_SPIN_SECONDS))
+	return CFrame.new(
+		item.from + item.velocity * t - Vector3.new(0, 0.5 * CHUNK_GRAVITY * t * t, 0)
+	) * item.turn * CFrame.fromAxisAngle(item.axis, item.rate * turned)
+end
+
+-- ice-13: a chunk that has hung for its time breaks into smaller pieces where it is (the owner, from
+-- the reference: "the ice pieces dont shrink, they gradually break into smaller pieces"). Two pieces
+-- ice-14: the pieces are
+-- NOT pushed apart sideways (the owner: "they just cut in half and go opposite directions sideways"):
+-- each carries on with the parent's own speed at that moment (ice-17) and what is left of its turning. ice-15: they start in
+-- the SAME place and facing as the piece they came from and slide apart slowly, about their own size
+-- in a second (the owner: "instead of teleporting apart, the pieces should slowly drift apart").
+local function splitChunk(item: Chunk, now: number, at: CFrame)
+	local u1 = fraction(math.sin(item.seed * 12.9898 + item.splits * 78.233) * 43758.5453)
+	local u2 = fraction(math.sin(item.seed * 39.346 + item.splits * 11.135) * 24634.6345)
+	local angle = u1 * math.pi * 2
+	local apart = Vector3.new(math.cos(angle), (u2 - 0.5) * 0.8, math.sin(angle)).Unit
+	for j = 1, 2 do
+		local sign = if j == 1 then 1 else -1
+		local uj = fraction(u1 * 7.31 + j * 0.37)
+		local part, size = KitModels.piece(item.name, item.size.Y * CHUNK_SPLIT_SIZE)
+		part.Material = Enum.Material.SmoothPlastic
+		part.Color = item.colour
+		part.Transparency = 0
+		part.CFrame = at -- in place this very frame: the chunk loop below does not reach a new piece until the next
+		-- The parent's speed as it broke, and a small push that parts the two slowly.
+		local velocity = item.velocity
+			- Vector3.new(0, CHUNK_GRAVITY * item.life, 0)
+			+ apart * sign * item.size.Y * (0.25 + 0.2 * uj)
+		local landing = secondsToFloor(at.Position.Y - item.floor, velocity.Y)
+		table.insert(chunks, {
+			part = part,
+			from = at.Position,
+			velocity = velocity,
+			turn = at.Rotation,
+			axis = item.axis,
+			rate = item.rate * math.exp(-item.life / CHUNK_SPIN_SECONDS),
+			size = size,
+			startAt = now,
+			life = math.max(math.min(0.5 + 0.4 * uj, landing), 0.1),
+			colour = item.colour,
+			hot = false,
+			glow = item.glow,
+			name = item.name,
+			splits = item.splits - 1,
+			seed = item.seed * 2 + j,
+			floor = item.floor,
 		})
 	end
 end
@@ -311,6 +425,11 @@ local function step()
 			table.remove(erupting, index)
 		elseif t >= 0 then
 			local leaveAt = RISE_SECONDS + SETTLE_SECONDS + item.hold
+			if item.vanish and t >= leaveAt then
+				part:Destroy()
+				table.remove(erupting, index)
+				continue
+			end
 			local grown: number
 			if t < RISE_SECONDS then
 				local u = t / RISE_SECONDS
@@ -413,8 +532,11 @@ local function step()
 		local part = item.part
 		local t = (now - item.startAt) / slow
 		if part.Parent == nil or t >= item.life then
-			part:Destroy()
 			table.remove(chunks, index)
+			if part.Parent ~= nil and item.splits > 0 then
+				splitChunk(item, now, chunkAt(item, item.life))
+			end
+			part:Destroy()
 		else
 			if item.hot and t >= CHUNK_HOT_SECONDS then
 				item.hot = false
@@ -423,19 +545,52 @@ local function step()
 				part.Transparency = 0
 				textured(part, true)
 			end
-			-- Bursts out, loses its speed to drag and hangs, sagging slowly; shrinks away where it is.
-			local share = t / item.life
-			local shrink = if share <= 0.55 then 1 else math.max(1 - (share - 0.55) / 0.45, 0.05)
-			part.Size = item.size * shrink
-			local travelled = CHUNK_DRAG_SECONDS * (1 - math.exp(-t / CHUNK_DRAG_SECONDS))
-			part.CFrame = CFrame.new(
-				item.from
-					+ item.velocity * travelled
-					+ Vector3.new(0, -0.5 * CHUNK_GRAVITY * t * t, 0)
-			) * item.turn * CFrame.fromAxisAngle(item.axis, item.rate * t)
+			-- Keeps its size; only the last, smallest pieces shrink, in their final moment.
+			local left = item.life - t
+			if item.splits == 0 and left < CHUNK_END_SECONDS then
+				part.Size = item.size * math.max(left / CHUNK_END_SECONDS, 0.05)
+			end
+			part.CFrame = chunkAt(item, t)
 		end
 	end
-	if #erupting == 0 and #thrown == 0 and #swept == 0 and #chunks == 0 and connection then
+	for index = #laid, 1, -1 do
+		local item = laid[index]
+		local part = item.part
+		local t = (now - item.startAt) / slow
+		if part.Parent == nil or t >= LAY_SECONDS + item.hold + item.shrink then
+			part:Destroy()
+			table.remove(laid, index)
+		elseif t >= 0 then
+			local share: number
+			if t < LAY_SECONDS then
+				share = 0.35 + 0.65 * (1 - (1 - t / LAY_SECONDS) ^ 3)
+			elseif t < LAY_SECONDS + item.hold then
+				share = 1
+			else
+				if not item.melting then
+					item.melting = true
+					if item.onMelt then
+						task.spawn(item.onMelt, part) -- its own thread: an error in it must not stop every piece
+					end
+				end
+				share = math.max(1 - (t - LAY_SECONDS - item.hold) / item.shrink, 0.02)
+			end
+			-- Flat all the way: only its width and depth change, about its own middle.
+			if share ~= item.share then
+				item.share = share
+				part.Size = Vector3.new(item.size.X * share, item.size.Y, item.size.Z * share)
+				part.CFrame = item.cframe
+			end
+		end
+	end
+	if
+		#erupting == 0
+		and #thrown == 0
+		and #swept == 0
+		and #chunks == 0
+		and #laid == 0
+		and connection
+	then
 		connection:Disconnect()
 		connection = nil
 	end
@@ -461,7 +616,8 @@ function KitModels.erupt(
 	material: Enum.Material?,
 	transparency: number?,
 	breaks: Break?,
-	glow: boolean?
+	glow: boolean?,
+	vanish: boolean?
 )
 	local part, size = KitModels.piece(name, height)
 	if glow then
@@ -479,6 +635,7 @@ function KitModels.erupt(
 		phase = 0,
 		breaks = breaks,
 		glow = glow,
+		vanish = vanish,
 	})
 	run()
 end
@@ -558,6 +715,52 @@ function KitModels.rooted(position: Vector3, toward: Vector3, lean: number, yaw:
 		frame *= CFrame.fromAxisAngle(axis, math.rad(lean))
 	end
 	return frame * CFrame.Angles(0, math.rad(yaw), 0)
+end
+
+--- A copy of the flat kit piece `name`, `width` studs across at its widest and `thick` studs thick (a kit
+--- tile is 1 across and paper-thin, so it is sized by its width, not its height).
+function KitModels.tile(name: string, width: number, thick: number): (BasePart, Vector3)
+	local source = template(name)
+	local part: BasePart
+	local size: Vector3
+	if source then
+		local across = math.max(source.Size.X, source.Size.Z, 0.001)
+		part, size = KitModels.piece(name, source.Size.Y * width / across)
+		size = Vector3.new(size.X, thick, size.Z)
+	else
+		part, size = KitModels.piece(name, thick)
+		size = Vector3.new(width, thick, width)
+	end
+	part.Size = size
+	return part, size
+end
+
+--- Lays the tile `name` flat with its middle at `cframe`: after `delay` it pops in, lies for `hold`
+--- seconds, then shrinks toward its own middle over `shrink` seconds and is gone. `onMelt` is called
+--- with the part as the shrinking starts (for what the melting gives off).
+function KitModels.lay(
+	name: string,
+	width: number,
+	thick: number,
+	cframe: CFrame,
+	delay: number,
+	hold: number,
+	shrink: number,
+	onMelt: ((BasePart) -> ())?
+)
+	local part, size = KitModels.tile(name, width, thick)
+	table.insert(laid, {
+		part = part,
+		cframe = cframe,
+		size = size,
+		startAt = os.clock() + delay * FxKit.slowness(),
+		hold = hold,
+		shrink = shrink,
+		melting = false,
+		onMelt = onMelt,
+		share = -1,
+	})
+	run()
 end
 
 return KitModels

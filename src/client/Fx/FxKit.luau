@@ -48,6 +48,9 @@ FxKit.Tex = {
 	Wisp = "rbxassetid://140573434581662", -- flipbook, 4 x 4, flame tongues rising and fraying
 	Dust = "rbxassetid://122673105804911", -- soft streaks fanning out from an empty middle
 	Star = "rbxassetid://124927142938107", -- a four-point glint
+	-- One sharp uneven white triangle, made in Blender (design/kits/ice-study/bake_tiles.py, 2026-11-23): the
+	-- sliver a Frost trail crystal dissolves into.
+	Triangle = "rbxassetid://116944529241949",
 	Ribbon = "rbxassetid://136226108329170", -- a bright tip edge, thinning streaks (for Trails)
 	-- The ability kits' shapes (design/vfx/draw_kit_shapes.ps1, 2026-11-15). All plain white, to be tinted.
 	Claw = "rbxassetid://90850328041429", -- a thick crescent pointed at both ends, bulge at the top

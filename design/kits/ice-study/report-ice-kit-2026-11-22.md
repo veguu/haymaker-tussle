@@ -1,6 +1,6 @@
 # Report for the tutorial session: Frost ice remade in Blender (test piece 4, 2026-11-22)
 
-STATUS: DONE. The owner said yes to the preview and "Looks right" in Studio. Nothing is committed.
+STATUS: ice-1 DONE (sections 1 to 7). Later work, ice-2 to ice-12, is in section 8; the ice-12 break awaits the owner's verdict. Committed as `8389203`.
 The numbers and the raw log are in `design/kits/ice-study/session-log-2026-11-22.md`.
 
 ## 1. The reference measurements, and the old vs new numbers
@@ -146,3 +146,142 @@ every cut blade (0 non-manifold edges on all five pieces).
   (100,100,115), ClockTime 16, sun toward (-0.860, 0.497, 0.113), Bloom 1 / 40 / 1.6, ColorCorrection contrast 0.12.
 - **Unclear:** "kit effects big" against "the camera never ends up inside the ice". A number for the largest
   allowed reach toward the camera would settle it; I used today's.
+
+## 8. After ice-1: the break, the textures and the glow (ice-2 to ice-12, added 2026-11-23)
+
+Sources: `HANDOFF.md` entries "ice-2" and "ice-3 to ice-12". Sections 1 to 7 describe ice-1 and are left as written;
+where they disagree with this section (vertex colours, "flat facets", "it sinks", package `124516489464164`), this
+section is the current state. Committed and pushed as `8389203` (merged in `997283e`).
+
+### What changed
+
+| Step | Change | Why |
+|---|---|---|
+| ice-2 | Glacier and freeze crystals break into `Ice_Shard` chunks instead of sinking; the Frostbite trail still sinks | Owner: "all crystals like the glacier and frozen fighter should break, but i think the frostbite trail should melt instead." |
+| ice-3 on | Vertex colours removed. Colour, roughness and metalness are baked in Blender (`bake_frost2.py` -> `design/kits/out/export/ice_kit_v4.glb`) and arrive as a SurfaceAppearance on each of the five meshes | Owner's rule: all art including textures is made in Blender; models stay default grey, colour comes from textures and VFX; a texture must wrap without stretching |
+| ice-3 on | Solid, paler ice (`ICE_SEE` 0), stands 1.4 s (`GLACIER_HOLD`), one floor ring | Owner's picks from sheets |
+| glow | `EmissiveMaskContent` = the roughness map, `EmissiveStrength` 4, `EmissiveTint` (200,235,255) on all five SurfaceAppearances | Owner picked "Strong" |
+| ice-9 to 11 | Physics chunks for the break | Replaced at the owner's pick |
+| ice-12 | Break copied from the reference: 2 to 8 small pieces a crystal burst from the cluster's middle, drag to a hang, white 0.2 s, then textured ice shrinking away (0.9-1.4 s); sparks, lingering mist, snow and a pale frost patch (2.2 s) at 93 f | Owner picked all four: more smaller pieces, burst and hang, cool quickly, sparks/mist/frost |
+
+Current ice: package `rbxassetid://116591693926374` ("HT Ice Kit v4 gloss test") at
+`ReplicatedStorage.HT_KitModels.IceKit`. Older kits in `ServerStorage.HT_KitModels_Old`: IceKit_kits2, IceKit_v2
+(vertex colours, section 6's "new ice"), IceKit_v3 (textured, no gloss). Build stamp
+`cam-1+ice-12+jab-3+keys-1+kits-8t+puff-1+village-4+ui-20e`. Gates: rojo build, 610 tests, selene 0, stylua clean,
+fx_smoke 7 of 7.
+
+### Errors and traps (continues section 3)
+
+| # | Symptom | Cause | Fix |
+|---|---|---|---|
+| 15 | Three frost textures thrown away | They were computed by a script, not made in Blender | Materials, bake and render in Blender for every image, textures included |
+| 16 | Uploaded GLB arrived with a plain `TextureID` and no gloss | A GLB with base colour only becomes `TextureID`; base colour + metallicRoughness becomes a SurfaceAppearance | Export both maps |
+| 17 | The white-hot flash did not show on textured pieces | A SurfaceAppearance hides the part's Material and Color | `textured(part, on)`: parent the SurfaceAppearance to nil for the flash, then back |
+| 18 | The first cast of a session was untextured | SurfaceAppearance images load late on first use | `KitModels.preload()` with `ContentProvider:PreloadAsync` on the kit |
+| 19 | fx_smoke failed after the preload | A new `GetService` needs a stand-in in `lune/fx_smoke.luau` | ContentProvider stand-in added; run fx_smoke after every Fx change |
+| 20 | A glow aura per crystal read as one blob, four attempts | Soft emitters on 23 overlapping crystals always merge | Dropped ("drop the aura idea"); the glow is the SurfaceAppearance's emissive instead. `addGlow` is left in KitModels, unused |
+| 21 | Generated Lua for a place patch was broken | It passed through a bash heredoc, which ate the escapes | Never paste generated Lua through a heredoc; one `execute_luau` that asserts the old hash, swaps exact strings, asserts the new hash, then writes |
+| 22 | Studio screenshots in play sometimes black | They return another Roblox window ("rungstig") | Open; `screen_capture` with `camera_position` works in Edit mode, but the lobby only exists in play |
+| 23 | Re-inserting the package would lose the glow | The three emissive values are set on the instance in the place, not in code or the GLB | Do not re-insert; or set them again after |
+
+### What took the most attempts
+
+The glow (four aura attempts before the emissive mask), and the break (shards in ice-2, physics chunks in ice-9 to
+11, the reference's burst-and-hang in ice-12).
+
+### The owner's verdicts, in their words
+
+- ice-2 break in Studio: "Looks right". Then the rule above about breaking and melting.
+- Textured ice: "looks right". Glow: "ok it looks good". Aura: "drop the aura idea".
+- ice-12 break at full speed: NOT JUDGED YET (seen only by me, in slow motion on the lobby stone; captures in
+  `studio/`).
+
+### Still open
+
+- The Frostbite trail's melt (owner picked both effects of YouTube `mOqFQpsmBeQ`; sheets `sheets/melt_pick_A.jpg`,
+  `melt_pick_B.jpg`). Not started.
+- The single ring's texture (`Tex.Circle`) is a double line; the break has no thin streak lines; the frost patch is
+  hard to see on pale stone; the freeze block glows and may hide the fighter; `Lighting.EnvironmentSpecularScale` is
+  0.1, so gloss reflections are weak.
+
+### For the tutorial notes (continues section 7)
+
+- Say which GLB contents become a SurfaceAppearance and which a `TextureID` (trap 16).
+- Say that a SurfaceAppearance hides Material and Color, and how to flash such a part (trap 17), and to preload (18).
+- `SurfaceAppearance.EmissiveMaskContent / EmissiveStrength / EmissiveTint` exist, bloom, and can be set in Edit mode.
+- "Colour from textures, models grey" replaces the vertex-colour route of sections 1 to 7 for this game.
+
+### ice-13 (2026-11-23): the owner's verdict on the ice-12 break, and the fix
+
+- Verdict, full speed: "our shatter spreads quite wide and drops very fast", "the pieces shrink at an unnaturally fast
+  pace", then "the ice pieces in the reference dont shrink, they gradually break into smaller pieces".
+- Cause: the reference's break was read as a cloud, not one piece at a time. "Fewer, smaller pieces later" became
+  "shrink"; the direction came from the blades (outward), not from the frames (up).
+- Fix: burst mostly up, stop in 0.3 s, sag at gravity 3; pieces split into two of 0.62 x size, twice; only the last
+  shrink, for 0.12 s. Trap 24 for section 3: follow single pieces through the frames and count pieces per frame.
+- Not judged by the owner yet.
+
+### ice-14 to ice-17 (2026-11-23): four more rounds on the break, then "Looks right"
+
+| Build | Owner's words | Change |
+|---|---|---|
+| ice-14 | "they should slowly drop instead of going out to the side ... they just cut in half and go opposite directions sideways and the pieces look like theyre constantly rotating" | Slow fall, no sideways push at a split, turning dies away in 0.3 s |
+| ice-15 | "instead of teleporting apart, the pieces should slowly drift apart" | New pieces start at the parent's exact place; a one-frame blink at each split fixed (new pieces sat at y -1000 for a frame) |
+| ice-16 | "the pieces should break less ... in the reference, the pieces break very slowly and dont move too much" | Every other piece breaks, once, 0.7-1.1 s in; halves 0.7 x size, barely part |
+| ice-17 | "i want it to follow physics ... in a curve since theyre effected by gravity ... the initial launch shouldnt be powerful enough for them to scatter a lot" | Launch (up 16-30, out 2-7) plus gravity 30 only; gone at the floor. Owner: "Looks right" |
+
+- Trap 25: a leftover `debris()` call in `FrostFx.strike` threw 8 chips of the same mesh at the break (gravity 150,
+  random constant spin, no floor). The owner's "drops very fast" and "constantly rotating" did not fit the code being
+  tuned; it took four rounds to find because only one source was read. Fix: count every instance by name per frame and
+  log the lowest and furthest; outliers are another source.
+- What took the most attempts in the whole piece: this break (ice-2, ice-9 to 17).
+- For the tutorial notes: before tuning debris, write down from the reference (a gridded every-frame sheet) the climb,
+  the outward speed and how the fall speed grows; that gives launch speeds and a gravity directly.
+
+## 9. The Frostbite trail's melt (melt-0 and melt-1, 2026-11-23)
+
+Full detail: `HANDOFF.md`, entries "melt-0" (eight notes) and "melt-1". Owner's last word at full speed: "Looks right".
+
+### What was built
+
+One strip of flat ice tiles behind the dash, about 6 studs wide (three columns 1.5 apart, a row every 1.3 studs,
+tiles over their neighbours); six uneven tile meshes and their colour and gloss textures made in Blender
+(`bake_tiles.py` -> `design/kits/out/export/ice_tiles_v1.glb`, Model `75962214621516`); short crystals (0.8-1.8 studs)
+on the trail's two edges; each crystal turns into a cloud of flat white triangles (Blender-rendered image
+`116944529241949`) and is gone; then the tiles shrink toward their own middles in a soft white particle haze with a
+few sparks. Reference for the order and timing: YouTube `mOqFQpsmBeQ` (dissolve 1.8-2.8 s, floor patch 5.5-7.4 s).
+
+### The owner's corrections, in order
+
+| What I showed | Owner's words | Change |
+|---|---|---|
+| Two colour looks, hexagon tiles | "more random instead of all being hexagons"; "dissolving spikes on the sides"; "match the glacier" | Six uneven shapes; edge crystals; the Glacier's blues and frost |
+| Crystals in two rows, 3-6 studs | "placed more randomly, and shouldnt be so long"; "the crystals should dissolve before the ice melts" | Uneven placement, shorter; tiles wait for their crystals |
+| Thick slabs, crystals all over | "by thicker i dont mean vertically thick"; "at the edges of the trail (but still ON the trail)" | Flat tiles; crystals on the edges only |
+| A wider trail | "you didnt need to make the trail wider ... just about the apparent gaps" | Earlier width, no gaps |
+| Evaporation as rising dots | "not like a rising particle but rather a glowing white aura around each melting piece" | (next rows) |
+| A soft ball round each tile | "it looks like a circle around the piece instead of an aura" | |
+| An outline glow with wisps | "i dont want it to be an outline, i want it to surround the pieces ... i dont want any spikes" | Real particles in Studio, three variants; owner picked C (soft + sparks) |
+| The trail in play, 11 studs wide | "its enough to cover 3 ppl even though it should only be for one person" | 6 studs |
+| Crystals 1.4-3.6 studs | "scaled down to match the smaller trail ... i dont want them to be tall" | 0.8-1.8; the four start crystals too |
+
+### Errors and traps (continues section 3)
+
+| # | Symptom | Cause | Fix |
+|---|---|---|---|
+| 26 | Four aura previews rejected in a row | A particle cloud was mocked up as solid shapes in Blender stills | Preview anything that will be particles in Studio with real emitters |
+| 27 | `screen_capture` with `camera_position` showed no particles | Emitters the real camera is not looking at are not simulated | Hold the real camera on them (RenderStep, Scriptable), wait, capture with no camera arguments |
+| 28 | First Blender renders appeared in `C:\out` | Blender reads a bare relative output path from the drive root | `os.path.abspath` on every output path |
+| 29 | Export failed: "StructRNA of type Mesh has been removed" | `ice_scene.new_scene()` resets Blender and deletes every mesh | Export before making another scene |
+| 30 | Every melting tile threw "NumberSequence must end at time=1.0", 10 fps | `FxKit.curve` takes triples (time, value, envelope); I passed pairs. The error was inside KitModels' per-frame step | `keys`/`fade` for pairs; the melt callback runs in its own thread |
+| 31 | The melting trail was one white band | The haze was tuned on tiles standing alone; the trail's tiles overlap, so the hazes add up | A sixth of the rate, fainter |
+| 32 | The laid trail was white, not blue, in the arena | Flat tiles face the sun; the Glacier's emissive strength 4 plus bloom blows out | Strength 1 on the tile kit's instances |
+| 33 | "Tall crystals" still there after shortening the trail's | A second source: four start crystals of 4-5.5 studs in `FrostFx.frostbite` | Count pieces by name and log the tallest (the same lesson as trap 25) |
+| 34 | Studio could not fetch from a local server | localhost is not in the Assistant's HTTP allowlist | Patches are typed as hunks and checked by hash |
+
+### For the tutorial notes (continues section 7)
+
+- Blender is for models and textures. A look that will be particles is judged from real emitters in Studio.
+- A flat, upward-facing emissive surface needs far less emissive strength than an upright one in the same light.
+- An effect tuned on one piece must be re-tuned on the real count and overlap before it is shown.
+- When the owner describes something the code being tuned cannot produce, look for a second source first.

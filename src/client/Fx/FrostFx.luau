@@ -583,6 +583,226 @@ local punches = FxKit.pool("HT_FrostPunchFx", 4, function(parent, add)
 	return { face = face, sets = sets }
 end)
 
+-- THE FROSTBITE'S TRAIL (melt-1, 2026-11-23), every part of it picked by the owner from pictures. ONE STRIP of
+-- flat ice tiles along the whole path, about 6 studs wide (ONE person's width), six uneven shapes lying over one another with no
+-- gaps (the tiles and their textures are made in Blender: design/kits/ice-study/bake_tiles.py). Short crystals
+-- stand ON the tiles along the two EDGES, never in the lane the body went down. Then it goes, in the order of
+-- the owner's reference (YouTube mOqFQpsmBeQ): each crystal DISSOLVES into a cloud of flat white triangles that
+-- stays inside the crystal's own shape and thins out; only when a spot's crystals are gone do its tiles MELT,
+-- each shrinking toward its own middle where it lies, in a small soft white haze with a few sparks (the owner's
+-- pick "C": a haze that surrounds the piece, not an outline, not spikes, not rising). The path's start goes
+-- first because it was laid first. Nothing is random: every size, turn and place comes from the row's number.
+-- Three columns 1.5 apart: about 6 studs. It was five columns 2.2 apart (11 studs) until the owner saw it in
+-- play: "its enough to cover 3 ppl even though it should only be for one person".
+local TRAIL_ACROSS = 1.5 -- studs between tile columns
+local TRAIL_STEP = TRAIL_ACROSS * 0.866 -- studs between tile rows along the path
+local TRAIL_THICK = 0.1 -- flat: "by thicker i dont mean vertically thick"
+local TRAIL_LANE = 1.0 -- studs to each side of the path's middle that stay clear of crystals
+local TRAIL_ROWS = 40 -- the most rows one dash lays (the dash covers about 36)
+local SPIKE_RISE = 0.15 -- KitModels: a crystal's rise and settle
+local SPIKE_HOLD = 0.5 -- seconds a crystal stands before it starts to dissolve
+local SPIKE_TURN = 0.25 -- seconds the triangles take to cover it (the reference); then the crystal is gone
+local SPIKE_THIN = 0.65 -- seconds the cloud of triangles takes to thin out (the reference)
+local TILE_WAIT = 0.1 -- seconds between a spot's crystals being gone and its tiles starting to shrink
+local TILE_SHRINK = 1.5 -- seconds a tile takes to shrink away (the reference)
+local FROST_WHITE = Color3.fromRGB(246, 252, 255)
+local FROST_GLOW = Color3.fromRGB(200, 235, 255)
+
+-- A fixed number from 0 to 1 for the pair (a, b): the same every time.
+local function fixed(a: number, b: number): number
+	local value = math.sin(a * 12.9898 + b * 78.233) * 43758.5453
+	return value - math.floor(value)
+end
+
+-- What a melting tile gives off: a soft white haze born all through the tile, and a few sparks. Measured in
+-- a play test with real emitters (design/kits/ice-study/studio/melt_aura_particles_ABC.jpg, pick C). Both
+-- shrink with the tile because they are born inside it. A SIXTH of that test's rate and fainter: the test's
+-- tiles stood alone, the trail's lie over each other, and at the test's strength a melting trail was one
+-- white band from end to end (seen in play, 2026-11-23). At this strength each piece keeps its own haze.
+local function meltAura(part: BasePart)
+	local share = math.max(part.Size.X, part.Size.Z) / 3.6
+	local speed = 1 / FxKit.slowness()
+	local size = 1.3 * (0.6 + 0.4 * share)
+	local haze = Instance.new("ParticleEmitter")
+	haze.Name = "MeltHaze"
+	haze.Texture = Tex.Glow
+	haze.Shape = Enum.ParticleEmitterShape.Box
+	haze.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	haze.EmissionDirection = Enum.NormalId.Top
+	haze.SpreadAngle = Vector2.new(180, 180)
+	haze.Speed = NumberRange.new(0.4, 1.0)
+	haze.Lifetime = NumberRange.new(0.49, 0.7)
+	haze.Rate = 45 * (0.4 + 0.6 * share) * 0.16 * FxKit.QUALITY
+	haze.Rotation = NumberRange.new(0, 360)
+	haze.LightEmission = 1
+	haze.LightInfluence = 0
+	haze.Brightness = 1.5
+	haze.Color = ColorSequence.new(FROST_WHITE, FROST_GLOW)
+	haze.Size = NumberSequence.new(keys(0, size * 0.5, 0.3, size, 1, size * 0.35))
+	haze.Transparency = fade(0, 1, 0.2, 0.7, 0.6, 0.82, 1, 1)
+	haze.LockedToPart = true
+	haze.TimeScale = speed
+	haze.Parent = part
+	local sparks = Instance.new("ParticleEmitter")
+	sparks.Name = "MeltSparks"
+	sparks.Texture = Tex.Glow
+	sparks.Shape = Enum.ParticleEmitterShape.Box
+	sparks.ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface
+	sparks.EmissionDirection = Enum.NormalId.Top
+	sparks.SpreadAngle = Vector2.new(70, 70)
+	sparks.Speed = NumberRange.new(2, 5)
+	sparks.Drag = 2
+	sparks.Lifetime = NumberRange.new(0.5, 0.9)
+	sparks.Rate = 3 * FxKit.QUALITY
+	sparks.LightEmission = 1
+	sparks.LightInfluence = 0
+	sparks.Brightness = 5
+	sparks.Color = ColorSequence.new(FROST_WHITE)
+	sparks.Size = NumberSequence.new(keys(0, 0.2, 1, 0))
+	sparks.TimeScale = speed
+	sparks.Parent = part
+end
+
+-- A crystal `height` tall and `wide` across, rooted at `base`, turning into triangles `delay` seconds from
+-- now: for SPIKE_TURN they appear all through its shape, then no more are made and the cloud thins out.
+local function dissolve(base: CFrame, height: number, wide: number, delay: number)
+	local slow = FxKit.slowness()
+	task.delay(delay * slow, function()
+		local host =
+			FxKit.hiddenPart("HT_FrostDissolve", Vector3.new(wide, height, wide), workspace)
+		host.CFrame = base * CFrame.new(0, height / 2, 0)
+		local shards = Instance.new("ParticleEmitter")
+		shards.Name = "Triangles"
+		shards.Texture = Tex.Triangle
+		shards.Shape = Enum.ParticleEmitterShape.Box
+		shards.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+		shards.EmissionDirection = Enum.NormalId.Top
+		shards.SpreadAngle = Vector2.new(180, 180)
+		shards.Speed = NumberRange.new(0, 0.5)
+		shards.Lifetime = NumberRange.new(SPIKE_THIN * 0.45, SPIKE_THIN)
+		shards.Rate = (26 + 8 * height) / SPIKE_TURN * FxKit.QUALITY
+		shards.Rotation = NumberRange.new(0, 360)
+		shards.RotSpeed = NumberRange.new(-60, 60)
+		shards.LightEmission = 0.9
+		shards.LightInfluence = 0
+		shards.Brightness = 3
+		shards.Color = ColorSequence.new(FROST_WHITE, FROST_GLOW)
+		local sliver = math.clamp(height / 2.2, 0.45, 1) -- smaller slivers for a smaller crystal
+		shards.Size =
+			NumberSequence.new(keys(0, 0.25 * sliver, 0.15, 0.55 * sliver, 1, 0.3 * sliver))
+		shards.Transparency = fade(0, 0, 0.7, 0.1, 1, 1)
+		shards.LockedToPart = true
+		shards.TimeScale = 1 / slow
+		shards.Parent = host
+		task.delay(SPIKE_TURN * slow, function()
+			shards.Enabled = false
+		end)
+		task.delay((SPIKE_TURN + SPIKE_THIN + 0.2) * slow, function()
+			host:Destroy()
+		end)
+	end)
+end
+
+-- One row of the trail, `row` rows from where the dash began, its middle over `at`.
+local function trailRow(row: number, at: Vector3, way: Vector3, right: Vector3)
+	local floor = FxKit.floorUnder(at, 8)
+	if not floor then
+		return
+	end
+	-- A spot's tiles wait for its crystals: rise, stand, turn to triangles, thin out.
+	local hold = SPIKE_RISE + SPIKE_HOLD + SPIKE_TURN + SPIKE_THIN + TILE_WAIT
+	local shift = if row % 2 == 1 then 0.25 else -0.25
+	for column = -1, 1 do
+		local x = (column + shift) * TRAIL_ACROSS
+		local edge = math.abs(x) > TRAIL_ACROSS * 0.9
+		local u, v, w = fixed(row, column), fixed(row + 31, column + 7), fixed(row + 5, column + 19)
+		-- Every tile lies over its neighbours: the bed has no gaps.
+		local width = TRAIL_ACROSS * (if edge then 1.25 + 0.5 * u else 1.55 + 0.45 * u)
+		local lift = 0.02 + ((row * 5 + column + 2) % 6) * 0.015 + TRAIL_THICK / 2
+		local spot = floor
+			+ right * (x + (v - 0.5) * 0.9)
+			+ way * ((w - 0.5) * 0.9)
+			+ Vector3.yAxis * lift
+		KitModels.lay(
+			"Ice_Tile" .. (1 + math.floor(w * 6) % 6),
+			width,
+			TRAIL_THICK,
+			CFrame.new(spot) * CFrame.Angles(0, v * math.pi * 2, 0),
+			0,
+			hold,
+			TILE_SHRINK,
+			meltAura
+		)
+		-- Smaller tiles lie on top of the bed (no haze of their own: the bed's is enough).
+		if not edge and fixed(row + 53, column + 3) > 0.4 then
+			local p, q = fixed(row + 71, column + 11), fixed(row + 13, column + 41)
+			local top = floor
+				+ right * (x + (p - 0.5) * 1.0)
+				+ way * ((q - 0.5) * 1.4)
+				+ Vector3.yAxis * (0.12 + TRAIL_THICK / 2)
+			KitModels.lay(
+				"Ice_Tile" .. (1 + math.floor(p * 6) % 6),
+				TRAIL_ACROSS * (0.7 + 0.5 * p),
+				TRAIL_THICK,
+				CFrame.new(top) * CFrame.Angles(0, q * math.pi * 2, 0),
+				0,
+				hold,
+				TILE_SHRINK,
+				nil
+			)
+		end
+	end
+	-- One short crystal on two rows of every three, on whichever edge its number gives.
+	for k = 1, if row % 3 == 0 then 0 else 1 do
+		local seed = row * 3 + k
+		local u, v, w, a = fixed(seed, 3), fixed(seed, 17), fixed(seed, 29), fixed(seed, 43)
+		local side = if fixed(seed, 61) > 0.5 then 1 else -1
+		local thick = (row + k) % 3 == 0
+		-- Low: 0.8 to 1.8 studs (it was 1.4 to 3.6: the owner, "scaled down to match the smaller trail ... i dont
+		-- want them to be tall").
+		local height = 0.8 + 1.0 * v * v
+		local spot = floor
+			+ right * side * (TRAIL_LANE + 0.6 + 1.0 * u)
+			+ way * ((w - 0.5) * 1.6)
+			+ Vector3.yAxis * (0.02 + TRAIL_THICK)
+		local toward = Vector3.new(math.cos(w * math.pi * 2), 0, math.sin(w * math.pi * 2))
+		local base = KitModels.rooted(spot, toward, 6 + 22 * a, u * 360)
+		KitModels.erupt(
+			if thick then "Ice_SpikeThick" else "Ice_SpikeTall",
+			height,
+			base,
+			0,
+			SPIKE_HOLD + SPIKE_TURN,
+			ICE[1 + (row + k) % 4],
+			Enum.Material.SmoothPlastic,
+			ICE_SEE,
+			nil,
+			nil,
+			true
+		)
+		dissolve(base, height, height * (if thick then 0.4 else 0.22), SPIKE_RISE + SPIKE_HOLD)
+	end
+end
+
+-- Lays the trail behind `root` for `seconds`: a row each time the body has gone another row's length along
+-- `way` from where it began, so the trail is as long as the dash really was.
+local function trail(root: BasePart, way: Vector3, seconds: number)
+	local start = root.Position
+	local right = Vector3.new(-way.Z, 0, way.X)
+	local endAt = os.clock() + (seconds + 0.1) * FxKit.slowness()
+	task.spawn(function()
+		local rows = 0
+		while root.Parent and os.clock() < endAt and rows < TRAIL_ROWS do
+			local gone = (root.Position - start):Dot(way)
+			while rows < TRAIL_ROWS and (rows + 1) * TRAIL_STEP <= gone - 1 do
+				rows += 1
+				trailRow(rows, start + way * (rows * TRAIL_STEP), way, right)
+			end
+			task.wait()
+		end
+	end)
+end
+
 --- The Frostbite: the burst where `root` sets off along `direction`, then for `seconds` a thick
 --- wake behind it, with small crystals coming up out of the floor it has crossed.
 function FrostFx.frostbite(root: BasePart, direction: Vector3, seconds: number)
@@ -600,37 +820,31 @@ function FrostFx.frostbite(root: BasePart, direction: Vector3, seconds: number)
 	if ground then
 		for index = 1, 4 do
 			local angle = math.rad(index * 90 + 45)
-			local spot = ground + Vector3.new(math.cos(angle), 0, math.sin(angle)) * 2.6
-			crystal("Ice_SpikeTall", 3.5 + index * 0.5, spot, ground, 28, 0, 0.45, 1 + index % 4)
+			-- Four low crystals round the start (1.45 to 2.2 studs; they were 4 to 5.5 and sank). They go the
+			-- way the trail's crystals go: into triangles.
+			local spot = ground + Vector3.new(math.cos(angle), 0, math.sin(angle)) * 1.8
+			local height = 1.2 + index * 0.25
+			local base = KitModels.rooted(spot, spot - ground, 28, index * 90)
+			KitModels.erupt(
+				"Ice_SpikeTall",
+				height,
+				base,
+				0,
+				SPIKE_HOLD + SPIKE_TURN,
+				ICE[1 + index % 4],
+				Enum.Material.SmoothPlastic,
+				ICE_SEE,
+				nil,
+				nil,
+				true
+			)
+			dissolve(base, height, height * 0.22, SPIKE_RISE + SPIKE_HOLD)
 		end
 		debris(ground, 6, 26, 0.9)
 	end
 
-	-- Small crystals come up behind the body as it goes.
-	local slow = FxKit.slowness()
-	local steps = math.max(2, math.floor(seconds / 0.06))
-	for index = 1, steps do
-		task.delay(index * 0.06 * slow, function()
-			if not root.Parent then
-				return
-			end
-			local under = FxKit.floorUnder(root.Position, 8)
-			if under then
-				local side = if index % 2 == 0 then 1 else -1
-				local across = Vector3.new(-way.Z, 0, way.X) * side * (1.2 + math.random() * 1.4)
-				crystal(
-					if index % 3 == 0 then "Ice_SpikeThick" else "Ice_SpikeTall",
-					3 + math.random() * 3,
-					under - way * 2 + across,
-					under - way * 2,
-					24,
-					0,
-					0.5,
-					1 + index % 4
-				)
-			end
-		end)
-	end
+	-- Ice is laid behind the body as it goes: tiles, with crystals on their edges (melt-1).
+	trail(root, way, seconds)
 
 	Common.stream(root, "FrostWake", seconds, Vector3.zero, function(at)
 		-- The body of the wake: solid blue, thick.
@@ -843,10 +1057,9 @@ function FrostFx.strike(root: BasePart, direction: Vector3)
 		end
 	end
 	debris(middle, 14, 62, 1.6)
-	-- And again as the ice sinks.
-	task.delay((GLACIER_HOLD + 0.15) * FxKit.slowness(), function()
-		debris(middle, 8, 30, 1.2)
-	end)
+	-- ice-17: no second throw of chips as the ice breaks. It was left from when the ice sank: eight
+	-- random chips under heavy gravity, spinning, falling through the floor. The break's own chunks
+	-- (KitModels) are the debris now, and they follow one set of rules.
 end
 
 --- The Glacier throwing `target`: ice breaks round them, and they leave snow behind as they go.
