@@ -1,0 +1,77 @@
+<title>Haymaker Icon Set</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,700;0,900;1,900&display=swap">
+<style>
+/* Layout: one band per group of icons; each icon is a tile showing it on its HUD button big, then at phone size on a button, a plate and the world. */
+:root{
+  --bg:#efeefb; --panel:#ffffff; --fg:#1d1040; --mute:#5d5788; --line:#d3cff0; --acc:#A63CD6;
+  --ink:#1d1040; --disc:#33206b; --dot:#4b3190; --sky:#4084d6; --plate:#00A6ED;
+  --ui:"Montserrat",system-ui,"Segoe UI",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#140c2c; --panel:#1f1442; --fg:#f4f1ff; --mute:#b2a9de; --line:#3a2a72; --acc:#FFCF00; color-scheme:dark } }
+:root[data-theme="dark"]{ --bg:#140c2c; --panel:#1f1442; --fg:#f4f1ff; --mute:#b2a9de; --line:#3a2a72; --acc:#FFCF00; color-scheme:dark }
+body{background:var(--bg);color:var(--fg);font-family:var(--ui);font-weight:500;font-size:15px;line-height:1.5}
+.wrap{max-width:1400px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:26px}
+h1{font:italic 900 clamp(26px,4vw,40px)/1.05 var(--ui);margin:0;text-wrap:balance}
+h2{font:italic 900 22px/1.1 var(--ui);margin:0}
+p{margin:0;max-width:68ch}
+.lead{display:flex;flex-direction:column;gap:10px}
+.mute{color:var(--mute)}
+.key{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--mute)}
+.key b{color:var(--fg)}
+section{display:flex;flex-direction:column;gap:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.tile{background:var(--panel);border:2px solid var(--line);border-radius:14px;padding:12px 8px 10px;display:flex;flex-direction:column;align-items:center;gap:9px;min-width:0}
+.tile .nm{font-weight:700;font-size:13px;text-align:center;line-height:1.2}
+.tile .id{font-size:11px;color:var(--mute);font-family:ui-monospace,Consolas,monospace}
+.small{display:flex;align-items:center;gap:8px}
+svg.ic{display:block;flex:none;overflow:visible;position:relative}
+.btn{--d:80px;position:relative;width:var(--d);height:var(--d);border-radius:50%;flex:none;background:var(--ring);border:max(1.8px,calc(var(--d)*.035)) solid var(--ink);box-shadow:0 max(2px,calc(var(--d)*.05)) 0 var(--ink);display:grid;place-items:center}
+.btn::before{content:"";position:absolute;inset:11%;border-radius:50%;background:radial-gradient(circle at 50% 30%,var(--dot) 0 1.2px,transparent 1.6px) 0 0/8px 8px,var(--disc);border:max(1.4px,calc(var(--d)*.025)) solid var(--ink)}
+.btn::after{content:"";position:absolute;left:18%;right:18%;top:6%;height:20%;border-radius:50%;background:linear-gradient(rgba(255,255,255,.4),rgba(255,255,255,0));pointer-events:none}
+.chip{width:34px;height:34px;border-radius:30%;display:grid;place-items:center;border:1.8px solid var(--ink);box-shadow:0 2px 0 var(--ink);flex:none}
+.chip.p{background:var(--plate)} .chip.w{background:var(--sky)}
+.bob{animation:bob 2.8s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-4%) rotate(-2deg)}}
+.phone{background:var(--sky);border:2px solid var(--ink);border-radius:14px;padding:14px;display:flex;flex-wrap:wrap;gap:10px 8px}
+ul{margin:0;padding-left:20px;max-width:72ch}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+{{SYMBOLS}}
+</svg>
+
+<div class="wrap">
+  <div class="lead">
+    <h1>Haymaker icons: the full set</h1>
+    <p>Style A (Cut), your pick, in the Kidcore HUD colours. <span id="count"></span> icons, every one drawn new for Haymaker: one for each icon the HUD mock uses today, plus the eight classes, their moves, AFK and the info "i".</p>
+    <div class="key"><span><b>Big button</b> the HUD's round button</span><span><b>Small row</b> phone size, 24 px: on a button, on a blue plate, on the world</span></div>
+    <p class="mute">Tell me which ones to redo, by name. Nothing is in the game or the HUD mock yet.</p>
+  </div>
+  <div id="groups"></div>
+  <section>
+    <h2>All of them at phone size</h2>
+    <div class="phone" id="phone"></div>
+  </section>
+  <section>
+    <h2>Good to know</h2>
+    <ul>
+      <li>The icons fill about 60% of a button here. Today's white ones fill 43%. A coloured object needs the room; say if you want them smaller.</li>
+      <li>Class and move icons are my reading of each name. Which class sits on which ring colour is a sample.</li>
+      <li>Not checked: a real phone, and how they look inside Roblox. Nothing is uploaded.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+const DATA={{DATA}};
+const TITLE={Fight:"Fight buttons",Menu:"Menu and tools",Stations:"Station markers",Classes:"The eight classes",Moves:"Class moves",Signs:"Coins, Gems and small signs"};
+const ic=(id,px,cls,delay)=>`<svg class="ic ${cls||""}" width="${px}" height="${px}" ${delay!=null?`style="animation-delay:${delay}s"`:""}><use href="#i-${id}"/></svg>`;
+const btn=(o,px,bob,i)=>`<div class="btn" style="--d:${Math.round(px/0.6)}px;--ring:${o.ring}">${ic(o.id,px,bob?"bob":"",bob?-(i*0.37%2.8):null)}</div>`;
+document.getElementById("count").textContent=DATA.length;
+const groups=[...new Set(DATA.map(o=>o.g))];
+document.getElementById("groups").outerHTML=groups.map(g=>`<section><h2>${TITLE[g]}</h2><div class="grid">`+
+  DATA.filter(o=>o.g===g).map((o,i)=>`<div class="tile" role="img" aria-label="${o.n}">${btn(o,56,true,i)}<div class="small">${btn(o,24)}<span class="chip p">${ic(o.id,24)}</span><span class="chip w">${ic(o.id,24)}</span></div><div class="nm">${o.n}</div><div class="id">i-${o.id}</div></div>`).join("")+
+  `</div></section>`).join("");
+document.getElementById("phone").innerHTML=DATA.map(o=>btn(o,24)).join("");
+</script>

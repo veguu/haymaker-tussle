@@ -1,0 +1,1497 @@
+<title>Haymaker Tussle HUD</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@700&family=Luckiest+Guy&family=Bangers&family=Denk+One&family=Nunito:wght@900&family=Titan+One&family=Lilita+One&family=Baloo+2:wght@800&family=Chewy&family=Bowlby+One&family=Paytone+One&family=Kalam:wght@700&family=Montserrat:ital,wght@0,500;0,700;0,900;1,900&display=swap">
+<style>
+/* Layout: a dark workbench. One row of tabs; each tab is either a live 16:9 game screen with a row of "play it"
+   buttons under it, or a board of labelled specimens. The game's own look lives only inside the screens. */
+:root{
+  --page:#11131d; --panel:#1a1d2c; --line:#2d3250; --fg:#f4f2ea; --mut:#a4a9c2; --acc:#FFCF00;
+  --ink:#1d1040; --disc:#33206b; --sky:#4084d6;
+  --game:Montserrat,"Arial Black","Segoe UI",sans-serif; --ui:Montserrat,"Segoe UI",system-ui,sans-serif; --hand:Kalam,"Comic Sans MS",cursive;
+  color-scheme:dark;
+}
+html,body{background:var(--page)}
+body{color:var(--fg);font-family:var(--ui);font-weight:500;font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 48px}
+.wrap{max-width:1840px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
+h1{font:italic 900 clamp(22px,3vw,34px)/1 var(--game);margin:0;letter-spacing:.01em}
+header p{margin:0;color:var(--mut);max-width:70ch}
+nav.tabs{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;color:inherit}
+.tab,.do{border:2px solid var(--line);background:var(--panel);border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:700}
+.tab[aria-selected="true"]{background:var(--acc);border-color:var(--acc);color:var(--ink)}
+.do:hover,.tab:hover{border-color:var(--acc)}
+.tab:focus-visible,.do:focus-visible,label.sw input:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.do{padding:6px 12px;font-size:14px}
+.do.on{background:#1f4a2a;border-color:#32D12A}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bar .grp{color:var(--mut);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-right:2px}
+label.sw{display:inline-flex;gap:6px;align-items:center;font-weight:700;font-size:14px;cursor:pointer}
+.note-line{color:var(--mut);margin:0;max-width:95ch}
+h2{font:italic 900 20px/1.1 var(--game);margin:14px 0 0}
+.specs{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px}
+figure.spec{margin:0;grid-column:span var(--span,4);min-width:0;background:var(--panel);border:2px solid var(--line);border-radius:12px;overflow:hidden}
+figure.spec figcaption{padding:8px 12px 10px;font-size:13.5px;color:var(--mut)}
+figure.spec figcaption b{color:var(--fg)}
+figure.spec.pick{border-color:var(--acc)}
+@media (max-width:900px){figure.spec{grid-column:span 12}}
+
+/* ---------- the game's look ---------- */
+.fit{position:relative;width:100%;overflow:hidden;border-radius:10px}
+.stage{position:absolute;left:0;top:0;transform-origin:0 0;overflow:hidden;background:var(--sky);font-family:var(--game);line-height:1;font-size:10px}
+.stage.round{border-radius:0}
+.stage .world{position:absolute;inset:0;background-size:cover;background-position:center;transition:filter .25s}
+.stage.blur .world{filter:blur(7px) brightness(.8)}
+.stage *{box-sizing:border-box}
+.pos{position:absolute;transform:translate(-50%,-50%)}
+.pos.l{transform:translate(0,-50%)}
+.pos.r{transform:translate(-100%,-50%)}
+.pos.tl{transform:none}
+/* lettering: heavy italic, white, an ink outline and a small drop shadow */
+.t{--o:calc(var(--fs)*.1);--ol:var(--ink);font:italic 900 var(--fs)/1 var(--game);color:#fff;white-space:nowrap;text-shadow:{{RING}};display:inline-block;letter-spacing:.005em}
+.t.wrap{white-space:normal;line-height:1.22}
+.kk{font:900 var(--fs)/1 var(--game);color:var(--ink);white-space:nowrap}
+.hand{font:700 var(--fs)/1.15 var(--hand);color:#fff6e2;--o:calc(var(--fs)*.07);--ol:var(--ink);text-shadow:{{RING}}}
+/* halftone: dots of --d over --c, fading in along --hd, drifting slowly */
+.ht{background:var(--c);overflow:hidden}
+.ht::before{content:"";position:absolute;inset:-12px;background-image:radial-gradient(circle,var(--d) 0 30%,transparent 33%),radial-gradient(circle,var(--d) 0 30%,transparent 33%);background-size:var(--cell,10px) var(--cell,10px);background-position:0 0,calc(var(--cell,10px)/2) calc(var(--cell,10px)/2);
+  -webkit-mask-image:linear-gradient(var(--hd,90deg),transparent 4%,#000 100%);mask-image:linear-gradient(var(--hd,90deg),transparent 4%,#000 100%);animation:drift 7s linear infinite}
+@keyframes drift{to{transform:translate(10px,-10px)}}
+/* slanted plate */
+.para{position:relative;display:block}
+.para>.bg{position:absolute;top:0;bottom:0;left:var(--lean);right:var(--lean);transform:skewX(var(--ang));border:var(--bw,3px) solid var(--ink)}
+.para>.bg>.drain{position:absolute;left:0;bottom:0;height:22%;width:calc(var(--f)*100%);background:#fff;opacity:.92}
+.para>.in{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:var(--gap,10px);padding:0 calc(var(--lean)*2 + 8px)}
+.para>.in.left{justify-content:flex-start}
+.para>.in.col{flex-direction:column;gap:2px;align-items:flex-start;justify-content:center}
+.para>.in.raw{padding:0;justify-content:flex-start;gap:0}
+.numbg{position:absolute;top:0;bottom:0;width:var(--nw);background:var(--nc)}
+.numbg.L{left:0;border-right:3px solid var(--ink)}
+.numbg.R{right:0;border-left:3px solid var(--ink)}
+.sp{flex:none}
+.keytab{flex:none;display:inline-grid;place-items:center;background:#fff;border:var(--kb,2.6px) solid var(--ink);border-radius:28%;min-width:var(--ks);height:var(--ks);padding:0 calc(var(--ks)*.18);font:900 calc(var(--ks)*.56)/1 var(--game);color:var(--ink);white-space:nowrap}
+/* round button */
+.btn{position:relative;width:calc(var(--r)*2);height:calc(var(--r)*2)}
+.btn .ring{position:absolute;inset:0;border-radius:50%;border:var(--bw) solid var(--ink);background:conic-gradient(var(--ring) calc(var(--frac)*360deg),var(--ringd) 0)}
+.btn .disc{position:absolute;inset:12%;border-radius:50%;border:calc(var(--bw)*.7) solid var(--ink);--c:var(--disc);--d:#4b3190;--cell:8px;--hd:180deg}
+.btn .ic{position:absolute;left:50%;top:50%;width:calc(var(--r)*.86);height:calc(var(--r)*.86);transform:translate(-50%,-50%)}
+.btn .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--r)*.05)}
+.btn .slash{position:absolute;left:14%;right:14%;top:50%;height:calc(var(--r)*.13);margin-top:calc(var(--r)*-.065);background:#FF3B4E;border:calc(var(--bw)*.6) solid var(--ink);border-radius:9px;transform:rotate(-38deg)}
+.btn .keytab{position:absolute;left:calc(50% + var(--r)*.68);top:calc(50% + var(--r)*.68);transform:translate(-50%,-50%);--ks:max(calc(var(--r)*.6),19px)}
+.btn .lbl{position:absolute;left:50%;top:calc(100% + 4px);transform:translateX(-50%)}
+/* cards */
+.card{position:relative;display:flex;align-items:center;gap:6px;padding:0 9px}
+.card>.cbg{position:absolute;inset:0;border:2.4px solid var(--ink);border-radius:9px}
+.card.you>.cbg{border-color:#fff;border-width:3px;box-shadow:0 0 0 2px var(--ink)}
+.card .head{flex:none;border-radius:50%;background:var(--disc);border:2px solid var(--ink);display:grid;place-items:center;position:relative}
+.card .txts{position:relative;display:flex;flex-direction:column;gap:3px;min-width:0}
+.card .crown,.chip .crown{position:absolute;right:6px;top:-13px;width:22px;height:20px;color:#FFCF00;filter:drop-shadow(0 0 0 var(--ink)) drop-shadow(0 1.5px 0 var(--ink))}
+.card.out>.cbg,.card.out>.head>svg,.card.out>.txts,.chip.out>.ring,.chip.out>.head>svg{filter:grayscale(1) brightness(.72)}
+.ox{position:absolute;left:-4%;right:-4%;top:50%;height:4px;margin-top:-2px;background:#FF3B4E;border-radius:3px;box-shadow:0 0 0 2px var(--ink);z-index:3;animation:oxdraw .12s ease-out both}
+.ox.b{animation-delay:.1s}
+@keyframes oxdraw{from{clip-path:inset(-3px 100% -3px -3px)}to{clip-path:inset(-3px)}}
+.sink{animation:sink .35s ease-in .35s both}
+@keyframes sink{to{translate:0 26px;opacity:0}}
+.chip{position:relative;width:calc(var(--r)*2);height:calc(var(--r)*2)}
+.chip .ring{position:absolute;inset:0;border-radius:50%;background:var(--c);border:var(--bw,2.4px) solid var(--ink)}
+.chip.you .ring{border-color:#fff}
+.chip .head{position:absolute;inset:16%;border-radius:50%;background:var(--disc);border:1.6px solid var(--ink);display:grid;place-items:center}
+.chip .keytab{position:absolute;left:calc(50% + var(--r)*.72);top:calc(50% + var(--r)*.72);transform:translate(-50%,-50%);--ks:max(calc(var(--r)*.8),17px);--kb:2px}
+.chip .crown{right:auto;left:50%;top:calc(var(--r)*-.62);width:calc(var(--r)*.9);height:calc(var(--r)*.8);transform:translateX(-50%)}
+.feed{position:absolute;display:flex;flex-direction:column;align-items:flex-end}
+.feed>div{display:flex;gap:.5em;align-items:center}
+.tagrow{display:flex;align-items:center;gap:6px}
+.dot{border-radius:50%;background:var(--disc);border:1.8px solid var(--ink);display:grid;place-items:center;flex:none}
+.station{position:relative;width:calc(var(--r)*2);height:calc(var(--r)*2.4)}
+.station .w{position:absolute;left:0;top:0;width:calc(var(--r)*2);height:calc(var(--r)*2);border-radius:50%;background:#fff;border:2.6px solid var(--ink)}
+.station .core{position:absolute;left:10%;top:calc(var(--r)*.2);width:80%;height:calc(var(--r)*1.6);border-radius:50%;--cell:7px;--hd:180deg}
+.station .ic{position:absolute;left:50%;top:var(--r);width:calc(var(--r)*.95);height:calc(var(--r)*.95);transform:translate(-50%,-50%);color:#fff}
+.station .tip{position:absolute;left:50%;top:calc(var(--r)*1.82);transform:translateX(-50%);width:calc(var(--r)*.7);height:calc(var(--r)*.58)}
+.navb{position:relative}
+.navb .para{position:absolute}
+.navb .btn{position:absolute;left:0;top:0}
+.navb:hover{transform:translateX(10px)}
+.navb.open{transform:translateX(18px) scale(1.04)}
+.topbar{position:absolute;left:12px;top:7px;display:flex;gap:8px;align-items:center}
+.topbar i{width:var(--tb,44px);height:var(--tb,44px);border-radius:10px;background:rgba(30,14,64,.62)}
+.pill{position:absolute;border-radius:99px;border:2.4px solid var(--ink)}
+/* windows */
+.win{position:absolute;width:948px;height:612px}
+.win>.body{position:absolute;inset:0;border-radius:22px;border:4px solid var(--ink);--c:#4a2e9a;--d:#5a3bb4;--cell:14px;--hd:180deg}
+.win .inner{position:absolute;border-radius:16px;border:3px solid var(--ink);background:#2c1a62}
+.tile{position:absolute;border-radius:14px;border:3px solid var(--ink);--cell:9px;--hd:0deg;cursor:pointer}
+.tile.pick{border:4px solid #fff;transform:translateY(-6px) scale(1.05);z-index:2}
+.tile>.c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
+.slab{position:absolute;border-radius:14px;border:3px solid var(--ink);--cell:9px;--hd:0deg}
+.slab.planned{background:transparent;border-color:rgba(255,255,255,.35)}
+.switch{position:absolute;width:88px;height:36px;border-radius:18px;border:3px solid var(--ink);display:flex;align-items:center;padding:0 12px}
+.switch i{position:absolute;top:3px;width:24px;height:24px;border-radius:50%;background:#fff;border:3px solid var(--ink)}
+.switch.on{background:#32D12A;justify-content:flex-start}.switch.on i{right:3px}
+.switch.off{background:#8F8BD9;justify-content:flex-end}.switch.off i{left:3px}
+.qm{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#fff;border:2.4px solid var(--ink);font:900 14px/1 var(--game);color:var(--ink);flex:none}
+.ttip{background:var(--ink);border-radius:8px;padding:6px 10px;font:italic 900 12.5px/1 var(--game);color:#fff6e2;white-space:nowrap}
+.see{position:absolute;border-radius:14px;border:2.6px solid var(--ink);background:rgba(34,16,74,.74)}
+.ava{position:absolute;width:calc(var(--u)*4);height:calc(var(--u)*6.2)}
+.ava i{position:absolute;border:2.6px solid var(--ink);border-radius:5px}
+.ava .hd{left:calc(var(--u)*1.35);top:0;width:calc(var(--u)*1.3);height:calc(var(--u)*1.3);background:#f1cfa8}
+.ava .to{left:calc(var(--u)*1);top:calc(var(--u)*1.3);width:calc(var(--u)*2);height:calc(var(--u)*2.2);background:var(--c)}
+.ava .la{left:0;top:calc(var(--u)*1.3);width:calc(var(--u)*1);height:calc(var(--u)*2.2);background:#f1cfa8;transform-origin:100% 8%;transform:rotate(18deg)}
+.ava .ra{left:calc(var(--u)*3);top:calc(var(--u)*1.3);width:calc(var(--u)*1);height:calc(var(--u)*2.2);background:#f1cfa8;transform-origin:0 8%;transform:rotate(-38deg)}
+.ava .ll{left:calc(var(--u)*1);top:calc(var(--u)*3.5);width:calc(var(--u)*1);height:calc(var(--u)*2.4);background:#3a2674}
+.ava .rl{left:calc(var(--u)*2);top:calc(var(--u)*3.5);width:calc(var(--u)*1);height:calc(var(--u)*2.4);background:#3a2674}
+/* motion: things arrive fast and all at once; small signs come from the left and leave to the right */
+.popin{animation:popin .17s cubic-bezier(.2,1.6,.4,1) both}
+.slam{animation:slam .18s ease-out both}
+@keyframes slam{0%{transform:translate(calc(-50% - 170px),-50%) scaleX(.7);opacity:0}70%{transform:translate(calc(-50% + 12px),-50%) scaleX(1.03);opacity:1}100%{transform:translate(-50%,-50%)}}
+.hit{animation:hit .16s ease-out both}
+@keyframes hit{0%{transform:translate(-50%,-50%) scale(2.3);opacity:0}60%{transform:translate(-50%,-50%) scale(.9);opacity:1}100%{transform:translate(-50%,-50%) scale(1)}}
+.navb .sp{animation:twinkle 2.8s ease-in-out infinite}
+@keyframes twinkle{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(.5) rotate(45deg)}}
+@property --frac{syntax:"<number>";inherits:true;initial-value:1}
+.cooling{animation:cool var(--cd,3s) linear both}
+@keyframes cool{from{--frac:0}to{--frac:1}}
+.readypop{animation:readypop .22s cubic-bezier(.2,1.7,.4,1) both}
+@keyframes readypop{from{scale:1.28}to{scale:1}}
+.ttl{animation:titleslam .3s cubic-bezier(.2,1.5,.4,1) .08s both;transform-origin:20% 50%}
+@keyframes titleslam{from{scale:2.1;rotate:-14deg;opacity:0}to{scale:1;rotate:-3deg;opacity:1}}
+.ttlpop{rotate:-3deg;filter:drop-shadow(6px 7px 0 var(--ink))}
+.btn{transition:scale .08s}
+[data-tool]:active .btn,[data-close]:active .btn,.navb:active .btn{scale:.9}
+ul.moves{margin:0;padding-left:20px;color:var(--mut);max-width:110ch}
+ul.moves b{color:var(--fg)}
+@keyframes popin{from{transform:translate(-50%,-50%) scale(.35);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+.slidein{animation:slidein .2s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes slidein{from{transform:translate(calc(-50% - 90px),-50%);opacity:0}to{transform:translate(-50%,-50%);opacity:1}}
+.leave{animation:leave .24s ease-in both}
+@keyframes leave{from{transform:translate(-50%,-50%);opacity:1}to{transform:translate(calc(-50% + 80px),-50%);opacity:0}}
+.winin{animation:winin .22s cubic-bezier(.22,1.2,.36,1) both}
+.popin2{animation:pop2 .18s cubic-bezier(.2,1.6,.4,1) both;transform-origin:420px 345px}
+@keyframes pop2{from{scale:.5;opacity:0}to{scale:1;opacity:1}}
+.zoomin{animation:zoomin .32s cubic-bezier(.3,1,.4,1) both}
+@keyframes zoomin{from{transform:scale(1)}to{transform:scale(1.9)}}
+@keyframes winin{from{translate:240px 0;opacity:0}to{translate:0 0;opacity:1}}
+.pillfx{position:absolute;overflow:visible;transform-origin:0 50%;animation:pillfx .32s cubic-bezier(.1,.8,.3,1) both}
+@keyframes pillfx{0%{clip-path:inset(0 100% 0 0);opacity:1}60%{clip-path:inset(0 0 0 0);opacity:1}100%{clip-path:inset(0 0 0 86%);opacity:0}}
+/* the big-hit flash: the whole screen in the hitter's colour for about a tenth of a second, under the HUD */
+.flash{position:absolute;inset:0;overflow:hidden;background:var(--ft)}
+.flash .band{position:absolute;border-radius:50%;border:130px solid var(--fb)}
+.flash .sil i{position:absolute;border:3.5px solid #fff;background:var(--fd);border-radius:4px}
+.flash .cor{position:absolute;left:-46px;bottom:-56px;width:340px;height:250px;transform:rotate(-5deg) skewX(-7deg);border:9px solid var(--ink);--cell:16px;--hd:0deg}
+.flash .cor .sp{position:absolute;right:70px;top:60px}
+.tword{display:flex;rotate:-4deg;gap:2px}
+.tw-a .t{filter:drop-shadow(.05em .06em 0 #FF3B4E) drop-shadow(.022em .028em 0 var(--ink))}
+.tw-c .t,.tw-d .t{--ol:#fff;filter:drop-shadow(.024em 0 0 var(--ink)) drop-shadow(-.024em 0 0 var(--ink)) drop-shadow(0 .024em 0 var(--ink)) drop-shadow(0 -.024em 0 var(--ink)) drop-shadow(0 .045em 0 var(--ink))}
+.thinair{animation:thinair .34s var(--settle) both}
+@keyframes thinair{0%{transform:translate(-50%,-50%) scale(.04);opacity:0;filter:blur(22px)}45%{transform:translate(-50%,-50%) scale(1.14);opacity:1;filter:blur(0)}72%{transform:translate(-50%,-50%) scale(.96)}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
+.vanish{animation:vanish .24s ease-in both}
+@keyframes vanish{0%{transform:translate(-50%,-50%) scale(1);opacity:1}100%{transform:translate(-50%,-50%) scale(1.5);opacity:0;filter:blur(10px)}}
+.tl{animation:tslam .38s var(--settle) both}
+@keyframes tslam{0%{opacity:0;scale:3.2;rotate:-16deg;translate:0 -46px}50%{opacity:1;scale:.84;rotate:4deg;translate:0 8px}76%{scale:1.1;rotate:-1deg;translate:0 0}100%{scale:1;rotate:0deg;translate:0 0}}
+/* the last five (owner 2026-11-24, after the red glow, wash and heartbeat: "is overdoing it, its not like they're in danger or anything"):
+   the row only gets BIGGER and pops in once. No red, no glow, no beating. */
+.frow.danger.enter .pos{animation:hit .3s var(--settle) both}
+@keyframes closeout{to{opacity:0;scale:.93;translate:0 22px}}
+.closing{animation:closeout .18s ease-in both!important;pointer-events:none!important;z-index:20}
+.closing *{pointer-events:none!important}
+@keyframes closebuy{to{opacity:0;scale:.93;translate:-50% 22px}}
+.roll .buy.closing{animation:closebuy .18s ease-in both!important}
+@keyframes zoomout{from{transform:scale(1.9)}}
+.stage .world.zoomout{animation:zoomout .3s cubic-bezier(.3,.7,.3,1) both}
+.stage.rm .flash:not(.keep){display:none}
+.stage.rm *,.stage.rm *::before,.stage.rm *::after{animation:none!important;transition:none!important}
+.pillfx.still{animation:none}
+.stage.rm .pillfx:not(.still){display:none}
+/* The page does NOT follow the computer's own reduce-motion setting: the owner's Windows has animation effects off, which
+   silently froze every animation here (found 2026-11-24). Only the Reduced Motion switch above stops the motion. */
+
+/* ---------- SHAPE OPTIONS (owner 2026-11-23: "less angular, and more bubbly") ----------
+   No attribute = the look as it was (slanted plates). a = soft slant, b = pills, c = bubbles.
+   Everything is one rule per piece on the stage, so every tab changes together. */
+.stage[data-shape] .keytab{border-radius:42%}
+.stage[data-shape] .win>.body{border-radius:38px}
+.stage[data-shape] .win .inner{border-radius:26px}
+.stage[data-shape] .tile,.stage[data-shape] .slab,.stage[data-shape] .see{border-radius:24px}
+.stage[data-shape] .card>.cbg{border-radius:16px}
+.stage[data-shape] .topbar i{border-radius:36%}
+.stage[data-shape] .ttip{border-radius:14px}
+.stage[data-shape] .flash .cor{transform:rotate(-5deg);border-radius:70px}
+.stage[data-shape] [style*="skewX(-22deg)"]{transform:none!important;border-radius:99px;overflow:hidden}
+/* A: the slant halved, every corner rounded */
+.stage[data-shape="a"] .para>.bg{transform:skewX(calc(var(--ang)*.5));border-radius:16px / 44%}
+/* B and C: no slant at all, full round ends */
+.stage[data-shape="b"] .para>.bg,.stage[data-shape="c"] .para>.bg{transform:none;border-radius:999px;left:calc(var(--lean)*.4);right:calc(var(--lean)*.4)}
+.stage[data-shape="b"] .card>.cbg,.stage[data-shape="c"] .card>.cbg{border-radius:999px}
+.stage[data-shape="b"] .ttlpop,.stage[data-shape="c"] .ttlpop{rotate:-2deg}
+/* C: B made puffy: a thicker ink line, a hard shadow under every piece, a soft shine on top, a bouncier pop */
+.stage[data-shape="c"] .para>.bg{border-width:calc(var(--bw,3px)*1.25);box-shadow:0 calc(var(--bw,3px)*1.5) 0 var(--ink)}
+.stage[data-shape="c"] .para>.bg::after,.stage[data-shape="c"] .card>.cbg::after{content:"";position:absolute;left:7%;right:7%;top:9%;height:28%;border-radius:999px;background:linear-gradient(rgba(255,255,255,.38),rgba(255,255,255,.1));pointer-events:none}
+.stage[data-shape="c"] .card>.cbg{box-shadow:0 3px 0 var(--ink)}
+.stage[data-shape="c"] .card.you>.cbg{box-shadow:0 0 0 2px var(--ink),0 5px 0 var(--ink)}
+.stage[data-shape="c"] .btn .ring{box-shadow:0 calc(var(--bw)*1.5) 0 var(--ink)}
+.stage[data-shape="c"] .btn .disc::after{content:"";position:absolute;left:18%;right:18%;top:7%;height:30%;border-radius:50%;background:linear-gradient(rgba(255,255,255,.3),rgba(255,255,255,.04));pointer-events:none}
+.stage[data-shape="c"] .chip .ring{box-shadow:0 2.5px 0 var(--ink)}
+.stage[data-shape="c"] .win>.body{border-radius:46px;border-width:5px;box-shadow:0 9px 0 var(--ink)}
+.stage[data-shape="c"] .tile,.stage[data-shape="c"] .slab:not(.planned){border-radius:28px;box-shadow:0 4px 0 var(--ink)}
+.stage[data-shape="c"] .tile::after{content:"";position:absolute;left:9%;right:9%;top:5%;height:16%;border-radius:999px;background:rgba(255,255,255,.22);pointer-events:none}
+.stage[data-shape="c"] .popin,.stage[data-shape="c"] .readypop,.stage[data-shape="c"] .popin2{animation-timing-function:cubic-bezier(.2,2.3,.4,1)}
+
+.bub{position:relative;cursor:pointer;animation:bob 3.4s ease-in-out infinite}
+.bub.locked{cursor:default}
+@keyframes bob{50%{translate:0 -7px}}
+.bub.pick{scale:1.07}
+.bub.pick .btn .ring{border-color:#fff;box-shadow:0 0 0 3px var(--ink),0 7px 0 var(--ink)!important}
+.mv{position:relative;display:flex;align-items:center;gap:12px}
+.mv .infoi{cursor:pointer;width:28px;height:28px;font-size:16px;font-style:italic}
+.mv .tip{display:none;position:absolute;left:50%;bottom:calc(100% + 14px);transform:translateX(-50%);width:286px;padding:14px 16px;border-radius:20px;border:3px solid var(--ink);background:rgba(34,16,74,.92);box-shadow:0 5px 0 var(--ink)}
+.mv .infoi:hover + .tip,.mv.open .tip{display:block}
+.mv.side .tip{left:calc(100% + 14px);bottom:auto;top:50%;transform:translateY(-50%);z-index:5}
+.mv.side .infoi{font-style:normal}
+.pos:has(.mv .infoi:hover),.pos:has(.mv.open){z-index:8}
+/* ---------- EVERYTHING MOVES (owner 2026-11-24: "every ui should have animations, whether it be the texture or the actual
+   frame itself"). TEXTURE: the halftone dots already drift on every plate, card, tile, disc and window; a shine now sweeps
+   across the important pieces only (menu buttons, banners, action buttons), rarely and out of step. FRAME: menu buttons and station icons float, crowns bob, the ULT READY badge
+   and SUMMON breathe, the character breathes. All of it stops under Reduced Motion. */
+@keyframes sweep{0%,86%{background-position:150% 0}100%{background-position:-70% 0}}
+.para.shiny::after,.btn.shiny::after{content:"";position:absolute;pointer-events:none;z-index:1;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.34) 50%,transparent 60%) no-repeat;background-size:280% 100%;animation:sweep var(--sp,6.5s) ease-in-out infinite;animation-delay:var(--sd,0s)}
+.para::after{top:0;bottom:0;left:var(--lean);right:var(--lean);transform:skewX(var(--ang))}
+.stage[data-shape="a"] .para::after{transform:skewX(calc(var(--ang)*.5));border-radius:16px / 44%}
+.stage[data-shape="b"] .para::after,.stage[data-shape="c"] .para::after{transform:none;border-radius:999px;left:calc(var(--lean)*.4);right:calc(var(--lean)*.4)}
+.card::after{inset:0;border-radius:9px}
+.stage[data-shape] .card::after{border-radius:16px}
+.stage[data-shape="b"] .card::after,.stage[data-shape="c"] .card::after{border-radius:999px}
+.btn::after{inset:0;border-radius:50%}
+@keyframes float{50%{translate:0 -5px}}
+.navb,.station{animation:float 4.4s ease-in-out infinite}
+@keyframes crown{50%{translate:0 -2px;rotate:7deg}}
+.card .crown,.chip .crown{animation:crown 2.2s ease-in-out infinite}
+@keyframes pulse{50%{scale:1.04}}
+.pulse{animation:pulse 1.5s ease-in-out infinite}
+@keyframes breathe{50%{scale:1 1.022}}
+.breathe{animation:breathe 2.8s ease-in-out infinite;transform-origin:50% 100%}
+@keyframes tipin{from{scale:.7;opacity:0}}
+.mv .infoi:hover + .tip,.mv.open .tip{animation:tipin .14s cubic-bezier(.2,1.8,.4,1) both;transform-origin:50% 100%}
+.mv.side .infoi:hover + .tip,.mv.side.open .tip{transform-origin:0 50%}
+/* the Classes screen arriving: bubbles pop in one after another, the rarities slide in from the right, the bottom pieces rise */
+.inR{animation:inR .22s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes inR{from{transform:translate(calc(-50% + 150px),-50%);opacity:0}to{transform:translate(-50%,-50%);opacity:1}}
+.inUp{animation:inUp .24s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes inUp{from{transform:translate(-50%,calc(-50% + 70px));opacity:0}to{transform:translate(-50%,-50%);opacity:1}}
+/* the summon: the light runs down the rarities, slows, stops on one; then the new class lands */
+[data-rar]{position:relative;transition:scale .07s,filter .07s,opacity .12s}
+.rolling [data-rar]{opacity:.5}
+.rolling [data-rar].hot{opacity:1;scale:1.14;filter:brightness(1.22)}
+.rolling [data-rar].won{opacity:1;scale:1.28;filter:brightness(1.15);transition:scale .16s cubic-bezier(.2,2.4,.4,1)}
+/* ---------- NOT STIFF (owner 2026-11-24: "I don't really like how stiff the animations are ... when hovering over it ... if u change
+   one of the animations make sure it stays consistent with everything else"). ONE spring for everything that arrives or
+   answers a touch: it overshoots a little and settles. ONE hover and ONE press for every pressable piece. */
+.stage{--spring:cubic-bezier(.2,1.7,.35,1);--settle:cubic-bezier(.3,.7,.3,1)}
+@supports (animation-timing-function:linear(0,1)){.stage{--spring:linear(0,.33 7%,.74 15%,1.02 24%,1.14 32%,1.13 40%,1.05 50%,.99 61%,.985 72%,1)}}
+.navb,[data-tool],[data-close],[data-summon],[data-use],[data-go]:not(.nohov),.bub:not(.locked),.tile[data-pick],.infoi,.card,.chip{cursor:pointer;transition:scale .34s var(--spring),transform .34s var(--spring),filter .18s ease}
+.navb:hover,[data-tool]:hover,[data-close]:hover,[data-use]:hover,[data-go]:not(.nohov):hover,.tile[data-pick]:hover,.infoi:hover,.card:hover,.chip:hover{scale:1.08;filter:brightness(1.1)}
+.bub:not(.locked):hover{scale:1.12;filter:brightness(1.1)}
+[data-summon]:hover{animation:none;scale:1.05;filter:brightness(1.1)}
+.navb:active,[data-tool]:active,[data-close]:active,[data-summon]:active,[data-use]:active,[data-go]:not(.nohov):active,.bub:not(.locked):active,.tile[data-pick]:active,.infoi:active,.card:active,.chip:active{scale:.92;transition-duration:.07s}
+[data-tool]:active .btn,[data-close]:active .btn,.navb:active .btn{scale:1}
+[data-go]{display:inline-block}
+/* arriving: quick in, a little past, back, rest */
+@keyframes popin{0%{transform:translate(-50%,-50%) scale(.3);opacity:0}52%{transform:translate(-50%,-50%) scale(1.13);opacity:1}76%{transform:translate(-50%,-50%) scale(.96)}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
+.popin{animation:popin .32s var(--settle) both}
+@keyframes pop2{0%{scale:.4;opacity:0}52%{scale:1.1;opacity:1}76%{scale:.97}100%{scale:1;opacity:1}}
+.popin2{animation:pop2 .34s var(--settle) both}
+@keyframes hit{0%{transform:translate(-50%,-50%) scale(2.2);opacity:0}42%{transform:translate(-50%,-50%) scale(.86);opacity:1}70%{transform:translate(-50%,-50%) scale(1.07)}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
+.hit{animation:hit .3s var(--settle) both}
+@keyframes slam{0%{transform:translate(calc(-50% - 190px),-50%) scaleX(.6);opacity:0}50%{transform:translate(calc(-50% + 20px),-50%) scaleX(1.07);opacity:1}76%{transform:translate(calc(-50% - 6px),-50%) scaleX(.985)}100%{transform:translate(-50%,-50%);opacity:1}}
+.slam{animation:slam .3s var(--settle) both}
+@keyframes slidein{0%{transform:translate(calc(-50% - 110px),-50%);opacity:0}55%{transform:translate(calc(-50% + 12px),-50%);opacity:1}80%{transform:translate(calc(-50% - 4px),-50%)}100%{transform:translate(-50%,-50%);opacity:1}}
+.slidein{animation:slidein .3s var(--settle) both}
+@keyframes leave{0%{transform:translate(-50%,-50%);opacity:1}22%{transform:translate(calc(-50% - 10px),-50%);opacity:1}100%{transform:translate(calc(-50% + 96px),-50%);opacity:0}}
+.leave{animation:leave .26s ease-in both}
+@keyframes readypop{0%{scale:1.3}48%{scale:.94}76%{scale:1.04}100%{scale:1}}
+.readypop{animation:readypop .3s var(--settle) both}
+@keyframes inR{0%{transform:translate(calc(-50% + 160px),-50%);opacity:0}58%{transform:translate(calc(-50% - 10px),-50%);opacity:1}82%{transform:translate(calc(-50% + 3px),-50%)}100%{transform:translate(-50%,-50%);opacity:1}}
+.inR{animation:inR .34s var(--settle) both}
+@keyframes inUp{0%{transform:translate(-50%,calc(-50% + 76px));opacity:0}58%{transform:translate(-50%,calc(-50% - 7px));opacity:1}82%{transform:translate(-50%,calc(-50% + 2px))}100%{transform:translate(-50%,-50%);opacity:1}}
+.inUp{animation:inUp .34s var(--settle) both}
+@keyframes winin{0%{translate:240px 0;opacity:0}60%{translate:-12px 0;opacity:1}84%{translate:4px 0}100%{translate:0 0;opacity:1}}
+.winin{animation:winin .34s var(--settle) both}
+.stage[data-shape="c"] .popin,.stage[data-shape="c"] .readypop,.stage[data-shape="c"] .popin2{animation-timing-function:var(--settle)}
+/* ---------- THE SUMMON, FULL SCREEN (owner 2026-11-24: "it should show up on ur entire screen, rolling through it on ur screen").
+   His second exception to "nothing covers the whole screen" (the first is the big-hit flash). */
+.roll{position:absolute;inset:0;z-index:30;overflow:hidden;display:grid;place-items:center;background:rgba(22,9,46,.94);animation:rollfade .18s ease-out both;cursor:pointer}
+@keyframes rollfade{from{opacity:0}}
+.roll.out{animation:rollout .22s ease-in both}
+@keyframes rollout{to{opacity:0;scale:1.06}}
+.roll .tint{position:absolute;inset:0;opacity:0;transition:opacity .25s;background:radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--rc,#fff) 78%,#16092e) 0%,color-mix(in srgb,var(--rc,#fff) 30%,#16092e) 45%,#16092e 82%)}
+.roll.won .tint{opacity:1}
+.roll .rays{position:absolute;left:50%;top:50%;width:2600px;height:2600px;margin:-1300px;border-radius:50%;opacity:0;background:repeating-conic-gradient(from 0deg,rgba(255,255,255,.1) 0 9deg,transparent 9deg 18deg);animation:rayspin 22s linear infinite}
+.roll.won .rays{opacity:1;transition:opacity .3s}
+@keyframes rayspin{to{rotate:360deg}}
+.roll .slot{position:relative;display:flex;flex-direction:column;align-items:center;gap:22px}
+.roll .in2.tick{animation:rolltick .12s ease-out both}
+@keyframes rolltick{0%{translate:0 90px;opacity:0;scale:.86}100%{translate:0 0;opacity:1;scale:1}}
+.roll .slot.land{animation:rollland .5s var(--settle) both}
+@keyframes rollland{0%{scale:2;opacity:0}38%{scale:.86;opacity:1}62%{scale:1.1}82%{scale:.97}100%{scale:1}}
+.roll .cap{position:absolute;left:0;right:0;text-align:center}
+.stage.rm .roll .rays{display:none}
+/* the build-up (owner 2026-11-24: "for a legendary, there should be a BIT of a build up ... mythics should have a longer build up") */
+.roll.won .tint,.roll.lit .tint{opacity:1}
+.roll.tense .slot{animation:rshake .08s linear infinite}
+.roll.tense.t2 .slot{animation-duration:.06s}
+@keyframes rshake{0%{translate:calc(var(--sh,3px)*-1) calc(var(--sh,3px)*.6)}33%{translate:var(--sh,3px) calc(var(--sh,3px)*-.8)}66%{translate:calc(var(--sh,3px)*-.6) calc(var(--sh,3px)*-.5)}100%{translate:calc(var(--sh,3px)*.8) var(--sh,3px)}}
+.roll.tense .rays{opacity:.7;animation-duration:7s}
+.roll .slot>.in2{display:flex;flex-direction:column;align-items:center;gap:22px}
+.roll .in2.climb{animation:climbpop .36s var(--settle) both}
+@keyframes climbpop{0%{scale:1.5;opacity:.3}45%{scale:.9;opacity:1}72%{scale:1.06}100%{scale:1}}
+.roll.dark .tint{opacity:0;transition:opacity .12s}
+.roll.dark .slot{opacity:0;transition:opacity .12s}
+.roll.dark .rays{opacity:0}
+.roll{cursor:pointer}
+.roll .skip{position:absolute;left:50%;bottom:44px;translate:-50% 0;z-index:3;cursor:pointer;transition:scale .34s var(--spring),filter .18s}
+.roll .skip:hover{scale:1.08;filter:brightness(1.1)}
+.roll .skip:active{scale:.92}
+.roll .buy{position:absolute;left:50%;bottom:150px;translate:-50% 0;z-index:4;width:560px;padding:22px 26px 24px;border-radius:30px;border:4px solid var(--ink);background:#36217a;box-shadow:0 8px 0 var(--ink);display:flex;flex-direction:column;align-items:center;gap:12px;animation:pop2 .3s var(--settle) both}
+.roll .buy [data-buy],.roll .buy [data-nobuy]{cursor:pointer;transition:scale .34s var(--spring)}
+.roll .buy [data-buy]:hover,.roll .buy [data-nobuy]:hover{scale:1.07}
+.stage.rm .roll.tense .slot{animation:none}
+.wv{display:inline-block;margin:0 -1px;animation:wv 2.6s ease-in-out infinite}
+@keyframes wv{0%,100%{translate:0 0}50%{translate:0 -7px}}
+/* the reveal's fireworks by rarity (owner 2026-11-24: "legendary shouldn't be that crazy but a bit crazier than getting epic and below, and
+   mythic should be crazier by a lot compared to legendary"). fx3 = legendary, fx4 = mythic; epic and below keep the plain reveal. */
+.roll .ring{position:absolute;left:50%;top:50%;width:220px;height:220px;margin:-110px;border-radius:50%;border:16px solid var(--rc);opacity:0;animation:ringout .85s cubic-bezier(.2,.7,.3,1) both}
+@keyframes ringout{0%{scale:.2;opacity:.95}100%{scale:9.5;opacity:0}}
+.roll .tw{position:absolute;margin:-20px;animation:twk 1.1s ease-in-out infinite}
+@keyframes twk{0%,100%{scale:.25;opacity:.15}50%{scale:1.15;opacity:1}}
+.roll.fx3 .rays{animation-duration:11s}
+.roll.fx3 .slot{filter:drop-shadow(0 0 26px var(--rc))}
+.roll.fx4 .rays{animation-duration:5s}
+.roll .rays2{animation:rayspin 7s linear infinite reverse;background:repeating-conic-gradient(from 4deg,color-mix(in srgb,var(--rc) 55%,transparent) 0 5deg,transparent 5deg 15deg)}
+.roll .flashc{position:absolute;inset:0;background:var(--rc);animation:flc .3s ease-out both}
+@keyframes flc{0%{opacity:.95}100%{opacity:0}}
+.roll.fx4{animation:quake .55s linear both}
+@keyframes quake{0%,100%{translate:0 0}10%{translate:-16px 9px}22%{translate:14px -11px}36%{translate:-11px -7px}50%{translate:9px 8px}66%{translate:-6px 4px}82%{translate:4px -3px}}
+.roll.fx4 .slot{filter:drop-shadow(0 0 46px var(--rc)) drop-shadow(0 0 14px #fff)}
+.roll .conf{position:absolute;top:-50px;width:15px;height:36px;border-radius:99px;border:2.5px solid var(--ink);animation:fall var(--d,2s) linear var(--dl,0s) infinite}
+@keyframes fall{0%{translate:0 0;rotate:0deg}100%{translate:var(--dx,0px) 1220px;rotate:560deg}}
+.stage.rm .roll .flashc,.stage.rm .roll .ring,.stage.rm .roll .conf,.stage.rm .roll .rays2{display:none}
+.ask{position:absolute;inset:0;z-index:25;display:grid;place-items:center;background:rgba(22,9,46,.62);animation:rollfade .15s ease-out both}
+.ask .box{width:660px;padding:28px 32px 26px;border-radius:34px;border:4px solid var(--ink);background:#36217a;box-shadow:0 9px 0 var(--ink);display:flex;flex-direction:column;align-items:center;gap:16px;animation:pop2 .32s var(--settle) both}
+.ask [data-askyes],.ask [data-askno],[data-warn],[data-warnr]{cursor:pointer;transition:scale .34s var(--spring),filter .18s}
+.ask [data-askyes]:hover,.ask [data-askno]:hover,[data-warn]:hover,[data-warnr]:hover{scale:1.07;filter:brightness(1.1)}
+.ask [data-askyes]:active,.ask [data-askno]:active,[data-warn]:active,[data-warnr]:active{scale:.93}
+.ask .box{border-color:#FF3B4E;box-shadow:0 0 0 4px var(--ink),0 12px 0 var(--ink)}
+.wc{position:relative;width:640px;height:370px;flex:none;animation:pop2 .32s var(--settle) both}
+.wc .win{position:absolute}
+@keyframes tapeslide{to{background-position:67.9px 0}}
+@keyframes taperun{to{translate:-50% 0}}
+.wc .tape2,.wc .hframe{background:repeating-linear-gradient(-45deg,#FFCF00 0 24px,#1d1040 24px 48px) 0 0/67.9px 100% repeat-x;animation:tapeslide 2.4s linear infinite}
+.wc .tapecut{position:absolute;left:-30px;right:-30px;height:72px;rotate:-3deg;z-index:1;filter:drop-shadow(0 0 0 var(--ink)) drop-shadow(0 6px 0 var(--ink)) drop-shadow(0 -3px 0 var(--ink)) drop-shadow(3px 0 0 var(--ink)) drop-shadow(-3px 0 0 var(--ink))}
+.wc .tape2{position:absolute;inset:0;clip-path:polygon(0 0,100% 0,calc(100% - 20px) 50%,100% 100%,0 100%,20px 50%)}
+.wc .ltape{position:absolute;left:-900px;right:-900px;height:44px;background:#FF3B4E;border-block:4px solid var(--ink);box-shadow:0 5px 0 var(--ink);overflow:hidden;z-index:0}
+.wc .ltape>span{position:absolute;left:0;top:0;height:100%;display:flex;align-items:center;gap:18px;white-space:nowrap;animation:taperun 26s linear infinite}
+.wc .ltape.rev>span{animation-direction:reverse}
+.wc .sign{filter:drop-shadow(0 4px 0 var(--ink))}
+.wc .hframe{position:absolute;left:0;top:24px;width:640px;height:330px;border-radius:26px;border:4px solid var(--ink);box-shadow:0 9px 0 var(--ink)}
+.wc .hpanel{position:absolute;left:18px;top:42px;width:604px;height:294px;border-radius:14px;border:4px solid var(--ink)}
+.stage[data-shape="g"] .wc .hpanel{background:linear-gradient(115deg,transparent 46%,rgba(255,255,255,.05) 46% 54%,transparent 54%),linear-gradient(#2a1030,#0c0719)}
+.stage[data-shape="g"] .wc .hpanel::before{opacity:.18}
+.wc .tapeword{display:flex;align-items:center;gap:10px;background:var(--ink);border-radius:14px;padding:6px 18px 9px}
+.stage.rm .wc .ltape>span{animation:none}
+.wc>.pos{z-index:2}
+.ask .warnhead{display:flex;align-items:center;gap:14px;animation:warnpulse 1.1s ease-in-out infinite}
+@keyframes warnpulse{50%{scale:1.05}}
+.hotbtn .para>.bg{border-color:#fff!important;box-shadow:0 0 0 3px var(--ink),0 8px 0 var(--ink)!important;filter:saturate(1.25) brightness(1.08)}
+.ask [data-askyes].hotbtn:hover{animation:none;scale:1.07}
+/* round lettering (an option beside the shape): upright and round in place of the heavy italic */
+.stage[data-font="round"] .t,.stage[data-font="round"] .kk,.stage[data-font="round"] .keytab,.stage[data-font="round"] .ttip,.stage[data-font="round"] .qm{font-family:Fredoka,var(--game);font-style:normal;font-weight:700;letter-spacing:.01em}
+
+/* ---------- TINTED GLASS (owner 2026-11-24: the Bubbles look "feels too ai"; "Yes, whole HUD ... includng SUMMONS, ETC, EVERYTHING").
+   Shape "g", the page's default. Every piece is ONE hue (--h) in three values: a deep see-through fill, a bright edge, a bright
+   icon. Inside: a diagonal glass streak and the Sky brawl print (gloves, clouds, the lobby windmill, stars) scaled to the piece
+   (--ts, set by skinPass). Only what you press is bright with sliding stripes. Lettering: Fredoka, upright. */
+.stage{--p3:{{PRINT}}}
+/* A PRINT PER LABEL (owner 2026-11-25: "the background texture thing is different depending on what ui label it is, should have the same
+   style, for example all of them have fists, but maybe only aplly that to classes or smthing. for shop it should have a cart, etc, use
+   context clues"). Same style, same size and drift everywhere; the shapes follow the label (design/style/icons/build.py ctx_prints).
+   Fists only where the fighting is: Classes, the summon, the arena. Everything else in the lobby: clouds, the windmill, stars. */
+{{CTXPRINTS}}
+.stage{--p3:var(--pr-sky)}
+.stage[data-actable],.navb[data-open="classes"],.bub,[data-summon],.roll{--p3:var(--pr-fight)}
+.navb[data-open="shop"],.win:has(>.body[data-ctx="shop"]){--p3:var(--pr-shop)}
+.navb[data-open="inventory"],.win:has(>.body[data-ctx="inventory"]){--p3:var(--pr-inventory)}
+.navb[data-open="ranked"],.win:has(>.body[data-ctx="ranked"]){--p3:var(--pr-ranked)}
+.navb[data-open="moves"],.win:has(>.body[data-ctx="moves"]){--p3:var(--pr-moves)}
+.win:has(>.body[data-ctx="settings"]){--p3:var(--pr-settings)}
+.wc{--p3:var(--pr-warn)}
+@keyframes txp{to{-webkit-mask-position:var(--ts,56px) calc(var(--ts,56px)*-1);mask-position:var(--ts,56px) calc(var(--ts,56px)*-1)}}
+@keyframes slide{to{background-position:-46px 0,0 0}}
+/* the lettering is a CHOICE (owner 2026-11-24: "give me a bunch fo customizable fonts to choose from"): --ff family, --fw weight, --fst slant, --fk size factor, set on the page by setLetter() */
+.stage[data-shape="g"] .t,.stage[data-shape="g"] .kk,.stage[data-shape="g"] .keytab,.stage[data-shape="g"] .ttip,.stage[data-shape="g"] .qm{font-family:var(--ff,Fredoka),Fredoka,var(--game);font-style:var(--fst,normal);font-weight:var(--fw,700);letter-spacing:.01em}
+.stage[data-shape="g"] .t{font-size:calc(var(--fs)*var(--fk,1))}
+.fontrow{position:absolute;left:0;width:1840px;height:84px;cursor:pointer;border-radius:16px}
+.fontrow:hover{background:rgba(255,255,255,.08)}
+.fontrow.on{background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 3px #FFCF00}
+#fontbar .do{font-size:16px;padding:5px 12px}
+#fontbar input[type=range]{width:120px;accent-color:#FFCF00}
+.stage[data-shape="g"] .ht{background:linear-gradient(115deg,transparent 36%,rgba(255,255,255,.1) 36% 49%,transparent 49% 55%,rgba(255,255,255,.06) 55% 59%,transparent 59%),linear-gradient(color-mix(in srgb,var(--h,#8F8BD9) 28%,#12062e),color-mix(in srgb,var(--h,#8F8BD9) 15%,#12062e))}
+.stage[data-shape="g"] .ht::before{inset:0;background-image:none;background:color-mix(in srgb,var(--h,#8F8BD9) 52%,#12062e);opacity:.6;-webkit-mask:var(--p3) 0 0/var(--ts,56px) var(--ts,56px);mask:var(--p3) 0 0/var(--ts,56px) var(--ts,56px);animation:txp 18s linear infinite}
+.stage[data-shape="g"] .para>.bg{transform:none;border-radius:14px;left:calc(var(--lean)*.4);right:calc(var(--lean)*.4);border:var(--bw,3px) solid var(--h,#8F8BD9);box-shadow:0 0 0 calc(var(--bw,3px)*.8) var(--ink),0 calc(var(--bw,3px)*1.7) 0 calc(var(--bw,3px)*.8) var(--ink),inset 0 2px 0 color-mix(in srgb,var(--h,#8F8BD9) 60%,transparent)}
+.stage[data-shape="g"] .para::after{transform:none;border-radius:14px;left:calc(var(--lean)*.4);right:calc(var(--lean)*.4)}
+.stage[data-shape="g"] .numbg{background:var(--h,#8F8BD9);border-color:var(--ink)}
+.stage[data-shape="g"] .para .sp{display:none}
+/* the things you press: bright, striped, with a lip */
+.stage[data-shape="g"] :is([data-summon],[data-use],[data-askyes],[data-buy],.pulse,.hotbtn,.prs,.slab) .para>.bg,.stage[data-shape="g"] .para.pulse>.bg{background:repeating-linear-gradient(120deg,rgba(255,255,255,.2) 0 9px,transparent 9px 20px) 0 0/200% 100%,linear-gradient(color-mix(in srgb,var(--h) 72%,#fff),var(--h) 55%);border-color:var(--ink);box-shadow:0 5px 0 color-mix(in srgb,var(--h) 62%,#12062e),0 5px 0 3px var(--ink);animation:slide 6s linear infinite}
+.stage[data-shape="g"] :is([data-summon],[data-use],[data-askyes],[data-buy],.pulse,.hotbtn,.prs,.slab) .para>.bg::before,.stage[data-shape="g"] .para.pulse>.bg::before{display:none}
+/* round buttons: the ring keeps the cooldown, the disc is glass in the ring's hue, the icon fills more of it */
+.stage[data-shape="g"] .btn{--h:var(--ring)}
+.stage[data-shape="g"] .btn .ring{box-shadow:0 calc(var(--bw)*1.5) 0 var(--ink)}
+.stage[data-shape="g"] .btn .disc{inset:9%}
+.stage[data-shape="g"] .btn .ic{width:calc(var(--r)*1.22);height:calc(var(--r)*1.22)}
+.stage[data-shape="g"] .btn .ic[style*="969cb0"]{filter:grayscale(1) brightness(.85);opacity:.75}
+.stage[data-shape="g"] .card>.cbg{border-radius:14px;border-color:var(--h,#8F8BD9);box-shadow:0 0 0 2px var(--ink),0 4px 0 2px var(--ink)}
+.stage[data-shape="g"] .card.you>.cbg{border-color:#fff;box-shadow:0 0 0 2px var(--ink),0 5px 0 2px var(--ink)}
+.stage[data-shape="g"] .card::after{border-radius:14px}
+.stage[data-shape="g"] .card .head,.stage[data-shape="g"] .dot{border-radius:30%;background:color-mix(in srgb,var(--h,#8F8BD9) 20%,#12062e)}
+.stage[data-shape="g"] .chip{--h:var(--c)}
+.stage[data-shape="g"] .chip .ring{border-radius:30%;box-shadow:0 2.5px 0 var(--ink)}
+.stage[data-shape="g"] .chip .head{border-radius:26%;background:color-mix(in srgb,var(--h,#8F8BD9) 20%,#12062e)}
+.stage[data-shape="g"] .station .w{border-radius:30%;background:var(--h,#8F8BD9);box-shadow:0 3px 0 var(--ink)}
+.stage[data-shape="g"] .station .core{border-radius:24%}
+.stage[data-shape="g"] .station .ic{width:calc(var(--r)*1.34);height:calc(var(--r)*1.34)}
+.stage[data-shape="g"] .keytab{border-radius:30%;box-shadow:0 2px 0 var(--ink)}
+/* windows: near-black in the menu's hue, a bright edge, inner panels darker still */
+.stage[data-shape="g"] .win>.body{border-radius:26px;border:5px solid var(--h,#8F8BD9);box-shadow:0 0 0 4px var(--ink),0 10px 0 4px var(--ink);background:linear-gradient(115deg,transparent 46%,rgba(255,255,255,.05) 46% 54%,transparent 54%),linear-gradient(color-mix(in srgb,var(--h,#8F8BD9) 12%,#0c0719),#0c0719)}
+.stage[data-shape="g"] .win>.body::before{opacity:.16}
+.stage[data-shape="g"] .win .inner{background:#150b2e;border-radius:18px;border-color:color-mix(in srgb,var(--h,#8F8BD9) 45%,#12062e)}
+.stage[data-shape="g"] .tile,.stage[data-shape="g"] .slab:not(.planned){border-radius:18px;border-color:var(--h,#8F8BD9);box-shadow:0 0 0 2.5px var(--ink),0 5px 0 2.5px var(--ink)}
+.stage[data-shape="g"] .tile.pick{border-color:#fff}
+/* an empty slot (Shop products, Inventory items not made yet): a dashed edge in the window's hue, no shadow */
+.stage[data-shape="g"] .slab.planned{border-radius:18px;border:2.5px dashed color-mix(in srgb,var(--h,#8F8BD9) 62%,transparent);background:color-mix(in srgb,var(--h,#8F8BD9) 8%,transparent)}
+.stage[data-shape="g"] .see,.stage[data-shape="g"] .mv .tip,.stage[data-shape="g"] .roll .buy{background:linear-gradient(rgba(29,16,64,.95),rgba(12,7,25,.95));border-radius:20px;border-color:#8F8BD9;box-shadow:0 0 0 3px var(--ink),0 7px 0 3px var(--ink)}
+.stage[data-shape="g"] .ask .box{background:linear-gradient(#2a1030,#0c0719);border-radius:24px}
+.stage[data-shape="g"] .ttip{border-radius:10px}
+/* the window title: a jagged blade in the window's hue, the word in its middle */
+.stage[data-shape="g"] .ttlpop{rotate:-3deg;filter:drop-shadow(2.5px 0 0 var(--ink)) drop-shadow(-2.5px 0 0 var(--ink)) drop-shadow(0 2.5px 0 var(--ink)) drop-shadow(0 -2.5px 0 var(--ink)) drop-shadow(0 7px 0 var(--ink))}
+.stage[data-shape="g"] .ttlpop .para>.bg{left:-9%;right:-9%;top:-16%;bottom:-16%;border:0;border-radius:0;box-shadow:none;clip-path:polygon(12% 6.7%,82.5% 4.4%,79.5% 22%,99.5% 11%,88% 42%,100% 49%,85% 69%,88% 93%,17.5% 95.5%,20.5% 78%,.5% 89%,12% 58%,0 51%,15% 31%);background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.3) 30% 40%,transparent 40%),linear-gradient(color-mix(in srgb,var(--h) 50%,#fff),var(--h) 50%,color-mix(in srgb,var(--h) 62%,#12062e))}
+.stage[data-shape="g"] .ttlpop .para>.bg::before,.stage[data-shape="g"] .ttlpop .para::after{display:none}
+/* ---------- THE ARENA HUD HAS ITS OWN EDGE (owner 2026-11-24: "the arena hud should have somewhat of a different style, but ... retains its style ... more like
+   action packed"). On the FIGHT screens only (data-act). Hue, glass, print, lettering and icons stay as in the lobby. Of A Lean, B Charged, C Blade he PICKED A: "lean is good, make sure its centered". */
+/* A, LEAN: every plate and card leans forward like the bars of a fighting game, tighter corners, the lettering leans with it, the print runs faster */
+.stage[data-shape="g"][data-act="a"] .para>.bg,.stage[data-shape="g"][data-act="a"] .para::after{transform:skewX(-13deg);border-radius:7px}
+.stage[data-shape="g"][data-act="a"] .card>.cbg,.stage[data-shape="g"][data-act="a"] .card::after{transform:skewX(-11deg);border-radius:6px}
+.stage[data-shape="g"][data-act="a"] .t{font-style:italic}
+.stage[data-shape="g"][data-act="a"] .ht::before{animation-duration:7s}
+/* the lobby menu: six square tiles, the icon in the middle, the name on the bottom edge */
+.navb.mt{position:relative}
+.navb.mt .mbg{position:absolute;inset:0;border-radius:18%;border:calc(var(--s)*.035) solid var(--h);box-shadow:0 0 0 calc(var(--s)*.028) var(--ink),0 calc(var(--s)*.07) 0 calc(var(--s)*.028) var(--ink)}
+.navb.mt>.ic{position:absolute;left:50%;top:47%;width:72%;height:72%;transform:translate(-50%,-50%) rotate(-4deg)}
+.navb.mt .ml{position:absolute;left:50%;bottom:-9%;transform:translateX(-50%)}
+.navb.mt:hover{transform:none}
+.navb.mt.open{transform:scale(1.06)}
+.navb.mt.open .mbg{border-color:#fff}
+/* the lobby menu as bars (owner 2026-11-24): one slim bar per entry in a column, like a fighting game's menu */
+.navb.bar{position:relative;animation:none}
+.navb.bar .mbg{position:absolute;inset:0;border-radius:calc(var(--s)*.24);border:calc(var(--s)*.055) solid var(--h);border-left-width:calc(var(--s)*.2);box-shadow:0 0 0 calc(var(--s)*.045) var(--ink),0 calc(var(--s)*.1) 0 calc(var(--s)*.045) var(--ink)}
+.navb.bar>.ic{position:absolute;left:calc(var(--s)*.3);top:50%;width:calc(var(--s)*.92);height:calc(var(--s)*.92);transform:translateY(-50%) rotate(-5deg)}
+.navb.bar .ml{position:absolute;left:calc(var(--s)*1.36);top:50%;transform:translateY(-50%)}
+.navb.bar:hover{transform:translateX(calc(var(--s)*.16));scale:1;filter:brightness(1.12)}
+.navb.bar.open{transform:translateX(calc(var(--s)*.3))}
+.navb.bar.open .mbg{border-color:#fff}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+{{ICONS}}
+</defs></svg>
+
+<div class="wrap">
+  <header>
+    <h1>Haymaker Tussle HUD</h1>
+    <p>The new look on every piece of the HUD. A mock: nothing here is in the game yet. Names, Coins and timers on it are samples; classes, prices, controls and page words are the game's own.</p>
+  </header>
+  <nav class="tabs" role="tablist" aria-label="Screens">
+    <button class="tab" role="tab" data-tab="fight" id="tab-fight">Fight</button>
+    <button class="tab" role="tab" data-tab="lobby" id="tab-lobby">Lobby</button>
+    <button class="tab" role="tab" data-tab="popups" id="tab-popups">Pop-ups</button>
+    <button class="tab" role="tab" data-tab="windows" id="tab-windows">Windows</button>
+    <button class="tab" role="tab" data-tab="pieces" id="tab-pieces">Pieces and choices</button>
+    <button class="tab" role="tab" data-tab="phone" id="tab-phone">Phone</button>
+    <label class="sw"><input type="checkbox" id="rm"> Reduced Motion</label>
+    <label class="sw"><input type="checkbox" id="snd" checked> Sound</label>
+  </nav>
+  <div class="bar" id="shapebar">
+    <span class="grp">Look</span>
+    <button class="do" data-shape-btn="g">Tinted glass (new)</button>
+    <button class="do" data-shape-btn="now">As it was (slanted)</button>
+    <button class="do" data-shape-btn="a">A · Soft slant</button>
+    <button class="do" data-shape-btn="b">B · Pills</button>
+    <button class="do" data-shape-btn="c">C · Bubbles</button>
+    <label class="sw" style="margin-left:10px"><input type="checkbox" id="roundfont"> Round lettering</label>
+  </div>
+  <div class="bar" id="fontbar">
+    <span class="grp">Lettering</span><span style="font-family:'Lilita One',Fredoka;font-size:17px">Lilita One (your pick)</span>
+    <label class="sw" style="margin-left:10px"><input type="checkbox" id="fslant"> Slanted</label>
+    <label class="sw">Size <input type="range" id="fsize" min="85" max="115" step="1" value="100"> <span id="fsizev">100%</span></label>
+  </div>
+  <div class="bar" id="sndbar">
+    <span class="grp">Sound set</span>
+    <button class="do on" data-snd="i">I · Your mix: Heavy clicks, Mallet spin</button><button class="do" data-snd="a">A · Made in the page (original)</button><button class="do" data-snd="b">B · Punch</button><button class="do" data-snd="c">C · Arcade</button><button class="do" data-snd="d">D · Glass &amp; chips</button><button class="do" data-snd="e">E · Crystal</button><button class="do" data-snd="f">F · Heavy</button><button class="do" data-snd="g">G · Chip</button><button class="do" data-snd="h">H · Mallet</button>
+    <button class="do" id="sndtour">Play every sound in this set</button>
+    <span class="grp" style="margin-left:6px;opacity:.75">each set changes every sound together. I: Heavy for everything you click, Mallet for the whole summon. Punch sounds are held for later.</span>
+  </div>
+  <p class="note-line">PICKED 2026-11-25: the lettering is LILITA ONE ("font should be lilita one"), TUSSLE! is white on red, the warning card is B1 (now with its middle centred), and the sound is your mix I (Heavy for everything you click, Mallet for the summon; punch sounds held for later). Lilita One is not one of the fonts measured inside Roblox (2026-11-14): in the game it would have to come from the Creator Store, not checked yet.</p>
+  <p class="note-line">NEW 2026-11-24: the page opens on TINTED GLASS, the new skin you approved for the whole HUD (dark pieces in their own colour with a bright edge, the Sky brawl print, blade titles, the menu as a column of six bars, new icons). The older looks are kept only for comparing. These buttons change EVERY tab at once; the four older ones side by side are on the Pieces and choices tab. New on 2026-11-24: CLASSES is its own screen now (Lobby tab, press CLASSES, then the long SUMMON button). Lettering: Lilita One (your pick). Each piece's print now follows its label: carts in the Shop, cogs in Settings, fists on Classes and in the arena, and so on.</p>
+
+  <section id="p-fight" data-panel="fight">
+    <div class="fit" data-w="1920" data-h="1080"><div class="stage" id="fs" style="width:1920px;height:1080px"></div></div>
+    <div class="bar" style="margin-top:10px">
+      <span class="grp">Arena style</span>
+      <button class="do on" data-act-btn="a">Lean (your pick)</button><button class="do" data-act-btn="">Same as lobby</button>
+    </div>
+    <p class="note-line">YOUR PICK (2026-11-24): LEAN. In the arena every plate and card leans forward like the bars of a fighting game and the lettering leans with it; colours, glass, print, lettering and icons stay as in the lobby. It is on the fight screen, the Pop-ups tab and the phone fight. The second button puts the lobby shape back to compare.</p>
+    <div class="bar" style="margin-top:10px">
+      <span class="grp">Play</span>
+      <button class="do" data-do="count" id="b-count">3, 2, 1, TUSSLE!</button>
+      <button class="do" data-do="last5" id="b-last5">5 left</button>
+      <button class="do" data-do="last2" id="b-last2">Final 2</button>
+      <button class="do" data-do="ultready" id="b-ultready">Ultimate ready</button>
+      <button class="do" data-do="ultuse" id="b-ultuse">Use ultimate</button>
+      <button class="do" data-do="ko" id="b-ko">Knockout</button>
+      <button class="do" data-do="closing" id="b-closing">Arena closing</button>
+      <button class="do" data-do="clash" id="b-clash">Clash</button>
+      <button class="do" data-do="cool" id="b-cool">Use R (cooldown)</button>
+      <button class="do" data-do="speed" id="b-speed">Speed up</button>
+      <button class="do" data-do="flash" id="b-flash">Big-hit flash</button>
+      <button class="do" data-do="flashhold" id="b-flashhold">Hold the flash</button>
+      <span class="grp" style="margin-left:10px">Show</span>
+      <button class="do" data-do="f25" id="b-f25">25 fighters</button>
+      <button class="do" data-do="f8" id="b-f8">8 fighters</button>
+      <button class="do" data-do="stun" id="b-stun">Stunned</button>
+      <button class="do" data-do="ctrl" id="b-ctrl">Controls panel (H)</button>
+    </div>
+    <p class="note-line">At rest this is one busy moment of a fight, so you can see that nothing overlaps. PRESS THE HUD ON THE SCREEN ITSELF: Q and R go on cooldown, the dial revs, Punch throws the big-hit flash, ULT READY uses the ultimate, a fighter's card or the feed plays a knockout. The buttons below play the rest.</p>
+  </section>
+
+  <section id="p-lobby" data-panel="lobby" hidden>
+    <div class="fit" data-w="1920" data-h="1080"><div class="stage" id="ls" style="width:1920px;height:1080px"></div></div>
+    <div class="bar" style="margin-top:10px">
+      <span class="grp">Open</span>
+      <button class="do" data-do="w-shop" id="b-wshop">Shop</button>
+      <button class="do" data-do="w-inventory" id="b-winventory">Inventory</button>
+      <button class="do" data-do="w-classes" id="b-wclasses">Classes</button>
+      <button class="do" data-do="w-ranked" id="b-wranked">Ranked</button>
+      <button class="do" data-do="w-moves" id="b-wmoves">Moves</button>
+      <button class="do" data-do="w-more" id="b-wmore">More</button>
+      <button class="do" data-do="w-settings" id="b-wsettings">Settings</button>
+      <button class="do" data-do="quests" id="b-quests">Daily quests</button>
+      <span class="grp" style="margin-left:10px">Play</span>
+      <button class="do" data-do="afk" id="b-afk">AFK</button>
+      <button class="do" data-do="area" id="b-area">Area sign</button>
+      <button class="do" data-do="spec" id="b-spec">Spectate panel</button>
+      <span class="grp" style="margin-left:10px">Summon a</span>
+      <button class="do" data-do="sum1" id="b-sum1">Common / Rare</button>
+      <button class="do" data-do="sum2" id="b-sum2">Epic</button>
+      <button class="do" data-do="sum3" id="b-sum3">Legendary</button>
+      <button class="do" data-do="sum4" id="b-sum4">Mythic</button>
+      <button class="do" data-do="skippass" id="b-skippass">Skip pass owned</button>
+      <button class="do" data-do="warn" id="b-warn">Show the summon warning</button>
+    </div>
+    <p class="note-line">The menu buttons on the screen work too. An open window stands clear of the menu buttons; the tools on the right hide under it, and the world behind it goes soft. "Summon a ..." plays the roll for that rarity so you can see and hear each one: Common and Rare are the same, Epic holds its breath, Legendary builds up, Mythic builds longer and goes dark first. "Show the summon warning" puts a Legendary in slot 1 and presses SUMMON: a red WARNING card shows what you will lose (by default for Epic and above; switch it off or choose the rarities in Settings). There is no skip button: pressing anywhere to skip brings up the Robux purchase; "Skip pass owned" shows it once bought (then a press just skips).</p>
+  </section>
+
+  <section id="p-popups" data-panel="popups" hidden><div class="specs" id="sp-popups"></div></section>
+  <section id="p-windows" data-panel="windows" hidden><div class="specs" id="sp-windows"></div></section>
+  <section id="p-pieces" data-panel="pieces" hidden>
+    <h2>How it moves</h2>
+    <ul class="moves">
+      <li><b>Banners and signs</b> slam in from the left, hold, and slide out to the right. Fast: under a fifth of a second.</li>
+      <li><b>Countdown:</b> plain white numbers, no frame, appearing out of thin air in the middle of the screen, big but not filling it, one at a time; then the letters of TUSSLE! slam in one after another and settle. No lines, pills or confetti.</li>
+      <li><b>The Sky brawl print</b> (gloves, clouds, the windmill, stars) drifts slowly inside every piece, sized to the piece; <b>bright stripes</b> slide across the buttons you press.</li>
+      <li><b>Ability rings</b> drain and refill; a button that comes ready pops once. The <b>speed dial</b>'s ring, number and colour follow your speed.</li>
+      <li><b>Windows</b> slide in from the right and their title slams down; the picked tile lifts.</li>
+      <li><b>A knocked-out fighter's</b> card gets a red cross drawn over it, sinks, and the row closes up.</li>
+      <li><b>Big-hit flash:</b> the whole screen in the hitter's colour for about a tenth of a second, under the HUD. Nothing else is ever full-screen.</li>
+      <li><b>Everything moves</b> (your rule, 2026-11-24): the dots drift on every plate, card, tile and window; a shine crosses only the IMPORTANT pieces (menu buttons, banners, the buttons you act with), rarely (once every 11 to 17 seconds) and each on its own clock; menu buttons and station icons float; crowns bob; ULT READY and SUMMON breathe.</li>
+      <li><b>Classes screen:</b> the camera pushes in, the slot badges pop in one after another, the rarities slide in from the right, the bottom pieces rise. Press SUMMON: the roll takes the whole screen, classes roll past faster then slower (about four seconds), and it stops on yours in its rarity's colour. A Legendary first climbs RARE, EPIC, LEGENDARY on a hidden card, shaking harder each step, and reveals with a shockwave ring, a glow and twinkles; a Mythic climbs, goes dark, a heartbeat, then breaks with a flash in its colour, a quake, four rings, double rays, twinkles everywhere and confetti. Then the new class lands in your slot with a hit. The (i) tips pop.</li>
+      <li><b>One spring, one hover, one press</b> for everything: a piece that arrives goes a little past and settles; hovering lifts and brightens it; pressing squashes it. Sound on every one of them (the Sound switch above).</li>
+      <li><b>Closing</b> (your rule, 2026-11-24): nothing just vanishes. A window, the Classes screen, the quests clipboard, the spectate panel and the warning and skip cards all leave the same way: sink a little, shrink a little, fade, in under a fifth of a second; the camera eases back out of the Classes screen.</li>
+      <li><b>The last five</b> (your rule, 2026-11-24): at 5 or fewer standing the row at the top gets bigger and pops in once. No red and no beating.</li>
+      <li><b>Reduced Motion</b> (the switch above): everything appears and leaves without moving, and the flash does not show.</li>
+    </ul>
+    <p class="note-line" style="margin:8px 0 14px">Play them on the Fight and Lobby tabs. In the game each is a tween or one shared loop that only runs while its piece is on screen.</p>
+    <div class="specs" id="sp-pieces"></div></section>
+  <section id="p-phone" data-panel="phone" hidden>
+    <p class="note-line">A phone at 844 x 390, drawn at its real size and enlarged. Touch buttons carry no key. No lettering under 12 px.</p>
+    <div class="specs" id="sp-phone" style="margin-top:12px"></div>
+  </section>
+</div>
+
+<script>
+"use strict";
+const INK="#1d1040", DISC="#33206b", CREAM="#fff6e2";
+// THE KIDCORE PALETTE (owner 2026-11-24, from his swatch sheet `Style References/kidcore-palette`): every colour as vivid as the sheet.
+// Red and the quiet "slate" are not on the sheet: a red and a periwinkle as vivid as the rest. The dark pieces moved from navy to deep violet.
+const K={blue:"#00A6ED",green:"#32D12A",gold:"#FFCF00",slate:"#8F8BD9",orange:"#FF9500",pink:"#F636AB",purple:"#A63CD6",teal:"#1FCFC0",red:"#FF3B4E"};
+// the game's own classes (Config/Abilities, Tokens "class.*"), in the Classes page's order
+const KITS=[
+ {id:"Base",c:"#FFE100",price:0,q:"Dash",r:"Uppercut",blurb:"The starting kit. A quick burst and a heavy launcher."},
+ {id:"Bruiser",c:"#FF9500",price:500,q:"Charge",r:"Slam"},
+ {id:"Inferno",c:"#FF6A2B",price:600,q:"Blastoff",r:"Meteor"},
+ {id:"Beast",c:"#FF3B4E",price:800,q:"Pounce",r:"Frenzy"},
+ {id:"Trickster",c:"#EB5CCB",price:750,q:"Flip",r:"Backfist"},
+ {id:"Dragon",c:"#A63CD6",price:1000,q:"Ascend",r:"Breath"},
+ {id:"Frost",c:"#00A6ED",price:600,q:"Frostbite",r:"Glacier"},
+ {id:"Tempest",c:"#1FCFC0",price:300,q:"Blink",r:"Cyclone",blurb:"Wind and speed. Get in, spin, get out."}];
+const OWNED={Base:1,Tempest:1,Bruiser:1}, WEARING="Tempest", COINS=700; // samples
+const YOU=K.blue; // your colour (free to change in the game); the pop-ups take their palette from it
+const hex=c=>[1,3,5].map(i=>parseInt(c.slice(i,i+2),16));
+const toHex=a=>"#"+a.map(v=>Math.round(Math.max(0,Math.min(255,v))).toString(16).padStart(2,"0")).join("");
+const lighter=(c,k=.35)=>toHex(hex(c).map(v=>v+(255-v)*k));
+const darker=(c,k=.3)=>toHex(hex(c).map(v=>v*(1-k)));
+let GLASS=true; // the Tinted glass skin: false only while the old shape boards are drawn
+// a piece's hue for the glass skin: its own colour, or the quiet periwinkle when that colour is too dark to be an edge
+const glassHue=c=>{ if(!/^#[0-9a-f]{6}$/i.test(c||"")) return c||K.slate; const [r,g,b]=hex(c); return (.299*r+.587*g+.114*b)/255<.3||Math.max(r,g,b)-Math.min(r,g,b)<40?K.slate:c; };
+const MV=n=>({Blink:"blink",Cyclone:"cyclone"})[n]||"m-"+n.toLowerCase(); // a move's icon id
+const P=(x,y,h,cls="",st="")=>`<div class="pos ${cls}" style="left:${x}px;top:${y}px;${st}">${h}</div>`;
+const svg=(n,s,c)=>`<svg class="ic" width="${s}" height="${s}" style="color:${c||"#fff"};${c&&c!=="#fff"?`--h:${c};`:""}flex:none"><use href="#i-${n}"/></svg>`;
+function txt(s,fs,o={}){
+  const st=[`--fs:${fs}px`]; if(o.c)st.push(`color:${o.c}`); if(o.o!=null)st.push(`--o:${o.o}px`); if(o.w)st.push(`width:${o.w}px`); if(o.st)st.push(o.st);
+  return `<span class="t ${o.wrap?"wrap":""} ${o.cls||""}" style="${st.join(";")}">${s}</span>`;}
+const note=(s,fs,w,o={})=>txt(s,fs,{c:o.c||CREAM,o:Math.max(1.2,fs*.085),wrap:true,w,st:o.st});
+const spark=(s,c="#fff")=>`<svg class="sp" width="${s}" height="${s}" viewBox="-10 -10 20 20"><path d="M10 0L1.84 1.84 0 10-1.84 1.84-10 0-1.84-1.84 0-10 1.84-1.84Z" fill="${c}"/></svg>`;
+const keytab=(k,s,st="")=>`<b class="keytab" style="--ks:${s}px;${st}">${k}</b>`;
+// every piece's shine runs on its own clock (owner 2026-11-24: "i dont like how it all shines at the same time")
+let SDN=7; const shine=()=>{ SDN=(SDN*73+41)%997; return `--sd:${(-(SDN/997)*17).toFixed(2)}s;--sp:${(11+(SDN%9)*.8).toFixed(2)}s`; };
+function para(w,h,fill,inner,o={}){
+  const lean=o.lean??.42, ang=-Math.atan(lean)*180/Math.PI;
+  return `<div class="para ${o.shine?"shiny":""} ${o.cls||""}" style="width:${w}px;height:${h}px;${shine()};--lean:${h*lean/2}px;--ang:${ang}deg;--bw:${o.bw??3}px;--gap:${o.gap??10}px;--h:${glassHue(fill)};${o.st||""}">`+
+    `<i class="bg ht" style="--c:${fill};--d:${o.dot||lighter(fill,.3)};--cell:${o.cell||10}px;--hd:${o.hd||"90deg"}">${o.bgx||""}${o.drain!=null?`<b class="drain" style="--f:${o.drain}"></b>`:""}</i>`+
+    `<div class="in ${o.in||""}">${inner}</div></div>`;}
+function banner(w,h,s,fill,o={}){ o=Object.assign({shine:fill!==K.slate},o); // banners are the important pieces: they carry the shine (not the quiet slate ones)
+  const fs=o.fs||h*.5; let inner="";
+  if(o.num!=null){ // a number that is part of the banner: its own deeper end, the word beside it
+    const lean=h*.42/2, nfs=fs*1.25, nw=o.nw||(String(o.num).length*nfs*.72+26), side=o.numAfter?"R":"L";
+    const num=`<span style="width:${nw}px;margin-${o.numAfter?"right":"left"}:${lean}px;display:grid;place-items:center;flex:none">${txt(o.num,nfs)}</span>`;
+    const rest=`<span style="flex:1;display:flex;align-items:center;justify-content:center;gap:10px;padding-${o.numAfter?"left":"right"}:${lean+10}px">${txt(s,fs,{c:o.tc})}${o.spark!==false?spark(h*.6):""}</span>`;
+    return para(w,h,fill,o.numAfter?rest+num:num+rest,Object.assign({},o,{in:"raw",bgx:`<b class="numbg ${side}" style="--nw:${nw}px;--nc:${o.numc||darker(fill,.34)}"></b>`}));
+  }
+  inner+=txt(s,fs,{c:o.tc});
+  if(o.key) inner+=keytab(o.key,h*.56);
+  if(o.spark!==false) inner+=spark(h*.6);
+  return para(w,h,fill,inner,o);}
+function btn(r,ring,ic,o={}){
+  const st=`${shine()};--r:${r}px;--ring:${o.dim?darker(ring,.55):ring};--ringd:${darker(ring,.55)};--frac:${o.dim?1:(o.frac??1)};--bw:${Math.max(1.8,r*.07).toFixed(1)}px`;
+  let mid;
+  if(o.big!=null) mid=`<div class="mid">${txt(o.big,r*(String(o.big).length<3?.62:.46))}${o.sub?txt(o.sub,Math.max(r*.18,o.minfs||0),{o:Math.max(1,r*.03)}):""}</div>`;
+  else if(o.cd!=null) mid=`<div class="mid">${txt(o.cd,r*.7)}</div>`;
+  else mid=`<svg class="ic" style="color:${o.dim?"#969cb0":"#fff"}"><use href="#i-${ic}"/></svg>`;
+  return `<div class="btn ${o.shine?"shiny":""}" style="${st}"><i class="ring"></i><i class="disc ht"></i>${mid}${o.slash?'<i class="slash"></i>':""}${o.key?`<b class="keytab">${o.key}</b>`:""}${o.label?`<span class="lbl">${txt(o.label,o.lfs||15,{o:o.lo||2.2,c:o.lc})}</span>`:""}</div>`;}
+function card(w,h,name,col,kos,o={}){
+  const r=h*.36;
+  return `<div class="card ${o.you?"you":""} ${o.out?"out":""} ${o.cls||""}" style="width:${w}px;height:${h}px;--h:${col};${shine()}"><i class="cbg ht" style="--c:${col};--d:${darker(col,.22)};--cell:8px;--hd:270deg"></i>`+
+    `<span class="head" style="width:${2*r}px;height:${2*r}px">${svg("face",r*1.7,lighter(col,.75))}${o.out?outx(45):""}</span><span class="txts">${txt(name,Math.max(h*.3,12),{o:h*.035})}${txt(kos+" KO",Math.max(h*.24,12),{c:CREAM,o:h*.03})}</span>`+
+    (o.crown?'<svg class="crown"><use href="#i-crown"/></svg>':"")+`</div>`;}
+const outx=a=>`<i class="ox a" style="transform:rotate(${a}deg)"></i><i class="ox b" style="transform:rotate(${-a}deg)"></i>`;
+function chip(r,col,kos,o={}){
+  return `<div class="chip ${o.you?"you":""} ${o.out?"out":""}" style="--r:${r}px;--c:${col};--bw:${o.you?3:2.4}px"><i class="ring"></i><span class="head">${svg("face",r*1.25,lighter(col,.75))}${o.out?outx(45):""}</span>`+
+    `${o.tab===false?"":`<b class="keytab">${kos}</b>`}${o.crown?'<svg class="crown"><use href="#i-crown"/></svg>':""}</div>`;}
+const feedRow=(a,verb,b,ca,cb,fs,vc)=>`<div>${txt(a,fs,{c:lighter(ca,.35)})}${txt(verb,fs,{c:vc||"#fff"})}${b?txt(b,fs,{c:lighter(cb,.35)}):""}</div>`;
+const nameTag=(n,c,fs=15)=>`<div class="tagrow"><span class="dot" style="width:${fs*1.45}px;height:${fs*1.45}px">${svg("face",fs*1.1,lighter(c,.7))}</span>${txt(n,fs,{o:2})}</div>`;
+const station=(r,ic,col)=>`<div class="station" style="--r:${r}px;--h:${col}"><i class="w"></i><i class="core ht" style="--c:${col};--d:${lighter(col,.3)}"></i><svg class="ic"><use href="#i-${ic}"/></svg><svg class="tip" viewBox="0 0 12 10"><path d="M1 .5h10L6 9z" fill="#fff" stroke="#1d1040" stroke-width="1.5" stroke-linejoin="round"/><path d="M1.8 0h8.4v1.5H1.8z" fill="#fff"/></svg></div>`;
+function navb(name,ic,col,o={}){ // glass skin. Owner 2026-11-24: "rows of like bars instead ... a column going down, it takes too much of the screen and it
+  // should fit like a fighting game": a slim bar per entry, the icon at its left end, the name beside it; the six stand in one column.
+  if(!GLASS) return navbOld(name,ic,col,o);
+  const h=o.h||54, w=o.w||236, fs=Math.max(12,(o.fs||22)*(name.length>8?.86:1));
+  return `<div class="navb bar ${o.open?"open":""}" data-open="${name.toLowerCase()}" style="width:${w}px;height:${h}px;--s:${h}px;--h:${col};animation-delay:${-(name.length*.53).toFixed(2)}s">`+
+    `<i class="mbg ht" style="--c:${col}"></i><svg class="ic"><use href="#i-${ic}"/></svg><span class="ml">${txt(name,fs)}</span></div>`;}
+function navbOld(name,ic,col,o={}){ // the old look (shape boards only): the circle and its slanted name plate, one piece
+  const r=o.r||44, pw=o.pw||286, ph=o.ph||56, fs=(o.fs||27)*(name.length>8?.88:1);
+  return `<div class="navb ${o.open?"open":""}" data-open="${name.toLowerCase()}" style="width:${r+pw+2}px;height:${2*r}px;animation-delay:${-(name.length*.53).toFixed(2)}s">`+
+    `<div style="position:absolute;left:${r+2}px;top:${r-ph/2}px">${para(pw,ph,col,`<span style="width:${r*.55}px;flex:none"></span>${txt(name,fs)}<span style="flex:1"></span>${spark(ph*.4)}`,{lean:.36,in:"left",shine:true})}</div>${btn(r,col,ic,{shine:true})}</div>`;}
+const coins=(w,h,n,fs,fill=DISC)=>para(w,h,fill,`${svg("coin",h*.9)}${txt(n,fs,{c:fill===DISC?"#FFE14D":"#fff"})}`,{lean:.35,dot:fill===DISC?"#45298a":undefined,in:"left",st:fill===DISC?`--h:${K.gold};--p3:var(--pr-coins)`:""});
+const topbar=(tb,stats,fs)=>`<div class="topbar" style="--tb:${tb}px"><i></i><i></i><span style="margin-left:6px">${txt(stats,fs,{c:CREAM,o:1.4})}</span></div>`;
+const ava=(u,c)=>`<div class="ava" style="--u:${u}px;--c:${c}"><i class="hd"></i><i class="to"></i><i class="la"></i><i class="ra"></i><i class="ll"></i><i class="rl"></i></div>`;
+function pills(w,h,tones,sides="lrb"){ // speed pills thrown out from a pop-up's edges (to the sides and down only: never across the row above)
+  let out=""; const A=[];
+  if(sides.includes("r")) for(const a of [-24,-8,8,24]) A.push(a);
+  if(sides.includes("l")) for(const a of [156,172,188,204]) A.push(a);
+  if(sides.includes("b")) for(const a of [58,90,122]) A.push(a);
+  A.forEach((a,i)=>{const rad=a*Math.PI/180, rx=w/2+10, ry=h/2+10; const x=Math.cos(rad)*rx, y=Math.sin(rad)*ry; const len=46+((i*37)%30);
+    const c=tones[i%tones.length];
+    out+=`<svg class="pillfx" viewBox="0 0 ${len+14} 14" style="left:calc(50% + ${x}px);top:calc(50% + ${y-7}px);width:${len+14}px;height:14px;transform:rotate(${a}deg);animation-delay:${.03+(i%3)*.02}s"><path d="M6 1.5L${len-4} 5a2 2 0 0 1 0 4L6 12.5a5.5 5.5 0 0 1 0-11Z" fill="${c}" stroke="#1d1040" stroke-width="2" stroke-linejoin="round"/><circle cx="${len+8}" cy="7" r="3.2" fill="${c}" stroke="#1d1040" stroke-width="1.8"/></svg>`;});
+  return out;}
+const palette=c=>[lighter(c,.45),c,darker(c,.35)]; // your colour's tint, the colour, its deep shade
+
+// ---------------------------------------------------------------- sound (owner 2026-11-24: "ALSO add sfx too"). Made in the page with
+// WebAudio, no files. These are stand-ins for the feel: the game has its own UI sounds (Ui/UiSound).
+// The click-only row (Kenney clicks B to K, 2026-11-25) is GONE: owner the same day, "EVERYTHING SOUND HAS TO CHANGE SO ITS
+// COMPATIBLE WITH THE NEW ONE AS WELL ... THERE WERE STILL SOME SOUNDS THAT DIDN'T CHANGE EVEN THO U MADE NEW SOUNDS FOR CLICKING".
+// Only whole sets now. The samples stay in sfx/kenney.
+// SOUND SETS (owner 2026-11-25: "when considering the sound design that means u should change the sounds for everything, not just
+// click"). A = every sound made in the page, as approved before. B, C, D = a whole set of Kenney CC0 samples each (sfx/kenney),
+// chosen by MEASURE (length, brightness, no piercing highs, jingles whose pitch RISES for the reveals), not by ear.
+// Common and rare share a reveal; epic, legendary and mythic step up (his summon rule). The build-up drone and the hush stay made
+// in the page in every set. SND.style picks; ?snd=b for local pictures. The Click row above overrides only the set's click.
+const SND={style:"i"}; // opens on his mix (2026-11-25)
+const SND_LIB={{SNDLIB}};
+const SND_BUF={};
+(()=>{ try{ const dec=new OfflineAudioContext(1,1,44100);
+  Object.entries(SND_LIB).forEach(([k,b64])=>{ const bin=atob(b64), u=new Uint8Array(bin.length); for(let j=0;j<bin.length;j++) u[j]=bin.charCodeAt(j);
+    dec.decodeAudioData(u.buffer).then(d=>{ let pk=0; const x=d.getChannelData(0); for(let j=0;j<x.length;j++) pk=Math.max(pk,Math.abs(x[j])); SND_BUF[k]={d,pk:pk||1}; }).catch(()=>{}); });
+}catch(e){} })();
+// MADE-IN-PAGE SETS E to H (owner 2026-11-25: "add more options", and "EVERYTHING SOUND HAS TO CHANGE"). Every made sound is built
+// from five voices (a tone, a glass bell, noise, the front click, a chord), and a set turns the same dials on all five, so EVERY
+// sound changes together: pitch (bells, chords, mid tones), low (thocks, the heartbeat, the build-up drone), ratio and depth (how
+// metallic a bell is), ring (how long it rings), wave (chords and the drone), bright (the chord's filter), air (every noise: the
+// hover edge, sweeps, the hush, sparkle), snapF / snapK (the front click's band and weight), bellWave (a plain wave for the bell).
+// A turns nothing: the original. B to D are sample sets; their dials voice what they have no sample for (the summon's build-up and
+// the hush), so those change with the set too. ?sndtest=1 checks that every sound differs from A in every set.
+const SYN={a:{},
+  b:{low:.85,air:.8,pitch:.94},              // Punch: lower, duller air
+  c:{low:.9,air:1.15,pitch:1.06,wave:"square"}, // Arcade: a square drone, brighter air
+  d:{low:1.15,air:1.2,pitch:1.12,wave:"triangle"}, // Glass & chips: glassy and airy
+  e:{pitch:1.26,ratio:3.5,depth:.6,ring:1.5,wave:"triangle",bright:1.25,low:1.12,air:1.1,snapF:3400,snapK:.9}, // Crystal: higher, cleaner glass, rings longer
+  f:{pitch:.75,ratio:1.41,depth:1.3,ring:1.2,bright:.7,low:.8,air:.75,snapF:2600,snapK:1.2}, // Heavy: lower, gong-like metal, a weightier click
+  g:{bellWave:"square",ring:.6,wave:"square",bright:.85,low:.9,air:.9,snapF:3000,snapK:.8}, // Chip: square blips, short (made here, unlike C)
+  h:{pitch:.89,ratio:4,depth:.5,ring:.55,wave:"triangle",bright:.8,low:1.2,air:.85,snapF:2200}, // Mallet: warm wooden bars, short
+  // I, HIS MIX (owner 2026-11-25: "heavy for like clicking stuff, and mallet for the spinning"): each sound takes the dials of the set
+  // its ROLE names. My reading of "the spinning": the whole summon (ticks to reveal), so it stays one piece. The punch-like sounds
+  // (countdown slam, hit, big-hit flash) are HELD ("punching sounds and landing a punch will sound extrememly different"): Heavy for now.
+  i:{mix:{ui:"f",spin:"h",hit:"f"}}};
+const ROLE={hover:"ui",click:"ui",pick:"ui",open:"ui",close:"ui",pop:"ui",buy:"ui",tick:"spin",drone:"spin",beat:"spin",climb:"spin",hush:"spin",win:"spin",slam:"hit",hit:"hit",flash:"hit"};
+const Ly=(s,v,o={})=>Object.assign({s,v},o); // one layer: sample, level (of its own peak), and at (s) / r (rate)
+const SETS={
+  b:{ name:"Punch", hover:[Ly("uiaudio_rollover4",.1)], click:[Ly("uiaudio_click1",.5),Ly("interface_tick_004",.4)], ring:[Ly("interface_glass_005",.25,{at:.03})],
+      close:[Ly("interface_back_002",.4),Ly("impact_impactWood_light_000",.25)], pop:[Ly("impact_impactWood_light_002",.35),Ly("interface_glass_002",.3)],
+      slam:[Ly("impact_impactPunch_heavy_000",.75)], hit:[Ly("impact_impactPunch_heavy_002",.8),Ly("impact_impactMetal_light_002",.35)],
+      flash:[Ly("impact_impactPunch_heavy_004",.85),Ly("impact_impactMetal_heavy_001",.45),Ly("impact_impactGlass_heavy_000",.35)],
+      tick:[Ly("impact_impactWood_light_003",.3)], tense:[Ly("impact_impactSoft_medium_000",.3)], beat:[Ly("impact_impactSoft_heavy_000",.7)],
+      climb:[Ly("impact_impactMetal_heavy_000",.5),Ly("impact_impactGlass_medium_001",.35)],
+      win0:[Ly("jingle_HIT14",.6),Ly("interface_glass_002",.3)], win1:[Ly("jingle_HIT02",.65),Ly("impact_impactMetal_light_000",.3)],
+      win2:[Ly("jingle_HIT03",.7),Ly("impact_impactPunch_heavy_000",.5)],
+      win3:[Ly("jingle_HIT11",.75),Ly("impact_impactPunch_heavy_004",.6),Ly("impact_impactGlass_heavy_001",.45),Ly("jingle_HIT03",.5,{at:.5})],
+      buy:[Ly("interface_confirmation_003",.5),Ly("casino_chips_stack_4",.35)] },
+  c:{ name:"Arcade", hover:[Ly("uiaudio_rollover2",.12,{r:1.3})], click:[Ly("interface_select_001",.45),Ly("digital_tone1",.45)], ring:[Ly("digital_powerUp2",.2,{at:.02})],
+      close:[Ly("digital_highDown",.25,{r:1.4})], pop:[Ly("digital_powerUp4",.3)],
+      slam:[Ly("digital_lowRandom",.6),Ly("digital_tone1",.5)], hit:[Ly("digital_phaseJump5",.45),Ly("digital_lowDown",.5)],
+      flash:[Ly("digital_laser3",.6),Ly("digital_powerUp10",.3)],
+      tick:[Ly("digital_tone1",.3,{r:1.6})], tense:[Ly("digital_tone1",.35,{r:.7})], beat:[Ly("digital_tone1",.7,{r:.6})],
+      climb:[Ly("digital_phaserUp4",.5)],
+      win0:[Ly("jingle_NES14",.6)], win1:[Ly("jingle_NES03",.65)], win2:[Ly("jingle_NES05",.7),Ly("digital_powerUp2",.3)],
+      win3:[Ly("jingle_NES12",.75),Ly("digital_powerUp1",.35),Ly("jingle_NES08",.55,{at:.55})],
+      buy:[Ly("digital_powerUp7",.45),Ly("casino_chips_collide_1",.2)] },
+  d:{ name:"Glass & chips", hover:[Ly("interface_glass_006",.1,{r:1.2})], click:[Ly("casino_chip_lay_3",.5),Ly("interface_glass_006",.3)], ring:[Ly("interface_glass_002",.3,{at:.03})],
+      close:[Ly("casino_card_slide_1",.4)], pop:[Ly("impact_impactGlass_light_001",.4)],
+      slam:[Ly("impact_impactGlass_heavy_003",.55),Ly("impact_impactPunch_medium_000",.6)], hit:[Ly("impact_impactGlass_heavy_001",.55),Ly("impact_impactPunch_heavy_002",.7)],
+      flash:[Ly("impact_impactGlass_heavy_000",.6),Ly("impact_impactPlate_heavy_000",.6)],
+      tick:[Ly("casino_chips_collide_1",.25)], tickVary:["casino_chips_collide_1","casino_chips_collide_2","casino_chips_collide_3","casino_chips_collide_4"],
+      tense:[Ly("impact_impactSoft_medium_000",.3)], beat:[Ly("impact_impactSoft_heavy_001",.7)],
+      climb:[Ly("impact_impactGlass_medium_001",.5),Ly("casino_dice_throw_2",.3)],
+      win0:[Ly("jingle_STEEL08",.6)], win1:[Ly("jingle_STEEL10",.65)], win2:[Ly("jingle_STEEL15",.7),Ly("impact_impactGlass_heavy_003",.4)],
+      win3:[Ly("jingle_STEEL12",.75),Ly("impact_impactGlass_heavy_001",.5),Ly("jingle_STEEL15",.5,{at:.6})],
+      buy:[Ly("casino_chips_stack_3",.5),Ly("interface_confirmation_003",.3)] }
+};
+const SFX=(()=>{ // owner 2026-11-24: "i dont like the cartoony sound ... Make it sound very sharp and ecstatic". Sharp = a hard, bright
+  // attack (a click of high noise) on everything; ecstatic = glassy bell tones and wide bright chords. Made in the page, no files.
+  let ac=null, out=null, on=true, armed=false;
+  const A=()=>{ if(!armed||!on) return null; if(!ac){ try{ ac=new (window.AudioContext||window.webkitAudioContext)(); const c=ac.createDynamicsCompressor(); c.threshold.value=-14; c.ratio.value=6; c.connect(ac.destination); out=ac.createGain(); out.gain.value=.9; out.connect(c); }catch(e){ return null; } } if(ac.state==="suspended") ac.resume(); return ac; };
+  const env=(g,t,d,v,atk=.003)=>{ g.gain.setValueAtTime(.0001,t); g.gain.linearRampToValueAtTime(v,t+atk); g.gain.exponentialRampToValueAtTime(.0001,t+d); };
+  // THE SET'S DIALS (SYN, above) reach every made sound through these five voices. TR logs what each voice plays, only while the
+  // local ?sndtest check is running.
+  let role="ui"; // the ROLE of the sound playing now (set on every call, below), for a mixed set
+  const Q=()=>{ const s=SYN[SND.style]||SYN.a; return s.mix?(SYN[s.mix[role]]||SYN.a):s; };
+  const TR=v=>{ if(window.__sndTrace) window.__sndTrace.push(v.map(x=>typeof x==="number"?Math.round(x*1000)/1000:x).join(" ")); };
+  // a plain voice: type, pitch (and a slide), length, level. Low voices (thocks, the heartbeat, the drone) follow the set's `low`,
+  // higher ones its `pitch`; the drone's saw takes the set's `wave`
+  const osc=(f,d,o={})=>{ const q=o.raw?{}:Q(), m=f<320?(q.low||1):(q.pitch||1), type=o.type==="sawtooth"&&q.wave?q.wave:(o.type||"sine");
+    TR(["o",type,f*m,(o.to||0)*m,d,o.v||.1,o.at||0]); const a=A(); if(!a) return;
+    const t=a.currentTime+(o.at||0), x=a.createOscillator(), g=a.createGain(); x.type=type; x.frequency.setValueAtTime(f*m,t); if(o.to) x.frequency.exponentialRampToValueAtTime(o.to*m,t+d); if(o.det) x.detune.value=o.det; env(g,t,d,(o.v||.1)*(type==="square"?.5:type==="triangle"?1.3:1),o.atk); x.connect(g); g.connect(out); x.start(t); x.stop(t+d+.05); };
+  // a glassy bell: one sine bending another (FM). ratio and depth set how metallic it is; a set's bellWave plays a plain filtered wave
+  const bell=(f,d,o={})=>{ const q=o.raw?{}:Q(); f=Math.min(f*(q.pitch||1),5200); d*=q.ring||1; const ratio=q.ratio||o.ratio||3.01, depth=(o.depth||2.2)*(q.depth||1);
+    TR(["b",q.bellWave||"fm",f,d,ratio,depth,o.v||.1,o.at||0]); const a=A(); if(!a) return; const t=a.currentTime+(o.at||0), g=a.createGain();
+    if(q.bellWave){ const x=a.createOscillator(), lp=a.createBiquadFilter(); x.type=q.bellWave; x.frequency.value=f; lp.type="lowpass"; lp.frequency.value=4200; env(g,t,d,(o.v||.1)*.45,.002); x.connect(lp); lp.connect(g); g.connect(out); x.start(t); x.stop(t+d+.05); return; }
+    const c=a.createOscillator(), m=a.createOscillator(), mg=a.createGain(); c.frequency.value=f; m.frequency.value=f*ratio;
+    mg.gain.setValueAtTime(f*depth,t); mg.gain.exponentialRampToValueAtTime(f*.05,t+d); m.connect(mg); mg.connect(c.frequency); env(g,t,d,o.v||.1,.002); c.connect(g); g.connect(out); c.start(t); m.start(t); c.stop(t+d+.05); m.stop(t+d+.05); };
+  // noise through a filter: "hp" for a sharp click or crack, "bp" for a sweep. The set's `air` moves every filter
+  const nz=(d,o={})=>{ const q=o.raw?{}:Q(), k=q.air||1, f0=Math.min((o.f||5000)*k,9000), f1=o.to?Math.min(o.to*k,9000):0;
+    TR(["n",o.type||"highpass",f0,f1,d,o.v||.08,o.at||0]); const a=A(); if(!a) return;
+    const t=a.currentTime+(o.at||0), n=Math.max(1,Math.floor(a.sampleRate*d)), buf=a.createBuffer(1,n,a.sampleRate), ch=buf.getChannelData(0); for(let i=0;i<n;i++) ch[i]=Math.random()*2-1;
+    const src=a.createBufferSource(), f=a.createBiquadFilter(), g=a.createGain(); src.buffer=buf; f.type=o.type||"highpass"; f.Q.value=o.q||.8; f.frequency.setValueAtTime(f0,t); if(o.to) f.frequency.exponentialRampToValueAtTime(f1,t+d);
+    if(o.swell){ g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(o.v||.08,t+d*.92); g.gain.linearRampToValueAtTime(.0001,t+d); } else env(g,t,d,o.v||.08,.001); src.connect(f); f.connect(g); g.connect(out); src.start(t); };
+  // the front edge on every sound. Owner 2026-11-24: the first version was "TOO sharp ... it should have a satisfying + sharp feel":
+  // so the click is lower and rounder (a band round 3 kHz, not a hiss above 6.5 kHz) and sits on a short low THOCK, like a good key press.
+  // A set moves the band (snapF) and the weight (snapK); the thock follows its `low`.
+  const snap=(v=.07,at=0)=>{ const q=Q(), k=q.snapK||1; nz(.014,{type:"bandpass",f:q.snapF||3100,q:1.1,v:v*.8*k,at,raw:true}); osc(210,.045,{to:120,v:v*1.5*k,at,atk:.002}); };
+  // a wide bright chord: detuned saws (or the set's wave) through an opening filter
+  const chord=(notes,d,o={})=>{ const q=Q(), p=q.pitch||1, w=q.wave||"sawtooth", b=q.bright||1, lv=w==="square"?.55:w==="triangle"?1.6:1;
+    TR(["c",w,notes.map(n=>Math.round(n*p)).join("/"),d,(o.f1||7000)*b,o.v||.12,o.at||0]); const a=A(); if(!a) return;
+    const t=a.currentTime+(o.at||0), f=a.createBiquadFilter(), g=a.createGain(); f.type="lowpass"; f.Q.value=1.2; f.frequency.setValueAtTime((o.f0||900)*b,t); f.frequency.exponentialRampToValueAtTime((o.f1||7000)*b,t+Math.min(.18,d*.4)); f.frequency.exponentialRampToValueAtTime(1400*b,t+d);
+    env(g,t,d,(o.v||.12)*lv,.004); f.connect(g); g.connect(out); notes.forEach(n=>[-9,0,8].forEach(dt=>{ const x=a.createOscillator(); x.type=w; x.frequency.value=n*p; x.detune.value=dt; x.connect(f); x.start(t); x.stop(t+d+.05); })); };
+  const N={C4:261.6,E4:329.6,G4:392,C5:523.3,D5:587.3,E5:659.3,G5:784,A5:880,B5:987.8,C6:1046.5,D6:1174.7,E6:1318.5,G6:1568,A6:1760,C7:2093,E7:2637,G7:3136};
+  const run=(notes,step,o={})=>notes.forEach((n,i)=>bell(n,o.d||.3,{at:(o.at||0)+i*step,v:o.v||.08,ratio:o.ratio||3.01,depth:o.depth||1.6}));
+  // a picked click sample, each layer brought to the same peak; false when A is picked or it can't play here
+  // samples: each layer brought to its own peak, then to its level; false when a set has no such sound or it can't play here (then
+  // the made-in-page sound plays instead). SAMPLE_GAIN brings a sample near the made sounds' loudness (an estimate, not measured).
+  const SAMPLE_GAIN=.6;
+  const lay=(ls,at=0,rate=1,k=1)=>{ if(!ls||!ls.length||ls.some(l=>!SND_BUF[l.s])) return false; TR(["s",ls.map(l=>l.s+"@"+(l.r||1)*rate).join("+"),at]); const a=A(); if(!a) return true;
+    ls.forEach(l=>{ const {d,pk}=SND_BUF[l.s], src=a.createBufferSource(), g=a.createGain(); src.buffer=d; src.playbackRate.value=(l.r||1)*rate;
+      g.gain.value=SAMPLE_GAIN*l.v*k/pk; src.connect(g); g.connect(out); src.start(a.currentTime+at+(l.at||0)); }); return true; };
+  const part=k=>(SETS[SND.style]||{})[k];
+  // the click: the set's own (a sample set's click sample; false for a made set, which then plays its made click)
+  const clk=(at=0,rate=1,k=1)=>lay(part("click"),at,rate,k);
+  const arm=()=>{ armed=true; }; window.addEventListener("pointerdown",arm,true); window.addEventListener("keydown",arm,true);
+  const api={ set(v){ on=v; },
+    hover(){ if(lay(part("hover"))) return; nz(.01,{type:"bandpass",f:2600,q:1.2,v:.02}); osc(520,.03,{to:420,v:.02}); },
+    click(){ if(clk()) return; snap(.085); osc(120,.07,{to:70,v:.1}); bell(880,.11,{v:.05,depth:.7,ratio:2}); },            // thock, then a small clean ring
+    pick(){ if(clk(0,1,.85)){ if(!lay(part("ring"))){ bell(784,.1,{v:.05,depth:.7,ratio:2}); bell(1175,.14,{v:.055,depth:.7,ratio:2,at:.06}); } return; } snap(.065); bell(784,.1,{v:.05,depth:.7,ratio:2}); bell(1175,.14,{v:.055,depth:.7,ratio:2,at:.06}); },
+    open(){ if(clk()){ clk(.07,1.12,.76); return; } snap(.085); osc(150,.06,{to:85,v:.11}); snap(.06,.07); osc(300,.04,{to:210,v:.05,at:.07}); },   // owner: no NOISE on opening, it is a CLICK: a firm double click (clack-click), nothing else
+    close(){ if(lay(part("close"))) return; snap(.065); nz(.14,{type:"bandpass",f:3400,to:700,q:1.8,v:.04}); osc(160,.08,{to:80,v:.07}); },
+    pop(){ if(lay(part("pop"))) return; snap(.065); bell(660,.13,{v:.055,depth:.8,ratio:2}); },
+    slam(){ if(lay(part("slam"))) return; snap(.1); osc(150,.13,{to:52,v:.2}); nz(.06,{f:3200,v:.06}); },
+    hit(){ if(lay(part("hit"))) return; snap(.12); osc(190,.15,{to:48,v:.24}); bell(420,.2,{v:.07,ratio:2.76,depth:3}); },
+    flash(){ if(lay(part("flash"))) return; snap(.14); osc(240,.22,{to:40,v:.26}); nz(.16,{f:2600,v:.08}); bell(880,.3,{v:.06,ratio:1.41,depth:4}); },
+    // THE SUMMON, BY RARITY r (0 common, 1 rare, 2 epic, 3 legendary, 4 mythic). Common and rare sound the SAME; epic is slightly
+    // tenser; legendary is tense; mythic is very tense. The tension is in the roll, the build-up and the weight of the reveal.
+    tick(j,r){ const t=Math.max(0,r-1), vary=part("tickVary"), tk=vary?[Ly(vary[j%vary.length],.25)]:part("tick");
+      if(lay(tk,0,1+j*.03+t*.04)){ if(t>=1&&j%2===0) lay(part("tense"),0,1,1+t*.3); return; } snap(.05+t*.008); bell(1200+j*38+t*60,.06,{v:.05,depth:1+t*.5,ratio:t>=2?2.76:3.01}); if(t>=1&&j%2===0) osc(70+t*6,.09,{v:.05+t*.025,type:"sine"}); },
+    drone(d,r){ const t=Math.max(0,r-1); if(!t) return; // a low, rising pressure under the build-up: the higher the rarity, the louder and the more it grinds
+      osc(55,d,{to:55*(1+t*.35),type:"sawtooth",v:.035+t*.02,atk:d*.5}); if(t>=2) osc(58.3,d,{to:58.3*(1+t*.35),type:"sawtooth",v:.03+t*.015,atk:d*.5});
+      nz(d,{type:"bandpass",f:400,to:2500+t*1800,q:3,v:.03+t*.02,swell:true}); },
+    beat(i,r){ const t=Math.max(0,r-1); if(lay(part("beat"),0,1,1+t*.1)){ lay(part("beat"),.17,1,.7); return; } osc(62,.16,{to:38,v:.2+t*.04}); osc(62,.12,{to:38,v:.14,at:.17}); }, // a heartbeat in the dark before a mythic
+    climb(i,r){ const t=Math.max(0,r-1), f=[523.3,659.3,830.6,1046.5][Math.min(i,3)]; if(lay(part("climb"),0,.9+Math.min(i,3)*.12,1+t*.1)) return; snap(.12); osc(110*(1+i*.2),.2,{to:60,v:.2}); bell(f,.4,{v:.09,ratio:t>=3?1.41:2.5,depth:2.5+t}); bell(f*1.06,.35,{v:.05*t,ratio:2.5,depth:3}); nz(.3,{type:"bandpass",f:1500,to:6000+i*900,q:2,v:.05,swell:true}); },
+    hush(){ nz(.5,{type:"bandpass",f:5000,to:300,q:1.5,v:.07}); },
+    win(r){ const t=Math.max(0,r-1); if(lay(part("win"+Math.min(t,3)))) return; snap(.14);
+      if(t===0){ run([N.C6,N.E6,N.G6,N.C7],.055,{v:.08}); chord([N.C5,N.E5,N.G5],.5,{v:.07}); nz(.35,{f:7000,v:.035}); }
+      else if(t===1){ osc(140,.28,{to:44,v:.24}); chord([N.C5,N.E5,N.G5,N.B5],.8,{v:.09}); run([N.C6,N.E6,N.G6,N.B5*2,N.C7,N.E7],.05,{v:.085}); nz(.5,{f:7000,v:.04}); }
+      else if(t===2){ osc(120,.5,{to:34,v:.3}); nz(.2,{f:2400,v:.1}); chord([N.C4,N.G4,N.C5,N.E5,N.G5],1.5,{v:.12,f1:9000}); chord([N.C5,N.E5,N.G5,N.C6],1.3,{v:.07,at:.16});
+        run([N.C6,N.E6,N.G6,N.C7,N.E7,N.G7,N.C7,N.G7],.055,{v:.09,at:.05}); run([N.E6,N.G6,N.C7,N.E7],.09,{v:.06,at:.6,d:.5}); nz(.9,{f:7500,v:.05}); }
+      else { osc(100,.9,{to:26,v:.36}); osc(200,.5,{to:30,v:.2}); nz(.35,{f:1800,v:.14}); chord([N.C4,N.G4,N.C5,N.D5,N.G5,N.C6],2.4,{v:.14,f1:11000}); chord([N.E5,N.G5,N.B5,N.D6],2.1,{v:.08,at:.2}); chord([N.C5,N.E5,N.G5,N.C6,N.E6],1.8,{v:.08,at:.75});
+        run([N.C6,N.D6,N.E6,N.G6,N.A6,N.C7,N.E7,N.G7,N.E7,N.G7,N.C7*2],.045,{v:.1,at:.04}); run([N.G6,N.C7,N.E7,N.G7,N.C7*2],.07,{v:.08,at:.7,d:.6}); run([N.C7,N.E7,N.G7],.12,{v:.06,at:1.3,d:.8}); nz(1.6,{f:8000,v:.06}); }
+    },
+    buy(){ if(lay(part("buy"))) return; snap(.09); osc(110,.1,{to:60,v:.12}); run([N.G5,N.C6,N.E6,N.G6],.055,{v:.07,depth:1}); } };
+  // every sound call first names its ROLE, so a mixed set (I) voices it with the right set's dials
+  Object.keys(ROLE).forEach(k=>{ const f=api[k]; api[k]=(...a)=>{ role=ROLE[k]; return f(...a); }; });
+  return api;
+})();
+// ---------------------------------------------------------------- windows (948 x 612, the game's own units)
+const kit=id=>KITS.find(k=>k.id===id);
+const stateOf=id=>id===WEARING?"EQUIPPED":OWNED[id]?"OWNED":"NOT OWNED";
+function winFrame(title,tone,sub,body){
+  return `<i class="body ht" data-ctx="${title.toLowerCase()}" style="--h:${glassHue(tone)}"></i>`+
+    P(-28,-14,`<div class="ttlpop ${WIN.fresh?"ttl":""}">${banner(Math.max(300,title.length*37+150),78,title.toUpperCase(),tone,{fs:42})}</div>`,"l","z-index:3")+
+    P(934,14,`<div data-close="1" style="cursor:pointer">${btn(24,K.red,"x")}</div>`,"","z-index:3")+
+    (sub?P(46,54,note(sub,13.5,820),"l"):"")+body;}
+function tileHTML(k,x,y,pick,w=132,h=112,noState=false){
+  const st=k?stateOf(k.id):"PLANNED", dimmed=!k||st==="NOT OWNED", col=k?(dimmed?darker(k.c,.3):k.c):"#7a68c8";
+  const ic=!k?"more":st==="NOT OWNED"?"lock":"c-"+k.id.toLowerCase(), s=h/112;
+  return `<div class="tile ht ${pick?"pick":""}" ${k?`data-pick="${k.id}"`:""} style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;--c:${col};--d:${darker(col,.2)}"><div class="c">`+
+    `<span class="dot ht" style="width:${42*s}px;height:${42*s}px;margin-top:${8*s}px;position:relative;--c:${DISC};--d:#4b3190;--cell:7px;--hd:180deg;border-width:2.4px">${svg(ic,24*s,dimmed?"#b9bfd6":"#fff").replace('class="ic"','class="ic" style="position:relative"')}</span>`+
+    `<span style="margin-top:${6*s}px">${txt(k?k.id.toUpperCase():"SOON",Math.max(12,17*s))}</span>${noState?"":`<span style="margin-top:${5*s}px">${txt(st,Math.max(12,11.5*s),{c:CREAM,o:1.4})}</span>`}</div></div>`;}
+function skillRow(x,y,key,name,ic,col,cd,w,o={}){
+  const r=o.r||22, fs=o.fs||18;
+  return P(x+r,y+r,btn(r,col,ic,{key}))+P(x+2*r+16,y+r*.62,txt(name,fs),"l")+
+    P(x+w,y+r*.62,`<div class="tagrow" style="gap:4px">${svg("clock",fs,"#fff")}${txt(cd,fs,{c:"#FFE14D"})}${txt("SEC",Math.max(12,fs*.62),{o:1.4})}</div>`,"r")+
+    (o.note?P(x+2*r+16,y+r*1.05+4,note(o.note,o.nfs||12.5,w-2*r-20),"tl"):"");}
+// THE CLASS SLOTS (owner 2026-11-24, "like roblox's blue lock rivals system"): no class inventory. You SUMMON on this page;
+// the class you get REPLACES the one in the slot you picked. Two slots are free, more are bought with Robux only.
+// Samples: which classes sit in the slots. His to set: rarity names, every chance, what a summon costs, slot prices.
+const SLOTS=[{id:"Tempest",use:true},{id:"Bruiser"},{lock:true},{lock:true}];
+const RARITIES=[["COMMON",K.slate],["RARE",K.blue],["EPIC",K.purple],["LEGENDARY",K.gold],["MYTHIC",K.red]]; // sample names
+const WHEEL={cx:884,cy:570,R:480}, wheelAt=a=>[Math.round(WHEEL.cx-WHEEL.R*Math.cos(a*Math.PI/180)),Math.round(WHEEL.cy-WHEEL.R*Math.sin(a*Math.PI/180))]; // the slots' circle on the Classes screen: 0 degrees = straight left of its centre, positive = up
+function slotBubble(i,cx,cy,r,pick,enter,ang){ // `enter`: "popin" with a delay as the screen arrives, "hit" when a new class has just landed in it // a class slot, built like the HUD's round buttons: a ring in the class's colour, the class's icon on the
+  // dark disc, the slot's number in a badge, the class's name on a pill hanging off the bottom. A locked slot is grey with a lock and ROBUX.
+  const sl=SLOTS[i], k=sl.id&&kit(sl.id), col=k?k.c:"#6b7494", ic=!k?"lock":"c-"+k.id.toLowerCase();
+  const fs=Math.max(12,r*.27), ph=fs*1.75, name=k?k.id.toUpperCase():"ROBUX", pw=Math.max(r*1.5,name.length*fs*.74+(k&&sl.use?fs*2.6:fs*1.9));
+  const pill=k&&sl.use?banner(pw,ph,name,col,{fs,bw:2.6,cell:7}):para(pw,ph,k?col:"#7a68c8",txt(name,fs,{c:k?"#fff":"#dfe4f2"}),{lean:.4,bw:2.6,cell:7});
+  return P(cx,cy,`<div class="bub ${pick?"pick":""} ${k?"":"locked"}" data-slot="${i}" ${ang!=null?`data-ang="${ang}"`:""} ${k?`data-pick="${i}"`:""} style="width:${2*r}px;height:${2*r}px;animation-delay:${-i*.8}s">${btn(r,col,ic,{dim:!k})}`+
+    `<b class="keytab" style="position:absolute;left:${r*.24}px;top:${r*.24}px;transform:translate(-50%,-50%);--ks:${Math.max(22,r*.44)}px">${i+1}</b>`+
+    `<div style="position:absolute;left:50%;top:${2*r-ph*.42}px;transform:translateX(-50%)">${pill}</div>`+
+    (r>=50&&k?`<div style="position:absolute;left:50%;top:${2*r+ph*.72}px;transform:translateX(-50%)">${txt(sl.use?"IN USE":"SAVED",Math.max(12,r*.17),{c:sl.use?"#fff":CREAM,o:1.5})}</div>`:"")+`</div>`,enter?enter[0]:"",enter?`animation-delay:${enter[1]}s`:"");}
+// WHICH CLASS SITS IN WHICH RARITY IS A SAMPLE (ordered here by the classes' Coin prices in the game today): his to set.
+const RARITY_OF={Tempest:0,Bruiser:1,Inferno:2,Frost:2,Trickster:3,Beast:3,Dragon:4};
+const rarOf=id=>RARITY_OF[id]??0;
+function rarityList(cx,y,w,o={}){ // owner 2026-11-24: each rarity is a TITLE in its own colour, and under it the names of its classes. Rarest first. No ODDS button.
+  const th=o.th||42, tfs=o.tfs||34, nfs=o.nfs||17, line=o.line||25, gap=o.gap||16; let h="", yy=y, n=0;
+  RARITIES.slice().reverse().forEach(([nm,c],ri)=>{ const r=RARITIES.length-1-ri, d=o.fresh?`animation-delay:${(.1+n*.04).toFixed(2)}s`:"";
+    h+=P(cx,yy+th/2,`<span data-rar="${r}">${txt(nm,tfs,{c})}</span>`,o.fresh?"inR":"",d); yy+=th+2; n++;
+    KITS.filter(k=>k.price>0&&rarOf(k.id)===r).forEach(k=>{ h+=P(cx,yy+line/2,`<span data-cls="${k.id}">${txt(k.id.toUpperCase(),nfs,{c})}</span>`,o.fresh?"inR":"",o.fresh?`animation-delay:${(.1+n*.04).toFixed(2)}s`:""); yy+=line; n++; });
+    yy+=gap; });
+  return h;}
+function moveChip(key,name,ic,col,cd,open){ // owner 2026-11-24: the name right beside its button, an "i" beside the name; hovering or clicking the "i"
+  // shows what the move does AND its cooldown (the cooldown no longer stands in the row). All placeholder text for now.
+  return `<div class="mv ${open?"open":""}">${btn(26,col,ic,{key})}${txt(name,22)}<span class="qm infoi">i</span>`+
+    `<div class="tip">${note("Placeholder: what "+name+" does goes here.",14,250)}<div class="tagrow" style="gap:5px;margin-top:8px">${svg("clock",18,"#fff")}${txt(cd,19,{c:"#FFE14D"})}${txt("SEC COOLDOWN",12.5,{o:1.4})}</div></div></div>`;}
+function classesScene(pick){ // 1920 x 1080, no window: the camera is close on your character, the pieces stand on the world
+  pick=SLOTS[pick]&&SLOTS[pick].id?pick:0; const sl=SLOTS[pick], k=kit(sl.id), CX=770, F=WIN.fresh, up=d=>[F?"inUp":"",F?`animation-delay:${d}s`:""], rc=RARITIES[rarOf(k.id)]; let h="";
+  h+=`<i style="position:absolute;left:${CX-148}px;top:712px;width:296px;height:46px;border-radius:50%;background:rgba(10,14,30,.36)"></i>`;
+  h+=`<div class="${F||WIN.rolled?"popin2":""}" style="position:absolute;left:${CX-128}px;top:330px;transform-origin:50% 100%"><div class="breathe" style="position:relative;width:256px;height:397px">${ava(64,k.c)}</div></div>`;
+  h+=P(40,172,`<div class="ttlpop ${F?"ttl":""}">${banner(380,78,"CLASSES",K.blue,{fs:42})}</div>`,"l","z-index:3")+P(476,172,`<div data-close="1">${btn(28,K.red,"x")}</div>`,"","z-index:3");
+  // your slots: a WHEEL on an arc round you (owner 2026-11-24: "if u slect one above, it move downrds, if u select something downwards, it
+  // should move up"). The picked slot sits in the big middle spot; the slots before it hang below, the ones after it stand above. Picking
+  // another turns the wheel: drawLobby() slides every circle from where it was to its new spot (slotSpots / slotSlide).
+  // owner, same day: "it should keep the circular shape": every spot is ON ONE CIRCLE (WHEEL), and a circle travels ALONG that circle.
+  const SPOT={"-3":[-62,34],"-2":[-44,38],"-1":[-27,58],"0":[0,92],"1":[27,64],"2":[50,50],"3":[65,42]}; // [angle on the wheel in degrees, radius of the slot]
+  SLOTS.forEach((_,i)=>{ const [a,r]=SPOT[i-pick], [x,y]=wheelAt(a); h+=slotBubble(i,x,y,r,i===pick,F?["popin",(.08+i*.07).toFixed(2)]:(WIN.rolled&&i===pick?["hit",0]:null),a); });
+  const nw=Math.max(270,k.id.length*30+140);
+  h+=P(CX,792,`<div style="position:relative">${para(nw,60,k.c,txt(k.id.toUpperCase(),34),{lean:.4})}${WIN.rolled?pills(nw,60,palette(k.c),"lr"):""}</div>`,WIN.rolled?"hit":up(.12)[0],up(.12)[1]);
+  h+=P(CX,840,txt(rc[0],17,{c:rc[1],o:1.9}));
+  h+=P(CX,894,`<div style="display:flex;gap:56px;align-items:center">${moveChip("Q",k.q,MV(k.q),k.c,"4")}${moveChip("R",k.r,MV(k.r),k.c,"6",WIN.tip)}</div>`,up(.17)[0],"z-index:4;"+up(.17)[1]);
+  h+=P(sl.use?CX:CX-110,976,`<div data-summon="1" class="pulse">${banner(sl.use?620:500,72,"SUMMON",K.pink,{fs:34})}</div>`,...up(.22)); // the long button under you
+  if(!sl.use) h+=P(CX+270,976,`<div data-use="1">${banner(200,72,"USE",K.green,{fs:30,spark:false})}</div>`,...up(.26));
+  h+=P(CX,1036,note(`A summon REPLACES the class in slot ${pick+1}. Your other slot is kept.`,16,640,{st:"text-align:center"}));
+  // the rarities: each a title in its own colour with its classes' names under it, rarest first. They slide in from the right.
+  h+=P(1560,176,`<div style="rotate:-5deg">${txt("RARITIES",58,{o:3.6})}</div>`,F?"inR":"")+rarityList(1560,248,280,{fresh:F});
+  h+=P(1560,800,note("Which class sits under which rarity is a sample: yours to set.",13.5,300,{st:"text-align:center"}),"","transform:translate(-50%,0)");
+  return `<div style="display:contents;--p3:var(--pr-fight)">${h}</div>`;}
+function askSummon(){ // pressing SUMMON: warn first when the class in the picked slot is of a rarity the player asked to be warned about
+  const ls=document.getElementById("ls"), p=SLOTS[WIN.pick]&&SLOTS[WIN.pick].id?WIN.pick:0, k=kit(SLOTS[p].id), r=rarOf(k.id), rc=RARITIES[r];
+  if(WIN.busy||ls.querySelector(".ask:not(.closing)")) return;
+  if(!(WARN.on&&WARN.rar[r])){ summonPlay(); return; }
+  SFX.pop();
+  // owner 2026-11-24: "less words more warning": WARNING big and red, what you lose, two buttons, and the SUMMON one is the loud one
+  ls.insertAdjacentHTML("beforeend",`<div class="ask">${warnCard(k,rc,WARN.style)}</div>`); }
+function warnCard(k,rc,style){ // owner 2026-11-24: the plain dark box "looks too ai"; of A Blade, B Tape, C Swap he took the TAPE one, "but redesign ti".
+  // PICKED B1 (owner 2026-11-25: "the warning is good how it is"); B2 Barrier and B3 Striped frame are no longer offered.
+  const NAME=k.id.toUpperCase(), ic="c-"+k.id.toLowerCase(), nfs=NAME.length>8?46:54, red=K.red;
+  const yes=`<div data-askyes="1" class="hotbtn pulse">${banner(300,68,"SUMMON",K.pink,{fs:32})}</div>`, no=`<div data-askno="1">${para(170,48,"#5e4aa8",txt("KEEP IT",18,{c:"#dfe4f2"}),{})}</div>`;
+  const win=(x,y,w,h)=>`<div class="win" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;--h:${red}"><i class="body ht" style="--h:${red}"></i></div>`;
+  // B1, BIG WORD: one fat tape with cut ends strapped across a glass card, a huge red WARNING sitting on it; the class's badge beside its name
+  return `<div class="wc">${win(0,46,640,324)}<div class="tapecut" style="top:40px"><i class="tape2"></i></div>`+
+    P(320,74,`<div style="rotate:-3deg">${txt("WARNING",74,{c:red})}</div>`)+
+    // 2026-11-25 polish: the badge and its words, and the two buttons, each sit as one group in the card's middle (they hung left before)
+    P(320,204,`<div style="display:flex;align-items:center;gap:30px">${btn(58,k.c,ic)}<div style="display:flex;flex-direction:column;align-items:flex-start;gap:7px">`+
+      `${txt("YOU WILL LOSE",19,{o:1.8})}${txt(rc[0],22,{c:rc[1]})}${txt(NAME,nfs,{c:rc[1]})}</div></div>`)+
+    P(320,326,`<div style="display:flex;align-items:center;gap:26px">${yes}${no}</div>`)+`</div>`; }
+function rollCard(k,big,final){ // one class as it rolls past: its rarity as the title, its name huge
+  const rc=RARITIES[rarOf(k.id)];
+  return `${final?txt("NEW CLASS!",38,{c:"#fff6e2"}):""}${para(big*2.6,big*.5,rc[1],txt(rc[0],big*.23),{lean:.4,cell:10})}${txt(k.id.toUpperCase(),big,{c:rc[1]})}${final?txt("INTO SLOT "+((SLOTS[WIN.pick]&&SLOTS[WIN.pick].id?WIN.pick:0)+1),26,{c:"#fff6e2"}):""}`;}
+function summonPlay(force){ // THE SUMMON, FULL SCREEN. Slower than before (owner 2026-11-24), because skipping it is a Robux purchase.
+  //   every rarity: the classes roll past, slowing (about 4 s)
+  //   EPIC: a short held breath before the reveal
+  //   LEGENDARY: a build-up: the rarity climbs RARE > EPIC > LEGENDARY on a hidden card, shaking harder each step
+  //   MYTHIC: a longer one: it climbs to LEGENDARY, the screen goes dark, a heartbeat, then MYTHIC
+  // The sound follows the same rarity. In the mock the result is random (a sample); in the game the SERVER rolls first and all of
+  // this only plays its answer back. `force` (the test buttons) asks for a rarity: a list of rarity numbers.
+  if(WIN.busy) return; const ls=document.getElementById("ls"), p=SLOTS[WIN.pick]&&SLOTS[WIN.pick].id?WIN.pick:0;
+  const held=SLOTS.map(x=>x.id), all=KITS.filter(c=>c.price>0);
+  let pool=force?all.filter(c=>force.includes(rarOf(c.id))&&c.id!==SLOTS[p].id):all.filter(c=>!held.includes(c.id)); if(!pool.length) pool=all.filter(c=>c.id!==SLOTS[p].id);
+  const got=pool[Math.floor(Math.random()*pool.length)], r=rarOf(got.id), rc=RARITIES[r];
+  WIN.busy=true; let over=false, revealed=false, timers=[];
+  const T=(fn,ms)=>{ const id=setTimeout(fn,ms); timers.push(id); return id; }, stop=()=>{ timers.forEach(clearTimeout); timers=[]; };
+  const robux=`<span class="qm" style="width:auto;padding:0 8px;height:28px;font-size:15px;border-radius:99px">R$</span>`;
+  ls.insertAdjacentHTML("beforeend",`<div class="roll"><i class="tint"></i><i class="rays"></i><div class="slot"><div class="in2"></div></div>`+
+    `<div class="cap skipcap" style="bottom:54px">${note("Press anywhere to skip",17,400,{st:"text-align:center"})}</div></div>`); // owner 2026-11-24: no skip BUTTON; trying to skip is what brings up the purchase
+  const o=ls.querySelector(".roll"), box=o.querySelector(".in2");
+  const land=()=>{ if(over) return; over=true; stop(); const done=()=>{ o.remove(); SLOTS[p].id=got.id; WIN.rolled=true; drawLobby(); WIN.rolled=false; WIN.busy=false; SFX.pop(); };
+    if(!ls.classList.contains("rm")){ o.classList.add("out"); setTimeout(done,210); } else done(); };
+  const reveal=()=>{ if(revealed) return; revealed=true; stop(); o.classList.remove("tense","t2","dark","lit"); o.style.setProperty("--rc",rc[1]); o.classList.add("won");
+    const sk=o.querySelector(".skipcap"); sk&&sk.remove(); const b=o.querySelector(".buy"); b&&b.remove();
+    const fx=r>=4?4:r===3?3:0, tones=[rc[1],lighter(rc[1],.5),"#fff"];
+    if(fx){ o.classList.add("fx"+fx); let x=""; // legendary: one shockwave ring, a ring of twinkles, a glow. mythic: a flash in its colour, a quake, four rings, a second set of rays, twice the twinkles, confetti
+      for(let i=0;i<(fx===4?4:1);i++) x+=`<i class="ring" style="animation-delay:${(i*.17).toFixed(2)}s"></i>`;
+      const nt=fx===4?24:10; for(let i=0;i<nt;i++){ const a=i/nt*Math.PI*2+.3, rad=(fx===4?360:430)+(i%3)*(fx===4?170:60);
+        x+=`<span class="tw" style="left:calc(50% + ${(Math.cos(a)*rad).toFixed(0)}px);top:calc(50% + ${(Math.sin(a)*rad*.6).toFixed(0)}px);animation-delay:${(-(i*.19)%1.1).toFixed(2)}s">${spark(fx===4?46-(i%3)*10:32,(i%2)?"#fff":lighter(rc[1],.5))}</span>`; }
+      if(fx===4){ x+=`<i class="rays rays2"></i><i class="flashc"></i>`; const cc=[rc[1],"#fff",K.gold,lighter(rc[1],.5),K.pink];
+        for(let i=0;i<30;i++) x+=`<i class="conf" style="left:${(i/30*100+1.5).toFixed(1)}%;background:${cc[i%cc.length]};--d:${(1.7+(i%5)*.32).toFixed(2)}s;--dl:${(-(i*.27)).toFixed(2)}s;--dx:${((i%7)-3)*34}px"></i>`; }
+      o.querySelector(".slot").insertAdjacentHTML("beforebegin",x);
+      T(()=>box.insertAdjacentHTML("beforeend",pills(980,430,tones,"lrb")),330); if(fx===4){ T(()=>box.insertAdjacentHTML("beforeend",pills(1300,560,tones,"lrb")),660); T(()=>box.insertAdjacentHTML("beforeend",pills(760,360,tones,"lr")),1050); } }
+    box.className="in2"; o.querySelector(".slot").className="slot land"; box.innerHTML=rollCard(got,fx===4?196:fx===3?180:170,true)+pills(700,330,tones,"lrb"); SFX.win(r); T(land,2600+Math.max(0,r-2)*700); };
+  const hidden=tier=>{ const tc=RARITIES[tier]; o.style.setProperty("--rc",tc[1]); o.classList.add("lit"); box.className="in2"; void box.offsetWidth; box.className="in2 climb";
+    box.innerHTML=`${para(390,75,tc[1],txt(tc[0],34),{lean:.4,cell:10})}${txt("? ? ?",150,{c:"#fff"})}`; };
+  const build=()=>{ // what happens between the last tick and the reveal, by rarity
+    if(r<=1){ reveal(); return; }
+    if(r===2){ hidden(2); o.classList.add("tense"); o.style.setProperty("--sh","2px"); SFX.drone(.7,r); SFX.climb(1,r); T(reveal,700); return; }
+    const gap=r===3?640:720; SFX.drone((r===3?3:5)*gap/1000,r); o.classList.add("tense");
+    [1,2,3].forEach((tier,i)=>T(()=>{ hidden(tier); o.style.setProperty("--sh",(3+i*3)+"px"); if(i===2) o.classList.add("t2"); SFX.climb(i,r); },i*gap));
+    if(r===3){ T(reveal,3*gap+120); return; }
+    T(()=>{ o.classList.remove("tense","t2"); o.classList.add("dark"); SFX.hush(); },3*gap+260); // mythic: the dark, a heartbeat, then it breaks
+    T(()=>SFX.beat(0,r),3*gap+700); T(()=>SFX.beat(1,r),3*gap+1350); T(reveal,3*gap+2000); };
+  o.addEventListener("click",e=>{ const t=e.target;
+    if(t.closest("[data-buy]")){ WIN.skipPass=true; const b=document.getElementById("b-skippass"); b&&b.classList.add("on"); SFX.buy(); reveal(); }
+    else if(t.closest("[data-nobuy]")){ SFX.close(); const b=o.querySelector(".buy:not(.closing)"); if(b){ if(ls.classList.contains("rm")) b.remove(); else{ b.classList.add("closing"); setTimeout(()=>b.remove(),200); } } }
+    else if(!revealed){ if(t.closest(".buy")) return; if(WIN.skipPass){ SFX.click(); reveal(); } else if(!o.querySelector(".buy")){ SFX.open();
+        o.insertAdjacentHTML("beforeend",`<div class="buy">${txt("SKIP THE SUMMON",28)}${note("A Robux purchase. The product and its price are yours: nothing here is a price. In the game, Roblox's own purchase window appears here.",15,500,{st:"text-align:center"})}`+
+          `<div style="display:flex;gap:16px;margin-top:6px"><div data-buy="1">${para(230,56,K.green,robux+txt("BUY",24),{gap:10})}</div><div data-nobuy="1">${para(200,56,K.slate,txt("NOT NOW",20))}</div></div></div>`); } }
+    else if(revealed) land(); });
+  if(ls.classList.contains("rm")){ box.innerHTML=txt("SUMMONING",90); T(reveal,1600); return; } // Reduced Motion: nothing moves, the wait is the same idea
+  const steps=18; let j=0;
+  const tick=()=>{ if(revealed) return; if(j>=steps){ build(); return; }
+    const k=all[(j*3+1)%all.length]; box.className="in2"; void box.offsetWidth; box.className="in2 tick"; box.innerHTML=rollCard(k,150,false); SFX.tick(j,r); j++; T(tick,75+j*j*1.3); };
+  tick(); }
+
+function pgShop(){ // Robux items only (owner 2026-11-23). Empty slots: he makes the products and the prices.
+  let h=""; [["PASSES",1],["GEMS",0],["ITEMS",0]].forEach(([n,on],i)=>{h+=P(44+i*178,108,para(168,38,on?K.gold:"#7a68c8",txt(n,17,{c:on?"#fff":"#dfe4f2"}),{cell:8}),"l");});
+  for(let i=0;i<6;i++){ const x=40+(i%3)*296, y=146+Math.floor(i/3)*164;
+    h+=`<div class="slab planned" style="left:${x}px;top:${y}px;width:276px;height:150px"></div>`+P(x+18,y+32,txt("GAMEPASS",25,{c:"#c9cfe6"}),"l")+P(x+18,y+60,note("Yours to name and price.",13.5,240),"l")+P(x+138,y+112,`<div class="prs">${para(244,40,K.green,txt("ROBUX PRICE",15))}</div>`);}
+  return winFrame("Shop",K.gold,"Robux items · your products go here, none are invented",h);}
+function pgInventory(){ // owner 2026-11-24: "inventory is for borders, coins, cosmetics, titles, gems". No classes: they live in their slots.
+  let h=""; [["TITLES",1],["BORDERS",0],["COSMETICS",0]].forEach(([n,on],i)=>{h+=P(44+i*196,108,para(186,38,on?K.green:"#7a68c8",txt(n,17,{c:on?"#fff":"#dfe4f2"}),{cell:8}),"l");});
+  h+=P(886,58,purse(128,34,16),"r");
+  for(let i=0;i<10;i++){ const x=44+(i%5)*172, y=150+Math.floor(i/5)*146;
+    h+=`<div class="slab planned" style="left:${x}px;top:${y}px;width:150px;height:128px"></div>`+P(x+75,y+64,txt("EMPTY",14,{c:"#B3AEE0",o:1.5}));}
+  h+=P(46,468,note("Titles, borders and cosmetics in tabs; your Coins and Gems on their own at the top right, clear of the tabs. My reading of 'coins' and 'gems' here: the page shows how many you have (they are not items in a tab).",14,820),"tl");
+  return winFrame("Inventory",K.green,"Your titles, borders and cosmetics",h);}
+function pgRanked(){
+  const h=`<div class="slab ht" style="left:40px;top:100px;width:500px;height:176px;--c:#7a68c8;--d:#6a58b8"></div>`+P(60,134,txt("COMING LATER",30),"l")+
+    P(60,160,note("This screen is a placeholder. The game has no ranked system, so no ranks, seasons or rewards are shown.",14,450),"tl")+P(60,250,txt("PLANNED",14,{c:"#c9cfe6",o:1.6}),"l");
+  return winFrame("Ranked",K.red,"Planned · not in the game yet",h);}
+const MOVES=[["Click","Punch","A 4-hit string. The first three stun and drag them, the fourth knocks them away."],["R","Your class's attack","Hold it for up to 3 seconds, let go to throw it."],
+ ["Q","Your class's move","Can't be used while stunned."],["Space","Jump","Click in the air to glide a punch at where you point."],["G","Ultimate","When ULT READY shows, land a hit, then press it."],
+ ["Ctrl","Shift lock",""],["Alt","Lock on","The nearest opponent."],["H","This guide",""]];
+function pgMoves(){
+  let h=""; MOVES.forEach((m,i)=>{const x=44+(i%2)*444, y=104+Math.floor(i/2)*112;
+    h+=P(x,y+18,keytab(m[0],34),"l")+P(x+96,y+18,txt(m[1],20),"l")+(m[2]?P(x+96,y+36,note(m[2],13,320),"tl"):"");});
+  return winFrame("Moves",K.teal,"Controls on keyboard and mouse",h);}
+function pgMore(){
+  let h=""; ["Cosmetics","Profile","Leaderboards","Emotes","Codes"].forEach((n,i)=>{const x=44+(i%2)*444, y=118+Math.floor(i/2)*74;
+    h+=P(x,y,txt(n,22,{c:"#dfe4f2"}),"l")+P(x+400,y,txt("PLANNED",14,{c:"#c9cfe6",o:1.6}),"r");});
+  return winFrame("More",K.slate,"Coming later",h);}
+const SETTINGS=[["Fighter row","Shows everyone still standing across the top in a fight.",1],["Camera shake","Shakes your camera on big hits.",1],["Hit flash","Flashes the fighter you hit.",0],["Music","Plays the game's music.",1]];
+// owner 2026-11-24: "hovering ove rthe question mark will give u a description on what it does, similar to the info in moves section":
+// the same piece as the moves' (i): hover or press the ? and the tip pops, here to the right of it so it never covers the row above.
+const setHelp=(name,desc)=>`<div class="mv side" style="gap:10px">${txt(name,20)}<span class="qm infoi">?</span><div class="tip">${note(desc,14,250)}</div></div>`;
+function pgSettings(){
+  let h=""; SETTINGS.forEach((s,i)=>{const y=96+i*70;
+    h+=`<div class="inner" style="left:40px;top:${y}px;width:868px;height:58px;border-radius:12px"></div>`+
+      P(60,y+29,setHelp(s[0],s[1]),"l")+
+      `<div class="switch ${s[2]?"on":"off"}" style="left:806px;top:${y+11}px"><span class="kk" style="--fs:14px">${s[2]?"ON":"OFF"}</span><i></i></div>`;});
+  { // the summon warning (owner 2026-11-24): one switch, and which rarities it shows for. Both work in this mock.
+    const y=96+4*70;
+    h+=`<div class="inner" style="left:40px;top:${y}px;width:868px;height:58px;border-radius:12px"></div>`+P(60,y+29,setHelp("Summon warning","Asks before a summon replaces a class."),"l")+
+      `<div class="switch ${WARN.on?"on":"off"}" data-warn="1" style="left:806px;top:${y+11}px;cursor:pointer"><span class="kk" style="--fs:14px">${WARN.on?"ON":"OFF"}</span><i></i></div>`;
+    const y2=y+70;
+    h+=`<div class="inner" style="left:40px;top:${y2}px;width:868px;height:92px;border-radius:12px;${WARN.on?"":"opacity:.45"}"></div>`+P(60,y2+22,txt("Don't warn for:",16,{c:"#dfe4f2",o:1.6}),"l"); // owner 2026-11-24: the row lists what you are NOT warned for; a lit chip = no warning for that rarity
+    RARITIES.forEach(([nm,c],i)=>{ h+=P(60+i*168,y2+62,`<div data-warnr="${i}" style="cursor:pointer;${WARN.on?"":"opacity:.45"}">${para(158,38,!WARN.rar[i]?c:"#5e4aa8",`${!WARN.rar[i]?svg("tick",15,"#fff"):""}${txt(nm,15,{c:!WARN.rar[i]?"#fff":"#aab1cc"})}`,{gap:5,cell:8})}</div>`,"l"); });
+    h+=P(46,y2+112,note("SAVED  ·  Your Coins and classes are saved.",14,700,{st:"opacity:.8"}),"l");
+  }
+  return winFrame("Settings",K.slate,"Fighter row and the summon warning work  ·  the other three don't change anything yet",h);}
+const PAGES={classes:()=>"",inventory:pgInventory,shop:pgShop,ranked:pgRanked,moves:pgMoves,more:pgMore,settings:pgSettings};
+const WIN={pick:0,confirm:null,fresh:false,rolled:false,busy:false};
+// THE SUMMON WARNING (owner 2026-11-24): on by default, and by default only for Epic and above ("rares and commons don't really need the warning").
+const WARN={on:true,rar:[false,false,true,true,true],style:"b1"};
+// the daily quests clipboard (the owner's own idea of 2026-11-20, kept): a board, a clip, a sheet; the new lettering and buttons
+function questBoard(){
+  const rows=[["Play 3 rounds",3,3,"claim"],["Land 40 hits",40,40,"claimed"],["Knock out 5 fighters",1,5,"open"]]; // wording from Core/Quests; counts and Coins are samples
+  let h=`<div class="ht" style="position:absolute;left:0;top:26px;width:560px;height:430px;border-radius:22px;border:4px solid ${INK};--c:#e2a93a;--d:#c98f24;--cell:12px;--hd:180deg"></div>`+
+    `<div style="position:absolute;left:24px;top:60px;width:512px;height:372px;border-radius:10px;border:3px solid ${INK};background:#fffaf0"></div>`+
+    `<div style="position:absolute;left:190px;top:0;width:180px;height:62px;border-radius:14px;border:4px solid ${INK};background:#8F8BD9"></div><div style="position:absolute;left:262px;top:10px;width:36px;height:22px;border-radius:11px;border:4px solid ${INK};background:#e2a93a"></div>`+
+    P(280,98,banner(300,50,"DAILY QUESTS",K.purple,{fs:24}))+`<div style="position:absolute;left:48px;top:136px;width:464px;height:3px;background:${INK};opacity:.25"></div>`+
+    P(520,44,`<div data-close="1" style="cursor:pointer">${btn(22,K.red,"x")}</div>`);
+  rows.forEach((q,i)=>{const y=152+i*92, done=q[1]>=q[2], claimed=q[3]==="claimed";
+    h+=P(70,y+26,`<span class="dot" style="width:34px;height:34px;border-width:3px;background:${done?K.green:"#fff"}">${done?svg("tick",20):""}</span>`)+
+      P(100,y+18,`<span class="t" style="--fs:19px;color:${INK};text-shadow:none;${claimed?"text-decoration:line-through;opacity:.5":""}">${q[0]}</span>`,"l")+
+      `<div style="position:absolute;left:100px;top:${y+38}px;width:230px;height:14px;border-radius:7px;border:2.4px solid ${INK};background:#d9d4c6;overflow:hidden"><i style="display:block;height:100%;width:${Math.min(1,q[1]/q[2])*100}%;background:${K.green}"></i></div>`+
+      P(340,y+45,`<span class="t" style="--fs:13px;color:${INK};text-shadow:none">${q[1]} / ${q[2]}</span>`,"l")+
+      (claimed?P(512,y+26,`<span class="t" style="--fs:16px;color:${INK};text-shadow:none;opacity:.5">CLAIMED</span>`,"r"):
+       q[3]==="claim"?P(512,y+26,`<div class="prs">${para(132,40,K.green,txt("CLAIM",18))}</div>`,"r"):P(512,y+26,`<div class="tagrow" style="gap:5px">${svg("coin",24)}<span class="t" style="--fs:19px;color:${INK};text-shadow:none">60</span></div>`,"r"));});
+  return `<div style="display:contents;--p3:var(--pr-quests)">${h}</div>`;}
+
+// ---------------------------------------------------------------- the fight screen
+const FIGHTERS=[["Bot 7",K.red,2],["Kairo",K.gold,4],["YOU",YOU,3],["Nova",K.teal,1],["Zed",K.purple,0],["Rally",K.orange,1]];
+const F={n:5,stun:false,ctrl:false,ult:true};
+function rowHTML(n,y,o={}){ // the rectangle cards at 5 or fewer; round head shots above that, growing as fighters fall up to a cap (maxp)
+  let h="";
+  if(n<=(o.cardMax||5)){ const w=o.cw||(o.danger?186:148), hh=o.ch||(o.danger?62:50), gap=o.danger?16:10, x0=o.cx-(n*(w+gap)-gap)/2;
+    for(let i=0;i<n;i++){const f=FIGHTERS[i%6]; h+=P(x0+i*(w+gap)+w/2,y,`<div data-fid="${i}">${card(w,hh,f[0],f[1],f[2],{you:f[0]==="YOU",crown:f[0]==="Kairo",out:o.out===i,cls:o.out===i?"sink":""})}</div>`);}
+  } else { const pitch=Math.min(o.maxp||64,(o.span||1150)/n), r=pitch*.42, x0=o.cx-(n-1)*pitch/2, cols=Object.values(K);
+    for(let i=0;i<n;i++){const f=i<6?FIGHTERS[i]:["Bot",cols[(i*4)%cols.length],(i*7)%3]; h+=P(x0+i*pitch,y,`<div data-fid="${i}" class="${o.out===i?"sink":""}">${chip(r,f[1],f[2],{you:f[0]==="YOU",crown:f[0]==="Kairo",tab:o.tab,out:o.out===i})}</div>`);}}
+  return h;}
+// THE LAST FIVE (owner 2026-11-24: "when theres 5 ppl left, i kinda want the ui at the top to popout somehow"). At 5 or fewer standing the
+// cards are a quarter bigger and further apart and the row pops in once. The first try (a red glow, a red wash from the top edge, a heartbeat)
+// was turned down the same day: "is overdoing it, its not like they're in danger or anything". Bigger, one pop, nothing else.
+const DANGER_AT=5;
+// The SMOOTH row: before a redraw each fighter's place and size is read, after it each one is played from its old place and size to its
+// new one (the page's settle curve; with a little spring when head shots stretch into cards). In Roblox: one tween of Position and Size
+// per fighter, the same idea. Nothing moves under Reduced Motion.
+function frowDraw(o={}){ const row=document.getElementById("frow"), dg=F.n<=DANGER_AT, st=row.closest(".stage"), k=st?st.getBoundingClientRect().width/1920:1, old={};
+  row.querySelectorAll("[data-fid]").forEach(e=>{ const r=e.getBoundingClientRect(); old[e.dataset.fid]={x:r.left+r.width/2,y:r.top+r.height/2,w:r.width,h:r.height}; });
+  row.innerHTML=rowHTML(F.n,dg?48:43,Object.assign({cx:960,danger:dg},o)); row.classList.toggle("danger",dg);
+  if(st&&k>0&&!st.classList.contains("rm")) row.querySelectorAll("[data-fid]").forEach(e=>{ const a=old[e.dataset.fid], r=e.getBoundingClientRect(); if(!a||!r.width) return;
+    const dx=(a.x-r.left-r.width/2)/k, dy=(a.y-r.top-r.height/2)/k, sx=a.w/r.width, sy=a.h/r.height, morph=Math.abs(sx-sy)>.15;
+    if(Math.abs(dx)<.5&&Math.abs(dy)<.5&&Math.abs(sx-1)<.01&&Math.abs(sy-1)<.01) return;
+    e.animate([{transform:`translate(${dx}px,${dy}px) scale(${sx},${sy})`,opacity:morph?.5:1},{transform:"none",opacity:1}],{duration:morph?460:380,easing:morph?"cubic-bezier(.2,1.45,.4,1)":"cubic-bezier(.3,.7,.3,1)"}); });
+  const sg=document.querySelector("#fs .dsignable"); if(sg){ sg.classList.toggle("dsign",dg); sg.style.visibility=dg?"":"hidden"; } }
+function fightBase(){
+  let h=`<i class="world" style="background-image:url({{BG_FIGHT}})"></i>`;
+  h+=topbar(44,"60 FPS  ·  42 MS  ·  SINGAPORE",13);
+  h+=P(44,104,btn(26,K.slate,"cog"));
+  h+=`<div id="frow" class="frow nohov ${F.n<=DANGER_AT?"danger":""}" data-go="ko" style="display:block">${rowHTML(F.n,F.n<=DANGER_AT?48:43,{cx:960,danger:F.n<=DANGER_AT})}</div>`;
+  h+=`<div class="feed nohov" id="feed" data-go="ko" style="right:28px;top:22px;gap:10px;display:flex">${feedRow("Kairo","KO","Bot 12",K.gold,K.red,19)}${feedRow("YOU","KO","Bot 3",YOU,K.green,19)}${feedRow("Bot 9","FELL","",K.slate,null,19,"#ffb46e")}</div>`;
+  for(const [n,c,px,py] of [["Bot 7",K.red,546,606],["Nova",K.teal,370,548],["Zed",K.purple,1772,558]]) h+=P(px,py,nameTag(n,c));
+  // your lock-on target: a chevron, the name, and a thin bar shaded by THEIR stagger
+  h+=P(1318,574,`<div style="display:flex;flex-direction:column;align-items:center;gap:3px">${nameTag("Kairo",K.gold)}<div style="width:92px;height:9px;border:2px solid ${INK};background:${DISC};transform:skewX(-22deg)"><i style="display:block;height:100%;width:64%;background:${K.orange}"></i></div>${svg("chev",18,"#fff")}</div>`);
+  const cy=962;
+  h+=P(780,cy+14,`<span id="qb" data-go="coolq">${qBtn()}</span>`);
+  h+=P(1140,cy+14,`<span id="rb" data-go="cool">${btn(46,K.green,"cyclone",{key:"R",label:"Cyclone",cd:3,frac:.62})}</span>`);
+  h+=P(960,cy-14,`<span id="dial" data-go="speed">${btn(78,K.orange,null,{big:"21",sub:"SPEED",frac:.7})}</span>`);
+  h+=P(960,cy+85,`<span id="stag" data-go="speed">${para(196,30,K.orange,txt("STAGGER 12 · 1.7x",15,{o:2}),{lean:.4,cell:8})}</span>`);
+  h+=P(1700,cy+14,`<span>${btn(38,K.slate,"jump",{key:"SPC",label:"Jump"})}</span>`);
+  h+=P(1808,cy+14,`<span data-go="flash">${btn(46,K.red,"punch",{key:"M1",label:"Punch"})}</span>`);
+  h+=P(1754,cy-72,para(176,30,K.slate,`${keytab("H",20,"--kb:2px")}${txt("CONTROLS",14,{o:1.8})}`,{lean:.4,gap:7,cell:8}),"","cursor:pointer",)+`<span id="ultb" class="nohov" data-go="ultuse" style="display:inline">${F.ult?P(1754,cy-118,`<div class="pulse">${banner(230,40,"ULT READY",K.gold,{fs:18,key:"G",spark:false,gap:8})}</div>`):""}</span>`;
+  h+=`<div id="ctrlp"></div><div id="fx"></div>`;
+  return h;}
+const qBtn=()=>F.stun?btn(46,K.blue,"blink",{key:"Q",label:"STUNNED",lc:"#ff9a8f",dim:true,slash:true}):btn(46,K.blue,"blink",{key:"Q",label:"Blink"});
+function ctrlPanel(x,y){
+  const rows=[["Click","Punch"],["R","Your class's attack"],["Q","Your class's move"],["Space","Jump"],["G","Ultimate"],["Ctrl","Shift lock"],["Alt","Lock on"],["H","Controls"]];
+  let h=`<div class="see" style="left:${x}px;top:${y}px;width:300px;height:${rows.length*32+22}px">`;
+  rows.forEach((r,i)=>{h+=P(16,27+i*32,keytab(r[0],24,"--kb:2px"),"l")+P(96,27+i*32,txt(r[1],14.5,{o:1.8}),"l");});
+  return h+"</div>";}
+// the announcements' stack under the fighters' row: a pop-up first, then ARENA CLOSING, then the toast (never on top of each other)
+const slots=[];
+function slotY(el){ let i=slots.indexOf(null); if(i<0) i=slots.length; slots[i]=el; return 112+i*56; }
+function freeSlot(el){ const i=slots.indexOf(el); if(i>=0) slots[i]=null; }
+function show(stage,x,y,html,life,o={}){
+  const fx=stage.querySelector("#fx")||stage; const d=document.createElement("div");
+  { const k=(o.in||"popin").trim(); if(k&&k!=="thinair") SFX[k==="hit"?"hit":(k==="slam"||k==="slidein")?"slam":"pop"](); }
+  d.className="pos "+(o.in||"popin"); d.style.left=x+"px"; d.style.top=y+"px"; d.style.zIndex=5; d.innerHTML=html+(o.pills||""); fx.appendChild(d);
+  const rm=()=>{freeSlot(d); d.remove(); o.done&&o.done();};
+  if(life) setTimeout(()=>{ if(stage.classList.contains("rm")){rm();return;} d.className="pos "+(o.out||"leave"); setTimeout(rm,260); },life*1000);
+  return d;}
+let REST=null;
+function announce(stage,html,life,o={}){ if(REST&&REST.stage===stage){ freeSlot(REST.el); REST.el.remove(); REST=null; }
+  const d=show(stage,960,0,html,life,Object.assign({in:"slam"},o)); d.style.top=slotY(d)+"px"; return d; }
+// THE COUNTDOWN (owner 2026-11-24: "just make it so its number on ur screen, a white number, then when tussle comes up, make it popout with a
+// cool animation ... don't add any effects ... it should be frameless"). No plate, no lines, no pills, no confetti: lettering only.
+// The numbers are white; TUSSLE! is gold (my choice: the UI's loudest colour, it reads on sky and on grass). Its letters slam in one
+// after another, a touch too big, and settle; the word sits a little tilted.
+// then: "i was the 3 2 1 countdown to king popout of thin air, and it shuld take up the screen": each number appears from nothing in the MIDDLE of
+// the screen at about two thirds of its height, a touch too big, settles, then swells and is gone. Still lettering only.
+const countNum=(n,big)=>txt(String(n),big?400:170,{c:"#fff",o:big?12:6.5}); // 700 px was "THAT big": 400 px, a bit over a third of the screen's height
+// TUSSLE!'s colour (owner 2026-11-24: "i don't like the gold on tussle, give me a few option n how we cna make it really stand out"). Four
+// options, lettering only (no effects): A white on a hard red block shadow; B every letter its own palette colour; C red with a white rim;
+// D YOUR own colour with a white rim. TUSS.style picks; he chooses by letter.
+const TUSS={style:"a"}; // PICKED A, white on red (owner 2026-11-25: "I like the white on red"); B, C, D are no longer offered
+const tussleWord=(live,big,st)=>{ st=st||TUSS.style; const rain=[K.red,K.orange,K.gold,K.green,K.blue,K.purple,K.pink], col=i=>st==="a"?"#fff":st==="b"?rain[i]:st==="c"?K.red:YOU, size=big?210:160;
+  return `<div class="tword tw-${st}">${[..."TUSSLE!"].map((ch,i)=>txt(ch,size,{c:col(i),o:size*(st==="c"||st==="d"?.03:.04),cls:live?"tl":"",st:live?`animation-delay:${(i*.045).toFixed(3)}s`:""})).join("")}</div>`; };
+const DO={
+  count(){ const fs=document.getElementById("fs"); // owner 2026-11-24: plain WHITE numbers with no frame, then TUSSLE! pops out; no effects at all
+    [3,2,1].forEach((n,i)=>setTimeout(()=>{ SFX.hit(); show(fs,960,540,countNum(n,true),.66,{in:"thinair",out:"vanish"}); },i*1000));
+    setTimeout(()=>{ SFX.hit(); show(fs,960,540,tussleWord(true,true),1.15,{in:" ",out:"vanish"}); },3000); },
+  last5(){ const fs=document.getElementById("fs"); announce(fs,banner(300,50,"LEFT",YOU,{num:5,fs:25}),1.8,{pills:pills(300,50,palette(YOU),"lrb")}); },
+  last2(){ const fs=document.getElementById("fs"); announce(fs,banner(320,50,"FINAL",darker(YOU,.3),{num:2,numAfter:true,numc:darker(YOU,.55),fs:25}),1.8,{pills:pills(320,50,palette(YOU),"lrb")}); },
+  ultready(){ const fs=document.getElementById("fs"); F.ult=false; fs.querySelector("#ultb").innerHTML="";
+    announce(fs,banner(430,56,"ULTIMATE READY",YOU,{fs:26,key:"G",gap:12}),1.6,{pills:pills(430,56,palette(YOU),"lrb"),done(){F.ult=true; fs.querySelector("#ultb").innerHTML=P(1754,962-118,`<div class="pulse">${banner(230,40,"ULT READY",K.gold,{fs:18,key:"G",spark:false,gap:8})}</div>`,"popin");}}); },
+  ultuse(){ const fs=document.getElementById("fs"); if(!F.ult){ DO.ultready(); return; } F.ult=false; fs.querySelector("#ultb").innerHTML=""; setTimeout(()=>{ if(!F.ult) DO.ultready(); },2600);
+    show(fs,300,780,para(470,128,YOU,`${txt("ULTIMATE",17,{o:2.2})}${txt("TEMPEST",52)}`,{lean:.3,in:"col left",cell:12})+`<div style="position:absolute;right:66px;top:22px">${spark(40)}</div>`,1.7,{pills:pills(470,128,palette(YOU),"rb")}); },
+  ko(){ const f=document.getElementById("feed"); const d=document.createElement("div"); d.innerHTML=txt("YOU",19,{c:lighter(YOU,.35)})+txt("KO",19)+txt("Bot 7",19,{c:lighter(K.red,.35)}); d.style.animation="slidein .2s both"; d.style.transform="none"; f.prepend(d); if(f.children.length>4) f.lastElementChild.remove();
+    if(F.n>3){ frowDraw({out:F.n-1}); const n=--F.n; setTimeout(()=>{ if(F.n===n) frowDraw(); },760); } },
+  coolq(){ if(F.stun) return; const el=document.getElementById("qb"); let left=4; SFX.click(); el.innerHTML=btn(46,K.blue,"blink",{key:"Q",label:"Blink",cd:left,frac:0});
+    el.firstElementChild.classList.add("cooling"); el.firstElementChild.style.setProperty("--cd","4s");
+    const t=setInterval(()=>{ left--; if(left<=0){ clearInterval(t); el.innerHTML=qBtn(); el.firstElementChild.classList.add("readypop"); SFX.pop(); return; } const m=el.querySelector(".mid"); if(!m){ clearInterval(t); return; } m.innerHTML=txt(left,46*.7); },1000); },
+  cool(){ const el=document.getElementById("rb"); let left=6; SFX.click(); el.innerHTML=btn(46,K.green,"cyclone",{key:"R",label:"Cyclone",cd:left,frac:0});
+    el.firstElementChild.classList.add("cooling"); el.firstElementChild.style.setProperty("--cd","6s");
+    const t=setInterval(()=>{ left--; if(left<=0){ clearInterval(t); el.innerHTML=btn(46,K.green,"cyclone",{key:"R",label:"Cyclone"}); el.firstElementChild.classList.add("readypop"); return; }
+      el.querySelector(".mid").innerHTML=txt(left,46*.7); },1000); },
+  speed(){ const el=document.getElementById("dial"), tg=document.getElementById("stag"); const t0=performance.now();
+    const step=()=>{ const t=(performance.now()-t0)/3200, u=t<.5?t*2:2-t*2, v=Math.round(4+27*Math.max(0,Math.min(1,u))), c=v<12?K.slate:v<28?K.orange:K.red;
+      el.innerHTML=btn(78,c,null,{big:String(v),sub:"SPEED",frac:v/31}); tg.innerHTML=para(196,30,c,txt("STAGGER 12 · 1.7x",15,{o:2}),{lean:.4,cell:8});
+      if(t<1) setTimeout(step,50); else { el.innerHTML=btn(78,K.orange,null,{big:"21",sub:"SPEED",frac:.7}); tg.innerHTML=para(196,30,K.orange,txt("STAGGER 12 · 1.7x",15,{o:2}),{lean:.4,cell:8}); } };
+    step(); },
+  closing(){ const fs=document.getElementById("fs"); announce(fs,para(300,42,K.red,`${txt("!",22,{c:"#ffe08a"})}${txt("ARENA CLOSING",20)}`,{gap:6}),2.5,{in:"slidein"}); },
+  clash(){ const fs=document.getElementById("fs"); show(fs,960,800,clashBar(.58,"2.4"),2.2,{done(){show(fs,960,800,banner(300,56,"YOU WIN!",K.gold),1.2,{pills:pills(300,56,palette(K.gold),"lr")});}}); },
+  f25(b){ F.n=F.n===25?5:25; b.classList.toggle("on",F.n===25); frowDraw(); },
+  f8(){ F.n=8; const b=document.getElementById("b-f25"); b&&b.classList.remove("on"); frowDraw(); },
+  stun(b){ F.stun=!F.stun; b.classList.toggle("on",F.stun); document.getElementById("qb").innerHTML=qBtn(); },
+  ctrl(b){ F.ctrl=!F.ctrl; b.classList.toggle("on",F.ctrl); document.getElementById("ctrlp").innerHTML=F.ctrl?ctrlPanel(1592,528):""; },
+};
+// The big-hit flash (the owner, 2026-11-22: "Yes, add it"): one tint over the whole world, broad bands, a white outline
+// round the one who was hit (a stand-in shape here), a halftone corner with a sparkle. It sits UNDER the HUD.
+function flashHTML(col,sx,sy,keep){
+  return `<div class="flash ${keep?"keep":""}" style="--ft:${col}a6;--fb:${lighter(col,.55)}8c;--fd:${darker(col,.6)}">`+
+    `<i class="band" style="left:-420px;top:-760px;width:1700px;height:1500px"></i><i class="band" style="left:760px;top:120px;width:1900px;height:1700px"></i>`+
+    `<span class="sil"><i style="left:${sx-13}px;top:${sy-46}px;width:26px;height:26px"></i><i style="left:${sx-22}px;top:${sy-20}px;width:44px;height:38px"></i><i style="left:${sx-20}px;top:${sy+18}px;width:40px;height:34px"></i></span>`+
+    `<i class="cor ht" style="--c:${col};--d:#ffffffd0">${spark(64)}</i></div>`;}
+Object.assign(DO,{
+  flash(){ const fs=document.getElementById("fs"); if(fs.querySelector(".flash")) return; SFX.flash(); fs.querySelector(".world").insertAdjacentHTML("afterend",flashHTML(YOU,1318,644)); setTimeout(()=>{ const f=fs.querySelector(".flash:not(.keep)"); f&&f.remove(); },110); },
+  flashhold(b){ const fs=document.getElementById("fs"), f=fs.querySelector(".flash"); if(f){ f.remove(); b.classList.remove("on"); } else { fs.querySelector(".world").insertAdjacentHTML("afterend",flashHTML(YOU,1318,644,true)); b.classList.add("on"); } },
+});
+function clashBar(score,secs){
+  const ang=-Math.atan(.42)*180/Math.PI;
+  return `<div style="display:flex;flex-direction:column;align-items:center;gap:8px">${txt("MASH M1!",26)}<div class="para" style="width:560px;height:38px;--lean:8px;--ang:${ang}deg">`+
+    `<i class="bg" style="background:linear-gradient(90deg,${YOU} 0 ${score*100}%,${K.red} ${score*100}% 100%);overflow:hidden"></i><div class="in" style="justify-content:space-between">${txt("YOU",17)}${txt("Bot 7",17)}</div>`+
+    `<span class="pos" style="left:50%;top:50%"><span class="dot" style="width:46px;height:46px;border-width:3px">${txt(secs,17)}</span></span></div></div>`;}
+// ---------------------------------------------------------------- the lobby screen
+const L={entry:null,afk:false,spec:false,quests:false};
+const NAV=[["SHOP","cart",K.gold],["CLASSES","classes",K.blue],["INVENTORY","bag",K.green],["RANKED","trophy",K.red],["MOVES","moves",K.teal],["MORE","more",K.slate]];
+const GEMS=120; // a sample
+const money=(w,h,ic,n,fs,tc)=>para(w,h,DISC,`${svg(ic,h*.9)}${txt(n,fs,{c:tc})}`,{lean:.35,dot:"#45298a",in:"left",st:`--h:${ic==="coin"?K.gold:K.blue};--p3:var(--pr-${ic==="coin"?"coins":"gems"})`});
+const purse=(w,h,fs)=>`<div style="display:flex;gap:${h*.12}px">${money(w,h,"gem",String(GEMS),fs,"#9be8ff")}${money(w*1.08,h,"coin",COINS.toLocaleString("en-US"),fs,"#FFE14D")}</div>`;
+function lobbyHTML(){
+  const zoom=L.entry==="classes"; // the Classes page: no window, the camera goes close on your character
+  let h=`<i class="world ${zoom&&WIN.fresh?"zoomin":""} ${WIN.unzoom?"zoomout":""}" style="background-image:url({{BG_LOBBY}});${zoom?"transform:scale(1.9);transform-origin:50% 64%":WIN.unzoom?"transform-origin:50% 64%":""}"></i>`;
+  h+=topbar(44,"60 FPS  ·  42 MS  ·  SINGAPORE",13);
+  h+=P(960,54,banner(440,60,"NEXT ROUND 0:08",K.purple,{fs:27}));
+  if(!zoom) NAV.forEach(([n,ic,c],k)=>{h+=`<div style="position:absolute;left:36px;top:${352+k*68}px">${navb(n,ic,c,{open:L.entry===n.toLowerCase()})}</div>`;});
+  h+=P(1892,54,purse(196,48,24),"r");
+  if(!L.entry&&!L.quests) [["Settings","cog"],["Spectate","eye"],["AFK","afk"]].forEach(([n,ic],k)=>{const on=n==="AFK"&&L.afk;
+    h+=P(1848,420+k*116,`<div data-tool="${n.toLowerCase()}" style="cursor:pointer">${btn(36,on?K.gold:K.slate,ic,{label:on?"AFK ON":n})}</div>`);});
+  if(!L.entry&&!L.quests) for(const [cx,cy,ic,c] of [[520,470,"cart",K.gold],[742,418,"classes",K.blue],[1178,418,"trophy",K.red],[1400,470,"quests",K.purple],[960,380,"target",K.orange]]) h+=P(cx,cy,station(30,ic,c));
+  if(zoom) h+=`<div data-closable="classes" style="position:absolute;inset:0">${classesScene(WIN.pick)}</div>`;
+  else if(L.entry) h+=`<div class="${WIN.fresh?"winin":""}" data-closable="win:${L.entry}" style="position:absolute;left:456px;top:204px;width:${948*1.26}px;height:${612*1.26}px"><div class="win" style="transform:scale(1.26);transform-origin:0 0">${PAGES[L.entry]()}</div></div>`;
+  if(L.quests) h+=`<div class="${WIN.fresh?"popin2":""}" data-closable="quests" style="position:absolute;left:${960-280*1.5}px;top:170px"><div style="position:relative;width:560px;height:460px;transform:scale(1.5);transform-origin:0 0">${questBoard()}</div></div>`;
+  if(L.spec&&!L.entry&&!L.quests) h+=`<div data-closable="spec" style="position:absolute;inset:0;pointer-events:none"><div style="pointer-events:auto">${P(960,972,specPanel())}</div></div>`;
+  h+=`<div id="fx"></div>`;
+  return h;}
+function specPanel(){
+  return `<div style="display:flex;flex-direction:column;align-items:center;gap:10px"><div style="display:flex;gap:6px">${para(190,40,K.slate,txt("MY VIEW",17))}${para(250,40,K.gold,txt("FIGHTER POV  ON",17))}</div>`+
+    `<div style="display:flex;gap:12px;align-items:center">${btn(22,K.slate,"left")}${para(300,46,K.gold,`${svg("face",24,lighter(K.gold,.75))}${txt("Kairo",22)}`,{gap:8})}${btn(22,K.slate,"right")}</div></div>`;}
+function slotSpots(ls){ const m={}; ls.querySelectorAll(".bub[data-slot][data-ang]").forEach(b=>{ m[b.dataset.slot]={a:+b.dataset.ang,w:parseFloat(b.style.width),p:b.parentElement}; }); return m; }
+function slotSlide(ls,was){ // the wheel turning: each circle runs ALONG the wheel's circle from the angle it had to its new one (never a straight line), growing or shrinking on the way
+  if(ls.classList.contains("rm")) return; const now=slotSpots(ls), ease="cubic-bezier(.2,1.5,.35,1)", sp=getComputedStyle(ls).getPropertyValue("--spring").trim();
+  for(const i in now){ const a=was[i], b=now[i]; if(!a||a.a===b.a) continue; const [bx,by]=wheelAt(b.a), kf=[], N=12;
+    for(let t=0;t<=N;t++){ const u=t/N, [x,y]=wheelAt(a.a+(b.a-a.a)*u); kf.push({translate:`${x-bx}px ${y-by}px`,scale:String((a.w+(b.w-a.w)*u)/b.w)}); }
+    try{ b.p.animate(kf,{duration:480,easing:sp||ease}); }catch(e){ b.p.animate(kf,{duration:480,easing:ease}); } } }
+// CLOSING (owner 2026-11-24: "i don't like how closing ui just makes it instantly disspear, there should be some animations for that").
+// ONE way out for every piece that closes (a window, the Classes screen, the quests clipboard, the spectate panel, the warning and
+// skip cards): it sinks a little, shrinks a little and fades, in under a fifth of a second. bye() does it for a single piece;
+// drawLobby() does it for whatever was open before the redraw and is not open after it. Nothing under Reduced Motion.
+const ARRIVE=["popin","popin2","inR","inUp","winin","ttl","hit","slam","slidein","zoomin","zoomout"];
+function bye(el,ls){ if(!el) return; if(!ls||ls.classList.contains("rm")){ el.remove(); return; }
+  el.querySelectorAll("*").forEach(e=>e.classList.remove(...ARRIVE)); el.classList.remove(...ARRIVE); el.removeAttribute("data-closable");
+  el.classList.add("closing"); if(el.parentElement!==ls) ls.appendChild(el); setTimeout(()=>el.remove(),200); }
+function drawLobby(fresh){ const ls=document.getElementById("ls"), was=fresh?null:slotSpots(ls), old=[...ls.querySelectorAll("[data-closable]")];
+  WIN.unzoom=old.some(e=>e.dataset.closable==="classes")&&L.entry!=="classes"&&!ls.classList.contains("rm");
+  WIN.fresh=!!fresh; ls.innerHTML=lobbyHTML(); WIN.fresh=false; WIN.unzoom=false; if(was) slotSlide(ls,was);
+  { const open=new Set([...ls.querySelectorAll("[data-closable]")].map(e=>e.dataset.closable)); old.forEach(e=>{ if(!open.has(e.dataset.closable)) bye(e,ls); }); } ls.classList.toggle("blur",!!((L.entry&&L.entry!=="classes")||L.quests));
+  for(const id of Object.keys(PAGES)) document.getElementById("b-w"+id).classList.toggle("on",L.entry===id);
+  document.getElementById("b-quests").classList.toggle("on",L.quests); document.getElementById("b-afk").classList.toggle("on",L.afk); document.getElementById("b-spec").classList.toggle("on",L.spec); }
+function openPage(id){ SFX.open(); L.quests=false; L.entry=L.entry===id?null:id; WIN.confirm=null; drawLobby(true); }
+function toast(stage,s){ announce(stage,para(Math.max(260,s.length*10.6+70),40,K.slate,txt(s,16,{o:1.9}),{cell:8}),2.6,{in:"slidein"}); }
+Object.assign(DO,{
+  "w-shop":()=>openPage("shop"),"w-inventory":()=>openPage("inventory"),"w-classes":()=>openPage("classes"),"w-ranked":()=>openPage("ranked"),"w-moves":()=>openPage("moves"),"w-more":()=>openPage("more"),"w-settings":()=>openPage("settings"),
+  quests(){ L.entry=null; L.quests=!L.quests; drawLobby(true); },
+  afk(){ L.afk=!L.afk; drawLobby(); toast(document.getElementById("ls"),L.afk?"AFK on. You'll sit out the next round.":"AFK off. You're in for the next round."); },
+  area(){ announce(document.getElementById("ls"),banner(280,42,"TRAINING AREA",K.teal,{fs:20,spark:false}),1.4); },
+  spec(){ L.spec=!L.spec; drawLobby(); },
+});
+{ const go=f=>()=>{ if(L.entry!=="classes"){ L.quests=false; L.entry="classes"; drawLobby(true); } summonPlay(f); };
+  DO.warn=()=>{ L.quests=false; L.entry="classes"; WIN.pick=0; SLOTS[0].id="Trickster"; drawLobby(true); setTimeout(askSummon,450); }; // puts a Legendary in slot 1 so the warning has something to warn about
+  Object.assign(DO,{ sum1:go([0,1]), sum2:go([2]), sum3:go([3]), sum4:go([4]), skippass(b){ WIN.skipPass=!WIN.skipPass; b.classList.toggle("on",WIN.skipPass); } }); }
+document.getElementById("ls").addEventListener("click",e=>{
+  const c=s=>e.target.closest(s), ls0=document.getElementById("ls"); let m;
+  if((m=c("[data-close]"))){ SFX.close(); L.entry=null; L.quests=false; drawLobby(); }
+  else if((m=c(".infoi"))){ SFX.click(); m.parentElement.classList.toggle("open"); }
+  else if((m=c("[data-askyes]"))){ SFX.click(); ls0.querySelector(".ask").remove(); summonPlay(); }
+  else if((m=c("[data-askno]"))){ SFX.close(); const a=ls0.querySelector(".ask:not(.closing)"); a&&bye(a,ls0); }
+  else if(c(".ask")){ /* a press on the dimmed screen does nothing: the question must be answered */ }
+  else if((m=c("[data-warn]"))){ WARN.on=!WARN.on; SFX.pick(); drawLobby(); }
+  else if((m=c("[data-warnr]"))){ if(WARN.on){ WARN.rar[+m.dataset.warnr]=!WARN.rar[+m.dataset.warnr]; SFX.pick(); drawLobby(); } }
+  else if((m=c("[data-summon]"))){ SFX.click(); askSummon(); }
+  else if((m=c("[data-use]"))){ SLOTS.forEach(x=>{ if(x.id) x.use=false; }); SLOTS[WIN.pick].use=true; SFX.pick(); WIN.rolled=true; drawLobby(); WIN.rolled=false; }
+  else if((m=c("[data-pick]"))){ SFX.pick(); WIN.pick=+m.dataset.pick; drawLobby(); }
+  else if((m=c("[data-open]"))) openPage(m.dataset.open);
+  else if((m=c("[data-tool]"))){ const t=m.dataset.tool; if(t==="afk") DO.afk(); else if(t==="settings") openPage("settings"); else DO.spec(); }
+});
+document.querySelectorAll(".do").forEach(b=>b.addEventListener("click",()=>DO[b.dataset.do]&&DO[b.dataset.do](b)));
+
+// ---------------------------------------------------------------- boards of specimens
+let FIGHTSPEC=false; // true while a tab of FIGHT specimens is being built: those stages follow the arena style switch
+function spec(el,span,w,h,html,cap,o={}){
+  el.insertAdjacentHTML("beforeend",`<figure class="spec ${o.pick?"pick":""}" style="--span:${span}"><div class="fit" data-w="${w}" data-h="${h}" style="border-radius:0"><div class="stage" ${o.shape!=null?`data-fixed="1" ${o.shape?`data-shape="${o.shape}"`:""}`:""} ${o.font!=null?`data-fixedfont="1" ${o.font?`data-font="${o.font}"`:""}`:""} ${o.act||FIGHTSPEC?`data-actable="1"`:""} style="width:${w}px;height:${h}px;${o.bg?`background:${o.bg}`:""}">${html}</div></div><figcaption>${cap}</figcaption></figure>`);}
+function buildPopups(){
+  const el=document.getElementById("sp-popups"); let h="";
+  [["NEXT ROUND 0:08",K.purple,372],["18 / 25 STANDING",K.purple,380],["FINAL TWO",K.red,280],["LAST ONE",K.red,270],["ROUND OVER",K.slate,300]].reduce((x,[s,c,w])=>{h+=P(x+w/2,55,banner(w,56,s,c,{fs:25}));return x+w+34;},60);
+  spec(el,12,1840,110,h,"<b>Top strip.</b> One banner; the words and the number together. In a fight the fighters' row takes its place; the standing count shows only with Fighter row switched off. No round number (the seconds show as a clock, 0:08, so they never read as one), no blue.");
+  h=rowHTML(6,50,{cx:560})+P(1240,50,card(148,50,"Bot 3",K.green,1,{out:true}))+P(1336,50,txt("out: a red cross over the picture, grey, then it sinks away",15,{o:2}),"l");
+  spec(el,12,1840,100,h,"<b>Fighters' row, 8 or fewer standing.</b> A card each in the fighter's colour: head shot, name, knockouts. The leader wears the crown; yours has the white edge.");
+  spec(el,12,1840,150,`<div class="frow danger">${rowHTML(5,70,{cx:920,danger:true})}</div>`,"<b>Fighters' row, the last 5.</b> The same cards, a quarter bigger and further apart, and the row pops in once as it gets there. Nothing else: no red, no glow, no beating. Play it on the Fight tab: press 8 fighters, then press the row to knock them out one by one.");
+  spec(el,12,1840,100,rowHTML(25,54,{cx:920,span:1500,maxp:60}),"<b>Fighters' row, all 25.</b> Above 5 each fighter is a round head shot in a ring of their colour, the knockouts in a tab that is part of the ring. As fighters fall the rest slide together and grow (never past the size they reach at 17), and at 5 they stretch into the cards. Play it on the Fight tab: press the row to knock them out one by one.");
+  h=""; [3,2,1].forEach((n,i)=>{h+=P(190+i*190,125,countNum(n));});
+  h+=P(1180,125,tussleWord(false,false,"a"));
+  spec(el,12,1840,250,h,"<b>Countdown.</b> As you asked: no frame and no effects. A plain white number appears out of thin air in the middle of the screen, a bit over a third of its height, one at a time, then swells and is gone; then TUSSLE! big across the middle (its colour is your pick, below), its letters slamming in one after another and settling, a little tilted. Shown small here: play it on the Fight tab for the real size.");
+  h=P(190,55,banner(300,50,"LEFT",YOU,{num:5,fs:25}))+P(530,55,banner(300,50,"LEFT",YOU,{num:4,fs:25}))+P(870,55,banner(300,50,"LEFT",darker(YOU,.3),{num:3,numc:darker(YOU,.55),fs:25}))+P(1220,55,banner(320,50,"FINAL",darker(YOU,.3),{num:2,numAfter:true,numc:darker(YOU,.55),fs:25}))+P(1590,55,banner(300,50,"LEFT",K.orange,{num:5,fs:25}));
+  spec(el,12,1840,110,h,"<b>Last players.</b> Under the fighters' row, in YOUR colour's palette (here blue; the last one shows an orange player's). Deeper at 3 and 2. The number is part of the banner.");
+  spec(el,6,910,150,P(455,75,banner(430,56,"ULTIMATE READY",YOU,{fs:26,key:"G",gap:12})),"<b>Ultimate earned.</b> Pops under the row in your palette; the key is printed in it.");
+  spec(el,6,910,150,P(250,75,banner(230,40,"ULT READY",K.gold,{fs:18,key:"G",spark:false,gap:8}))+P(640,75,banner(230,40,"PRESS",K.gold,{fs:18,key:"G",spark:false,gap:8,drain:.6})),"<b>ULT READY badge</b> over Jump and Punch while it waits; after a hit it says <b>PRESS</b> and a white line runs out with the window.");
+  spec(el,6,910,220,P(290,112,`<div style="position:relative">${para(470,128,YOU,`${txt("ULTIMATE",17,{o:2.2})}${txt("TEMPEST",52)}`,{lean:.3,in:"col left",cell:12})}<div style="position:absolute;right:66px;top:22px">${spark(40)}</div></div>`)+P(570,112,note("lower left of the screen, as you use your ultimate. No dark bars, nothing full-screen.",14,300),"l"),"<b>Your class's name</b> as you use your ultimate: a dark glass card with a bright edge, in your colour.");
+  h=`<div class="feed" style="left:60px;top:34px;gap:14px;align-items:flex-start">${feedRow("Kairo","KO","Bot 12",K.gold,K.red,21)}${feedRow("Nova","FELL","",K.teal,null,21,"#ffb46e")}${feedRow("Zed","LEFT","",K.purple,null,21,"#9be8ee")}</div>`+P(480,112,note("top right, newest on top, four rows at most. Colour is carried by the lettering; no plates.",14,360),"l");
+  spec(el,6,910,220,h,"<b>Feed.</b> A knockout, a fall, someone leaving.");
+  h=P(250,50,para(430,40,K.slate,txt("AFK on. You'll sit out the next round.",16,{o:1.9}),{cell:8}))+P(640,50,banner(280,42,"TRAINING AREA",K.teal,{fs:20,spark:false}))+P(940,50,banner(240,42,"LOBBY AREA",K.purple,{fs:20,spark:false}))+P(1250,50,para(300,42,K.red,`${txt("!",22,{c:"#ffe08a"})}${txt("ARENA CLOSING",20)}`,{gap:6}))+P(1590,50,banner(250,42,"SPECTATING",K.slate,{fs:20,spark:false}));
+  spec(el,12,1840,100,h,"<b>Small signs.</b> Toast, area signs, ARENA CLOSING, SPECTATING. Small, under the top row, in from the left and out to the right; they stack and never cover each other.");
+  const frozen=col=>`<div style="position:absolute;left:0;top:0;width:1920px;height:1080px;transform:scale(.474);transform-origin:0 0"><i class="world" style="background-image:url({{BG_FIGHT}})"></i>${flashHTML(col,1318,644,true)}${P(1318,574,nameTag("Kairo",K.gold))}${P(960,948,btn(78,K.orange,null,{big:"21",sub:"SPEED",frac:.7}))}${P(780,976,btn(46,K.blue,"blink",{key:"Q"}))}${P(1140,976,btn(46,K.green,"cyclone",{key:"R"}))}</div>`;
+  spec(el,6,910,512,frozen(YOU),"<b>Big-hit flash</b> (your answer: yes, add it), frozen here. The whole screen takes the HITTER's colour for about a tenth of a second: broad bands, a white outline round the one who was hit, a glass corner with a spark. The HUD stays on top and readable. Play it on the Fight tab.",{pick:true});
+  spec(el,6,910,512,frozen(K.gold),"<b>The same flash from a gold player.</b> My proposal, for your yes or changes: only on a fully charged class attack that lands and a clash win; only on the screens of the two fighters in it; never twice within 2 seconds. Reduced Motion: no flash at all. Phones and low graphics: one flat tint, no bands or outline. Ultimates keep their own impact frames.",{pick:true});
+  spec(el,6,910,200,P(300,100,clashBar(.58,"2.4"))+P(740,56,banner(250,46,"YOU WIN!",K.gold,{fs:22}))+P(740,106,banner(250,46,"YOU LOSE",K.slate,{fs:22,spark:false}))+P(740,156,banner(250,46,"TIE",K.purple,{fs:22,spark:false})),"<b>Clash.</b> You on the left in your colour, them on the right in theirs, the seconds in the middle. Above the dial.");
+}
+function buildWindows(){
+  const el=document.getElementById("sp-windows");
+  const w=(html)=>`<div class="win" style="left:46px;top:70px">${html}</div>`;
+  const cap={classes:"<b>Classes, Haymaker's own (2026-11-24): no window.</b> The camera goes close on your character. Your slots are ROUND BADGES floating round you, built like the HUD's round buttons: a ring in the class's colour, its icon, the slot's number in a badge and the class's name on a plate. They sit on one big circle, like a wheel: the one you pick is in the big middle spot, the slots before it hang below, the ones after it stand above; pick another and every circle runs round that same circle to its new place (pick one above and the wheel turns down, pick one below and it turns up). Locked ones are grey with a lock and ROBUX. They bob gently. On the right RARITIES is a real title plain white lettering with no frame: big, on a hard shadow, tilted a little, and each rarity is bold lettering in its own colour with NO frame, the names of its classes smaller under it, rarest first (which class sits where is a sample). No ODDS button. Each move has its name right beside its button and an (i) beside the name: hover or click it for what the move does and its cooldown (placeholder text for now). SUMMON is one long button under your character: press it on the Lobby tab and the roll takes the WHOLE screen: classes roll past, slow, and stop on yours in its rarity's colour, then it lands in the slot you picked. Legendary and Mythic build up first. It says Press anywhere to skip; trying to skip is what brings up the Robux purchase. The sound gets tenser with the rarity. Nothing here is a price or a rate.",
+    shop:"<b>Shop.</b> Robux items only: classes are summoned on the Classes page. The six slots stand for your products; no names or prices are invented.",
+    inventory:"<b>Inventory.</b> As you said: titles, borders and cosmetics in tabs, with your Coins and Gems shown on the page. No classes.",
+    ranked:"<b>Ranked.</b> A placeholder, as now.",moves:"<b>Moves.</b> The controls for the device in your hands; rows without frames, keys in their tabs.",
+    more:"<b>More.</b> What is planned.",settings:"<b>Settings.</b> The plain page: flat rows, a ? on each: hover or press it and a small card says what the setting does (like the (i) on the moves), real switches told by word, colour and knob. New: the Summon warning switch, and under it \"Don't warn for:\" with one chip per rarity (Common and Rare are lit by default, so only Epic, Legendary and Mythic warn)."};
+  { const keep={e:L.entry,p:WIN.pick}; L.entry="classes"; WIN.pick=0; const a=lobbyHTML(); WIN.pick=1; const b=lobbyHTML(); L.entry=keep.e; WIN.pick=keep.p;
+    spec(el,6,1920,1080,a,cap.classes); spec(el,6,1920,1080,b,"<b>Classes, the SAVED slot picked.</b> USE swaps to that class (my reading: swapping between your saved classes is free). A summon now would replace THIS slot and keep the one in use."); }
+  for(const id of ["inventory","shop","ranked","moves","more","settings"]) spec(el,6,1020,714,w(PAGES[id]()),cap[id],{bg:"#2a1a5c"});
+  spec(el,6,1020,714,`<div style="position:absolute;left:230px;top:112px;width:560px;height:460px">${questBoard()}</div>`,"<b>Daily quests.</b> Your clipboard stays (board, clip, sheet); the lettering, tick boxes and CLAIM button are the new look. Counts and Coins here are samples.",{bg:"#2a1a5c"});
+}
+// THE LETTERING CHOICES (owner 2026-11-24). [letter, family, weight, size factor so its width sits like A's, where it comes from]
+// In Roblox: measured in Studio 2026-11-14 (UI Research/research_notes/.../roblox_fonts_measured.md). Creator Store: NOT checked.
+const FONTS=[["A","Fredoka",700,1,"in Roblox (as Fredoka One)"],["B","Luckiest Guy",400,.96,"in Roblox"],["C","Bangers",400,1.12,"in Roblox"],["D","Denk One",400,1,"in Roblox"],
+  ["E","Nunito",900,1,"in Roblox"],["F","Montserrat",900,.92,"in Roblox (the game's font today)"],["G","Titan One",400,.92,"Creator Store, not checked"],["H","Lilita One",400,1.04,"Creator Store, not checked"],
+  ["I","Baloo 2",800,1.04,"Creator Store, not checked"],["J","Chewy",400,1.06,"Creator Store, not checked"],["K","Bowlby One",400,.82,"Creator Store, not checked"],["L","Paytone One",400,.96,"Creator Store, not checked"]];
+function buildPieces(){
+  const el=document.getElementById("sp-pieces");
+  { // PICK: the arena HUD with its own edge (owner 2026-11-24: "more like action packed ... but it should still pretain the original ui")
+    const row=()=>P(100,52,card(160,54,"Nova",K.teal,3,{you:true}))+P(280,52,card(160,54,"Kairo",K.gold,5,{crown:true}))+P(460,52,card(160,54,"Bot 7",K.red,2))+
+      P(730,52,banner(300,52,"LEFT",YOU,{num:5,fs:26}))+P(1040,52,`<div class="pulse">${banner(250,44,"ULT READY",K.gold,{fs:19,key:"G"})}</div>`)+P(1330,52,para(220,34,K.orange,txt("STAGGER 12 · 1.7x",15,{o:1.8}),{lean:.4,cell:7}))+
+      P(1560,40,`<div class="feed" style="position:static;gap:6px">${feedRow("Kairo","KO","Bot 12",K.gold,K.red,17)}${feedRow("YOU","KO","Bot 3",YOU,K.green,17)}</div>`)+
+      P(120,170,btn(48,K.blue,"blink",{key:"Q",label:"Blink"}))+P(270,170,btn(48,K.green,"cyclone",{key:"R",label:"Cyclone",cd:3,frac:.62}))+P(450,160,btn(66,K.orange,null,{big:"21",sub:"SPEED",frac:.7}))+
+      P(630,170,btn(48,K.slate,"jump",{key:"SPC",label:"Jump"}))+P(780,170,btn(54,K.red,"punch",{key:"M1",label:"Punch"}))+P(1000,160,txt("3",110,{c:"#fff",o:4.5}))+P(1360,160,`<div style="scale:.62">${tussleWord(false,false,"a")}</div>`);
+    [["a","<b>YOUR PICK · Lean</b> (of A Lean, B Charged, C Blade). The arena's plates and cards lean forward with tighter corners and the lettering leans with them; round buttons stay round; what is inside each piece stays in its middle."]]
+      .forEach(([act,cap])=>spec(el,12,1840,250,row(),cap,{pick:act!=="",shape:"g",act}));
+  }
+  { // PICK: the shape. The same six pieces four times; each board keeps its own shape whatever the switch says.
+    GLASS=false; const row=()=>P(24,62,navb("SHOP","cart",K.gold),"l")+P(560,62,banner(300,50,"LEFT",YOU,{num:5,fs:25}))+P(800,62,purse(150,40,20),"l")+
+      P(96,152,card(148,50,"Nova",K.teal,3,{you:true}))+P(270,152,card(148,50,"Kairo",K.gold,5,{crown:true}))+P(420,152,btn(40,K.green,"cyclone",{key:"R"}))+P(520,152,btn(40,K.blue,"blink",{cd:3,frac:.62}))+
+      P(690,152,banner(250,46,"EQUIP",K.green,{fs:24}))+`<div class="win" style="left:1120px;top:58px;width:330px;height:160px"><i class="body ht"></i>${P(-22,-10,`<div class="ttlpop">${banner(240,62,"SHOP",K.gold,{fs:34})}</div>`,"l")}${tileHTML(kit("Tempest"),190,40,false,118,100)}</div>`;
+    [["","<b>AS IT WAS: slanted.</b> Parallelogram plates, corners of a few pixels."],
+     ["a","<b>PICK A · Soft slant.</b> The slant is halved and every corner is rounded. Still reads as the same look, just gentler."],
+     ["b","<b>PICK B · Pills.</b> No slant at all: every plate and banner has full round ends, the cards too. Rounder windows and tiles."],
+     ["c","<b>PICK C · Bubbles.</b> B made puffy: a thicker ink line, a hard little shadow under every piece, a soft shine on top, and pop-ups bounce more. In the game the shine is one extra layer per piece, so it gets a measured frame cost and a phone path."]]
+      .forEach(([sh,cap])=>spec(el,12,1520,244,row(),cap,{pick:sh!=="",shape:sh})); GLASS=true;
+  }
+  let h=P(90,84,btn(52,K.blue,"blink",{key:"Q",label:"Blink"}))+P(250,84,btn(52,K.green,"cyclone",{key:"R",label:"Cyclone",cd:3,frac:.62}))+P(410,84,btn(52,K.blue,"blink",{key:"Q",label:"STUNNED",lc:"#ff9a8f",dim:true,slash:true}))+P(570,84,btn(52,K.red,"punch",{key:"M1",label:"Punch"}))+P(720,84,btn(44,K.slate,"jump",{key:"SPC",label:"Jump"}))+P(850,84,btn(40,K.red,"punch"));
+  spec(el,6,910,190,h,"<b>Ability buttons.</b> Ready (bright ring, icon), cooling (the ring drains, seconds in the disc), can't use (dark, a red slash, the name becomes the reason), Punch, Jump, and a touch button (no key).");
+  h=""; [["4",.12,K.slate,"STAGGER 0 · 1.0x"],["21",.7,K.orange,"STAGGER 12 · 1.7x"],["31",1,K.red,"STAGGER 30 · 2.6x"]].forEach(([n,f,c,s],i)=>{const cx=160+i*290; h+=P(cx,92,btn(78,c,null,{big:n,sub:"SPEED",frac:f}))+P(cx,186,para(200,30,c,txt(s,15,{o:2}),{lean:.4,cell:8}));});
+  spec(el,6,910,220,h,"<b>Speed dial.</b> The ring fills with your speed; slow, fast, flat out. The stagger and the knockback it means are printed in the tag under it.");
+  h=P(120,60,nameTag("Nova",K.teal,17))+P(360,56,`<div style="display:flex;flex-direction:column;align-items:center;gap:3px">${nameTag("Kairo",K.gold,17)}<div style="width:100px;height:10px;border:2px solid ${INK};background:${DISC};transform:skewX(-22deg)"><i style="display:block;height:100%;width:64%;background:${K.orange}"></i></div>${svg("chev",20,"#fff")}</div>`)+P(560,60,note("left: a fighter's name. right: your lock-on target, with their stagger. The round reticle on the body stays as it is.",13.5,320),"l");
+  spec(el,6,910,120,h,"<b>Over the fighters.</b>");
+  spec(el,6,910,120,P(120,60,`<div class="topbar" style="position:static;--tb:36px"><i></i><i></i></div>`)+P(180,60,txt("60 FPS  ·  42 MS  ·  SINGAPORE",13,{c:CREAM,o:1.4}),"l")+P(560,60,btn(26,K.slate,"cog"))+P(760,60,para(210,36,K.slate,txt("BOTS ON",15,{o:1.8}),{cell:8})),"<b>Stats line</b> in Roblox's top bar (no plate), the <b>Settings cog</b> in a round, and the owner's <b>Bots</b> button (F8).");
+  spec(el,6,910,150,P(455,75,specPanel()),"<b>Spectate panel,</b> bottom centre: two tabs (the one that is on is gold and says ON), previous, who you watch, next.");
+  spec(el,6,910,330,P(180,60,para(176,30,K.slate,`${keytab("H",20,"--kb:2px")}${txt("CONTROLS",14,{o:1.8})}`,{lean:.4,gap:7,cell:8}))+ctrlPanel(420,24),"<b>CONTROLS chip</b> (the key is part of it) and its small see-through panel.");
+  h=P(455,60,banner(560,52,"Punch a bot three times",K.teal,{num:"2 / 5",fs:20,spark:false}))+P(455,112,note("Hint: get close first.",14,300))+P(820,60,para(110,36,K.slate,txt("SKIP",15,{o:1.8})))+P(455,170,banner(300,56,"CLICK NOW!",K.red,{fs:26}));
+  spec(el,6,910,220,h,"<b>Tutorial.</b> The step and its count in one banner, a hint under it, Skip, and the CLICK NOW! prompt. The step's words here are a stand-in.");
+  h=`<div class="see" style="left:40px;top:20px;width:300px;height:250px"></div>`+P(60,46,txt("TESTING DISPLAY",16,{o:2}),"l");
+  ["Station","Target","Stagger","Hits","Knockback","Attack"].forEach((n,i)=>{h+=P(60,82+i*26,txt(n,14,{c:CREAM,o:1.6}),"l")+P(320,82+i*26,txt("...",14,{o:1.6}),"r");});
+  h+=P(110,246,para(130,30,K.slate,txt("HITBOXES",13,{o:1.6}),{cell:8}))+P(260,246,para(100,30,K.slate,txt("HIDE",13,{o:1.6}),{cell:8}))+P(400,140,note("the optional testing display in the training area: the same lettering on a see-through panel.",13.5,440),"l");
+  spec(el,6,910,290,h,"<b>Training panel.</b>");
+  h=""; NAV.forEach(([n,ic,c],k)=>{h+=`<div style="position:absolute;left:${24+Math.floor(k/3)*270}px;top:${40+(k%3)*68}px">${navb(n,ic,c,{open:k===2})}</div>`;});
+  h+=P(1410,100,purse(196,48,24),"l");
+  h+=P(600,100,btn(36,K.slate,"cog",{label:"Settings"}))+P(730,100,btn(36,K.slate,"eye",{label:"Spectate"}))+P(860,100,btn(36,K.gold,"afk",{label:"AFK ON"}));
+  ["cart","classes","trophy","moves","quests","target","flag","crown"].forEach((ic,k)=>{h+=P(600+k*86,260,station(28,ic,[K.gold,K.blue,K.red,K.teal,K.purple,K.orange,K.green,K.pink][k]));});
+  spec(el,12,1840,360,h,"<b>Lobby.</b> Six slim menu bars (in the game they stand in ONE column down the left edge; here in two to fit the picture): the SUMMON button is gone (you summon on the Classes page), INVENTORY stays for what is not a class (the open one has a white edge). Gems beside Coins, on the dark plate you picked. The tools with AFK ON, and the station icons you approved.");
+  const corner=(x,inner)=>`<div class="win" style="left:${x}px;top:78px;width:330px;height:150px;--h:${K.gold}"><i class="body ht"></i>${inner}</div>`;
+  h=P(34,40,txt("A",30,{c:K.gold}),"l")+corner(100,P(-28,-14,`<div class="ttlpop">${banner(300,78,"SHOP",K.gold,{fs:42})}</div>`,"l"))+
+    P(486,40,txt("B",30,{c:K.gold}),"l")+corner(552,P(-22,-12,`<div style="rotate:-4deg;display:flex;align-items:center;gap:10px">${txt("SHOP",60)}${spark(46)}</div>`,"l"));
+  spec(el,6,910,250,h,"<b>PICK: the window's title.</b> A (on every window) = a jagged blade in the window's colour hanging off the top-left corner, tipped a little, on a hard shadow. B = no frame: big lettering and a spark popping out of the corner.",{pick:true});
+  h=P(90,80,btn(46,K.green,null,{big:"12",sub:"LEVEL",frac:.64,minfs:11}))+P(160,64,txt("YOU",24),"l")+P(160,92,txt("(YOUR TITLE)",14,{c:CREAM,o:1.6}),"l")+P(470,80,purse(196,48,24),"l");
+  spec(el,6,910,160,h,"<b>SKETCH, nothing decided: level, title, Gems.</b> Your level as a round piece whose ring fills with XP, your title under your name, Gems beside Coins. Every number is a sample.");
+}
+// ---------------------------------------------------------------- phone (844 x 390)
+function phoneFight(){
+  let h=`<i class="world" style="background-image:url({{BG_FIGHT}})"></i>`+topbar(34,"60 FPS · 42 MS",12)+P(30,74,btn(22,K.slate,"cog"));
+  h+=rowHTML(10,26,{cx:422,span:330,maxp:34,tab:false});
+  h+=P(422,70,para(216,30,K.red,`${txt("!",15,{c:"#ffe08a"})}${txt("ARENA CLOSING",14,{o:1.7})}`,{gap:5,bw:2.4,cell:8}));
+  h+=`<div class="feed" style="right:10px;top:10px;gap:6px">${feedRow("Kairo","KO","Bot 12",K.gold,K.red,12)}${feedRow("YOU","KO","Bot 3",YOU,K.green,12)}</div>`;
+  h+=P(250,220,nameTag("Bot 7",K.red,12))+P(560,206,nameTag("Kairo",K.gold,12));
+  h+=P(422,316,btn(40,K.orange,null,{big:"21",sub:"SPEED",frac:.7,minfs:12}))+P(422,373,para(170,22,K.orange,txt("STAGGER 12 · 1.7x",12,{o:1.6}),{lean:.4,cell:7,bw:2.4}));
+  const L={lfs:12,lo:1.6};
+  h+=P(784,300,btn(40,K.red,"punch",{label:"Punch",...L}))+P(700,334,btn(28,K.slate,"jump",{label:"Jump",...L}))+P(700,256,btn(28,K.blue,"blink",{label:"Blink",...L}))+P(760,204,btn(28,K.green,"cyclone",{cd:3,frac:.62,label:"Cyclone",...L}))+P(808,132,btn(26,K.gold,"star",{label:"ULT",...L}));
+  return h;}
+function phoneLobby(){
+  let h=`<i class="world" style="background-image:url({{BG_LOBBY}})"></i>`+topbar(34,"60 FPS · 42 MS",12)+P(422,24,banner(246,32,"NEXT ROUND 0:08",K.purple,{fs:15}));
+  NAV.forEach(([n,ic,c],k)=>{h+=`<div style="position:absolute;left:${10+Math.floor(k/3)*146}px;top:${84+(k%3)*50}px">${navb(n,ic,c,{h:44,w:140,fs:13.5})}</div>`;});
+  h+=P(836,24,purse(100,26,13),"r");
+  [["Settings","cog"],["Spectate","eye"],["AFK","afk"]].forEach(([n,ic],k)=>{h+=P(806,106+k*76,btn(22,K.slate,ic,{label:n,lfs:12,lo:1.6}));});
+  for(const [cx,cy,ic,c] of [[340,180,"cart",K.gold],[420,150,"classes",K.blue],[520,150,"trophy",K.red],[620,176,"quests",K.purple]]) h+=P(cx,cy,station(18,ic,c));
+  return h;}
+function phoneClasses(){
+  const k=kit(SLOTS[0].id); let h=`<i class="world" style="background-image:url({{BG_LOBBY}});transform:scale(1.9);transform-origin:50% 64%"></i>`+topbar(34,"60 FPS · 42 MS",12);
+  h+=P(14,66,`<div class="ttlpop">${banner(190,40,"CLASSES",K.blue,{fs:21})}</div>`,"l","z-index:3")+P(232,66,btn(20,K.red,"x"));
+  [[236,196,46],[112,150,40],[66,262,32],[152,314,32]].forEach(([x,y,r],i)=>{h+=slotBubble(i,x,y,r,i===0);});
+  h+=`<i style="position:absolute;left:356px;top:262px;width:112px;height:18px;border-radius:50%;background:rgba(10,14,30,.36)"></i><div style="position:absolute;left:364px;top:122px">${ava(24,k.c)}</div>`;
+  h+=P(412,304,para(170,34,k.c,txt("TEMPEST",18),{lean:.4,bw:2.4}));
+  h+=P(560,150,btn(26,k.c,"blink",{label:k.q,lfs:12,lo:1.6}))+P(560,244,btn(26,k.c,"cyclone",{label:k.r,lfs:12,lo:1.6}));
+  h+=rarityList(764,58,142,{th:21,tfs:17,nfs:12,line:14,gap:5});
+  h+=P(412,354,`<div class="pulse">${banner(300,42,"SUMMON",K.pink,{fs:20})}</div>`);
+  h+=P(836,24,purse(100,26,13),"r");
+  return h;}
+function buildPhone(){
+  const el=document.getElementById("sp-phone");
+  spec(el,6,844,390,phoneFight(),"<b>Fight on a phone.</b> The row beside Roblox's buttons, as round head shots without the knockout count (it would be under 12 px; cards with counts come at 5 or fewer); the dial low in the middle; Punch, Jump, Q, R and the ultimate as round touch buttons with no key, each with its name under it (the name becomes the reason when it can't be used). Roblox's own thumbstick appears under the left thumb.",{act:"a"});
+  spec(el,6,844,390,phoneLobby(),"<b>Lobby on a phone.</b> The same pieces, smaller. Six slim menu bars, each 44 px tall (the tap size). On a phone they stand in TWO short columns at the top left, my choice: one column of six would reach the bottom-left corner, where your thumb moves the character.");
+  spec(el,6,844,390,phoneClasses(),"<b>Classes on a phone.</b> The same screen: your slots on the left, your character, the two moves, the long SUMMON button under you, and on the right the rarities with their classes.");
+}
+
+// ---------------------------------------------------------------- page plumbing
+function fitAll(){ document.querySelectorAll(".fit").forEach(f=>{ const w=+f.dataset.w, h=+f.dataset.h, cw=f.clientWidth; if(!cw) return; const k=cw/w; f.style.height=h*k+"px"; f.firstElementChild.style.transform=`scale(${k})`; }); }
+const TABS=["fight","lobby","popups","windows","pieces","phone"];
+function showTab(t){ if(!TABS.includes(t)) t="fight";
+  document.querySelectorAll("[data-panel]").forEach(p=>p.hidden=p.dataset.panel!==t);
+  document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===t?"true":"false")); fitAll(); }
+document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{ try{history.replaceState(null,"","#"+b.dataset.tab);}catch(e){} showTab(b.dataset.tab); }));
+window.addEventListener("hashchange",()=>showTab(location.hash.slice(1)));
+document.getElementById("snd").addEventListener("change",e=>SFX.set(e.target.checked));
+{ let last=null; const PRESS=".navb,[data-tool],[data-close],[data-summon],[data-use],[data-go]:not(.nohov),.bub:not(.locked),.tile[data-pick],.infoi,.card,.chip";
+  document.addEventListener("pointerover",e=>{ if(e.pointerType&&e.pointerType!=="mouse") return; const t=e.target.closest&&e.target.closest(PRESS); if(t&&t!==last&&t.closest(".stage")) SFX.hover(); last=t; }); }
+document.getElementById("rm").addEventListener("change",e=>document.querySelectorAll(".stage").forEach(s=>s.classList.toggle("rm",e.target.checked)));
+document.getElementById("fs").innerHTML=fightBase();
+{ const fs=document.getElementById("fs"); const d=announce(fs,`<div class="dsignable dsign">${banner(300,50,"LEFT",YOU,{num:5,fs:25})}</div>`,0,{in:" "}); REST={stage:fs,el:d}; }
+// the arena HUD itself can be pressed (owner 2026-11-24): each piece plays its own animation
+document.getElementById("fs").addEventListener("click",e=>{ const g=e.target.closest("[data-go]"); if(g&&DO[g.dataset.go]){ DO[g.dataset.go](document.getElementById("b-"+g.dataset.go)); return; }
+ if(e.target.closest(".para")&&e.target.closest(".pos")&&/CONTROLS/.test(e.target.closest(".pos").textContent)&&!/ULT/.test(e.target.closest(".pos").textContent)) DO.ctrl(document.getElementById("b-ctrl")); });
+drawLobby(); FIGHTSPEC=true; buildPopups(); FIGHTSPEC=false; buildWindows(); buildPieces(); buildPhone();
+showTab(location.hash.slice(1)||"fight");
+new ResizeObserver(()=>requestAnimationFrame(fitAll)).observe(document.querySelector(".wrap"));
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(fitAll);
+// ---------------------------------------------------------------- shape options (owner 2026-11-23: less angular, more bubbly)
+function skinPass(){ document.querySelectorAll(".stage .ht").forEach(e=>{
+    const c=e.style.getPropertyValue("--c"); if(c&&!e.style.getPropertyValue("--h")) e.style.setProperty("--h",glassHue(c.trim()));
+    const m=Math.min(e.offsetWidth,e.offsetHeight); if(m){ const ts=Math.round(Math.max(24,Math.min(110,m*.7)))+"px"; if(e.style.getPropertyValue("--ts")!==ts) e.style.setProperty("--ts",ts); } }); }
+{ let due=false; new MutationObserver(()=>{ if(due) return; due=true; requestAnimationFrame(()=>{ due=false; skinPass(); }); }).observe(document.body,{childList:true,subtree:true}); skinPass(); }
+function setShape(sh){ if(!["now","a","b","c","g"].includes(sh)) sh="g";
+  document.querySelectorAll(".stage:not([data-fixed])").forEach(e=>{ if(sh==="now") e.removeAttribute("data-shape"); else e.dataset.shape=sh; });
+  document.querySelectorAll("[data-shape-btn]").forEach(b=>b.classList.toggle("on",b.dataset.shapeBtn===sh));
+  try{ localStorage.setItem("ht-hud-shape3",sh); }catch(e){} }
+const LET={i:7,slant:false,size:100}; // 7 = H, Lilita One
+function setLetter(o){ Object.assign(LET,o); const f=FONTS[LET.i]||FONTS[0], r=document.documentElement.style;
+  r.setProperty("--ff",`'${f[1]}'`); r.setProperty("--fw",f[2]); r.setProperty("--fk",(f[3]*LET.size/100).toFixed(3)); r.setProperty("--fst",LET.slant?"italic":"normal");
+  document.querySelectorAll("[data-font-btn]").forEach(b=>b.classList.toggle("on",+b.dataset.fontBtn===LET.i));
+  document.getElementById("fslant").checked=LET.slant; document.getElementById("fsize").value=LET.size; document.getElementById("fsizev").textContent=LET.size+"%";
+  try{ localStorage.setItem("ht-hud-letter",JSON.stringify(LET)); }catch(e){} }
+function setFont(round){ document.querySelectorAll(".stage:not([data-fixedfont])").forEach(e=>{ if(round) e.dataset.font="round"; else e.removeAttribute("data-font"); });
+  document.getElementById("roundfont").checked=!!round; try{ localStorage.setItem("ht-hud-font",round?"round":""); }catch(e){} requestAnimationFrame(fitAll); }
+document.querySelectorAll("[data-shape-btn]").forEach(b=>b.addEventListener("click",()=>setShape(b.dataset.shapeBtn)));
+document.getElementById("roundfont").addEventListener("change",e=>setFont(e.target.checked));
+{ const tv=new URLSearchParams(location.search).get("tuss"); if(tv) TUSS.style=tv; } // local pictures: ?tuss=c
+const setSnd=v=>{ if(v!=="a"&&!SETS[v]&&!SYN[v]) return; SND.style=v; document.querySelectorAll("[data-snd]").forEach(x=>x.classList.toggle("on",x.dataset.snd===v)); try{ localStorage.setItem("ht-hud-sound2",v); }catch(e){} };
+document.addEventListener("click",e=>{ const b=e.target.closest("[data-snd]"); if(!b) return; setSnd(b.dataset.snd); SFX.click(); });
+{ let v=null; try{ v=localStorage.getItem("ht-hud-sound2"); }catch(e){} v=new URLSearchParams(location.search).get("snd")||v; if(v) setSnd(v); } // local pictures: ?snd=b
+// a tour of the picked set: EVERY sound it has, one after another (the countdown's slam and hit, a common summon's ticks and reveal,
+// then a mythic one: tense ticks, the build-up, the heartbeat, the climb, the hush, the reveal; then buying)
+document.getElementById("sndtour").addEventListener("click",()=>{ const steps=[["hover"],["click"],["pick"],["open"],["close"],["pop"],["slam"],["hit"],["flash"],
+  ...[0,1,2,3,4,5].map(j=>["tick",j,0]),["win",0],...[0,1,2,3].map(j=>["tick",j,4]),["drone",1.4,4],["beat",0,4],["climb",0,4],["climb",1,4],["hush"],["win",4],["buy"]];
+  let t=300; steps.forEach(([k,...a])=>{ setTimeout(()=>SFX[k](...a),t); t+=k==="tick"?110:k==="win"||k==="drone"?1500:k==="flash"||k==="beat"?700:k==="hush"?600:450; }); });
+function setAct(v){ document.querySelectorAll("#fs,.stage[data-actable]").forEach(fs=>{ if(v) fs.dataset.act=v; else fs.removeAttribute("data-act"); }); document.querySelectorAll("[data-act-btn]").forEach(b=>b.classList.toggle("on",b.dataset.actBtn===(v||""))); }
+document.addEventListener("click",e=>{ const b=e.target.closest("[data-act-btn]"); if(b) setAct(b.dataset.actBtn); });
+{ const av=new URLSearchParams(location.search).get("act"); setAct(av==null?"a":av); } // Lean is the default; local pictures: ?act= (empty) shows the lobby shape
+{ // PICKED: H, Lilita One (owner 2026-11-25: "font should be lilita one"). Slanted and Size stay as knobs.
+  document.getElementById("fslant").addEventListener("change",e=>setLetter({slant:e.target.checked}));
+  document.getElementById("fsize").addEventListener("input",e=>setLetter({size:+e.target.value}));
+  let o={}; try{ o=JSON.parse(localStorage.getItem("ht-hud-letter")||"{}")||{}; }catch(e){}
+  const qf=new URLSearchParams(location.search).get("ff"); if(qf){ o.i=Math.max(0,FONTS.findIndex(f=>f[0]===qf.toUpperCase())); } // local pictures: ?ff=K
+  const lil=FONTS.findIndex(f=>f[1]==="Lilita One"); if(!qf) o.i=lil;
+  setLetter({i:FONTS[o.i]?o.i:lil,slant:!!o.slant,size:o.size>=85&&o.size<=115?o.size:100}); }
+{ let sh="g", f=""; try{ sh=localStorage.getItem("ht-hud-shape3")||"g"; f=localStorage.getItem("ht-hud-font")||""; }catch(e){}
+  const q0=new URLSearchParams(location.search); if(q0.get("shape")) sh=q0.get("shape"); if(q0.get("pick")){ WIN.pick=+q0.get("pick"); } if(q0.get("tip")) WIN.tip=true; if(q0.get("font")!=null) f=q0.get("font");
+  setShape(sh); setFont(f==="round"); }
+// local checks only (a published page never receives a query string): ?do=a,b plays those buttons; ?selftest=1 plays every one and reports errors
+{ const q=new URLSearchParams(location.search), errs=[]; window.addEventListener("error",e=>{errs.push(String(e.message)); document.title="ERR "+errs.join(" | ");});
+  const run=d=>{ try{ DO[d](document.querySelector(`[data-do="${d}"]`)); }catch(e){ errs.push(d+": "+e.message); } };
+  if(q.get("do")) q.get("do").split(",").forEach(run);
+  if(q.get("tipq")) setTimeout(()=>{ const m=document.querySelectorAll("#ls .mv.side")[+q.get("tipq")]; m&&m.classList.add("open"); },600); // local pictures of a Settings tip
+  if(q.get("click")) setTimeout(()=>{ const r=document.querySelector(".roll"); r&&r.click(); },+q.get("click")); // local pictures of the skip purchase card
+  if(q.get("summon")) setTimeout(()=>{ try{ summonPlay(); }catch(e){ errs.push("summon: "+e.message); document.title="ERR "+errs.join(" | "); } },500);
+  if(q.get("selftest")){ Object.keys(DO).forEach(run); setTimeout(()=>{ document.body.setAttribute("data-selftest",errs.length?("ERR "+errs.join(" | ")):"OK "+Object.keys(DO).length); },1500); }
+  // ?sndtest=1: plays every sound in every set with a log instead of the speakers, and checks each one differs from set A's (his rule:
+  // a set changes EVERY sound). Reports into body[data-sndtest].
+  if(q.get("sndtest")) setTimeout(()=>{ const calls=[["hover"],["click"],["pick"],["open"],["close"],["pop"],["slam"],["hit"],["flash"],["tick",2,0],["tick",2,4],
+      ["drone",1.2,2],["drone",1.2,4],["beat",0,4],["climb",1,4],["hush"],["win",0],["win",2],["win",3],["win",4],["buy"]];
+    const sets=[...new Set(["a",...Object.keys(SETS),...Object.keys(SYN)])], sig=s=>{ setSnd(s); return calls.map(([k,...a])=>{ window.__sndTrace=[]; try{ SFX[k](...a); }catch(e){ errs.push(s+" "+k+": "+e.message); } const r=window.__sndTrace.join("|"); window.__sndTrace=null; return r; }); };
+    const base=sig("a"), bad=[]; base.forEach((r,i)=>{ if(!r) bad.push("a:"+calls[i][0]+" silent"); });
+    sets.filter(s=>s!=="a").forEach(s=>sig(s).forEach((r,i)=>{ if(!r) bad.push(s+":"+calls[i].join("/")+" silent"); else if(r===base[i]) bad.push(s+":"+calls[i].join("/")+" same as A"); }));
+    // a mixed set must play exactly what the set its ROLE names plays
+    const by={}; Object.entries(SYN).filter(([,v])=>v.mix).forEach(([s,v])=>{ const mine=sig(s); calls.forEach((c,i)=>{ const src=v.mix[ROLE[c[0]]]; by[src]=by[src]||sig(src); if(mine[i]!==by[src][i]) bad.push(s+":"+c.join("/")+" is not "+src); }); });
+    setSnd("i"); document.body.setAttribute("data-sndtest",(bad.length||errs.length?"BAD "+bad.concat(errs).join(", "):"OK "+(sets.length-1)+" sets x "+calls.length+" sounds all differ from A; I matches its sets by role")+" | samples decoded "+Object.keys(SND_BUF).length+"/"+Object.keys(SND_LIB).length); },+q.get("sndtest")>100?+q.get("sndtest"):2500); }
+</script>

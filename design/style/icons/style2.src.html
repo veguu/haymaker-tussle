@@ -1,0 +1,242 @@
+<title>Haymaker HUD Restyle</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Montserrat:ital,wght@0,500;0,700;0,900;1,900&display=swap">
+<style>
+/* Layout: three 16:9 game screens (lobby, shop window, fight) stacked, then the rules of the look and the icons.
+   The look ("Tinted glass"): every piece is ONE hue in three values: a deep fill, a bright edge, a bright icon. */
+:root{
+  --bg:#efeefb; --panel:#ffffff; --fg:#1d1040; --mute:#5d5788; --line:#d3cff0; --acc:#A63CD6;
+  --ink:#170a36; --base:#12062e;
+  --ui:"Montserrat",system-ui,"Segoe UI",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#140c2c; --panel:#1f1442; --fg:#f4f1ff; --mute:#b2a9de; --line:#3a2a72; --acc:#FFCF00; color-scheme:dark } }
+:root[data-theme="dark"]{ --bg:#140c2c; --panel:#1f1442; --fg:#f4f1ff; --mute:#b2a9de; --line:#3a2a72; --acc:#FFCF00; color-scheme:dark }
+body{background:var(--bg);color:var(--fg);font-family:var(--ui);font-weight:500;font-size:15px;line-height:1.5}
+.wrap{max-width:1320px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:26px}
+h1{font:italic 900 clamp(26px,4vw,40px)/1.05 var(--ui);margin:0;text-wrap:balance}
+h2{font:italic 900 22px/1.1 var(--ui);margin:0}
+p{margin:0;max-width:70ch}
+.lead,.sec{display:flex;flex-direction:column;gap:10px}
+.mute{color:var(--mute)}
+ul{margin:0;padding-left:20px;max-width:74ch}
+.frame{width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:14px;border:2px solid var(--line);position:relative;background:#4084d6}
+.stage{position:absolute;left:0;top:0;width:1280px;height:720px;transform-origin:0 0;background-size:cover;background-position:center;font-family:var(--ui);line-height:1}
+.stage.dimmed::before{content:"";position:absolute;inset:0;background:rgba(18,6,46,.45);backdrop-filter:blur(5px)}
+.stage>*{position:absolute}
+svg.ic{display:block;flex:none;overflow:visible}
+
+/* lettering: white heavy italic with an ink edge and a hard drop (the owner's pick, kept) */
+.t{--o:calc(var(--fs)*.085);--ol:var(--ink);font:700 var(--fs)/1 "Fredoka",var(--ui);letter-spacing:.01em;color:var(--tc,#fff);white-space:nowrap;text-shadow:{{RING}};display:inline-block}
+
+/* THE PIECE: deep fill of its hue, bright edge, ink line outside, hard shadow, a slow drifting pattern */
+.pc{--deep:color-mix(in srgb,var(--h) 26%,var(--base));--mid:color-mix(in srgb,var(--h) 52%,var(--base));--lite:color-mix(in srgb,var(--h) 55%,#fff);
+  position:relative;background:linear-gradient(115deg,transparent 36%,rgba(255,255,255,.1) 36% 49%,transparent 49% 55%,rgba(255,255,255,.06) 55% 59%,transparent 59%),linear-gradient(var(--deep),color-mix(in srgb,var(--h) 16%,var(--base)));border:3px solid var(--h);border-radius:var(--rad,14px);
+  box-shadow:0 0 0 3px var(--ink),0 6px 0 3px var(--ink),inset 0 2px 0 color-mix(in srgb,var(--h) 60%,transparent);display:flex;align-items:center}
+.pc::before{content:"";position:absolute;inset:0;border-radius:inherit;background:var(--mid);opacity:.5;pointer-events:none;
+  -webkit-mask:var(--pat) 0 0/46px 46px;mask:var(--pat) 0 0/46px 46px;animation:drift 9s linear infinite;animation-delay:var(--dl,0s)}
+@keyframes drift{to{-webkit-mask-position:46px -46px;mask-position:46px -46px}}
+.pc>*{position:relative}
+.stage{--pat:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 46'%3E%3Cpath d='M11 3l2.4 5.6L19 11l-5.6 2.4L11 19l-2.4-5.6L3 11l5.600-2.400z'/%3E%3Ccircle cx='34' cy='33' r='5.500' fill='none' stroke='%23000' stroke-width='3'/%3E%3Cpath d='M35 5l-6 9h4l-2 7 7-9h-4z'/%3E%3Cpath d='M6 30h9v4H6zM8 38h9v4H8z'/%3E%3C/svg%3E")}
+
+/* a bright press-me button: the hue itself, sliding stripes, a lip under it */
+.bb{--dk:color-mix(in srgb,var(--h) 62%,var(--base));position:relative;border-radius:12px;border:3px solid var(--ink);display:grid;place-items:center;
+  background:repeating-linear-gradient(120deg,rgba(255,255,255,.2) 0 9px,transparent 9px 20px) 0 0/200% 100%,linear-gradient(color-mix(in srgb,var(--h) 72%,#fff),var(--h) 55%);
+  box-shadow:0 5px 0 var(--dk),0 5px 0 3px var(--ink);animation:slide 6s linear infinite;animation-delay:var(--dl,0s)}
+@keyframes slide{to{background-position:-46px 0,0 0}}
+
+/* icon standing on a piece: bigger than the piece, tipped, breathing */
+.ico{animation:bob 3s ease-in-out infinite;animation-delay:var(--dl,0s);filter:drop-shadow(0 0 5px color-mix(in srgb,var(--h) 55%,transparent))}
+@keyframes bob{0%,100%{transform:rotate(var(--tilt,-6deg)) translateY(0)}50%{transform:rotate(calc(var(--tilt,-6deg) + 3deg)) translateY(-3px)}}
+
+.mt{width:90px;height:90px;--rad:18px;justify-content:center;align-items:center}
+.mt .ml{position:absolute;left:50%;bottom:-9px;transform:translateX(-50%)}
+.mbar{width:236px;height:50px;padding-left:66px;--rad:14px}
+.mbar .ico{position:absolute;left:-12px;top:-12px}
+.count{height:44px;padding:0 16px 0 52px;--rad:12px;min-width:150px}
+.count .ico{position:absolute;left:-14px;top:-8px}
+.count small{position:absolute;right:10px;bottom:-9px;font:700 11px/1 "Fredoka",var(--ui);color:var(--lite);text-shadow:0 0 0 var(--ink),1px 1px 0 var(--ink),-1px 1px 0 var(--ink),1px -1px 0 var(--ink),-1px -1px 0 var(--ink),0 2px 0 var(--ink)}
+.tile{width:60px;height:60px;--rad:16px;justify-content:center}
+.tile+.lbl,.rb+.lbl{position:absolute}
+.rb{border-radius:50%;justify-content:center;--rad:50%}
+.key{position:absolute;right:-8px;bottom:-6px;min-width:26px;height:26px;padding:0 5px;border-radius:8px;background:#fff;border:2.5px solid var(--ink);box-shadow:0 3px 0 var(--ink);display:grid;place-items:center;font:900 13px/1 var(--ui);color:var(--ink)}
+.pin{width:44px;height:44px;--rad:14px;justify-content:center;animation:float 3.2s ease-in-out infinite;animation-delay:var(--dl,0s)}
+.pin::after{content:"";position:absolute;left:50%;bottom:-13px;margin-left:-8px;border:8px solid transparent;border-top:10px solid var(--h);filter:drop-shadow(0 3px 0 var(--ink))}
+@keyframes float{50%{transform:translateY(-6px)}}
+.chip{height:46px;padding:0 14px 0 46px;--rad:12px;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;min-width:128px}
+.chip .ico{position:absolute;left:-10px;top:-4px}
+.chip.you{border-color:#fff}
+.banner{filter:drop-shadow(0 6px 0 var(--ink));display:grid;place-items:center}
+.banner .t{position:relative;margin-top:-3%}
+.card{--rad:14px;flex-direction:column;align-items:flex-start;gap:8px;padding:14px;width:226px;height:146px}
+.dial{border-radius:50%;display:grid;place-items:center;border:4px solid var(--ink);box-shadow:0 6px 0 var(--ink);background:conic-gradient(var(--h) calc(var(--f)*360deg),color-mix(in srgb,var(--h) 30%,var(--base)) 0)}
+.dial>i{position:absolute;inset:11%;border-radius:50%;border:3px solid var(--ink);background:radial-gradient(circle at 50% 30%,color-mix(in srgb,var(--h) 34%,var(--base)),color-mix(in srgb,var(--h) 14%,var(--base)))}
+.dial>div{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px}
+.strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:14px 10px;background:#2a1a5c;border:2px solid var(--ink);border-radius:14px;padding:18px 14px}
+.strip .tile{width:54px;height:54px;margin:0 auto}
+.strip{--pat:none;--ink:#170a36;--base:#12062e}
+.strip .pc::before{display:none}
+.stage>*{position:absolute}
+.pc,.bb,.dial{box-sizing:border-box}
+
+{{PRINTS}}
+.tx-c1::before,[data-tx="c1"] .pc::before{background:var(--mid);opacity:.62;-webkit-mask:var(--p1) 0 0/var(--ts,96px) var(--ts,96px);mask:var(--p1) 0 0/var(--ts,96px) var(--ts,96px);animation:txp 18s linear infinite}
+.tx-c2::before,[data-tx="c2"] .pc::before{background:var(--mid);opacity:.62;-webkit-mask:var(--p2) 0 0/var(--ts,96px) var(--ts,96px);mask:var(--p2) 0 0/var(--ts,96px) var(--ts,96px);animation:txp 18s linear infinite}
+.tx-c3::before,[data-tx="c3"] .pc::before{background:var(--mid);opacity:.62;-webkit-mask:var(--p3) 0 0/var(--ts,96px) var(--ts,96px);mask:var(--p3) 0 0/var(--ts,96px) var(--ts,96px);animation:txp 18s linear infinite}
+@keyframes txp{to{-webkit-mask-position:var(--ts,96px) calc(var(--ts,96px)*-1);mask-position:var(--ts,96px) calc(var(--ts,96px)*-1)}}
+.demo .big{height:150px}
+/* ---- texture options (owner 2026-11-24: likes textures in the pieces, wants a different style) */
+.pick{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:10px 0}
+.pick button{font:700 14px/1 var(--ui);padding:9px 14px;border-radius:10px;border:2px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer}
+.pick button[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:#170a36}
+.pick button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.pick #txb{display:flex;flex-wrap:wrap;gap:8px}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.opt{display:flex;flex-direction:column;gap:8px;min-width:0}
+.opt>b{font:italic 900 20px/1 var(--ui)}
+.opt>b span{font:700 14px/1 var(--ui);margin-left:6px}
+.demo{--pat:none;--ink:#170a36;--base:#12062e;background:#4084d6;border-radius:14px;border:2px solid var(--ink);padding:18px 16px 22px;display:flex;flex-direction:column;gap:18px;align-items:flex-start}
+.demo .big{width:100%;height:96px;--rad:16px;padding:0 16px;gap:14px;box-sizing:border-box}
+.demo .mt{flex:none}
+.tx-a::before,[data-tx="a"] .pc::before{background:var(--mid);opacity:.75;-webkit-mask:radial-gradient(circle,#000 0 30%,transparent 34%) 0 0/11px 11px,linear-gradient(200deg,#000 5%,transparent 70%);-webkit-mask-composite:source-in;mask:radial-gradient(circle,#000 0 30%,transparent 34%) 0 0/11px 11px,linear-gradient(200deg,#000 5%,transparent 70%);mask-composite:intersect;animation:txa 5s linear infinite}
+@keyframes txa{to{-webkit-mask-position:11px 11px,0 0;mask-position:11px 11px,0 0}}
+.tx-b::before,[data-tx="b"] .pc::before{background:var(--mid);opacity:.5;-webkit-mask:repeating-linear-gradient(115deg,#000 0 9px,transparent 9px 26px) 0 0/200% 100%;mask:repeating-linear-gradient(115deg,#000 0 9px,transparent 9px 26px) 0 0/200% 100%;animation:txb 4s linear infinite}
+@keyframes txb{to{-webkit-mask-position:-57.4px 0;mask-position:-57.4px 0}}
+.tx-c::before,[data-tx="c"] .pc::before{background:var(--mid);opacity:.6;-webkit-mask:var(--fist) 0 0/52px 52px;mask:var(--fist) 0 0/52px 52px;animation:txc 10s linear infinite}
+@keyframes txc{to{-webkit-mask-position:52px -52px;mask-position:52px -52px}}
+.tx-d::before,[data-tx="d"] .pc::before{background:var(--mid);opacity:.55;-webkit-mask:repeating-conic-gradient(from 0deg at 0% 100%,#000 0 5deg,transparent 5deg 13deg);mask:repeating-conic-gradient(from 0deg at 0% 100%,#000 0 5deg,transparent 5deg 13deg);animation:txd 3.4s ease-in-out infinite}
+@keyframes txd{50%{opacity:.25}}
+.tx-e::before,[data-tx="e"] .pc::before{background:var(--mid);opacity:.5;-webkit-mask:conic-gradient(#000 25%,transparent 0 50%,#000 0 75%,transparent 0) 0 0/26px 26px;mask:conic-gradient(#000 25%,transparent 0 50%,#000 0 75%,transparent 0) 0 0/26px 26px;animation:txe 8s linear infinite}
+@keyframes txe{to{-webkit-mask-position:26px 26px;mask-position:26px 26px}}
+.wrap{--fist:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 52 52'%3E%3Cpath d='M7 15c0-6 4-10 10-10s9 4 9 9c0 4-2 7-6 8v3H10v-4c-2-1-3-3-3-6z'/%3E%3Cpath d='M38 28l2.200 5 5.500.5-4.200 3.600 1.300 5.400-4.800-2.900-4.800 2.900 1.300-5.400-4.200-3.600 5.500-.5z'/%3E%3Cpath d='M36 6l-5 8h4l-2 6 7-8h-4z'/%3E%3Cpath d='M6 36h10v3.500H6zM9 43h10v3.500H9z'/%3E%3C/svg%3E")}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+{{SYMBOLS}}
+</svg>
+
+<div class="wrap">
+  <div class="lead">
+    <h1>Haymaker HUD: a new skin</h1>
+    <p>Built from your three screenshots and your icon sheets. I call it <b>Tinted glass</b>: every piece is one colour in three strengths (a dark see-through fill, a bright edge, a bright icon standing out of it), windows are near-black with a jagged blade for a title, and only the thing you press is a bright striped button.</p>
+    <p>My reading of "change everything, I like the structure": every piece keeps its place on the screen, and everything about how it looks is new: shapes, lettering, textures, icons. One layout change, because all three of your references do it: the menu is a block of six tiles, not a list of long buttons.</p>
+    <p class="mute">This is a style board, three screens. If you like it, it goes onto the whole HUD mock. Names, Coins and timers are samples.</p>
+  </div>
+
+  <div class="sec">
+    <h2>The fist print: you picked C3, Sky brawl</h2>
+    <p>You picked fists and stars, without the random lines and the lightning bolt. The gloves stay in all three; what goes with them is different in each. The print takes the colour of its piece, drifts slowly, and scales with the piece: small on a small button, big on a window. Press a button under them to see one on all three screens, then tell me which, or name things to add or drop.</p>
+    <div class="opts" id="opts"></div>
+    <div class="pick"><b>Show on the three screens below:</b><span id="txb"></span></div>
+  </div>
+
+  <div class="sec"><h2>Lobby</h2><div class="frame"><div class="stage" id="s-lobby" style="background-image:url({{BG_LOBBY}})"></div></div></div>
+  <div class="sec"><h2>A window (Shop)</h2><div class="frame"><div class="stage dimmed" id="s-shop" style="background-image:url({{BG_LOBBY}})"></div></div></div>
+  <div class="sec"><h2>Fight</h2><div class="frame"><div class="stage" id="s-fight" style="background-image:url({{BG_FIGHT}})"></div></div></div>
+
+  <div class="sec">
+    <h2>Icons in this style</h2>
+    <p>The icons are the set you saw (style A). On a piece they take that piece's colour, so the button and its icon read as one thing. Coins, Gems, the crown and the eight classes keep their own colours, because they are things you own.</p>
+    <div class="strip" id="strip"></div>
+  </div>
+
+  <div class="sec">
+    <h2>What I took from where</h2>
+    <ul>
+      <li><b>From the green teleport screenshot:</b> dark see-through pieces in their own colour with a bright edge, a faint pattern inside, the icon bigger than its bar and sticking out, a small label tucked on the bar's corner.</li>
+      <li><b>From the blue shop screenshot:</b> the near-black window with a jagged blade title that breaks out of it, square menu tiles with the name on the bottom edge, cards that each have their own colour and a big picture on the right, green price buttons.</li>
+      <li><b>From the fish collection screenshot:</b> the diagonal glass streak across every piece, the round red close button with a white ring, bright bars for tabs.</li>
+      <li><b>From your icon sheets:</b> the chunky cut icons with a thick outline.</li>
+      <li><b>For a brawler:</b> the pattern is sparks, bolts and speed lines, the blade title looks like an impact, icons tilt as if mid-swing.</li>
+      <li><b>New lettering:</b> chunky and rounded, upright. The heavy italic went with the old look; say if you want it back.</li>
+      <li><b>Kept:</b> the Kidcore colours and round thumb buttons for the fight.</li>
+    </ul>
+    <p class="mute">Not checked: a real phone, Roblox. Nothing is in the game, the HUD mock is untouched, nothing is uploaded.</p>
+  </div>
+</div>
+
+<script>
+const DATA={{DATA}}, BY=Object.fromEntries(DATA.map(o=>[o.id,o]));
+const K={blue:"#00A6ED",green:"#32D12A",gold:"#FFCF00",peri:"#8F8BD9",orange:"#FF9500",pink:"#F636AB",purple:"#A63CD6",teal:"#1FCFC0",red:"#FF3B4E"};
+let N=0; const dl=()=>`--dl:${-((N++*0.61)%5).toFixed(2)}s`;
+const at=(x,y)=>`left:${x}px;top:${y}px`;
+const ic=(id,px,full,hue)=>`<svg class="ic" width="${px}" height="${px}"><use href="#${full?"i-"+id:"t-"+id+"-"+(hue||BY[id].ring).slice(1).toLowerCase()}"/></svg>`;
+const ico=(id,px,full,tilt,hue)=>`<span class="ico" style="${dl()};--tilt:${tilt??-6}deg">${ic(id,px,full,hue)}</span>`;
+const t=(s,fs,c)=>`<span class="t" style="--fs:${fs}px${c?`;--tc:${c}`:""}">${s}</span>`;
+const mbar=(x,y,id,label,h)=>`<div class="pc mbar" style="${at(x,y)};--h:${h};${dl()}">${ico(id,70)}${t(label,23)}</div>`;
+const mtile=(x,y,id,label,h)=>`<div class="pc mt" style="${at(x,y)};--h:${h};${dl()}">${ico(id,62,false,-4,h)}<span class="ml">${t(label,label.length>7?13:15)}</span></div>`;
+const count=(x,y,id,n,label,h)=>`<div class="pc count" style="${at(x,y)};--h:${h};${dl()}">${ico(id,58,true,-8)}${t(n,24,`color-mix(in srgb,${h} 45%,#fff)`)}<small>${label}</small></div>`;
+const tile=(x,y,id,label,h,s=60)=>`<div class="pc tile" style="${at(x,y)};--h:${h};width:${s}px;height:${s}px;${dl()}">${ico(id,s*.9,false,0)}</div>`+
+  (label?`<span class="lbl" style="left:${x+s/2}px;top:${y+s+10}px;transform:translateX(-50%)">${t(label,14)}</span>`:"");
+const pin=(x,y,id,h)=>`<div class="pc pin" style="${at(x,y)};--h:${h};${dl()}">${ic(id,38,false,h)}</div>`;
+const rb=(x,y,d,id,h,key,label,mid)=>`<div class="pc rb" style="${at(x,y)};width:${d}px;height:${d}px;--h:${h};border-width:4px;${dl()}">${mid||ico(id,d*.74,false,-4)}${key?`<b class="key">${key}</b>`:""}</div>`+
+  (label?`<span class="lbl" style="left:${x+d/2}px;top:${y+d+12}px;transform:translateX(-50%)">${t(label,15)}</span>`:"");
+const bb=(x,y,w,h,label,hue,fs=20)=>`<div class="bb" style="${x!=null?at(x,y)+";position:absolute;":""}width:${w}px;height:${h}px;--h:${hue};${dl()}">${t(label,fs)}</div>`;
+let BN=0;
+const banner=(x,y,w,h,label,hue,fs,rot)=>{const g="bg"+(BN++);return `<div class="banner" style="${at(x,y)};width:${w}px;height:${h}px;transform:rotate(${rot}deg)"><svg width="${w}" height="${h}" viewBox="0 0 400 90" preserveAspectRatio="none" style="position:absolute;inset:0;overflow:visible">
+  <defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:color-mix(in srgb,${hue} 50%,#fff)"/><stop offset=".5" style="stop-color:${hue}"/><stop offset="1" style="stop-color:color-mix(in srgb,${hue} 62%,#12062e)"/></linearGradient></defs>
+  <path d="M48 6 L330 4 L318 20 L398 10 L352 38 L400 44 L340 62 L352 84 L70 86 L82 70 L2 80 L48 52 L0 46 L60 28 Z" fill="url(#${g})" stroke="#170a36" stroke-width="6" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+  <path d="M76 15 L300 11 L288 24 L70 29 Z" fill="#fff" opacity=".4"/><path d="M110 66 L300 62 L310 72 L100 76 Z" fill="#fff" opacity=".16"/><path d="M300 52 L372 34 L330 58 Z" fill="#fff" opacity=".22"/></svg>${t(label,fs)}</div>`};
+
+/* ---- lobby */
+const menu=[["cart","SHOP",K.gold],["classes","CLASSES",K.blue],["bag","INVENTORY",K.green],["trophy","RANKED",K.red],["moves","MOVES",K.teal],["more","MORE",K.peri]];
+/* rule: an icon on a piece is ALWAYS drawn in that piece's colour */
+const lobbyBase=()=>menu.map((m,i)=>mtile(36+(i%3)*104,262+Math.floor(i/3)*112,m[0],m[1],m[2])).join("")+
+  count(960,26,"gem","120","GEMS",K.blue)+count(1118,26,"coin","700","COINS",K.gold)+
+  `<div class="pc count" style="${at(500,24)};--h:${K.purple};height:50px;padding-left:60px;padding-right:22px;${dl()}">${ico("clock",62,false,-8,K.purple)}${t("NEXT ROUND 0:08",24)}</div>`;
+document.getElementById("s-lobby").innerHTML=lobbyBase()+
+  tile(1180,300,"cog","Settings",K.peri)+tile(1180,400,"eye","Spectate",K.peri)+tile(1180,500,"afk","AFK",K.peri)+
+  pin(350,300,"cart",K.gold)+pin(500,260,"classes",K.blue)+pin(640,236,"target",K.orange)+pin(770,262,"trophy",K.red)+pin(910,296,"quests",K.orange);
+
+/* ---- shop window */
+const CARD=[K.purple,K.blue,K.gold,K.pink,K.orange,K.green];
+const card=(x,y,h)=>`<div class="pc card" style="${at(x,y)};--h:${h};background:linear-gradient(115deg,transparent 52%,rgba(255,255,255,.1) 52% 66%,transparent 66%),linear-gradient(100deg,color-mix(in srgb,${h} 62%,#12062e),color-mix(in srgb,${h} 20%,#12062e));${dl()}">${t("GAMEPASS",21,`color-mix(in srgb,${h} 35%,#fff)`)}<span style="font:600 12px/1.2 'Fredoka',var(--ui);color:#fff;opacity:.85">Yours to name<br>and price.</span><span class="ico" style="position:absolute;right:4px;top:6px;--tilt:8deg;${dl()}">${ic("star",62,true)}</span><span style="margin-top:auto;align-self:stretch">${bb(null,null,182,34,"ROBUX PRICE",K.green,15)}</span></div>`;
+document.getElementById("s-shop").innerHTML=lobbyBase()+
+  `<div class="pc" style="${at(372,150)};width:790px;height:500px;--h:${K.gold};--rad:20px;border-width:4px;background:linear-gradient(color-mix(in srgb,${K.gold} 9%,#0c0719),#0c0719)"></div>`+
+  banner(338,92,430,100,"SHOP",K.gold,52,-3)+
+  `<div class="bb" style="${at(1124,126)};width:56px;height:56px;border-radius:50%;--h:${K.red};box-shadow:0 0 0 3px #fff,0 5px 0 3px #170a36">${ic("x",34)}</div>`+
+  `<span style="${at(408,212)};font:600 13px/1 'Fredoka',var(--ui);color:#e9dcae">Robux items · your products go here, none are invented</span>`+
+  bb(408,244,150,42,"PASSES",K.gold,18)+
+  `<div class="pc" style="${at(574,244)};width:150px;height:42px;--h:${K.gold};justify-content:center;--rad:12px">${t("GEMS",18)}</div>`+
+  `<div class="pc" style="${at(740,244)};width:150px;height:42px;--h:${K.gold};justify-content:center;--rad:12px">${t("ITEMS",18)}</div>`+
+  [0,1,2,3,4,5].map(i=>card(408+(i%3)*244,314+Math.floor(i/3)*164,CARD[i])).join("");
+
+/* ---- fight */
+const chip=(x,name,ko,h,you,crown)=>`<div class="pc chip ${you?"you":""}" style="${at(x,22)};--h:${h};${dl()}">${ico("face",46,false,-6,h)}${t(name,15)}${t(ko+" KO",11,`color-mix(in srgb,${h} 45%,#fff)`)}${crown?`<span style="position:absolute;right:6px;top:-22px">${ic("crown",30,true)}</span>`:""}</div>`;
+document.getElementById("s-fight").innerHTML=
+  chip(330,"Bot 7",2,K.red)+chip(478,"Kairo",4,K.gold,false,true)+chip(626,"YOU",3,K.blue,true)+chip(774,"Nova",1,K.teal)+chip(922,"Zed",0,K.purple)+
+  `<div class="pc" style="${at(556,92)};height:46px;padding:0 22px 0 64px;--h:${K.blue};--rad:12px"><span style="position:absolute;left:-6px;top:-8px;width:58px;height:58px;display:grid;place-items:center" class="bb" >${t("5",30)}</span>${t("LEFT",24)}</div>`+
+  `<div style="${at(1010,96)};display:flex;flex-direction:column;align-items:flex-end;gap:7px;width:250px">${t(`<span style="color:${K.gold}">Kairo</span> KO <span style="color:${K.red}">Bot 12</span>`,15)}${t(`<span style="color:${K.blue}">YOU</span> KO <span style="color:${K.green}">Bot 3</span>`,15)}${t(`<span style="color:${K.purple}">Bot 9</span> <span style="color:${K.orange}">FELL</span>`,15)}</div>`+
+  rb(478,578,74,"blink",K.blue,"Q","Blink")+
+  `<div class="dial" style="${at(585,546)};width:118px;height:118px;--h:${K.orange};--f:.7"><i></i><div>${t("21",48)}${t("SPEED",13,K.orange)}</div></div>`+
+  rb(736,578,74,"cyclone",K.green,"R","Cyclone",t("3",40))+
+  `<div class="pc" style="${at(574,676)};height:28px;padding:0 14px;--h:${K.orange};--rad:9px;justify-content:center;width:140px">${t("STAGGER 12 · 1.7x",12)}</div>`+
+  bb(1066,522,176,44,"ULT READY  G",K.gold,18)+
+  rb(1080,600,62,"jump",K.peri,"SPC","Jump")+rb(1166,592,78,"punch",K.red,"M1","Punch")+
+  tile(34,30,"cog","",K.peri,46);
+
+
+/* ---- texture options */
+const TX=[["c1","C1","Knockout","gloves, impact bursts, KO and stars"],["c2","C2","Champion","gloves, crowns, the round bell, title belts and stars"],["c3","C3","Sky brawl","gloves, clouds, the lobby windmill and stars"]];
+document.getElementById("opts").innerHTML=TX.map(([k,L,n,d],i)=>{const h=[K.purple,K.blue,K.red,K.green,K.orange][i], h2=K.red;
+  return `<div class="opt"><b>${L}<span>${n}</span></b><div class="demo">
+    <div class="pc big tx-${k}" style="--h:${h}">${t("GAMEPASS",24)}</div>
+    <div style="display:flex;gap:22px;align-items:center;padding-left:4px"><div class="pc mt tx-${k}" style="--h:${h2}">${ico("punch",62,false,-4,null)}<span class="ml">${t("PUNCH",15)}</span></div>
+    <div class="pc count tx-${k}" style="--h:${K.gold};min-width:120px">${ico("coin",58,true,-8)}${t("700",24,"#ffe680")}</div></div>
+  </div><span class="mute" style="font-size:13px">${d}</span></div>`}).join("");
+
+const setTx=k=>{document.querySelectorAll(".stage").forEach(s=>{if(k)s.dataset.tx=k;else delete s.dataset.tx});
+  document.querySelectorAll("#txb button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.k===k)))};
+document.getElementById("txb").innerHTML=[["","Old (sparks)"]].concat(TX.map(x=>[x[0],x[1]+" "+x[2]])).map(([k,n])=>`<button type="button" id="tx-btn-${k||"old"}" data-k="${k}">${n}</button>`).join("");
+document.getElementById("txb").addEventListener("click",e=>{const b=e.target.closest("button");if(b)setTx(b.dataset.k)});
+setTx("c3");
+
+/* ---- icon strip */
+const FULL=new Set(["coin","gem","crown","star"]);
+document.getElementById("strip").innerHTML=DATA.map(o=>{const full=FULL.has(o.id)||o.g==="Classes";
+  return `<div class="pc tile" title="${o.n}" style="--h:${o.ring}">${ic(o.id,46,full)}</div>`}).join("");
+
+/* the print scales with its piece: one tile is about 0.7 of the piece's short side, between 30 and 96 px */
+document.querySelectorAll(".pc").forEach(e=>{const m=Math.min(e.offsetWidth,e.offsetHeight);if(m)e.style.setProperty("--ts",Math.round(Math.max(30,Math.min(96,m*.7)))+"px")});
+function fit(){document.querySelectorAll(".frame").forEach(f=>{f.firstElementChild.style.transform=`scale(${f.clientWidth/1280})`})}
+addEventListener("resize",fit); fit();
+</script>
