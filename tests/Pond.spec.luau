@@ -1,24 +1,31 @@
 --!strict
 -- Spec files are required BY the runner, so this path is relative to tests/.
--- Gnomon's central pond (user, 2026-11-11) on the game's real settings: its basin, its water and the wading slowdown.
+-- The pond rules (user, 2026-11-11): basin, water and the wading slowdown. Only the old Gnomon map had a pond, and it was
+-- deleted 2026-11-26, so these run on Gnomon's pond as it was, kept here as a test pond; the code stays for a future map.
 local GameConfig = require("../src/shared/Config/GameConfig")
 local Envs = require("../src/shared/Config/MapEnvironments")
 local Round = require("../src/shared/Core/Round")
 local Pond = require("../src/shared/Core/Pond")
 
 local CFG: any = GameConfig.Pond
-local POND: any = (Envs :: any).Maps.gnomon.pond
+local POND: any = { -- the old Gnomon's pond, exactly
+	x = 0,
+	z = 0,
+	semiX = 24,
+	semiZ = 18,
+	wobble = { { 3, 0.08, 0.6 }, { 5, 0.05, 2.1 } },
+	depth = 1.6,
+	inner = 0.68,
+	water = 0.55,
+}
 
 return {
-	["the pond sits in the middle of Gnomon and nowhere else"] = function()
-		assert(POND and POND.x == 0 and POND.z == 0)
-		local live: any = Round.arenaFor(GameConfig.Arena :: any, (Envs :: any).Maps.gnomon, nil)
-		assert(live.Pond == POND)
+	["no map has a pond now (the old Gnomon was the only one), and a map's pond reaches the live arena"] = function()
 		for id, entry in (Envs :: any).Maps do
-			if id ~= "gnomon" then
-				assert(entry.pond == nil, id)
-			end
+			assert(entry.pond == nil, id)
 		end
+		local live: any = Round.arenaFor(GameConfig.Arena :: any, { pond = POND }, nil)
+		assert(live.Pond == POND)
 	end,
 
 	["the basin is deepest in the middle and meets the floor at its rim"] = function()

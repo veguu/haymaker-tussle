@@ -90,255 +90,6 @@ MapEnvironments.Default = {
 -- owner), rise (studs, each way), period, sway (studs along the wind).
 
 MapEnvironments.Maps = {
-	gnomon = {
-		name = "Gnomon Meadow",
-		model = "Gnomon",
-		-- THE ARENA'S SIZE (user, 2026-11-10: double this map's length and width, once). Semi-axes in studs
-		-- of the walkable oval (rim included), X along the long axis, Z toward the lobby. Absolute numbers,
-		-- never a multiplier, so nothing can double it twice. The original oval was 106.5 x 88 (213 x 176
-		-- studs; design/maps/common.py ORIGINAL_OVAL); the Blender build is common.OVALS.gnomon. Spawns sit
-		-- on the oval at spawnShare of it; Round.isOut is this oval plus Arena.PlayAreaMargin.
-		-- 2026-11-11 (user): the props are placed by hand in Studio, each with its own collision, so the game adds
-		-- none of Config/MapObstacles' colliders here (they were invisible walls once the meshes came out).
-		codeObstacles = false,
-		-- THE POND (user, 2026-11-11): a shallow basin in the middle of the battlefield, carved by the Blender build
-		-- from these same numbers (design/maps/gnomon_dress.py POND) and read by Core/Pond for the wading slowdown.
-		-- x, z from the arena's centre; semi-axes in studs; wobble = { cycles, amount, phase } round the shore;
-		-- the bed is `depth` deep inside rho `inner`; the water's surface is `water` below the floor.
-		pond = {
-			x = 0,
-			z = 0,
-			semiX = 24,
-			semiZ = 18,
-			wobble = { { 3, 0.08, 0.6 }, { 5, 0.05, 2.1 } },
-			depth = 1.6,
-			inner = 0.68,
-			water = 0.55,
-		},
-		arena = {
-			semiX = 213,
-			semiZ = 176,
-			spawnShare = 0.65,
-			original = { semiX = 106.5, semiZ = 88 },
-		},
-		environment = {
-			-- fresh greens, gently warm sun low over the lobby's left shoulder (azimuth -55, elevation 38) so
-			-- the cliff's layers, the islets and the tufts model in light and shade; soft cool shade.
-			-- Tuned 2026-11-10 from the gameplay camera and lobby spawn on the reworked island (no outlines).
-			-- Sunny grass pass (2026-11-11): modest saturation lift, clear greens, and a gentle
-			-- sun, lighter and softer shade, a little more haze; the sky is kept blue (desaturating further
-			-- turned it grey).
-			-- LIGHTING PASS 2026-11-12 (user brief, five references: bright airy daylight with warm sun, cool readable
-			-- shade and gentle distance haze). The sun is higher and warmer and the shade cooler and bluer, so lit and
-			-- shaded sides separate by hue as well as value; a soft shadow edge; more sky light in the shade so it stays
-			-- readable; exposure near neutral (no global brightening); the atmosphere's haze is raised and its offset
-			-- pushed out, so the battlefield stays clear while the distant islets soften toward the sky colour; very
-			-- light bloom with a threshold above 1, so white flowers, pale rocks and clouds keep their detail.
-			sun = { clockTime = 14.6, latitude = 50, colour = { 255, 234, 204 }, brightness = 2.45 },
-			ambient = {
-				ambient = { 98, 114, 146 },
-				outdoor = { 124, 142, 178 },
-				bottom = { 26, 34, 20 },
-				shadowSoftness = 0.38,
-				diffuse = 0.55,
-				specular = 0.08,
-			},
-			exposure = 0,
-			grade = {
-				saturation = 0.02,
-				contrast = 0.16,
-				brightness = 0,
-				tint = { 255, 252, 246 },
-			},
-			bloom = { intensity = 0.3, size = 28, threshold = 1.35 },
-			sunRays = { intensity = 0.02, spread = 0.12 },
-			atmosphere = {
-				density = 0.3,
-				offset = 0.3,
-				colour = { 206, 228, 250 },
-				decay = { 150, 186, 232 },
-				glare = 0.15,
-				haze = 1.3,
-			},
-			-- a summer breeze across the meadow from the lobby's left. Raised 2026-11-10 (user: "too subtle",
-			-- wanted "a teeny bit stronger"): about half again the lean and gusts, a livelier shiver, gust
-			-- bands passing a little faster so the waves read across the meadow.
-			wind = {
-				direction = { 1, 0.3 },
-				lean = 0.09,
-				strength = 0.3,
-				gustLength = 42,
-				gustSeconds = 4,
-				flutter = 0.05,
-			},
-			clouds = {
-				-- 2026-11-12: the fixed swaying clouds became DRIFTING lanes (Environment.driftCloud): each lane's cloud
-				-- crosses 3000 studs down-wind at about 5.5 studs/s (8-11 min a crossing), fades out at the far end and
-				-- comes back up-wind as a new cloud (its own size, height, offset, shape, heading). `across` is the
-				-- lane's side offset from the arena (+ = the lobby's side), `y` its height, `phase` where it starts.
-				list = {},
-				drift = {
-					span = 3000,
-					speed = 5.5,
-					edge = 0.14,
-					acrossJitter = 60,
-					yJitter = 25,
-					sizeJitter = 0.15,
-					headingJitter = 20,
-					rise = 6,
-					risePeriod = 90,
-					lanes = {
-						{
-							across = -600,
-							y = 210,
-							length = 140,
-							speed = 1.0,
-							phase = 0.05,
-							stretched = 0.4,
-						},
-						{
-							across = -600,
-							y = 240,
-							length = 130,
-							speed = 1.0,
-							phase = 0.55,
-							stretched = 0.6,
-						},
-						{
-							across = -800,
-							y = 270,
-							length = 150,
-							speed = 0.85,
-							phase = 0.3,
-							stretched = 0.5,
-						},
-						{
-							across = -950,
-							y = 300,
-							length = 160,
-							speed = 1.15,
-							phase = 0.78,
-							stretched = 0.6,
-						},
-						{
-							across = -1100,
-							y = 330,
-							length = 160,
-							speed = 0.8,
-							phase = 0.12,
-							stretched = 0.7,
-						},
-						{
-							across = -1250,
-							y = 350,
-							length = 150,
-							speed = 1.05,
-							phase = 0.95,
-							stretched = 0.5,
-						},
-						{
-							across = 600,
-							y = 160,
-							length = 130,
-							speed = 0.9,
-							phase = 0.85,
-							stretched = 0.4,
-						},
-						{
-							across = 650,
-							y = 185,
-							length = 140,
-							speed = 0.9,
-							phase = 0.35,
-							stretched = 0.5,
-						},
-						{
-							across = 800,
-							y = 210,
-							length = 150,
-							speed = 1.1,
-							phase = 0.18,
-							stretched = 0.5,
-						},
-						{
-							across = 950,
-							y = 240,
-							length = 160,
-							speed = 0.95,
-							phase = 0.62,
-							stretched = 0.6,
-						},
-						{
-							across = 1100,
-							y = 270,
-							length = 150,
-							speed = 1.2,
-							phase = 0.42,
-							stretched = 0.6,
-						},
-					},
-				},
-			},
-			motes = {
-				list = {
-					-- leaves off the grove and the tall pair, petals off the hollow log's flowers and the sundial's beds
-					{
-						x = 325,
-						y = 30,
-						z = -151,
-						radius = 16,
-						count = 6,
-						kind = "leaf",
-						fall = 26,
-						colours = { { 92, 160, 70 }, { 150, 190, 74 } },
-					},
-					{
-						x = -354,
-						y = 34,
-						z = -65,
-						radius = 14,
-						count = 5,
-						kind = "leaf",
-						fall = 26,
-						colours = { { 70, 140, 74 }, { 120, 176, 70 } },
-					},
-					{
-						x = -391,
-						y = 18,
-						z = 196,
-						radius = 16,
-						count = 5,
-						kind = "petal",
-						fall = 18,
-						colours = { { 240, 120, 96 }, { 250, 214, 120 } },
-					},
-					{
-						x = 478,
-						y = -6,
-						z = -28,
-						radius = 18,
-						count = 5,
-						kind = "petal",
-						fall = 18,
-						colours = { { 250, 232, 196 }, { 240, 120, 96 } },
-					},
-				},
-			},
-			scenery = {
-				bob = {
-					{ match = "^Sight_BalloonNear", rise = 2.5, period = 11, sway = 4 },
-					{ match = "^Sight_BalloonFar", rise = 3, period = 14, sway = 6 },
-				},
-			},
-			landmarks = {
-				-- moved out with the doubled rim (2026-11-10 b): each by how far the rim moved at its bearing
-				{ name = "Sundial", x = 486, y = 60, z = -38, radius = 95 },
-				{ name = "Launch isle", x = 378, y = -20, z = 290, radius = 95 },
-				{ name = "Near balloon", x = -320, y = 78, z = -301, radius = 22 },
-			},
-			standIn = { floor = { 110, 168, 92 }, ring = { 240, 236, 214 } },
-		},
-	},
 	kitestead = {
 		name = "Kitestead",
 		model = "Kitestead",
@@ -637,11 +388,230 @@ MapEnvironments.Maps = {
 
 -- MAP 1 OF THE ARENA SUITE, "Grassy Plains" (owner brief 2026-11-20; design/maps/suite/meadow.py): Gnomon revamped.
 -- A CIRCLE of radius 180 since 2026-11-22 (owner: "more circle than oval"; his size), clean (no pond, no obstacles),
--- floating in open sky with floating islands for a background. Gnomon's light and wind for now. NOT IN THE ROTATION until the owner approves it (game.json
--- Maps.Rotation); until its model is at ServerStorage.HT_Maps.Meadow a stand-in floor is built.
+-- floating in open sky with floating islands for a background. The ONLY map in the rotation since 2026-11-26 (owner: "Only Map 1",
+-- until the other maps are rebuilt); until its model is at ServerStorage.HT_Maps.Meadow a stand-in floor is built.
 -- Gnomon's light, but clearer air: the fresh review (2026-11-22) found the game milky and the floor pale next to the
 -- Blender look, and the haze line under the arena reading as a sea.
-local meadowEnvironment = table.clone(MapEnvironments.Maps.gnomon.environment)
+-- Map 1's light, sky, clouds and wind. They were the old Gnomon map's (Map 1 is Gnomon revamped) and live here since the
+-- old Gnomon was deleted from the game (owner 2026-11-26: "just delte the old one from everything too"): the values are
+-- Gnomon's exactly, then Map 1's own clearer air below.
+local meadowEnvironment = {
+	-- fresh greens, gently warm sun low over the lobby's left shoulder (azimuth -55, elevation 38) so
+	-- the cliff's layers, the islets and the tufts model in light and shade; soft cool shade.
+	-- Tuned 2026-11-10 from the gameplay camera and lobby spawn on the reworked island (no outlines).
+	-- Sunny grass pass (2026-11-11): modest saturation lift, clear greens, and a gentle
+	-- sun, lighter and softer shade, a little more haze; the sky is kept blue (desaturating further
+	-- turned it grey).
+	-- LIGHTING PASS 2026-11-12 (user brief, five references: bright airy daylight with warm sun, cool readable
+	-- shade and gentle distance haze). The sun is higher and warmer and the shade cooler and bluer, so lit and
+	-- shaded sides separate by hue as well as value; a soft shadow edge; more sky light in the shade so it stays
+	-- readable; exposure near neutral (no global brightening); the atmosphere's haze is raised and its offset
+	-- pushed out, so the battlefield stays clear while the distant islets soften toward the sky colour; very
+	-- light bloom with a threshold above 1, so white flowers, pale rocks and clouds keep their detail.
+	sun = { clockTime = 14.6, latitude = 50, colour = { 255, 234, 204 }, brightness = 2.45 },
+	ambient = {
+		ambient = { 98, 114, 146 },
+		outdoor = { 124, 142, 178 },
+		bottom = { 26, 34, 20 },
+		shadowSoftness = 0.38,
+		diffuse = 0.55,
+		specular = 0.08,
+	},
+	exposure = 0,
+	grade = {
+		saturation = 0.02,
+		contrast = 0.16,
+		brightness = 0,
+		tint = { 255, 252, 246 },
+	},
+	bloom = { intensity = 0.3, size = 28, threshold = 1.35 },
+	sunRays = { intensity = 0.02, spread = 0.12 },
+	atmosphere = {
+		density = 0.3,
+		offset = 0.3,
+		colour = { 206, 228, 250 },
+		decay = { 150, 186, 232 },
+		glare = 0.15,
+		haze = 1.3,
+	},
+	-- a summer breeze across the meadow from the lobby's left. Raised 2026-11-10 (user: "too subtle",
+	-- wanted "a teeny bit stronger"): about half again the lean and gusts, a livelier shiver, gust
+	-- bands passing a little faster so the waves read across the meadow.
+	wind = {
+		direction = { 1, 0.3 },
+		lean = 0.09,
+		strength = 0.3,
+		gustLength = 42,
+		gustSeconds = 4,
+		flutter = 0.05,
+	},
+	clouds = {
+		-- 2026-11-12: the fixed swaying clouds became DRIFTING lanes (Environment.driftCloud): each lane's cloud
+		-- crosses 3000 studs down-wind at about 5.5 studs/s (8-11 min a crossing), fades out at the far end and
+		-- comes back up-wind as a new cloud (its own size, height, offset, shape, heading). `across` is the
+		-- lane's side offset from the arena (+ = the lobby's side), `y` its height, `phase` where it starts.
+		list = {},
+		drift = {
+			span = 3000,
+			speed = 5.5,
+			edge = 0.14,
+			acrossJitter = 60,
+			yJitter = 25,
+			sizeJitter = 0.15,
+			headingJitter = 20,
+			rise = 6,
+			risePeriod = 90,
+			lanes = {
+				{
+					across = -600,
+					y = 210,
+					length = 140,
+					speed = 1.0,
+					phase = 0.05,
+					stretched = 0.4,
+				},
+				{
+					across = -600,
+					y = 240,
+					length = 130,
+					speed = 1.0,
+					phase = 0.55,
+					stretched = 0.6,
+				},
+				{
+					across = -800,
+					y = 270,
+					length = 150,
+					speed = 0.85,
+					phase = 0.3,
+					stretched = 0.5,
+				},
+				{
+					across = -950,
+					y = 300,
+					length = 160,
+					speed = 1.15,
+					phase = 0.78,
+					stretched = 0.6,
+				},
+				{
+					across = -1100,
+					y = 330,
+					length = 160,
+					speed = 0.8,
+					phase = 0.12,
+					stretched = 0.7,
+				},
+				{
+					across = -1250,
+					y = 350,
+					length = 150,
+					speed = 1.05,
+					phase = 0.95,
+					stretched = 0.5,
+				},
+				{
+					across = 600,
+					y = 160,
+					length = 130,
+					speed = 0.9,
+					phase = 0.85,
+					stretched = 0.4,
+				},
+				{
+					across = 650,
+					y = 185,
+					length = 140,
+					speed = 0.9,
+					phase = 0.35,
+					stretched = 0.5,
+				},
+				{
+					across = 800,
+					y = 210,
+					length = 150,
+					speed = 1.1,
+					phase = 0.18,
+					stretched = 0.5,
+				},
+				{
+					across = 950,
+					y = 240,
+					length = 160,
+					speed = 0.95,
+					phase = 0.62,
+					stretched = 0.6,
+				},
+				{
+					across = 1100,
+					y = 270,
+					length = 150,
+					speed = 1.2,
+					phase = 0.42,
+					stretched = 0.6,
+				},
+			},
+		},
+	},
+	motes = {
+		list = {
+			-- leaves off the grove and the tall pair, petals off the hollow log's flowers and the sundial's beds
+			{
+				x = 325,
+				y = 30,
+				z = -151,
+				radius = 16,
+				count = 6,
+				kind = "leaf",
+				fall = 26,
+				colours = { { 92, 160, 70 }, { 150, 190, 74 } },
+			},
+			{
+				x = -354,
+				y = 34,
+				z = -65,
+				radius = 14,
+				count = 5,
+				kind = "leaf",
+				fall = 26,
+				colours = { { 70, 140, 74 }, { 120, 176, 70 } },
+			},
+			{
+				x = -391,
+				y = 18,
+				z = 196,
+				radius = 16,
+				count = 5,
+				kind = "petal",
+				fall = 18,
+				colours = { { 240, 120, 96 }, { 250, 214, 120 } },
+			},
+			{
+				x = 478,
+				y = -6,
+				z = -28,
+				radius = 18,
+				count = 5,
+				kind = "petal",
+				fall = 18,
+				colours = { { 250, 232, 196 }, { 240, 120, 96 } },
+			},
+		},
+	},
+	scenery = {
+		bob = {
+			{ match = "^Sight_BalloonNear", rise = 2.5, period = 11, sway = 4 },
+			{ match = "^Sight_BalloonFar", rise = 3, period = 14, sway = 6 },
+		},
+	},
+	landmarks = {
+		-- moved out with the doubled rim (2026-11-10 b): each by how far the rim moved at its bearing
+		{ name = "Sundial", x = 486, y = 60, z = -38, radius = 95 },
+		{ name = "Launch isle", x = 378, y = -20, z = 290, radius = 95 },
+		{ name = "Near balloon", x = -320, y = 78, z = -301, radius = 22 },
+	},
+	standIn = { floor = { 110, 168, 92 }, ring = { 240, 236, 214 } },
+}
 meadowEnvironment.exposure = -0.1
 meadowEnvironment.grade =
 	{ saturation = 0.06, contrast = 0.18, brightness = 0, tint = { 255, 252, 246 } }

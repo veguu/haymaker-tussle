@@ -1,7 +1,8 @@
 --!strict
 -- Spec files are required BY the runner, so this path is relative to tests/.
--- The doubled Gnomon arena (user, 2026-11-10) on the game's real settings: its oval, its ring-out line,
--- its spawns, its obstacles, the bots round them, and the lobby kept past the out line.
+-- The arena shapes on the game's real settings: the oval (Gnomon's doubled oval of 2026-11-10, which the maps not yet
+-- rebuilt keep; Gnomon itself was deleted 2026-11-26, so Quarry stands in for it), Map 1's circle, their ring-out lines,
+-- spawns, obstacles, the bots round them, and the lobby kept past the out line.
 local GameConfig = require("../src/shared/Config/GameConfig")
 local Envs = require("../src/shared/Config/MapEnvironments")
 local MapObstacles = require("../src/shared/Config/MapObstacles")
@@ -11,22 +12,21 @@ local BotBrain = require("../src/shared/Core/BotBrain")
 local BASE: any = GameConfig.Arena
 local LOBBY: any = GameConfig.Lobby
 local BOT: any = GameConfig.TestBot
-local GNOMON: any = Round.arenaFor(BASE, (Envs :: any).Maps.gnomon, (MapObstacles :: any).gnomon)
+local OVAL: any = Round.arenaFor(BASE, (Envs :: any).Maps.quarry, nil) -- the oval, on Map 2 (Quarry)
 -- Map 1, "Grassy Plains": a CIRCLE since 2026-11-22 (the owner's size, 180)
 local MEADOW: any = Round.arenaFor(BASE, (Envs :: any).Maps.meadow, nil)
 local MEADOW_RADIUS = 180
 
 return {
-	["Gnomon is the original oval doubled exactly once, as absolute numbers"] = function()
-		local shape = (Envs :: any).Maps.gnomon.arena
-		assert(shape.semiX == shape.original.semiX * 2 and shape.semiZ == shape.original.semiZ * 2)
+	["the oval is Gnomon's doubled oval, 426 x 352 studs, as absolute numbers"] = function()
+		local shape = (Envs :: any).Maps.quarry.arena
 		assert(shape.semiX == 213 and shape.semiZ == 176, "426 x 352 studs")
 	end,
 
-	["a map with its own shape has Gnomon's oval (owner 2026-11-20) until it is rebuilt as a circle (Map 1 is); the rest keep the base circle"] = function()
-		local g = (Envs :: any).Maps.gnomon.arena
+	["a map with its own shape has the oval (owner 2026-11-20) until it is rebuilt as a circle (Map 1 is); the rest keep the base circle"] = function()
+		local g = (Envs :: any).Maps.quarry.arena
 		for id, entry in (Envs :: any).Maps do
-			if id ~= "gnomon" then
+			if id ~= "quarry" then
 				local a: any = Round.arenaFor(BASE, entry, nil)
 				if id == "meadow" then
 					assert(
@@ -50,12 +50,12 @@ return {
 		local cx, cy, cz = BASE.CenterX, BASE.CenterY, BASE.CenterZ
 		local m = BASE.PlayAreaMargin
 		-- the old circle (97 + 60) would have called a fighter out while still over the long end of the floor
-		assert(not Round.isOut(GNOMON, cx + 200, cy, cz), "still over the floor")
-		assert(not Round.isOut(GNOMON, cx + 213 + m - 1, cy, cz))
-		assert(Round.isOut(GNOMON, cx + 213 + m + 1, cy, cz))
-		assert(not Round.isOut(GNOMON, cx, cy, cz + 176 + m - 1))
-		assert(Round.isOut(GNOMON, cx, cy, cz - 176 - m - 1))
-		assert(Round.isOut(GNOMON, cx, cy - BASE.EliminationDepth - 1, cz), "below the line is out")
+		assert(not Round.isOut(OVAL, cx + 200, cy, cz), "still over the floor")
+		assert(not Round.isOut(OVAL, cx + 213 + m - 1, cy, cz))
+		assert(Round.isOut(OVAL, cx + 213 + m + 1, cy, cz))
+		assert(not Round.isOut(OVAL, cx, cy, cz + 176 + m - 1))
+		assert(Round.isOut(OVAL, cx, cy, cz - 176 - m - 1))
+		assert(Round.isOut(OVAL, cx, cy - BASE.EliminationDepth - 1, cz), "below the line is out")
 	end,
 
 	["Map 1's ring-out line is its circle plus the margin, the same in every direction"] = function()
@@ -71,7 +71,7 @@ return {
 			)
 			assert(Round.isOut(MEADOW, cx + c * (out + 1), cy, cz + s * (out + 1)), `out at {step}`)
 		end
-		-- the oval's long end is not floor here: 213 + margin - 1 was in on Gnomon, it is out on the circle
+		-- the oval's long end is not floor here: 213 + margin - 1 is in on the oval, it is out on the circle
 		assert(Round.isOut(MEADOW, cx + 213 + BASE.PlayAreaMargin - 1, cy, cz))
 		assert(Round.isOut(MEADOW, cx, cy - BASE.EliminationDepth - 1, cz), "below the line is out")
 		local a, b = Round.semiAxes(MEADOW)
@@ -95,7 +95,7 @@ return {
 	end,
 
 	["25 spawns sit on the oval inside the floor, facing the middle, spread out"] = function()
-		local pts = Round.spawnPoints(GNOMON, 25, 0.3)
+		local pts = Round.spawnPoints(OVAL, 25, 0.3)
 		for _, p in pts do
 			local dx, dz = p.x - BASE.CenterX, p.z - BASE.CenterZ
 			local f = math.sqrt((dx / 213) ^ 2 + (dz / 176) ^ 2)
@@ -110,27 +110,31 @@ return {
 		end
 	end,
 
-	["no spawn, at any turn of the ring, is within 8 studs of an obstacle"] = function()
-		local list: any = (MapObstacles :: any).gnomon
-		assert(#list == 0, "Gnomon has an open floor with no generated obstacles")
-		for step = 0, 359, 3 do
-			for _, p in Round.spawnPoints(GNOMON, 25, math.rad(step)) do
-				for _, o in list do
-					local d =
-						math.sqrt((p.x - BASE.CenterX - o.x) ^ 2 + (p.z - BASE.CenterZ - o.z) ^ 2)
-					assert(d - o.r > 8, `spawn too near an obstacle at turn {step}`)
+	["no spawn, at any turn of the ring, is within 8 studs of an obstacle (every map's generated obstacles)"] = function()
+		for id, list: any in MapObstacles :: any do
+			local shape: any = Round.arenaFor(BASE, (Envs :: any).Maps[id], list)
+			for step = 0, 359, 3 do
+				for _, p in Round.spawnPoints(shape, 25, math.rad(step)) do
+					for _, o in list do
+						local d = math.sqrt(
+							(p.x - BASE.CenterX - o.x) ^ 2 + (p.z - BASE.CenterZ - o.z) ^ 2
+						)
+						assert(d - o.r > 8, `spawn too near an obstacle at turn {step}`)
+					end
 				end
 			end
 		end
 	end,
 
 	["obstacles are knee to waist high, round, inside the floor with room to land at the edge"] = function()
-		for _, o in (MapObstacles :: any).gnomon do
-			assert(o.h >= 0.9 and o.h <= 3.4, "height")
-			assert(o.r > 1 and o.r < 5, "radius")
-			local f = math.sqrt((o.x / 213) ^ 2 + (o.z / 176) ^ 2)
-			assert(f < 0.86, "clear of the recovery edge")
-			assert(f > 0.2, "clear of the open middle")
+		for _, list: any in MapObstacles :: any do
+			for _, o in list do
+				assert(o.h >= 0.9 and o.h <= 3.4, "height")
+				assert(o.r > 1 and o.r < 5, "radius")
+				local f = math.sqrt((o.x / 213) ^ 2 + (o.z / 176) ^ 2)
+				assert(f < 0.86, "clear of the recovery edge")
+				assert(f > 0.2, "clear of the open middle")
+			end
 		end
 	end,
 

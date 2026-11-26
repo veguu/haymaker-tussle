@@ -717,12 +717,9 @@ local GameConfig = {
 	Maps = {
 		Enabled = true,
 		Rotation = {
-			"gnomon",
-			"kitestead",
-			"saltcrest",
 			"meadow",
 		},
-		StartMap = "gnomon",
+		StartMap = "",
 		ChangeEveryRounds = 1,
 		FadeOutSeconds = 0.6,
 		SwapBufferSeconds = 0.25,

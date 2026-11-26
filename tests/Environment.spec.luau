@@ -13,7 +13,7 @@ return {
 			assert(Envs.Maps[id], `{id} is in the rotation but has no entry in MapEnvironments`)
 		end
 		for id in Envs.Maps do
-			-- each map against its own arena (Gnomon's doubled oval grows the fight space and the lobby's view)
+			-- each map against its own arena (the oval grows the fight space and the lobby's view)
 			local arena = Round.arenaFor(ARENA, Envs.Maps[id], nil)
 			local problems = Environment.problems(Environment.resolve(Envs, id), LOBBY, arena)
 			assert(#problems == 0, `{id}:\n  ` .. table.concat(problems, "\n  "))
@@ -51,14 +51,14 @@ return {
 	end,
 
 	["a map's preset overrides only what it names; lists are replaced, not merged"] = function()
-		local p = Environment.resolve(Envs, "gnomon")
-		assert(p.sun.clockTime == Envs.Maps.gnomon.environment.sun.clockTime)
+		local p = Environment.resolve(Envs, "meadow")
+		assert(p.sun.clockTime == Envs.Maps.meadow.environment.sun.clockTime)
 		assert(p.wind.global == Envs.Default.wind.global, "unnamed values come from the default")
 		assert(
 			p.clouds.under == Envs.Default.clouds.under,
 			"nested defaults survive a partial override"
 		)
-		assert(#p.clouds.list == #Envs.Maps.gnomon.environment.clouds.list)
+		assert(#p.clouds.list == #Envs.Maps.meadow.environment.clouds.list)
 	end,
 
 	["lighting values keep the vault's rules: bloom above 1, outdoor ambient at least ambient"] = function()
@@ -134,7 +134,7 @@ return {
 	end,
 
 	["the same time gives the same sky: clouds and leaves are pure functions of time"] = function()
-		local p = Environment.resolve(Envs, "gnomon")
+		local p = Environment.resolve(Envs, "meadow")
 		local wx, wz = Environment.wind(p.wind.direction)
 		local drift = p.clouds.drift
 		local c1 = Environment.driftCloud(drift, drift.lanes[1], 1, wx, wz, 37.5)
@@ -150,7 +150,7 @@ return {
 	end,
 
 	["drifting clouds move one way, fade at the ends and come back as a new cloud"] = function()
-		local p = Environment.resolve(Envs, "gnomon")
+		local p = Environment.resolve(Envs, "meadow")
 		local wx, wz = Environment.wind(p.wind.direction)
 		local drift = p.clouds.drift
 		local lane = drift.lanes[1]
@@ -187,8 +187,8 @@ return {
 		local behind = Environment.lobbyBehindCorridor(LOBBY, ARENA)
 		assert(Environment.inCorridor(behind, 0, 20, -300, 1), "right behind the arena")
 		assert(not Environment.inCorridor(behind, 0, 20, 150, 1), "the behind view stays behind")
-		-- beside the doubled Gnomon arena, level with it, is not in either view (its side islets live there)
-		local gnomon = Round.arenaFor(ARENA, Envs.Maps.gnomon, nil)
+		-- beside the oval arena (Quarry's; Gnomon's before it was deleted), level with it, is not in either view
+		local gnomon = Round.arenaFor(ARENA, Envs.Maps.quarry, nil)
 		assert(
 			not Environment.inCorridor(Environment.lobbyCorridor(LOBBY, gnomon), 330, 30, -150, 16),
 			"beside, near"

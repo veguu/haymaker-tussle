@@ -6,6 +6,6 @@
 
 export type Obstacle = { kind: string, x: number, z: number, r: number, h: number }
 
-return {
-	gnomon = {},
-} :: { [string]: { Obstacle } }
+-- 2026-11-26: Gnomon's entry removed with the old Gnomon map (owner: "just delte the old one from everything too");
+-- obstacles.py only ever wrote Gnomon's list, so no map has generated obstacles now.
+return {} :: { [string]: { Obstacle } }

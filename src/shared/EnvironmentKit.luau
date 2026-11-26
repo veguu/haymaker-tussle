@@ -13,7 +13,7 @@
 --
 -- EDIT-MODE PREVIEW (Studio command bar or MCP, no Play needed):
 --   local Kit = require(game.ReplicatedStorage.Shared.EnvironmentKit)
---   Kit.preview("gnomon", Vector3.new(0, 100, 0))   -- lighting snapshot taken, clouds/leaves built
+--   Kit.preview("meadow", Vector3.new(0, 100, 0))   -- lighting snapshot taken, clouds/leaves built
 --   Kit.endPreview()                                  -- Lighting restored, preview parts removed
 -- Run endPreview before saving: the preview is for looking, not for keeping in the place.
 
