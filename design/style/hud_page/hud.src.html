@@ -43,6 +43,8 @@ figure.spec.pick{border-color:var(--acc)}
 .stage.round{border-radius:0}
 .stage .world{position:absolute;inset:0;background-size:cover;background-position:center;transition:filter .25s}
 .stage.blur .world{filter:blur(7px) brightness(.8)}
+.stage .rcl{position:absolute;inset:0;pointer-events:none} /* Round change tab */
+#p-rounds .rc-h{font:800 15px/1.2 var(--ui);letter-spacing:.06em;color:var(--acc);margin:22px 0 10px}
 .stage *{box-sizing:border-box}
 .pos{position:absolute;transform:translate(-50%,-50%)}
 .pos.l{transform:translate(0,-50%)}
@@ -512,6 +514,7 @@ ul.moves b{color:var(--fg)}
     <button class="tab" role="tab" data-tab="fight" id="tab-fight">Fight</button>
     <button class="tab" role="tab" data-tab="lobby" id="tab-lobby">Lobby</button>
     <button class="tab" role="tab" data-tab="popups" id="tab-popups">Pop-ups</button>
+    <button class="tab" role="tab" data-tab="rounds" id="tab-rounds">Round change</button>
     <button class="tab" role="tab" data-tab="windows" id="tab-windows">Windows</button>
     <button class="tab" role="tab" data-tab="pieces" id="tab-pieces">Pieces and choices</button>
     <button class="tab" role="tab" data-tab="phone" id="tab-phone">Phone</button>
@@ -599,6 +602,14 @@ ul.moves b{color:var(--fg)}
   </section>
 
   <section id="p-popups" data-panel="popups" hidden><div class="specs" id="sp-popups"></div></section>
+  <section id="p-rounds" data-panel="rounds" hidden>
+    <p class="note-line">PICKED 2026-11-26: S6, RISE AND SETTLE, for both the round start and the round end ("i like s6 for both, but ... not THAT subtle and slightly cover the screen to make it smoothly transition, make it more higher quality"). Improved: the camera rises through a layer of painted clouds at three depths (far ones small and slow, near ones big, soft and fast). At the change the clouds cover part of the screen and the rest is softened, never all of it. About 0.8 seconds, and nothing stops at the change. Each card loops; Replay plays one again with its sounds.</p>
+    <label class="sw" style="margin-top:8px;display:inline-flex"><input type="checkbox" id="rcslow"> Slow motion (2.5 times as long, to look closely)</label>
+    <h3 class="rc-h">ROUND START · lobby to arena</h3>
+    <div class="specs" id="sp-rounds-start"></div>
+    <h3 class="rc-h">ROUND END · arena to lobby</h3>
+    <div class="specs" id="sp-rounds-end"></div>
+  </section>
   <section id="p-windows" data-panel="windows" hidden><div class="specs" id="sp-windows"></div></section>
   <section id="p-pieces" data-panel="pieces" hidden>
     <h2>How it moves</h2>
@@ -1414,9 +1425,117 @@ function buildPhone(){
   spec(el,6,844,390,phoneClasses(),"<b>Classes on a phone.</b> The same screen: your slots on the left, your character, the two moves, the long SUMMON button under you, and on the right the rarities with their classes.");
 }
 
+// ---------------------------------------------------------------- ROUND CHANGE (owner 2026-11-25: "when the round starts or when the
+// round ends, i don't like how the screen turns black, find a better way to trnasiiton between rounds"). Today the game's
+// EnvironmentController lays HT_MapFade, a dark navy cover (0.6 s in; the map swaps 0.85 s after the change starts; 0.35 s hold;
+// 0.8 s out), over the moment the arena loads or goes, the light and sky change and everyone is moved. Every option still hides
+// that moment, in the game's own look, with about the same timing. PICKED the same day: "i like the clouds for start and sky dive
+// for end, HOWEVER, try improving both of them and give me variations too choose from". So: CLOUDS for the START (lobby to arena),
+// SKY DIVE for the END (arena to lobby). Then: "i want it to be like subtle for both ... without maing it take the entire screen":
+// C5 to C7 and S5 to S7 never cover the whole screen (blur, haze, see-through wisps, edge clouds, small or real camera moves).
+// In the game the old and new place can't both be on screen, so the blur ones change at their softest moment. Mock only.
+const RC_CARDS=[
+  ["s6s","start","Rise and settle, round start","The village drops away as the camera rises through a layer of painted clouds at three depths (far small and slow, near big, soft and fast). At the change the clouds cover part of the screen and the rest is softened; then the arena rises into place and settles."],
+  ["s6e","end","Rise and settle, round end","The same move the other way: the arena drops away, the cloud layer rushes past, and the village rises into place and settles."]];
+let RC_K=1; // the Slow motion box: 2.5 x as long, to look closely; 1 = the real, fast pace
+let rcWait=ms=>new Promise(r=>setTimeout(r,ms*RC_K));
+const rcRest=ms=>new Promise(r=>setTimeout(r,ms)); // the pause between plays, never scaled
+let rcAnim=(el,kf,o)=>el.animate(kf,Object.assign({fill:"both",easing:"cubic-bezier(.3,.7,.3,1)"},o,{duration:(o.duration||0)*RC_K,delay:(o.delay||0)*RC_K})).finished.catch(()=>{});
+// HIGHER-QUALITY CLOUDS (owner 2026-11-25: "make the clouds higher quality, and smoother animations"): painted by the page on a canvas,
+// once: a broad soft base with three to five rounded heads (highest near the middle), a ragged soft edge, lit from above (warm white
+// tops, cool lilac-blue undersides, a shadow along the base). Six shapes, seeded so they're the same every time. Shown as images, so
+// moving one costs the browser nothing. In the game they would be a few soft cloud images.
+function rcRng(seed){ let s=(seed*2654435761)>>>0; return ()=>((s=(s*1664525+1013904223)>>>0)/4294967296); }
+function rcCloudCanvas(seed){ const W=1024, H=560, c=document.createElement("canvas"); c.width=W; c.height=H; const g=c.getContext("2d"); if(!g) return c;
+  const r=rcRng(seed), base=H*.74, P=[]; // [x, y, radius, layer]: 0 the base, 1 to 2 a head from its foot up, 3 the small bumps on top
+  for(let i=0;i<13;i++) P.push([W*(.12+.76*i/12)+(r()-.5)*40,base-H*(.02+r()*.05),H*(.13+r()*.06),0]);
+  const n=3+Math.floor(r()*3);
+  for(let t=0;t<n;t++){ const u=(t+.5)/n, cx=W*(.2+.6*u)+(r()-.5)*50, hgt=H*(.24+.2*(1-Math.abs(u-.5)*2))*(.85+r()*.25), rad=H*(.12+r()*.06);
+    for(let j=0;j<7;j++){ const k=j/6; P.push([cx+(r()-.5)*rad*1.4,base-hgt*(1-k*.75),rad*(1.1-k*.3)*(.85+r()*.3),1+k]); }
+    for(let j=0;j<3;j++){ const a=-Math.PI*(.2+.6*r()); P.push([cx+Math.cos(a)*rad*.9,base-hgt+Math.sin(a)*rad*.55,rad*(.45+r()*.2),3]); } }
+  P.sort((p,q)=>p[3]-q[3]||q[1]-p[1]); // low puffs first, the tops last, so each bump sits over the one below
+  P.forEach(([x,y,rad])=>{ const gr=g.createRadialGradient(x-rad*.32,y-rad*.38,rad*.05,x,y,rad); // lit from its own upper left
+    gr.addColorStop(0,"rgba(255,255,255,1)"); gr.addColorStop(.5,"rgba(250,252,255,1)"); gr.addColorStop(.82,"rgba(234,239,250,.95)"); gr.addColorStop(1,"rgba(228,235,249,0)");
+    g.fillStyle=gr; g.beginPath(); g.arc(x,y,rad,0,6.2832); g.fill(); });
+  const c2=document.createElement("canvas"); c2.width=W; c2.height=H; const g2=c2.getContext("2d"); g2.filter="blur(4px)"; g2.drawImage(c,0,0); g2.filter="none"; // the puffs melt together
+  g2.globalCompositeOperation="source-atop"; // a warm glow where the sun hits, a cool shade toward the underside
+  const sun=g2.createRadialGradient(W*.34,H*.18,0,W*.34,H*.18,W*.6); sun.addColorStop(0,"rgba(255,250,238,.45)"); sun.addColorStop(1,"rgba(255,250,238,0)"); g2.fillStyle=sun; g2.fillRect(0,0,W,H);
+  const sh=g2.createLinearGradient(0,base-H*.16,0,base+H*.16); sh.addColorStop(0,"rgba(170,186,222,0)"); sh.addColorStop(1,"rgba(160,178,218,.6)"); g2.fillStyle=sh; g2.fillRect(0,0,W,H);
+  g2.globalCompositeOperation="destination-in"; // a soft, flat underside
+  const fl=g2.createLinearGradient(0,base+H*.04,0,base+H*.16); fl.addColorStop(0,"rgba(0,0,0,1)"); fl.addColorStop(1,"rgba(0,0,0,0)"); g2.fillStyle=fl; g2.fillRect(0,0,W,H);
+  g2.globalCompositeOperation="source-over"; return c2; }
+const RC_SPR=[]; // object URLs of the six clouds (short strings, so a play never re-parses big images)
+function rcSprites(){ if(RC_SPR.length) return; for(let i=0;i<6;i++){ RC_SPR[i]=""; const c=rcCloudCanvas(i+1); if(c.toBlob) c.toBlob(b=>{ if(b) RC_SPR[i]=URL.createObjectURL(b); },"image/png"); } }
+const rcImg=(i,w,x,y,o={})=>`<img alt="" src="${RC_SPR[i%6]||""}" style="position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${Math.round(w*.547)}px;opacity:${o.op??1};${o.blur?`filter:blur(${o.blur}px);`:""}will-change:transform,opacity;transform:${o.t||"none"}">`;
+const rcHaze=()=>`<i class="rcl" style="background:#e8f2ff;opacity:0;will-change:opacity"></i>`;
+const rcStreaks=(n=18)=>Array.from({length:n},(_,i)=>{ const x=(i*347)%1880+20; return `<i style="position:absolute;left:${x}px;top:0;width:${6+(i%3)*4}px;height:${160+(i%4)*70}px;border-radius:9px;background:linear-gradient(rgba(255,255,255,0),rgba(255,255,255,.9),rgba(255,255,255,0));will-change:transform;transform:translateY(-400px)"></i>`; }).join("");
+const rcRush=(bits,from,to,ms,spread,start=0)=>bits.forEach((b,i)=>rcAnim(b,[{transform:`translateY(${from}px)`},{transform:`translateY(${to}px)`}],{duration:ms,delay:start+(i*53)%spread,easing:"linear"}));
+// SMOOTH (owner: "also make it transition smoothly", then "smoother animations"): only moves and fades are animated, never a blur.
+// Each view has a pre-blurred twin (.rc-blur) that fades in and out; the view leaves on RC_IN and the new one arrives on RC_OUT (their
+// slopes meet at the change, so nothing stops); the clouds move at one steady speed straight through it.
+const RC_IN="cubic-bezier(.55,0,.85,.4)", RC_OUT="cubic-bezier(.15,.6,.45,1)", T1=360, T2=440;
+const rcTw=w=>w.querySelector(".rc-blur");
+const rcBlur=(w,a,b,ms,ease,delay=0)=>rcAnim(rcTw(w),[{opacity:a},{opacity:b}],{duration:ms,delay,easing:ease});
+// S6 IMPROVED (owner 2026-11-26: "i like s6 for both, but ... not THAT subtle and slightly cover the screen to make it smoothly transition,
+// make it more higher quality"): the camera rises through a layer of painted clouds at three depths. Each layer is placed as it stands
+// AT THE CHANGE (so that moment's cover is designed, not left to chance: ?rccover=1 measures it) and slides down past the camera at its own
+// steady speed: far small and slow, near big, soft and fast. Bigger moves than before; never the whole screen.
+const RC_LAYERS=[ // [speed in px per ms, opacity, blur, clouds [sprite, width, x, y]]
+  [1.2,.75,0,[[2,520,200,0],[4,560,1300,260],[5,480,700,420],[1,500,1500,780]]],
+  [2.2,.92,0,[[0,900,1000,40],[3,800,-100,120],[2,850,520,760]]],
+  [3.2,.82,4,[[1,1250,-260,380],[4,1150,960,560]]]];
+async function rcRise(st,fx,out,inn,swap,s,alive){ const D=T1+T2+240;
+  fx.innerHTML=rcHaze()+`<div class="rcl" style="opacity:0">${rcStreaks(14)}</div>`+RC_LAYERS.map(([,,b,L])=>`<div class="rcl" style="opacity:0;will-change:transform,opacity">${L.map(([i,w,x,y])=>rcImg(i,w,x,y,{blur:b})).join("")}</div>`).join("");
+  const [haze,box,...layers]=fx.children, bits=[...box.children]; s("hush");
+  layers.forEach((e,j)=>{ const [v,op]=RC_LAYERS[j], A=v*T1, B=v*(D-T1); // at the change (t = T1) each layer stands where it was placed
+    rcAnim(e,[{transform:`translateY(${-A}px)`,opacity:0},{opacity:op,offset:.18},{opacity:op,offset:.78},{transform:`translateY(${B}px)`,opacity:0}],{duration:D,easing:"linear"}); });
+  rcAnim(box,[{opacity:0},{opacity:.3,offset:.25},{opacity:.3,offset:.6},{opacity:0}],{duration:T1+T2,easing:"linear"}); rcRush(bits,-400,1500,T1+T2,220);
+  rcAnim(haze,[{opacity:0},{opacity:.22,offset:T1/(T1+T2)},{opacity:0}],{duration:T1+T2,easing:"linear"});
+  rcBlur(out,0,1,T1,RC_IN); await rcAnim(out,[{transform:"translateY(0) scale(1)"},{transform:"translateY(300px) scale(.95)"}],{duration:T1,easing:RC_IN}); if(!alive()) return;
+  inn.style.transform="translateY(-340px) scale(1.05)"; rcTw(inn).style.opacity=1; swap();
+  rcBlur(inn,1,0,T2,RC_OUT); await rcAnim(inn,[{transform:"translateY(-340px) scale(1.05)"},{transform:"translateY(0) scale(1)"}],{duration:T2,easing:RC_OUT}); if(!alive()) return;
+  s("pop"); await rcWait(D-T1-T2); } // the clouds finish leaving the screen
+const RC_PLAY={ s6s:rcRise, s6e:rcRise };
+const RC_VIS={}; let rcIO=null;
+function rcBuild(){ const a=document.getElementById("sp-rounds-start"), b=document.getElementById("sp-rounds-end"); if(!a||!b||a.children.length) return;
+  rcSprites();
+  // the browser gives url("..."): its double quotes would end the style attribute below (found 2026-11-25: the pictures were missing)
+  const bg=sel=>{ const w=document.querySelector(sel); return (w&&w.style.backgroundImage||"linear-gradient(#6fa86a,#3d6b3a)").replace(/"/g,"'"); }, lob=bg("#ls .world"), fig=bg("#fs .world");
+  // a view and its pre-blurred twin, moved together (only the twin's fade is animated, never a blur)
+  const view=(cls,img,show)=>`<div class="rcl ${cls}" style="will-change:transform,opacity${show?"":";opacity:0"}"><i class="world" style="background-image:${img}"></i>`+
+    `<i class="world rc-blur" style="background-image:${img};filter:blur(12px) brightness(1.08);transform:scale(1.04);opacity:0;will-change:opacity"></i></div>`;
+  const card=([k,dir,name,desc])=>`<figure class="spec" style="--span:12"><div class="fit" data-w="1920" data-h="1080" style="border-radius:0"><div class="stage" id="rc-${k}" style="width:1920px;height:1080px">`+
+    `<i class="rcl" style="background:linear-gradient(#2f74cf,#7fbef5 55%,#d9efff)"></i>`+view("rc-l",lob,dir==="start")+view("rc-f",fig,dir!=="start")+
+    `<div class="rcl rc-fx"></div><div style="position:absolute;left:44px;top:36px">${txt(dir==="start"?"ROUND START":"ROUND END",40,{c:"#FFE14D"})}</div></div></div>`+
+    `<figcaption><b>${k.toUpperCase()} · ${name}.</b> ${desc} <button class="do" data-rcplay="${k}" style="margin-left:6px">Replay</button></figcaption></figure>`;
+  a.innerHTML=RC_CARDS.filter(c=>c[1]==="start").map(card).join(""); b.innerHTML=RC_CARDS.filter(c=>c[1]==="end").map(card).join(""); fitAll();
+  // only the cards on screen play, so the ones in view stay smooth
+  if("IntersectionObserver" in window){ rcIO=new IntersectionObserver(es=>es.forEach(e=>{ RC_VIS[e.target.id.slice(3)]=e.isIntersecting; }),{threshold:.15});
+    RC_CARDS.forEach(([k])=>{ const st=document.getElementById("rc-"+k); if(st) rcIO.observe(st); }); } }
+const rcParts=k=>{ const st=document.getElementById("rc-"+k), dir=(RC_CARDS.find(c=>c[0]===k)||[])[1]; if(!st) return null;
+  const L=st.querySelector(".rc-l"), F=st.querySelector(".rc-f"); return { st, fx:st.querySelector(".rc-fx"), out:dir==="start"?L:F, inn:dir==="start"?F:L }; };
+function rcReset(k){ const p=rcParts(k); if(!p) return; p.st.getAnimations({subtree:true}).forEach(a=>a.cancel()); p.fx.innerHTML="";
+  [p.out,p.inn].forEach(w=>{ w.style.transform=""; rcTw(w).style.opacity=0; }); p.out.style.opacity=1; p.inn.style.opacity=0; }
+async function rcPlay(k,snd,alive){ const p=rcParts(k); if(!p) return; const {st,fx,out,inn}=p;
+  const s=n=>{ if(snd&&SFX[n]) SFX[n](); }, swap=()=>{ out.style.opacity=0; inn.style.opacity=1; };
+  try{ if(document.getElementById("rm").checked){ await rcAnim(out,[{opacity:1},{opacity:0}],{duration:300}); swap(); } // Reduced Motion: a plain short crossfade
+    else await RC_PLAY[k](st,fx,out,inn,swap,s,alive);
+  }catch(e){ document.title="ERR rc-"+k+": "+e.message; }
+  if(!alive()) return; fx.innerHTML=""; [out,inn].forEach(w=>{ w.getAnimations({subtree:true}).forEach(a=>a.cancel()); w.style.transform=""; rcTw(w).style.opacity=0; }); swap();
+  document.body.dataset.rcplays=(+document.body.dataset.rcplays||0)+1; }
+const RC_GEN={}, RC_SOUND={};
+async function rcLoop(k){ const g=RC_GEN[k]=(RC_GEN[k]||0)+1, alive=()=>RC_GEN[k]===g; let first=true;
+  while(alive()){ const sec=document.getElementById("p-rounds"); if(!sec||sec.hidden||RC_VIS[k]===false){ await rcRest(400); continue; }
+    rcBuild(); rcReset(k); await rcRest(1300+(first?RC_CARDS.findIndex(c=>c[0]===k)*300:0)); first=false; if(!alive()) return; // staggered, so the cards don't all move at once
+    const snd=RC_SOUND[k]; RC_SOUND[k]=false; await rcPlay(k,snd,alive); if(!alive()) return; await rcRest(1500); } }
+function rcReplay(k){ rcBuild(); RC_SOUND[k]=true; rcLoop(k); }
+document.addEventListener("click",e=>{ const b=e.target.closest("[data-rcplay]"); if(b) rcReplay(b.dataset.rcplay); });
+document.addEventListener("change",e=>{ if(e.target.id==="rcslow") RC_K=e.target.checked?2.5:1; });
+RC_CARDS.forEach(([k])=>rcLoop(k));
+Object.assign(DO,Object.fromEntries(RC_CARDS.map(([k])=>["rc-"+k,()=>rcReplay(k)])));
 // ---------------------------------------------------------------- page plumbing
 function fitAll(){ document.querySelectorAll(".fit").forEach(f=>{ const w=+f.dataset.w, h=+f.dataset.h, cw=f.clientWidth; if(!cw) return; const k=cw/w; f.style.height=h*k+"px"; f.firstElementChild.style.transform=`scale(${k})`; }); }
-const TABS=["fight","lobby","popups","windows","pieces","phone"];
+const TABS=["fight","lobby","popups","rounds","windows","pieces","phone"];
 function showTab(t){ if(!TABS.includes(t)) t="fight";
   document.querySelectorAll("[data-panel]").forEach(p=>p.hidden=p.dataset.panel!==t);
   document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===t?"true":"false")); fitAll(); }
@@ -1486,6 +1605,17 @@ document.addEventListener("click",e=>{ const b=e.target.closest("[data-act-btn]"
   if(q.get("selftest")){ Object.keys(DO).forEach(run); setTimeout(()=>{ document.body.setAttribute("data-selftest",errs.length?("ERR "+errs.join(" | ")):"OK "+Object.keys(DO).length); },1500); }
   // ?sndtest=1: plays every sound in every set with a log instead of the speakers, and checks each one differs from set A's (his rule:
   // a set changes EVERY sound). Reports into body[data-sndtest].
+  // ?rctest=1: runs every round change card (C5 to C7, S5 to S7) with no waiting (each animation jumps to its end), and reports
+  // into body[data-rctest]. A logic check only: how they move is checked by eye.
+  if(q.get("rctest")) setTimeout(async()=>{ rcWait=()=>Promise.resolve(); rcAnim=(el,kf)=>{ const {offset,...last}=kf[kf.length-1]; Object.assign(el.style,last); return Promise.resolve(); };
+    Object.keys(RC_GEN).forEach(k=>RC_GEN[k]++); rcBuild(); let n=0; const t0=document.title;
+    for(const [k] of RC_CARDS){ rcReset(k); await rcPlay(k,true,()=>true); n++; }
+    const ok=document.title===t0; document.body.setAttribute("data-rctest",(ok?"OK ":"BAD "+document.title+" | ")+n+" transitions, plays counted "+(document.body.dataset.rcplays||0)); },1500);
+  // ?rccover=1: how much of the screen the clouds cover at the change (the layers as placed in RC_LAYERS), into body[data-rccover]
+  if(q.get("rccover")) setTimeout(()=>{ const W=480, H=270, k=W/1920, cv=document.createElement("canvas"); cv.width=W; cv.height=H; const g=cv.getContext("2d");
+    RC_LAYERS.forEach(([,op,,L])=>L.forEach(([i,w,x,y])=>{ g.globalAlpha=op; g.drawImage(rcCloudCanvas(i+1),x*k,y*k,w*k,w*.547*k); }));
+    const d=g.getImageData(0,0,W,H).data; let n=0, m=0; for(let j=3;j<d.length;j+=4){ if(d[j]>128) n++; if(d[j]>20) m++; }
+    document.body.setAttribute("data-rccover",`${(n/(W*H)*100).toFixed(0)}% under thick cloud, ${(m/(W*H)*100).toFixed(0)}% touched by any cloud`); },300);
   if(q.get("sndtest")) setTimeout(()=>{ const calls=[["hover"],["click"],["pick"],["open"],["close"],["pop"],["slam"],["hit"],["flash"],["tick",2,0],["tick",2,4],
       ["drone",1.2,2],["drone",1.2,4],["beat",0,4],["climb",1,4],["hush"],["win",0],["win",2],["win",3],["win",4],["buy"]];
     const sets=[...new Set(["a",...Object.keys(SETS),...Object.keys(SYN)])], sig=s=>{ setSnd(s); return calls.map(([k,...a])=>{ window.__sndTrace=[]; try{ SFX[k](...a); }catch(e){ errs.push(s+" "+k+": "+e.message); } const r=window.__sndTrace.join("|"); window.__sndTrace=null; return r; }); };
