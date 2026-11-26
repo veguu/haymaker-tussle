@@ -59,14 +59,12 @@ local blinkCfg: any = Abilities.Blink
 local lastBlink = -math.huge
 local blinkRemote: RemoteEvent? = nil
 
--- The states nothing can be started from: stunned, caught by a kick or mid-kick, in a clash, held for
+-- The states nothing can be started from: stunned, in a clash, held for
 -- a round's countdown, spectating.
 local function canAct(character: Model): boolean
 	return character:GetAttribute("HT_Stunned") == nil
-		and character:GetAttribute("HT_Air") ~= "hold"
 		and character:GetAttribute("HT_Clash") == nil
 		and character:GetAttribute("HT_RoundHold") == nil
-		and character:GetAttribute("HT_Skill") == nil
 		and character:GetAttribute("HT_Spectating") == nil
 end
 

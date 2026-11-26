@@ -722,9 +722,9 @@ local function stepPunch(self: any, punch: Punch, now: number)
 		punches[attacker] = nil
 		return
 	end
-	-- A swing thrown just before being caught by a kick doesn't land from inside it.
-	if attacker:GetAttribute("HT_Air") == "hold" or attacker:GetAttribute("HT_Stunned") ~= nil then
-		trace(`{attacker.Name} {punch.side} punch dropped: caught by a kick`)
+	-- A swing thrown just before being stunned doesn't land from inside it.
+	if attacker:GetAttribute("HT_Stunned") ~= nil then
+		trace(`{attacker.Name} {punch.side} punch dropped: stunned`)
 		punches[attacker] = nil
 		sendResult(self, punch, "cancelled")
 		return
@@ -822,7 +822,7 @@ local function startPunch(
 	}
 end
 
---- Someone was just hit: any punch they're winding up is beaten, and a kick in progress ends.
+--- Someone was just hit: any punch they're winding up is beaten.
 --- Is either of these two mid-swing, with the swing still to be decided? A bump between them waits on it.
 function CombatService:PunchPendingBetween(a: Model, b: Model): boolean
 	local pa, pb = punches[a], punches[b]
@@ -846,7 +846,6 @@ function CombatService:MarkHit(target: Model)
 		hitRecord.chargeCancelled = true
 		target:SetAttribute(CHARGE_ATTRIBUTE, nil)
 	end
-	Knit.GetService("KickService"):Cancel(target)
 end
 
 --- Sets a fighter's punch cooldown going, as if they'd just thrown one, with nothing extra owed. A
@@ -946,7 +945,7 @@ function CombatService:KnitStart()
 			return nil
 		end
 		if Knit.GetService("KickService"):IsBusy(attacker) then
-			trace(`{player.Name} refused: mid-kick`)
+			trace(`{player.Name} refused: stunned or in a clash`)
 			self._punchResult:FireClient(player, attacker, "refused")
 			return nil
 		end

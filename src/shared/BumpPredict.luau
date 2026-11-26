@@ -17,7 +17,7 @@ local CollectionService = game:GetService("CollectionService")
 local BumpPredict = {}
 
 BumpPredict.FIGHTER_TAG = "HT_Fighter" -- RoundService: on every body still in the round
-local BLOCKING = { "HT_RoundHold", "HT_Skill", "HT_Air", "HT_Clash", "HT_Stationary" }
+local BLOCKING = { "HT_RoundHold", "HT_Air", "HT_Clash", "HT_Stationary" }
 
 local function free(model: Model): boolean
 	if not CollectionService:HasTag(model, BumpPredict.FIGHTER_TAG) then
@@ -32,7 +32,7 @@ local function free(model: Model): boolean
 end
 
 --- Is a collision between these two one that each player's own client handles? Both still in the
---- round, past the countdown, and neither mid-kick, launched, in a clash or a training target.
+--- round, past the countdown, and neither launched, in a clash or a training target.
 function BumpPredict.predicted(a: Model, b: Model): boolean
 	return a ~= b and free(a) and free(b)
 end

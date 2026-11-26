@@ -53,7 +53,7 @@ function StatusService:IsFrozen(target: Model): boolean
 end
 
 --- Freezes `target` for `seconds`. False when it can't be: not alive, pinned in place, already
---- frozen, only just thawed, or held by a kick or a round's countdown.
+--- frozen, only just thawed, or held by a round's countdown.
 function StatusService:Freeze(target: Model, seconds: number): boolean
 	local now = os.clock()
 	if
@@ -63,7 +63,6 @@ function StatusService:Freeze(target: Model, seconds: number): boolean
 		or frozen[target]
 		or not Combatants.isAlive(target)
 		or target:GetAttribute(Combatants.STATIONARY_ATTRIBUTE) ~= nil
-		or target:GetAttribute("HT_Air") == "hold"
 		or target:GetAttribute("HT_RoundHold") ~= nil
 		or target:GetAttribute("HT_Spectating") ~= nil
 		or now - (lastEnded[target] or -math.huge) < REFREEZE_GAP

@@ -16,8 +16,7 @@ local PAD = 8
 -- (on the UI palette since ui-22a, Retro Comic; were fixed RGB values)
 local INK = Tokens.colour("ink.950")
 local ACCENT = Tokens.colour("gold.400")
-local ROWS =
-	{ "Station", "Attack", "Hits", "Target", "Stagger", "Knockback", "Height", "Kick", "Recovery" }
+local ROWS = { "Station", "Attack", "Hits", "Target", "Stagger", "Knockback", "Height", "Recovery" }
 
 export type Panel = typeof(setmetatable({} :: any, TrainingPanel))
 

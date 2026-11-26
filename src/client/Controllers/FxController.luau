@@ -29,7 +29,6 @@ local FxKit = require(script.Parent.Parent.Fx.FxKit)
 local InfernoFx = require(script.Parent.Parent.Fx.InfernoFx)
 local SkillFx = require(script.Parent.Parent.Fx.SkillFx)
 local TricksterFx = require(script.Parent.Parent.Fx.TricksterFx)
-local KickHitFx = require(script.Parent.Parent.Fx.KickHitFx)
 local PunchHitFx = require(script.Parent.Parent.Fx.PunchHitFx)
 local StepBurstFx = require(script.Parent.Parent.Fx.StepBurstFx)
 local SwingTrailFx = require(script.Parent.Parent.Fx.SwingTrailFx)
@@ -206,17 +205,6 @@ local function kitOf(character: Model?): string?
 	return if typeof(kit) == "string" then kit else nil
 end
 
--- A kit's own landing where a kick connects, a kicked body lands or a dive reaches the floor.
-local function kitLanding(kit: string?, at: Vector3)
-	if kit == "Frost" then
-		FrostFx.landing(at)
-	elseif kit == "Inferno" then
-		InfernoFx.landing(at)
-	elseif kit == "Beast" then
-		BeastFx.landing(at)
-	end
-end
-
 --- A landed hit on the target, sending them away from the attacker.
 function FxController:HitBurst(target: Model, attacker: Model?, strength: number, tip: Vector3?)
 	local root = target:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked just below)
@@ -354,87 +342,6 @@ function FxController:CameraKick(size: number)
 		kickFov = cfg.KickFovPunch * size * left
 		camera.FieldOfView = baseFov + kickFov + dashFov
 	end)
-end
-
---- The kick landing, and the body it sent reaching the floor. Rings, a blast, debris streaks,
---- sound and camera. `landing` is the second of those: the slammed body hitting the floor, which
---- gets the ground slam's sound at the body instead of the kick's crack.
-function FxController:KickImpact(
-	attacker: Model,
-	target: Model?,
-	position: Vector3,
-	hit: boolean,
-	share: number,
-	finisher: boolean?,
-	landing: boolean?
-)
-	local up = Vector3.yAxis
-	local power = (if hit then 1 else 0.55) * share
-	if finisher then
-		-- A finisher throws them away: smoke left along the first of their flight (Fx/AirFx).
-		local targetRoot = target and target:FindFirstChild("HumanoidRootPart")
-		if targetRoot and targetRoot:IsA("BasePart") then
-			AirFx.trail(targetRoot, (cfg.TrailPuffs + 2) * cfg.TrailPuffSeconds)
-		end
-	end
-	-- THE LOOK (vfx-10, Fx/KickHitFx and Fx/StepBurstFx; the old discs, ball and spokes of solid
-	-- parts are gone). A kick that connects is the reference's second hit: a star, one thick beam the
-	-- way it sends them, a green ball with sparks, hoops. A body reaching the floor, or a kick that
-	-- hit nothing, is only movement, so it gets the white floor burst.
-	local kickerRoot = attacker:FindFirstChild("HumanoidRootPart") :: BasePart? -- lihfolk-ignore: findfirstchild-chain (a type cast, nil-checked where it is used)
-	if hit and not landing then
-		local line = if kickerRoot then position - kickerRoot.Position else Vector3.zero
-		local along = Vector3.new(line.X, 0, line.Z)
-		if along.Magnitude <= 0.01 and kickerRoot then
-			along = kickerRoot.CFrame.LookVector
-		end
-		KickHitFx.play(
-			position,
-			along,
-			math.clamp(0.75 + 0.35 * power, 0.7, 1.3) * (if finisher then 1.2 else 1)
-		)
-	else
-		StepBurstFx.play(position + up * 0.5, math.clamp(0.8 + 0.5 * power, 0.7, 1.5))
-	end
-	-- A kit with its own kick shows it where the kick connects or the body lands (cosmetic only).
-	if hit or landing then
-		kitLanding(kitOf(attacker), FxKit.floorUnder(position + up * 2, 14) or position)
-	end
-
-	-- One sound per moment: the kick's crack where it connects, then the ground slam where the body
-	-- lands. The two used to play the same thump and whoosh, which sounded like one sound twice.
-	local root = attacker:FindFirstChild("HumanoidRootPart")
-	if landing then
-		local body = target and target:FindFirstChild("HumanoidRootPart") or root
-		-- The floor breaks and blows up where they hit it, whatever kind of kick sent them there.
-		if target then
-			self:GroundBlast(target, position, power)
-		end
-		Sfx.play("ground_break", body, PITCH_VARY, { volume = 1.1 })
-		Sfx.play("boom_mid", body, 0, { pitch = 0.9, cut = 1 })
-		Sfx.play("punch_hit", body, 0, { pitch = 0.7, volume = 0.7 })
-	else
-		-- The crack itself comes from HitBurst on the target (the kick is a confirmed hit too), so this
-		-- adds only the kick's weight: a deeper body and a boom.
-		Sfx.play("punch_hit", root, 0, { pitch = 0.8, volume = 0.6 })
-		Sfx.play("boom_low", root, 0, { volume = 0.9, cut = 0.7 })
-		if hit then
-			Sfx.play("launch", root, PITCH_VARY)
-		end
-	end
-
-	-- Everyone feels it a little; whoever kicked or got kicked feels all of it.
-	local me = Players.LocalPlayer.Character
-	local shake = 0
-	if me == attacker or me == target then
-		shake = power * (if finisher then GameConfig.Kick.FinisherShake else 1)
-	elseif me and me:FindFirstChild("HumanoidRootPart") then
-		local distance = ((me :: any).HumanoidRootPart.Position - position).Magnitude
-		shake = math.clamp(1 - distance / cfg.KickShakeRange, 0, 1) * 0.5 * power
-	end
-	if shake > 0 then
-		self:CameraKick(shake)
-	end
 end
 
 -- The floor straight below someone, looking past every fighter and all of this file's own parts.
@@ -728,25 +635,6 @@ function FxController:LaunchTrail(target: Model)
 	if torso and torso:IsA("BasePart") then
 		local upper = GameConfig.Uppercut
 		AirFx.ribbon(torso, upper.TrailSeconds, upper.TrailWidth, 0.45)
-	end
-end
-
---- A dive kick reaching the floor: the floor breaks and a blast goes off under the kicker.
-function FxController:DiveLanded(character: Model, at: Vector3, hit: boolean)
-	self:GroundBlast(character, at, if hit then 1 else 0.6)
-	kitLanding(kitOf(character), at)
-	local root = character:FindFirstChild("HumanoidRootPart")
-	if root then
-		Sfx.play("ground_break", root, PITCH_VARY)
-	end
-	local mine = Players.LocalPlayer.Character
-	local myRoot = mine and mine:FindFirstChild("HumanoidRootPart")
-	if
-		myRoot
-		and myRoot:IsA("BasePart")
-		and (myRoot.Position - at).Magnitude <= cfg.KickShakeRange
-	then
-		self:CameraKick(if character == mine then 0.6 else 0.35)
 	end
 end
 
@@ -1112,7 +1000,6 @@ function FxController:KnitInit()
 	task.spawn(Sfx.preload)
 	task.spawn(PunchHitFx.preload)
 	task.spawn(StepBurstFx.preload)
-	task.spawn(KickHitFx.preload)
 	task.spawn(ClashFx.preload)
 	task.spawn(AirFx.preload)
 	task.spawn(DrawnImpact.preload) -- the ultimate's drawn impact frames (kits-8c: first-shown images drew blank)
@@ -1212,57 +1099,6 @@ function FxController:KnitStart()
 			end)
 		end
 	end)
-	-- Someone was dashed into: shown as a hit, at the body, sized by how hard.
-	local dashHit = Net.client("DashHit")
-	if dashHit then
-		dashHit.OnClientEvent:Connect(function(dasher: Model, target: Model, strength: number)
-			if dasher and target and dasher.Parent and target.Parent then
-				Knit.GetController("AnimController"):HitLanded(dasher, target, strength)
-				self:HitBurst(target, dasher, strength)
-			end
-		end)
-	end
-	local diveLanded = Net.client("DiveLanded")
-	if diveLanded then
-		diveLanded.OnClientEvent:Connect(function(character: Model, at: Vector3, hit: boolean)
-			-- Your own landing already showed, the moment your feet reached the floor.
-			if character and character.Parent and character ~= Players.LocalPlayer.Character then
-				self:DiveLanded(character, at, hit == true)
-			end
-		end)
-	end
-	local impact = Net.client("KickImpact")
-	if impact then
-		impact.OnClientEvent:Connect(
-			function(
-				attacker: Model,
-				target: Model?,
-				position: Vector3,
-				hit: boolean,
-				share: number,
-				stop: number,
-				finisher: boolean?
-			)
-				if attacker and attacker.Parent then
-					self:KickImpact(
-						attacker,
-						target,
-						position,
-						hit,
-						share,
-						finisher == true,
-						stop <= 0
-					)
-					local anim = Knit.GetController("AnimController")
-					if stop > 0 then
-						anim:KickLanded(attacker, target, stop, share)
-					elseif target then
-						anim:FloorArrived(target)
-					end
-				end
-			end
-		)
-	end
 	local last = 0
 	RunService.Heartbeat:Connect(function()
 		local now = os.clock()

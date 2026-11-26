@@ -7,7 +7,7 @@
 -- replicates: velocity, and the server's PunchStarted.
 --
 -- Layers, lowest first: the stock walk and run (Core), the guard and standing stance (Idle), the
--- sprint (Movement), the brake and landing (Action), the swings (Action2), the kick (Action3), the
+-- sprint (Movement), the brake and landing (Action), the swings (Action2), the
 -- reactions to being hit (Action4).
 --
 -- Hit stop and shake are purely visual: the pose freezes and the body shakes through the root joint's
@@ -55,20 +55,11 @@ local maxSpeed = GameConfig.Movement.MaxSpeed
 local COMBATANT_TAG = "HT_Combatant"
 local OFF_WEIGHT = 0.001 -- a looping track stays running and in step, without showing
 local SWING_FADE = 0.033
-local SKILL_FADE = 0.033
-local KICK_FADE = 0.016 -- the kick's first frame is its big pose: it has to arrive at once
+local KICK_FADE = 0.016 -- a landing's first frame is its big pose: it has to arrive at once
 local FAST_FADE = 0.05
 local STRIKE_EVENT = AnimSequence.STRIKE_EVENT
 local TIP_LIFE = 0.5 -- seconds the fist's position stays useful after the strike
 
--- The kick's phases, from the server's attribute on the character.
-local SKILL_CLIPS: { [string]: string } = {
-	chase = "KickLeap",
-	attach = "KickAim",
-	flip = "KickSpin",
-	kick = "KickDown",
-	dive = "KickDown", -- the dive kick out of a jump: the same heel-down pose, all the way to the floor
-}
 local SWING_ARMS: { [string]: string } = {
 	Left = "Left Arm",
 	Right = "Right Arm",
@@ -111,7 +102,6 @@ type Fighter = {
 	runTime: number,
 	lastSpeed: number,
 	brakingFor: number,
-	skill: string?,
 	strikePending: { () -> () }?,
 	strikeArm: string?,
 	strikeTip: Vector3?,
@@ -233,32 +223,6 @@ local function setUpFighter(model: Model): Fighter?
 	return fighter
 end
 
-local function updateSkill(model: Model, fighter: Fighter)
-	local skill = model:GetAttribute("HT_Skill") :: string?
-	if skill == fighter.skill then
-		return
-	end
-	local old = fighter.skill and SKILL_CLIPS[fighter.skill]
-	if old and fighter.tracks[old] then
-		fighter.tracks[old]:Stop(SKILL_FADE)
-	end
-	fighter.skill = skill
-	-- The squat's end is the spring, for everyone watching. Your own jump shows it from
-	-- MovementController, at the exact moment you leave the floor.
-	if skill == "chase" and model ~= game:GetService("Players").LocalPlayer.Character then
-		task.delay(GameConfig.Kick.JumpSquatSeconds, function()
-			if model.Parent then
-				Knit.GetController("FxController")
-					:JumpBreak(model, GameConfig.Effects.GroundBreakWatchReach)
-			end
-		end)
-	end
-	local clip = skill and SKILL_CLIPS[skill]
-	if clip and fighter.tracks[clip] then
-		fighter.tracks[clip]:Play(if skill == "kick" then KICK_FADE else SKILL_FADE, 1, 1)
-	end
-end
-
 local function setWeight(track: AnimationTrack?, weight: number, fade: number?)
 	if track then
 		track:AdjustWeight(math.max(weight, OFF_WEIGHT), fade or cfg.FadeSeconds)
@@ -354,7 +318,7 @@ end
 -- longer stop always beats a shorter one. Movement underneath carries on.
 local function freezePose(fighter: Fighter, seconds: number)
 	fighter.stopUntil = math.max(fighter.stopUntil, os.clock() + seconds)
-	local names = { fighter.swingName, if fighter.skill then SKILL_CLIPS[fighter.skill] else nil }
+	local names = { fighter.swingName }
 	for _, name in names do
 		local track = name and fighter.tracks[name]
 		if track and track.IsPlaying and not table.find(fighter.stopped, track) then
@@ -381,7 +345,6 @@ local function updateFighter(model: Model, dt: number)
 		return
 	end
 
-	updateSkill(model, fighter)
 	if model ~= game:GetService("Players").LocalPlayer.Character then
 		local ready = model:GetAttribute(READY_ATTRIBUTE) :: string?
 		if ready ~= fighter.readySeen then
@@ -469,7 +432,7 @@ local function updateFighter(model: Model, dt: number)
 	local knocked = air ~= nil
 		or model:GetAttribute("HT_Stunned") ~= nil
 		or (airborne and now - fighter.hitAt < cfg.RecentHitSeconds)
-	knocked = knocked and fighter.skill == nil and not fighter.cutscene
+	knocked = knocked and not fighter.cutscene
 	local slammed = knocked and air == nil and velocity.Y < -cfg.SlammedFallSpeed
 	local onFloorHit = now - fighter.floorHitAt < 0.26
 	setWeight(
@@ -478,9 +441,6 @@ local function updateFighter(model: Model, dt: number)
 		FAST_FADE
 	)
 	setWeight(fighter.tracks.Slammed, if slammed then 1 else 0, FAST_FADE)
-	if fighter.tracks.AirTumble then
-		fighter.tracks.AirTumble:AdjustSpeed(if air == "hold" then 0.25 else 1)
-	end
 
 	-- Knocked backward along the floor: heels dug in. When the slide ends, the weight rocks forward.
 	local look = root.CFrame.LookVector
@@ -488,7 +448,6 @@ local function updateFighter(model: Model, dt: number)
 	local skidding = not airborne
 		and now - fighter.hitAt < cfg.SkidHoldSeconds
 		and sliding < -cfg.SkidMinSpeed
-		and fighter.skill == nil
 	setWeight(fighter.tracks.HitSkid, if skidding and not fighter.cutscene then 1 else 0, FAST_FADE)
 	if fighter.skidding and not skidding and not airborne and fighter.tracks.BrakeSettle then
 		fighter.tracks.BrakeSettle:Play(FAST_FADE, 0.8, 1)
@@ -986,34 +945,6 @@ function AnimController:HitLanded(
 		fighter.stopUntil = math.max(fighter.stopUntil, os.clock() + stop)
 		if not table.find(fighter.stopped, flinch) then
 			table.insert(fighter.stopped, flinch)
-		end
-	end
-end
-
---- The air kick has landed. `stop` comes from the server, which really does hold both for that long.
-function AnimController:KickLanded(attacker: Model?, target: Model?, stop: number, share: number)
-	local attackerFighter = attacker and fighters[attacker]
-	if attackerFighter then
-		freezePose(attackerFighter, stop)
-		shake(attackerFighter, stop, cfg.AttackerShakeStuds * 2 * share)
-	end
-	local fighter = target and fighters[target]
-	if fighter then
-		fighter.hitAt = os.clock()
-		shake(fighter, stop * cfg.VictimShakeShare, cfg.VictimShakeStuds * 1.5 * share)
-	end
-end
-
---- Someone a kick sent down has hit the floor: flattened, then up off it.
-function AnimController:FloorArrived(target: Model)
-	local fighter = fighters[target]
-	if fighter then
-		fighter.floorHitAt = os.clock()
-		fighter.hitAt = os.clock()
-		shake(fighter, 0.12, cfg.VictimShakeStuds)
-		local hit = fighter.tracks.FloorHit
-		if hit then
-			hit:Play(KICK_FADE, 1, 1)
 		end
 	end
 end

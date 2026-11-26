@@ -58,7 +58,7 @@ end
 --- The arena settings for a map: the shared `base` (GameConfig.Arena) with the map's own oval (`entry.arena`
 --- from MapEnvironments) and obstacles laid over it. A map without an `arena` keeps the base circle. A new
 --- table every time; `base` is never changed. StartRadius becomes the oval's smaller semi-axis, so anything
---- that still thinks in a circle (the kick rebound's landing check) stays on the floor.
+--- that still thinks in a circle stays on the floor.
 function Round.arenaFor(base: ArenaSettings, entry: any?, obstacles: { any }?): ArenaSettings
 	local out: any = table.clone(base)
 	local shape = entry and entry.arena

@@ -5,8 +5,8 @@
 -- The server keeps the same lock for the attacks (EndlagService); this is what makes the keys and the
 -- HUD agree with it at once.
 --
--- It sees two things for itself: a dash starting (MovementController.Propelled) and an air kick or
--- dive kick ending (the character's HT_Skill attribute going back to nothing).
+-- It sees one thing for itself: a dash starting (MovementController.Propelled).
+-- (The dive kick's end, read from HT_Skill, went with the dive: 2026-11-25.)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,7 +18,6 @@ local Endlag = require(ReplicatedStorage.Shared.Core.Endlag)
 
 -- GameConfig's numbers, with the kits' skills' laid over them (Config/Abilities.Endlag).
 local cfg: any = Endlag.with(GameConfig.Endlag :: any, Abilities.Endlag)
-local SKILL_ATTRIBUTE = "HT_Skill"
 
 local EndlagController = Knit.CreateController({
 	Name = "EndlagController",
@@ -60,26 +59,13 @@ function EndlagController:Undo()
 end
 
 function EndlagController:KnitStart()
-	local player = Players.LocalPlayer
 	Knit.GetController("MovementController").Propelled:Connect(function()
 		self:Start("Dash")
 	end)
-	-- An air kick or dive kick ending, however it ends.
-	local function onCharacter(character: Model)
+	-- A new body starts with nothing to recover from.
+	Players.LocalPlayer.CharacterAdded:Connect(function()
 		busyUntil, before, lastMove = -math.huge, -math.huge, nil
-		local was = character:GetAttribute(SKILL_ATTRIBUTE)
-		character:GetAttributeChangedSignal(SKILL_ATTRIBUTE):Connect(function()
-			local now = character:GetAttribute(SKILL_ATTRIBUTE)
-			if was ~= nil and now == nil then
-				self:Start("AirKick")
-			end
-			was = now
-		end)
-	end
-	player.CharacterAdded:Connect(onCharacter)
-	if player.Character then
-		onCharacter(player.Character)
-	end
+	end)
 end
 
 return EndlagController

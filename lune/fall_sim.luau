@@ -52,7 +52,6 @@ local cases = {
 	{ "uppercut, no input, lands at launch height", KICK.AirGravityScale, KNOCK.UppercutLift, 0 },
 	{ "uppercut, falls 30 below the platform", KICK.AirGravityScale, KNOCK.UppercutLift, 30 },
 	{ "grounded punch hop (UpwardMax)", 1, KNOCK.UpwardMax, 0 },
-	{ "missed jump", KICK.MissGravityScale, KICK.MissLift, 0 },
 }
 
 print(

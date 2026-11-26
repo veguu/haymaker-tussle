@@ -15,8 +15,7 @@
 --
 -- Also here, because they all shape this one body's movement: Q's short, hard-to-steer burst
 -- (Core/Momentum), the recovery lift on a punch thrown while falling off the edge (Core/AirRecovery),
--- and the follow-up snap (Core/DiveKick). A knock ends a burst and any recovery lift. The kick takes
--- the body over entirely until it's done.
+-- and the steering of a launched body (Core/DiveKick). A knock ends a burst and any recovery lift.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -37,18 +36,14 @@ local Clash = require(ReplicatedStorage.Shared.Core.Clash)
 local BumpPredict = require(ReplicatedStorage.Shared.BumpPredict)
 local Combat = require(ReplicatedStorage.Shared.Core.Combat)
 local DiveKick = require(ReplicatedStorage.Shared.Core.DiveKick)
-local KickMeter = require(ReplicatedStorage.Shared.Core.KickMeter)
 local AimAssist = require(ReplicatedStorage.Shared.Core.AimAssist)
 local Jump = require(ReplicatedStorage.Shared.Core.Jump)
 local Momentum = require(ReplicatedStorage.Shared.Core.Momentum)
 local SkillMove = require(ReplicatedStorage.Shared.Core.SkillMove)
-local TrainingLayout = require(ReplicatedStorage.Shared.Core.TrainingLayout)
-local Lobby = require(ReplicatedStorage.Shared.Core.Lobby)
 local Net = require(ReplicatedStorage.Shared.Net)
 
 local STEP_NAME = "HaymakerMovement"
-local KICK_ACTION = "HaymakerKick"
-local KICK_CLICK_ACTION = "HaymakerKickClick"
+local JUMP_ACTION = "HaymakerJump"
 local STEP_PRIORITY = Enum.RenderPriority.Input.Value + 1
 local INPUT_STALE_SECONDS = 0.25
 local MIN_LIFT = 1 -- below this a knock isn't a lift, just the floor's own tiny motion
@@ -59,11 +54,10 @@ local UNDO_SECONDS = 1 -- a refused punch's push is taken back only if the answe
 
 local cfg = GameConfig.Movement
 local kickCfg = GameConfig.Kick
-local meterCfg = GameConfig.KickMeter
 local airCfg = GameConfig.AirRecovery
 local jumpCfg = GameConfig.Jump
 local punchCfg = GameConfig.Punch
-local DIVE_LAND_SECONDS = 0.05 -- an air punch's glide can't count as landed this soon
+local GLIDE_LAND_SECONDS = 0.05 -- an air punch's glide can't count as landed this soon
 
 local MovementController = Knit.CreateController({
 	Name = "MovementController",
@@ -77,9 +71,6 @@ local MovementController = Knit.CreateController({
 	Hud = {
 		speed = 0, -- real flat speed, studs/s, from the root's velocity
 		propelLeft = 0, -- seconds of propel cooldown left
-		kickReadyAt = 0,
-		kickTarget = false, -- someone in the air this body could jump at right now
-		kicking = false,
 		jumpReadyAt = 0, -- when Space can jump again
 	},
 })
@@ -257,14 +248,9 @@ function MovementController:_bind(
 	local punchPressedAt: number? = nil
 	-- A dash pressed while a punch's stun held you: it goes off as the stun ends (Combat.dashBuffered).
 	local dashPressedInStun: number? = nil
-	local kick: DiveKick.State? = nil
-	local kickTarget: Model? = nil
-	local kickRequested = false
-	local kickClicked = false -- the timed kick, once attached: a left click (R2), the punch button
-	local kickAwaiting = false -- the timing is over, and waiting for the server's verdict
-	local kickReadyAt = 0
+	local jumpRequested = false
 	-- THE JUMP (Space): up, and forward in an arc that grows with speed (Core/Jump), flown as an air run.
-	-- THE AIR PUNCH (2026-11-15; it replaced the dive kick): a punch thrown in the air glides the body
+	-- THE AIR PUNCH (2026-11-15): a punch thrown in the air glides the body
 	-- straight toward what the cursor is on, up to Punch.AirReach studs, over Punch.AirGlideSeconds, and
 	-- the punch lands as it arrives (CombatService gives it the longer AirWindup). A plain hitbox: no slam.
 	local jumping = false
@@ -273,7 +259,7 @@ function MovementController:_bind(
 	local steerX, steerZ = 0, 0 -- a launched body's own steering, on top of its push
 	local speedShare = 1 -- how much of running speed stagger leaves
 	local pondShare = 1 -- how much of it wading in a pond leaves (Core/Pond), eased on its own
-	-- After a missed jump or a kick's rebound: ordinary movement, but in the air.
+	-- A jump's flight: ordinary movement, but in the air.
 	local airRun: { t: number, gravityScale: number, keep: number? }? = nil
 	local wasSideSteering = false
 	local airSeconds = 0 -- how long since the floor
@@ -292,17 +278,7 @@ function MovementController:_bind(
 	local floorParams = RaycastParams.new()
 	floorParams.FilterType = Enum.RaycastFilterType.Exclude
 	floorParams.FilterDescendantsInstances = { character }
-	local kickAccepted = false
-	local kickSnap = false -- the server's word: the locked-on snap, or the slower guided leap
-	local lockSent: Model? = nil
 	local fx = Knit.GetController("FxController")
-	local prompt = Knit.GetController("KickPromptController")
-	local kickRemotes = {
-		request = Net.client("KickRequest"),
-		attach = Net.client("KickAttach"),
-		commit = Net.client("KickCommit"),
-		lockOn = Net.client("LockOnState"),
-	}
 
 	-- Who you're locked onto, where their body is, if they're close enough for the aim assist to help.
 	local function assistTarget(): BasePart?
@@ -317,17 +293,12 @@ function MovementController:_bind(
 		return targetRoot
 	end
 
-	local function endKick()
-		kick = nil
-		kickTarget = nil
-		kickAwaiting = false
-		kickAccepted = false
+	local function endJump()
 		airRun = nil
 		jumping = false
 		glide = nil
-		prompt:Hide()
 	end
-	trove:Add(endKick)
+	trove:Add(endJump)
 
 	-- Only solid parts count as being in the way; fighters never do.
 	local function solidParams(): RaycastParams
@@ -339,78 +310,9 @@ function MovementController:_bind(
 		return params
 	end
 
-	-- Who you can follow up, by the same rule the server uses: anyone floating within range with nothing
-	-- solid in between, picked by distance and how far off where you face they are. The server makes
-	-- the real pick and says so; this only decides whether to show the prompt.
-	local function jumpTarget(position: Vector3): Model?
-		local myId = Players.LocalPlayer.UserId
-		local params = solidParams()
-		local models: { Model } = {}
-		local candidates: { DiveKick.Candidate } = {}
-		for _, other in CollectionService:GetTagged("HT_Combatant") do
-			local otherRoot = other:FindFirstChild("HumanoidRootPart") :: BasePart?
-			if other ~= character and otherRoot and other:GetAttribute("HT_Air") == "float" then
-				local at = otherRoot.Position
-				local own = other:GetAttribute("HT_AirBy") == myId
-				local range = if own then kickCfg.FollowUpOwnRange else kickCfg.FollowUpRange
-				if
-					(own or kickCfg.FollowUpOthers)
-					and (at - position).Magnitude <= range
-					and workspace:Raycast(position, at - position, params) == nil
-				then
-					table.insert(models, other :: Model)
-					table.insert(candidates, {
-						x = at.X,
-						y = at.Y,
-						z = at.Z,
-						own = own,
-					})
-				end
-			end
-		end
-		local facing = root.CFrame.LookVector
-		local index = DiveKick.pickFollowUp(
-			kickCfg,
-			position.X,
-			position.Y,
-			position.Z,
-			facing.X,
-			facing.Z,
-			candidates
-		)
-		return if index then models[index] else nil
-	end
-
-	-- Where a perfect kick should send them: from the target toward the spot on the floor under the
-	-- cursor. The server uses it flat for the way they're thrown, and its slope for whether it's a spike
-	-- (the cursor on the floor close under them points steeply down). Without a mouse (touch, gamepad),
-	-- or with the cursor on the sky, it's the way the camera looks.
-	local function kickAim(targetRoot: BasePart?): Vector3?
-		local camera = workspace.CurrentCamera
-		if not camera or not targetRoot then
-			return nil
-		end
-		local from = targetRoot.Position
-		if UserInputService.MouseEnabled then
-			local mouse = UserInputService:GetMouseLocation()
-			local ray = camera:ViewportPointToRay(mouse.X, mouse.Y)
-			local floorY = GameConfig.Arena.CenterY
-			if ray.Direction.Y < -0.01 then
-				local reach = (floorY - ray.Origin.Y) / ray.Direction.Y
-				local spot = ray.Origin + ray.Direction * reach
-				local toSpot = spot - from
-				if reach > 0 and toSpot.Magnitude > 1 then
-					return toSpot.Unit
-				end
-			end
-		end
-		local viewing = camera.CFrame.LookVector
-		return if viewing.Magnitude > 0.01 then viewing.Unit else nil
-	end
-
 	-- Where an air punch is aimed: the spot the cursor is on (the floor, or anything solid). Without a
 	-- mouse, a little ahead of where the camera looks.
-	local function diveSpot(): Vector3
+	local function aimSpot(): Vector3
 		local camera = workspace.CurrentCamera
 		local from = root.Position
 		if not camera then
@@ -436,115 +338,6 @@ function MovementController:_bind(
 		return from + ahead * punchCfg.AirReach - Vector3.yAxis * 4
 	end
 
-	-- The server's pick for the follow-up. It only counts for a squat waiting on it, so a late answer
-	-- can never start anything.
-	local function onKickAccepted(target: Model, snap: boolean?)
-		if kick and kick.phase == "squat" and not kickAccepted and target and target.Parent then
-			kickTarget = target
-			kickSnap = snap == true
-			kickAccepted = true
-		end
-	end
-	self._kickAccepted = onKickAccepted
-	trove:Add(function()
-		if self._kickAccepted == onKickAccepted then
-			self._kickAccepted = nil
-		end
-	end)
-
-	-- The server says this kick connected. Stay on the frozen pose through the stop, then push off them:
-	-- backward from where you face at a propel's speed, held until you land, and upward by how well you
-	-- timed it. This is your rebound. It isn't the bounce a green kick gives them off the floor. From
-	-- here it's normal movement, so the keys still steer, and pushing against it slows you.
-	self._kickConnected = function(stop: number)
-		if kick and kick.phase == "flip" then
-			task.delay(stop, function()
-				if kick and kick.phase == "flip" then
-					local facing = root.CFrame.LookVector
-					local at = root.Position
-					-- Whichever platform this is: the rebound lands on the one you kicked from.
-					local lobbyCfg: any = GameConfig.Lobby
-					local arena = if lobbyCfg.Enabled and Lobby.contains(lobbyCfg, at.X, at.Z)
-						then Lobby.disc(lobbyCfg, at.Z)
-						else TrainingLayout.platformAt(
-							GameConfig.Training,
-							-- the live map's arena (its smaller semi-axis as the radius on an oval)
-							ActiveArena.get() :: any,
-							at.X,
-							at.Z
-						)
-					-- how high the kick throws you back scales with the timing the server recorded
-					local score = character:GetAttribute("HT_KickScore")
-					local kickRise = KickMeter.rise(
-						meterCfg :: any,
-						if typeof(score) == "Vector3" then score.Y else 0
-					)
-					local plan = DiveKick.planRebound(
-						kickCfg,
-						character:GetAttribute("HT_KickGrade") or "red",
-						{
-							x = at.X,
-							z = at.Z,
-							height = at.Y - arena.y - humanoid.HipHeight - root.Size.Y / 2,
-							backX = -facing.X,
-							backZ = -facing.Z,
-							centerX = arena.x,
-							centerZ = arena.z,
-							radius = arena.radius,
-							speed = cfg.PropelSpeed,
-							gravity = workspace.Gravity * kickCfg.ReboundGravityScale,
-							-- The rebound falls on the same lighter gravity as everything else, so
-							-- the landing is planned on that fall.
-							fallTime = function(up: number, height: number): number
-								return AirRecovery.timeToDrop(
-									airCfg,
-									workspace.Gravity,
-									kickCfg.ReboundGravityScale,
-									up,
-									height
-								)
-							end,
-						},
-						kickRise
-					)
-					kick = nil
-					kickTarget = nil
-					state = Momentum.moving(state, plan.dirX, plan.dirZ, plan.speed)
-					airRun = {
-						t = 0,
-						gravityScale = kickCfg.ReboundGravityScale,
-						keep = plan.speed,
-					}
-					local vx, vz = Momentum.velocity(state)
-					root.AssemblyLinearVelocity = Vector3.new(vx, plan.up, vz)
-				end
-			end)
-		end
-	end
-
-	-- The snap, at the end of the squat, once the server has accepted it: straight at the target it
-	-- picked, timed by the distance. Arriving on your side of them, so the kick sends them the way you
-	-- came unless the keys swing you round.
-	local function snapJump(squat: DiveKick.State, targetRoot: BasePart): DiveKick.State
-		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
-		-- Right here for your own jump: waiting to hear it back from the server would put it in mid-air.
-		fx:JumpBreak(character, GameConfig.Effects.GroundBreakOwnReach)
-		local offset = root.Position - targetRoot.Position
-		local approach = DiveKick.approachSeconds(kickCfg, offset.Magnitude)
-		return DiveKick.snap(squat, offset.X, offset.Z, approach, approach + kickCfg.JumpMissGrace)
-	end
-
-	-- The guided leap, for when you aren't locked onto them: a real jump on an arc, a good deal slower
-	-- than the snap, but re-aimed at them the whole way, so it gets there on its own. The server isn't
-	-- holding them, so they keep falling and steering while you're on your way.
-	local function guidedJump(squat: DiveKick.State, targetRoot: BasePart): DiveKick.State
-		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
-		fx:JumpBreak(character, GameConfig.Effects.GroundBreakOwnReach)
-		local offset = root.Position - targetRoot.Position
-		local guide = DiveKick.leapSeconds(kickCfg, offset.Magnitude)
-		return DiveKick.leap(squat, offset.X, offset.Z, guide, guide + kickCfg.JumpMissGrace)
-	end
-
 	-- The server decides knockback, and this client applies it because it owns the body.
 	-- `selfRecoil` is what a punch costs the one who threw it. In the air that's no slowdown and nothing
 	-- ended: a whiff costs nothing at all, and a hit a share of its recoil. The vertical speed is left alone.
@@ -566,7 +359,7 @@ function MovementController:_bind(
 			end
 			return
 		end
-		endKick()
+		endJump()
 		-- A hit's own lift and fall take over from any recovery lift still running.
 		liftUntil, liftSet = 0, false
 		state = Momentum.applyKnock(state, cfg, velocity.X, velocity.Z, speedKeep)
@@ -599,10 +392,10 @@ function MovementController:_bind(
 	-- The server has moved this body somewhere else. Nothing it was doing carries over, or the speed of
 	-- a big launch would throw it straight off wherever it was put.
 	self._bodyReset = function(face: Vector3?)
-		endKick()
+		endJump()
 		slammed = false
 		steerX, steerZ, pushX, pushZ, lift = 0, 0, 0, 0, 0
-		punchRequested, propelRequested, kickRequested = false, false, false
+		punchRequested, propelRequested, jumpRequested = false, false, false
 		skillMove = nil
 		punchPressedAt, dashPressedInStun = nil, nil
 		lastPush = nil
@@ -646,12 +439,12 @@ function MovementController:_bind(
 				end
 			end
 		end
-		return diveSpot()
+		return aimSpot()
 	end
 
 	self._punchThrown = function(swing: string?)
 		-- In the air, the punch is the air punch: a glide toward the aim, and nothing else.
-		if humanoid.FloorMaterial == Enum.Material.Air and not kick then
+		if humanoid.FloorMaterial == Enum.Material.Air then
 			local offset = airPunchGoal() - root.Position
 			local distance = offset.Magnitude
 			-- Stop a little short of whatever it is, so the fist meets them instead of the body.
@@ -775,13 +568,12 @@ function MovementController:_bind(
 		return nil, nil, nil, nil
 	end
 
-	-- Space: jumps at someone you launched; else an ordinary jump.
-	-- The timed press once attached is a left click (below). A click in the air is the air punch.
+	-- Space: an ordinary jump. A click in the air is the air punch.
 	ContextActionService:BindActionAtPriority(
-		KICK_ACTION,
+		JUMP_ACTION,
 		function(_name: string, inputState: Enum.UserInputState)
 			if inputState == Enum.UserInputState.Begin then
-				kickRequested = true
+				jumpRequested = true
 			end
 			return Enum.ContextActionResult.Sink
 		end,
@@ -790,32 +582,9 @@ function MovementController:_bind(
 		Enum.KeyCode.Space,
 		Enum.KeyCode.ButtonY
 	)
-	ContextActionService:SetTitle(KICK_ACTION, "Kick")
+	ContextActionService:SetTitle(JUMP_ACTION, "Jump")
 	trove:Add(function()
-		ContextActionService:UnbindAction(KICK_ACTION)
-	end)
-
-	-- Once attached in a follow-up kick, the punch button is the timed kick
-	-- instead: the press is taken here, above the punch, and the punch never sees it. Any other time it
-	-- passes straight through to the punch.
-	ContextActionService:BindActionAtPriority(
-		KICK_CLICK_ACTION,
-		function(_name: string, inputState: Enum.UserInputState)
-			if not kick then
-				return Enum.ContextActionResult.Pass
-			end
-			if inputState == Enum.UserInputState.Begin then
-				kickClicked = true
-			end
-			return Enum.ContextActionResult.Sink
-		end,
-		false,
-		Enum.ContextActionPriority.High.Value,
-		Enum.UserInputType.MouseButton1,
-		Enum.KeyCode.ButtonR2
-	)
-	trove:Add(function()
-		ContextActionService:UnbindAction(KICK_CLICK_ACTION)
+		ContextActionService:UnbindAction(JUMP_ACTION)
 	end)
 
 	-- BUMPS, the instant they happen (BumpPredict): in a round, this client watches its own body against
@@ -904,10 +673,7 @@ function MovementController:_bind(
 			state.propelCooldownLeft = 0 -- free practice on the training grounds: no dash cooldown
 		end
 		hud.propelLeft = state.propelCooldownLeft or 0
-		hud.kickReadyAt = kickReadyAt
 		hud.jumpReadyAt = jumpReadyAt
-		hud.kicking = kick ~= nil
-		hud.kickTarget = false
 		local inputX, inputZ = worldInput(input)
 		-- Winding up a heavy kick: rooted to the spot, the keys do nothing.
 		local rooted = os.clock() < rootedUntil
@@ -927,41 +693,17 @@ function MovementController:_bind(
 
 		local now = os.clock()
 		local air = character:GetAttribute("HT_Air")
-		-- A hold carries its own deadline, so even a release that never arrives can't keep anyone stuck.
-		local holdUntil = character:GetAttribute("HT_HoldUntil") :: number?
-		if air == "hold" and holdUntil and workspace:GetServerTimeNow() >= holdUntil then
-			air = "float"
-		end
 		airSeconds = if grounded then 0 else airSeconds + dt
 		if grounded then
 			slammed = false
 			lifts, liftUntil, liftSet = AirRecovery.newLifts(), 0, false
 		end
 
-		-- Hung in the air while someone is attached. The kick's own knock takes over at once.
-		if air == "hold" and now >= knockGraceUntil then
-			kickRequested, propelRequested, punchRequested = false, false, false
-			pushX, pushZ, lift = 0, 0, 0
-			state = Momentum.stopped(state)
-			humanoid.WalkSpeed = 0
-			humanoid:Move(Vector3.zero, false)
-			root.AssemblyLinearVelocity = Vector3.zero
-			local face = character:GetAttribute("HT_HoldFace") :: Vector3?
-			if face then
-				align.CFrame = CFrame.lookAt(Vector3.zero, face)
-			end
-			prompt:Hide()
-			if readout then
-				readout.Text = `Held   Stagger {character:GetAttribute("HT_Stagger") or 0}`
-			end
-			return
-		end
-
 		-- In a clash: walks to the spot the server gave, and holds there looking at the other fighter.
-		-- A knock takes over at once, the same as above, because the finishing punch is one.
+		-- A knock takes over at once, because the finishing punch is one.
 		local clashAt = character:GetAttribute("HT_ClashAt") :: Vector3?
 		if clashAt and now >= knockGraceUntil then
-			kickRequested, propelRequested, punchRequested = false, false, false
+			jumpRequested, propelRequested, punchRequested = false, false, false
 			pushX, pushZ, lift = 0, 0, 0
 			local face = character:GetAttribute("HT_ClashFace") :: Vector3?
 			if face then
@@ -974,7 +716,6 @@ function MovementController:_bind(
 			local walk = Clash.alignSpeed(GameConfig.Clash, offset.Magnitude)
 			humanoid.WalkSpeed = walk
 			humanoid:Move(if walk > 0 then offset.Unit else Vector3.zero, false)
-			prompt:Hide()
 			if readout then
 				readout.Text = `Clash   Stagger {character:GetAttribute("HT_Stagger") or 0}`
 			end
@@ -1017,7 +758,7 @@ function MovementController:_bind(
 			if propelRequested and character:GetAttribute("HT_Stunned") ~= nil then
 				dashPressedInStun = now
 			end
-			kickRequested, propelRequested, punchRequested = false, false, false
+			jumpRequested, propelRequested, punchRequested = false, false, false
 			inputX, inputZ = 0, 0
 			drive, side = "side", 0
 		elseif dashPressedInStun then
@@ -1126,7 +867,7 @@ function MovementController:_bind(
 			end
 		end
 		-- Anywhere in the air without something else moving the body, the keys steer it.
-		local freeAir = not grounded and not floating and not airRun and not kick and not stunned
+		local freeAir = not grounded and not floating and not airRun and not stunned
 		if not floating and not freeAir then
 			steerX, steerZ = 0, 0
 		end
@@ -1136,123 +877,36 @@ function MovementController:_bind(
 			pushX, pushZ = 0, 0
 		end
 
-		local pressed = kickRequested
-		kickRequested = false
-		-- The timed press: a left click (R2). On touch the Kick button does it, as before.
-		local timedPress = kickClicked
-			or (pressed and UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled)
-		kickClicked = false
-		-- The server needs to know who you're locked onto: only that makes a follow-up the snap.
-		if kickRemotes.lockOn then
-			local lockedNow = Knit.GetController("LockOnController"):GetTarget()
-			if lockedNow ~= lockSent then
-				lockSent = lockedNow
-				kickRemotes.lockOn:FireServer(lockedNow)
+		local pressed = jumpRequested
+		jumpRequested = false
+		if
+			pressed
+			and grounded
+			and not floating
+			and not stunned
+			and not rooted
+			and not jumping
+			and now >= jumpReadyAt
+			and not Knit.GetController("EndlagController"):IsBusy()
+		then
+			-- An ordinary jump: up, and forward with the speed you had. Not while still
+			-- recovering from another move (Core/Endlag).
+			local moving = root.AssemblyLinearVelocity
+			local level = Vector3.new(moving.X, 0, moving.Z)
+			local up, forward = Jump.launch(jumpCfg, level.Magnitude)
+			-- NO JUMP COOLDOWN IN THE LOBBY (the owner, 2026-11-18): it is a fight's rule, and in
+			-- the lobby, its practice end too, you may jump again as soon as you land. In a
+			-- round (the server marks you HT_InRound) the cooldown stands as before.
+			local inRound = Players.LocalPlayer:GetAttribute("HT_InRound") == true
+			jumpReadyAt = if inRound then now + jumpCfg.Cooldown else now
+			jumping = true
+			if forward then
+				state = Momentum.moving(state, level.X, level.Z, forward)
 			end
-		end
-
-		if not kick then
-			local canJump = grounded and not floating and kickRemotes.request ~= nil
-			local target = if canJump and now >= kickReadyAt then jumpTarget(root.Position) else nil
-			hud.kickTarget = target ~= nil
-			if target then
-				if pressed then
-					kickReadyAt = if Players.LocalPlayer:GetAttribute("HT_TrainingFree")
-							== true
-						then now -- free practice: no kick cooldown
-						else now + kickCfg.Cooldown
-					-- Only a guess until the server says which target it picked.
-					kickTarget = target
-					kickAccepted = false
-					kick = DiveKick.start()
-					state = Momentum.stopped(state)
-					prompt:Hide()
-					kickRemotes.request:FireServer()
-				else
-					prompt:ShowJump()
-				end
-			else
-				prompt:Hide()
-				if
-					pressed
-					and grounded
-					and not floating
-					and not stunned
-					and not rooted
-					and not jumping
-				then
-					if
-						now >= jumpReadyAt and not Knit.GetController("EndlagController"):IsBusy()
-					then
-						-- An ordinary jump: up, and forward with the speed you had. Not while still
-						-- recovering from another move (Core/Endlag).
-						local moving = root.AssemblyLinearVelocity
-						local level = Vector3.new(moving.X, 0, moving.Z)
-						local up, forward = Jump.launch(jumpCfg, level.Magnitude)
-						-- NO JUMP COOLDOWN IN THE LOBBY (the owner, 2026-11-18): it is a fight's rule, and in
-						-- the lobby, its practice end too, you may jump again as soon as you land. In a
-						-- round (the server marks you HT_InRound) the cooldown stands as before.
-						local inRound = Players.LocalPlayer:GetAttribute("HT_InRound") == true
-						jumpReadyAt = if inRound then now + jumpCfg.Cooldown else now
-						jumping = true
-						if forward then
-							state = Momentum.moving(state, level.X, level.Z, forward)
-						end
-						airRun = { t = 0, gravityScale = jumpCfg.GravityScale, keep = forward }
-						humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
-						local vx, vz = Momentum.velocity(state)
-						root.AssemblyLinearVelocity = Vector3.new(vx, up, vz)
-					end
-				end
-			end
-		elseif timedPress and kick.phase == "attach" and prompt:MeterLive() then
-			-- (a press before the bar has settled doesn't count: the timing starts when it's readable)
-			if kickRemotes.commit then
-				local aimAt = kickTarget and kickTarget:FindFirstChild("HumanoidRootPart")
-				kickRemotes.commit:FireServer(
-					kickAim(if aimAt and aimAt:IsA("BasePart") then aimAt else nil)
-				)
-			end
-			kick = DiveKick.press(kick)
-			kickAwaiting = true
-			-- the marker stops where it is at once; the bar then shows what the server recorded
-			prompt:FreezeMeter()
-		end
-
-		-- The server grades the timing. Only its answer shows, so both sides always agree.
-		if kickAwaiting then
-			local skill = character:GetAttribute("HT_Skill")
-			if skill == "flip" or skill == "kick" then
-				kickAwaiting = false
-				prompt:ShowScore(character:GetAttribute("HT_KickScore"))
-			elseif skill == nil then
-				endKick()
-			end
-		end
-
-		-- A jump that has missed, or has nothing left to reach, stops being a jump. It's back to ordinary
-		-- movement with a little of its speed, a small lift and a slower fall, to get back to the platform.
-		if kick and kick.phase == "chase" then
-			if character:GetAttribute("HT_Skill") == nil and kick.t >= LAND_CHECK_SECONDS then
-				kick = DiveKick.giveUp(kick)
-			end
-			if DiveKick.hasMissed(kick) then
-				local flight = root.AssemblyLinearVelocity
-				local level = Vector3.new(flight.X, 0, flight.Z)
-				state = Momentum.moving(
-					state,
-					level.X,
-					level.Z,
-					math.min(level.Magnitude, kickCfg.MissCarryKeep)
-				)
-				airRun = {
-					t = 0,
-					gravityScale = kickCfg.MissGravityScale,
-				}
-				root.AssemblyLinearVelocity =
-					Vector3.new(flight.X, math.max(flight.Y, kickCfg.MissLift), flight.Z)
-				kick = nil
-			end
+			airRun = { t = 0, gravityScale = jumpCfg.GravityScale, keep = forward }
+			humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+			local vx, vz = Momentum.velocity(state)
+			root.AssemblyLinearVelocity = Vector3.new(vx, up, vz)
 		end
 
 		if airRun then
@@ -1263,28 +917,6 @@ function MovementController:_bind(
 				end
 				airRun = nil
 				jumping = false
-				kickTarget = nil
-			elseif
-				kickTarget
-				and character:GetAttribute("HT_Skill") == "chase"
-				and kickTarget:GetAttribute("HT_Air") ~= nil
-			then
-				-- Still got there in the end: it still counts.
-				local targetRoot = kickTarget:FindFirstChild("HumanoidRootPart") :: BasePart?
-				local offset = if targetRoot then root.Position - targetRoot.Position else nil
-				if offset and DiveKick.isTouching(kickCfg, offset.X, offset.Y, offset.Z) then
-					kick = DiveKick.attach(
-						DiveKick.spring(DiveKick.start(), 0, 0, 0),
-						offset.X,
-						offset.Z,
-						KickMeter.endsAt(meterCfg :: any)
-					)
-					airRun = nil
-					state = Momentum.stopped(state)
-					if kickRemotes.attach then
-						kickRemotes.attach:FireServer()
-					end
-				end
 			end
 		end
 
@@ -1299,7 +931,7 @@ function MovementController:_bind(
 			pushX, pushZ, lift = 0, 0, 0
 			steerX, steerZ = 0, 0
 			local level = Vector3.new(glide.dir.X, 0, glide.dir.Z)
-			local done = (grounded and glide.t >= DIVE_LAND_SECONDS)
+			local done = (grounded and glide.t >= GLIDE_LAND_SECONDS)
 				or stunned
 				or glide.t >= punchCfg.AirGlideSeconds
 			if done then
@@ -1326,137 +958,6 @@ function MovementController:_bind(
 				end
 				return
 			end
-		end
-
-		if kick then
-			local gravity = workspace.Gravity * kickCfg.AirGravityScale
-			local skill = character:GetAttribute("HT_Skill")
-			local targetRoot = kickTarget
-				and kickTarget:FindFirstChild("HumanoidRootPart") :: BasePart?
-			local before = kick.phase
-			propelRequested = false -- no propel during the committed jump or the kick
-			skillMove = nil
-			punchRequested = false
-			pushX, pushZ, lift = 0, 0, 0
-			-- The jump is a jump, and lasts until you land, whatever happens to anyone else. Once
-			-- aligned, losing the target or being hit out of it ends the move.
-			local over = (before == "chase" and kick.t >= LAND_CHECK_SECONDS and grounded)
-				or ((before == "attach" or before == "flip") and (skill == nil or not targetRoot))
-				-- Never accepted: nothing happened, and it can be tried again shortly.
-				or (before == "squat" and not kickAccepted and kick.t >= kickCfg.AcceptWaitSeconds)
-			if over and before == "squat" then
-				kickReadyAt = now + LAND_CHECK_SECONDS
-			end
-			-- During the timing the keys aim the kick, unless in shift lock, when the camera does.
-			local stepX, stepZ = inputX, inputZ
-			if before == "attach" and Knit.GetController("ShiftLockController"):IsLocked() then
-				local camera = workspace.CurrentCamera
-				local viewing = if camera then camera.CFrame.LookVector else Vector3.zero
-				local level = Vector3.new(viewing.X, 0, viewing.Z)
-				if level.Magnitude > 0.01 then
-					stepX, stepZ = level.Unit.X, level.Unit.Z
-				end
-			end
-			local nextKick = if over
-				then nil
-				else DiveKick.step(kick, kickCfg, dt, gravity, stepX, stepZ)
-			state = Momentum.step(state, cfg, 0, 0, grounded, dt)
-			humanoid.WalkSpeed = 0
-			humanoid:Move(Vector3.zero, false)
-			if rootJoint then
-				rootJoint.C0 = baseC0
-			end
-			if nextKick == nil then
-				endKick()
-			else
-				-- The squat ends in the snap, but only once the server has said yes and which target.
-				if
-					nextKick.phase == "squat"
-					and nextKick.t >= kickCfg.JumpSquatSeconds
-					and kickAccepted
-					and targetRoot
-				then
-					-- Locked onto them: the fast snap straight to them. Otherwise a slower leap, guided to them.
-					nextKick = if kickSnap
-						then snapJump(nextKick, targetRoot)
-						else guidedJump(nextKick, targetRoot)
-				end
-				if before == "attach" and nextKick.phase == "flip" then
-					-- The meter ran out with no press. The kick still comes, at its weakest.
-					kickAwaiting = true
-					prompt:FreezeMeter()
-				end
-				local position = root.Position
-				-- The server holds them from the moment it accepts, so "hold" is the usual case here.
-				if
-					nextKick.phase == "chase"
-					and skill == "chase"
-					and targetRoot
-					and kickTarget
-					and kickTarget:GetAttribute("HT_Air") ~= nil
-				then
-					local offset = position - targetRoot.Position
-					if DiveKick.isTouching(kickCfg, offset.X, offset.Y, offset.Z) then
-						nextKick = DiveKick.attach(
-							nextKick,
-							offset.X,
-							offset.Z,
-							KickMeter.endsAt(meterCfg :: any)
-						)
-						if kickRemotes.attach then
-							kickRemotes.attach:FireServer()
-						end
-					end
-				end
-				kick = nextKick
-				if nextKick.phase == "attach" then
-					-- this kick's marker, as the server rolled it (a centre start only if it hasn't arrived)
-					local rolled = character:GetAttribute("HT_KickMeter")
-					local plan = if typeof(rolled) == "Vector3"
-						then KickMeter.readPlan(rolled.X, rolled.Y)
-						else nil
-					prompt:UpdateMeter(nextKick.t, plan or { start = -1, dir = 1 })
-				end
-				local at = if targetRoot then targetRoot.Position else position
-				local moving = if targetRoot
-					then targetRoot.AssemblyLinearVelocity
-					else Vector3.zero
-				local vx, vy, vz = DiveKick.velocity(
-					nextKick,
-					kickCfg,
-					position.X,
-					position.Y,
-					position.Z,
-					at.X,
-					at.Y,
-					at.Z,
-					moving.X,
-					moving.Y,
-					moving.Z
-				)
-				if vx and vy and vz then
-					root.AssemblyLinearVelocity = Vector3.new(vx, vy, vz)
-				end
-				-- From the snap on you face them. In the rebound you keep looking the way you kicked.
-				local faceTo = Vector3.zero
-				if
-					nextKick.phase == "chase"
-					or nextKick.phase == "attach"
-					or nextKick.phase == "flip"
-				then
-					faceTo = Vector3.new(at.X - position.X, 0, at.Z - position.Z)
-				end
-				if faceTo.Magnitude > 0.5 then
-					align.CFrame = CFrame.lookAt(Vector3.zero, faceTo)
-				end
-			end
-			if readout then
-				readout.Text =
-					`Speed {math.floor(root.AssemblyLinearVelocity.Magnitude + 0.5)} / {cfg.MaxSpeed}   Kick   Stagger {character:GetAttribute(
-						"HT_Stagger"
-					) or 0}`
-			end
-			return
 		end
 
 		-- A punch in the air gives one push, added to whatever the body is already doing.
@@ -1877,24 +1378,6 @@ function MovementController:KnitStart()
 					:PropelGust(other.Character, cfg.PropelSeconds, power)
 			end
 		end)
-	end
-	local kickAccepted = Net.client("KickAccepted")
-	if kickAccepted then
-		kickAccepted.OnClientEvent:Connect(function(target: Model, snap: boolean?)
-			if self._kickAccepted then
-				self._kickAccepted(target, snap)
-			end
-		end)
-	end
-	local kickImpact = Net.client("KickImpact")
-	if kickImpact then
-		kickImpact.OnClientEvent:Connect(
-			function(attacker: Model, _target, _at, _hit, _share, stop: number)
-				if attacker == player.Character and self._kickConnected and stop > 0 then
-					self._kickConnected(stop)
-				end
-			end
-		)
 	end
 	local input = hookInput(player)
 	local readout = makeReadout()

@@ -325,9 +325,7 @@ end
 --- The floor under `position` within `reach` studs, looking past every fighter and `ignore`.
 function FxKit.floorUnder(position: Vector3, reach: number, ignore: { Instance }?): Vector3?
 	local skip: { Instance } = CollectionService:GetTagged("HT_Combatant")
-	for _, folderName in
-		{ "HT_PunchHitFx", "HT_StepBurstFx", "HT_KickHitFx", "HT_ClashFx", "HT_Fx" }
-	do
+	for _, folderName in { "HT_PunchHitFx", "HT_StepBurstFx", "HT_ClashFx", "HT_Fx" } do
 		local found = workspace:FindFirstChild(folderName)
 		if found then
 			table.insert(skip, found)

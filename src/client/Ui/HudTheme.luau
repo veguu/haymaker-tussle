@@ -177,7 +177,7 @@ HudTheme.Strip = {
 HudTheme.Icons = {
 	punch = Icons.id("classes"), -- the glove
 	propel = Icons.id("dash"), -- T, the class's move
-	kick = Icons.id("jump"),
+	jump = Icons.id("jump"),
 	uppercut = Icons.id("punch"), -- R, the class's attack
 }
 
@@ -202,10 +202,10 @@ HudTheme.Actions = {
 		touchAction = "HaymakerPropel",
 	},
 	{
-		id = "kick",
+		id = "jump",
 		name = "Jump",
 		keys = { mouse = "Space", gamepad = "Y" },
-		touchAction = "HaymakerKick",
+		touchAction = "HaymakerJump",
 	},
 }
 
@@ -259,7 +259,7 @@ HudTheme.Guide = {
 		{ key = "Propel", action = "Your class's move." },
 		{ key = "Upper", action = "Your class's attack. Hold, then let go to throw it." },
 		{
-			key = "Kick",
+			key = "Jump",
 			action = "Jump. Punch in the air to glide a punch at them.",
 		},
 		{ key = "Lock", action = "Lock on: the nearest opponent." },

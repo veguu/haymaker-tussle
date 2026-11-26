@@ -110,12 +110,10 @@ local function pairState(a: Model, b: Model): Combat.BumpPair
 	return state
 end
 
--- Can these two bump at all right now? A stationary training target, anyone in a skill, in the air or in
--- a clash never does.
+-- Can these two bump at all right now? A stationary training target, anyone in the air or in a clash
+-- never does.
 local function eligible(combat: any, a: Model, b: Model): boolean
 	return combat:CanFight(a, b)
-		and not a:GetAttribute("HT_Skill")
-		and not b:GetAttribute("HT_Skill")
 		and not a:GetAttribute("HT_Air")
 		and not b:GetAttribute("HT_Air")
 		and not a:GetAttribute("HT_Clash")

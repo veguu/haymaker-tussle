@@ -176,7 +176,6 @@ SHOULDER = {"Right Arm": (1, 0.5, 0), "Left Arm": (-1, 0.5, 0)}
 # ---- Timing helpers. The rule, from the research note: snap on the way to the strike, hold where
 # a pose should be seen, and only ease on the way home.
 FPS = 60
-JUMP_SQUAT = 0.067  # Kick.JumpSquatSeconds: when the jump's clip and physics leave the floor
 
 
 def ease_in(t):
@@ -656,7 +655,7 @@ UPPERCUT = {
 }
 
 
-# ---- The air kick and the reactions: poses, then beats between them.
+# ---- The reactions: poses, then beats between them.
 def right_limb(forward, out=0.0):
     return (-out, 0, forward, 0, 0, 0)
 
@@ -700,147 +699,6 @@ def body_pose(torso, head, right_arm, left_arm, right_leg, left_leg):
         "Right Leg": right_leg,
         "Left Leg": left_leg,
     }
-
-
-def bake_leap():
-    """The jump. Arms stay down beside the body, a little out, the whole way. Down into a quick
-    squat, and at JUMP_SQUAT, when physics leaves the floor, it springs: legs straight, body long,
-    rising off its joints past where it settles, which is as close as rigid parts get to a stretch.
-    Knee-bends here are legs splayed out and forward with the hips dropped, since R6 has no knees."""
-
-    def arms(out, forward=0.0):
-        return right_limb(forward, out), left_limb(forward, out)
-
-    def planted(pose):
-        torso = list(pose["Torso"])
-        torso[5] = 0
-        pose["Torso"] = tuple(torso)
-        torso[5] = GROUND - lowest_foot(pose)
-        pose["Torso"] = tuple(torso)
-        return pose
-
-    right_arm, left_arm = arms(14, 6)
-    half = planted(body_pose(
-        (16, 0, -6, 0, 0, 0), (-8, 0, 3, 0, 0, 0), right_arm, left_arm, right_limb(26, 16), left_limb(26, 16),
-    ))
-    right_arm, left_arm = arms(20, 12)
-    squat = planted(body_pose(
-        (30, 0, -4, 0, 0, 0), (-20, 0, 2, 0, 0, 0), right_arm, left_arm, right_limb(50, 27), left_limb(50, 27),
-    ))
-    right_arm, left_arm = arms(24, -8)
-    stretch = body_pose(
-        (-9, 0, 2, 0, 0, 0.8), (10, 0, 0, 0, 0, 0), right_arm, left_arm, right_limb(-12, 4), left_limb(-8, 4),
-    )
-    right_arm, left_arm = arms(26, -2)
-    settle = body_pose(
-        (2, 0, 0, 0, 0, 0.1), (2, 0, 0, 0, 0, 0), right_arm, left_arm, right_limb(16, 7), left_limb(30, 7),
-    )
-
-    def air(wave):
-        right_arm, left_arm = arms(26 + 4 * wave, 4 + 5 * wave)
-        return body_pose(
-            (6 + 2 * wave, 1.5 * wave, 3 * wave, 0, 0, 0), (-2, 0, -2 * wave, 0, 0, 0),
-            right_arm, left_arm, right_limb(26 - 12 * wave, 8), left_limb(44 + 12 * wave, 8),
-        )
-
-    beats = [
-        (0, half),
-        (0.05, squat, ease_out),
-        (JUMP_SQUAT, squat),
-        (JUMP_SQUAT + 0.05, stretch, ease_out_hard),
-        (JUMP_SQUAT + 0.2, settle),
-        (JUMP_SQUAT + 0.42, air(1)),
-    ]
-    t = JUMP_SQUAT + 0.42
-    wave = 1
-    while t < 2.3:
-        t += 0.4
-        wave = -wave
-        beats.append((t, air(wave)))
-    clip = beats_clip(beats, False, round(t, 3))
-    clip["spring"] = JUMP_SQUAT
-    return clip
-
-
-# The tight ball: knees to the chest, arms tucked in, head down. Every spin starts from here.
-CURL = body_pose(
-    (58, 0, 0, 0, 0, 0), (18, 0, 0, 0, 0, 0),
-    right_limb(108, -8), left_limb(108, -8), right_limb(130, -4), left_limb(124, -4),
-)
-STRIKE_LEAN = -10  # the body at the moment of the kick, past a whole turn
-KICK_LEG = 8  # the leg, nearly in line with the body: reaching straight past the hip
-KICK_FLIP_START = CURL["Torso"][0]
-KICK_FLIP_END = 360 + STRIKE_LEAN
-KICK_OTHER_LEG = 80
-
-
-def bake_aim():
-    """Close enough: curl into the ball and hold it tight, quivering, for the timing."""
-
-    def curled(wave):
-        pose = dict(CURL)
-        torso = list(CURL["Torso"])
-        torso[0] += 2 * wave
-        pose["Torso"] = tuple(torso)
-        pose["Right Leg"] = right_limb(130 + 3 * wave, -4)
-        pose["Left Leg"] = left_limb(124 - 3 * wave, -4)
-        return pose
-
-    return beats_clip(
-        [(0, curled(0)), (0.1, curled(1)), (0.2, curled(-1)), (0.3, curled(1)), (0.4, curled(0))],
-        True,
-        0.4,
-    )
-
-
-def bake_spin():
-    """One movement from ball to heel. Rotating forward, head over heels, gathering speed. Partway
-    round the kicking leg uncurls, so it's reaching overhead when the body is upside down, and the
-    rotation itself then whips the heel over and down. It ends just short of the strike, and
-    KickDown's first frame is the strike, so spin and kick are one motion."""
-    frames = []
-    seconds = 0.28
-    total = round(seconds * FPS)
-    for index in range(total + 1):
-        t = index / total
-        angle = KICK_FLIP_START + (KICK_FLIP_END - 4 - KICK_FLIP_START) * (t ** 1.35)
-        # Tight until nearly upside down, then the leg shoots out.
-        open_leg = ease_out(min(max(t - 0.38, 0) / 0.42, 1))
-        open_rest = smooth(min(max(t - 0.45, 0) / 0.55, 1))
-        pose = body_pose(
-            (angle, 0, 0, 0, 0, 0),
-            (18 + (20 - 18) * open_rest, 0, 0, 0, 0, 0),
-            right_limb(108 + (-58 - 108) * open_rest, -8 + 48 * open_rest),
-            left_limb(108 + (-46 - 108) * open_rest, -8 + 40 * open_rest),
-            right_limb(130 + (KICK_LEG + 4 - 130) * open_leg, -4 + 4 * open_leg),
-            left_limb(124 + (KICK_OTHER_LEG - 124) * open_rest, -4 + 4 * open_rest),
-        )
-        frames.append({"t": index / FPS, "pose": pose})
-    return {"loop": False, "priority": "Action3", "seconds": seconds, "frames": frames}
-
-
-def bake_kick():
-    """Frame 1 is the heel on them, with the leg long: the hit stop freezes here, so this is the pose
-    that gets seen, and the server's stop lasts exactly as long. After it comes the push-off: the
-    kicking leg snaps back up to the body as if rebounding off them, the torso arches backward as
-    the body goes up, and the arms open late. Then it opens up to fall."""
-
-    def pose(lean, head, kick, other, right_arm, left_arm, rise=0.0):
-        return body_pose(
-            (lean, 0, 0, 0, 0, rise), (head, 0, 0, 0, 0, 0),
-            right_arm, left_arm, right_limb(kick), left_limb(other),
-        )
-
-    strike = pose(STRIKE_LEAN, 20, KICK_LEG, KICK_OTHER_LEG, right_limb(-58, 40), left_limb(-46, 32))
-    past = pose(STRIKE_LEAN + 6, 24, KICK_LEG - 8, KICK_OTHER_LEG + 6, right_limb(-70, 44), left_limb(-56, 36))
-    retract = pose(-30, -10, 92, 44, right_limb(-20, 60), left_limb(16, 52), 0.5)
-    recoil = pose(-18, -6, 62, 26, right_limb(34, 56), left_limb(50, 48), 0.25)
-    fall = pose(4, -2, 26, 12, right_limb(24, 30), left_limb(38, 26))
-    return beats_clip(
-        [(0, strike), (0.033, past, ease_out), (0.13, retract, ease_out_hard), (0.28, recoil), (0.5, fall)],
-        False,
-        0.5,
-    )
 
 
 def flinch_clip(pain, past, seconds):
@@ -1109,10 +967,6 @@ def bake_all():
         clips[f"HookLeft{suffix}"] = bake_swing("Left Arm", HOOK, running)
         clips[f"HookRight{suffix}"] = bake_swing("Right Arm", HOOK, running)
         clips[f"Uppercut{suffix}"] = bake_swing("Right Arm", UPPERCUT, running)
-    clips["KickLeap"] = bake_leap()
-    clips["KickAim"] = bake_aim()
-    clips["KickSpin"] = bake_spin()
-    clips["KickDown"] = bake_kick()
     clips["HitFlinch"] = bake_flinch()
     clips["HitFlinchHeavy"] = bake_flinch_heavy()
     clips["HitFlinchBack"] = bake_flinch_back()

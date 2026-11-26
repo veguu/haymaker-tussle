@@ -87,12 +87,11 @@ local function frenzy(_self: any, attacker: Model, _side: string, cfg: any)
 	for hit = 1, cast.Hits do
 		task.delay(cfg.Windup + (hit - 1) * cast.Every, function()
 			local root = Combatants.rootOf(attacker)
-			-- A caster who has been stunned, frozen or caught by a kick stops clawing.
+			-- A caster who has been stunned or frozen stops clawing.
 			if
 				not root
 				or not Combatants.isAlive(attacker)
 				or attacker:GetAttribute("HT_Stunned") ~= nil
-				or attacker:GetAttribute("HT_Air") == "hold"
 			then
 				return
 			end

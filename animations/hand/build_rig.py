@@ -51,7 +51,7 @@ def matrix_of(transform):
 # 2. Forward kinematics against the game's own maths.
 worst_rot = worst_pos = 0.0
 tested = 0
-for clip_name in ("Guard", "HookRight", "Sprint", "KickSpin", "Slammed"):
+for clip_name in ("Guard", "HookRight", "Sprint", "Land", "Slammed"):
     for frame in clips[clip_name]["frames"]:
         r6_rig.set_pose(rig, frame["pose"])
         bpy.context.view_layer.update()

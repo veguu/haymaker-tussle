@@ -1,7 +1,7 @@
 """Shows the baked clips on exact R6 dummies in their own Blender scene. Run inside Blender.
 
-Eight dummies side by side, looping: Sprint, Brake, punches standing, punches while sprinting,
-the idle, and the air kick's clips in order, held up off the floor as they would be in the game.
+Dummies side by side, looping: Sprint, Brake, punches standing, punches while sprinting,
+the idle, the reactions and stopping. (The air kick's clips were removed 2026-11-25.)
 Nothing here saves a file, and no other scene is changed. Re-running replaces the scene.
 """
 import importlib.util
@@ -81,21 +81,9 @@ def pose_both(time):
     return pose
 
 
-AIR_KICK = (("KickLeap", 0.6), ("KickAim", 0.3), ("KickSpin", 0.28), ("KickDown", 0.5))
 REACTIONS = (("HitFlinch", 0.28), ("Stance", 0.3), ("HitFlinchHeavy", 0.46), ("HitSkid", 0.4), ("Stance", 0.3), ("HitFlinchBack", 0.34), ("AirTumble", 0.6), ("Slammed", 0.3), ("FloorHit", 0.26), ("AirTumble", 0.4), ("Land", 0.3))
 STOPPING = (("Sprint", 1.066), ("Brake", 0.6), ("BrakeSettle", 0.4), ("Stance", 0.6))
-AIR_KICK_SECONDS = sum(seconds for _, seconds in AIR_KICK)
-AIR_LIFT = {"Air kick": 5}
-
-
-def pose_air_kick(time):
-    """The jump, hanging on while the ring closes, the front flip, the kick, then a short rest."""
-    left = time % (AIR_KICK_SECONDS + 0.4)
-    for name, seconds in AIR_KICK:
-        if left < seconds:
-            return sample(CLIPS[name], left)
-        left -= seconds
-    return sample(CLIPS["KickDown"], CLIPS["KickDown"]["seconds"])
+AIR_LIFT = {}
 
 
 def in_order(sequence, time, rest=0.0):
@@ -118,7 +106,6 @@ def pose_stopping(time):
 
 
 DUMMIES = [
-    ("Air kick", pose_air_kick),
     ("Hit reactions", pose_reactions),
     ("Run, brake, settle", pose_stopping),
     ("Sprint + swings", pose_both),

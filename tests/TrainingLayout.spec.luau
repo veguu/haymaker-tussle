@@ -1,14 +1,12 @@
 --!strict
 -- Spec files are required BY the runner, so this path is relative to tests/.
 local Combat = require("../src/shared/Core/Combat")
-local DiveKick = require("../src/shared/Core/DiveKick")
 local GameConfig = require("../src/shared/Config/GameConfig")
 local TrainingLayout = require("../src/shared/Core/TrainingLayout")
 
 local CFG: any = GameConfig.Training
 local ARENA: any = GameConfig.Arena
 local PUNCH: any = GameConfig.Punch
-local KICK: any = GameConfig.Kick
 local STAGGER: any = GameConfig.Stagger
 
 local function status(fields: { [string]: any }): any
@@ -286,38 +284,6 @@ return {
 			)
 			lastOut[kind] = pad.OutwardSpeed
 			lastUp[kind] = pad.UpSpeed
-		end
-	end,
-
-	["a kick's rebound on a station lands on that station, not the 1v1 arena"] = function()
-		local station: any = TrainingLayout.stationByKey(CFG, "B")
-		local cx, cz, outX, outZ = TrainingLayout.stationCenter(CFG, station)
-		local atX, atZ = cx + outX * 20, cz + outZ * 20
-		local platform = TrainingLayout.platformAt(CFG, ARENA, atX, atZ)
-		-- the weakest, a middling and the best press on the timing meter
-		local meter: any = GameConfig.KickMeter
-		local rises = {
-			red = meter.RiseMin,
-			orange = (meter.RiseMin + meter.RiseMax) / 2,
-			green = meter.RiseMax,
-		}
-		for _, grade: any in { "red", "orange", "green" } do
-			local plan = DiveKick.planRebound(KICK, grade, {
-				x = atX,
-				z = atZ,
-				height = 40,
-				backX = -outX,
-				backZ = -outZ,
-				centerX = platform.x,
-				centerZ = platform.z,
-				radius = platform.radius,
-				speed = GameConfig.Movement.PropelSpeed,
-				gravity = 196.2 * KICK.ReboundGravityScale,
-			}, rises[grade])
-			local landX = atX + plan.dirX * plan.speed * plan.air
-			local landZ = atZ + plan.dirZ * plan.speed * plan.air
-			local away = math.sqrt((landX - cx) ^ 2 + (landZ - cz) ^ 2)
-			assert(away <= station.Radius, `{grade} lands {away} from the centre`)
 		end
 	end,
 }

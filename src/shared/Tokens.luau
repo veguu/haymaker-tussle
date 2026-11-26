@@ -273,7 +273,7 @@ Tokens.type = {
 -- Font families for the faces above.
 Tokens.family = {
 	-- Oswald since 2026-11-19 (was TitilliumWeb.json): the owner wants ONE weight of lettering everywhere, so the
-	-- older pieces (clash bar, kick meter, kick prompt, tutorial, training panel) follow the poster UI. Oswald has
+	-- older pieces (clash bar, tutorial, training panel) follow the poster UI. Oswald has
 	-- no Heavy face: a role asking for Heavy gets its Bold.
 	display = "rbxasset://fonts/families/Oswald.json",
 	poster = "rbxasset://fonts/families/Oswald.json", -- the fight-poster look's numbers and big words

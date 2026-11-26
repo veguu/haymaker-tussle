@@ -16,7 +16,7 @@
 --   the target: a chevron and the name over your lock-on target (an open one over the nearest opponent ahead
 --      when nothing is locked), with a thin bar shaded by THEIR stagger.
 --
--- It only draws. Every number comes from where the game keeps it: MovementController.Hud (propel and kick
+-- It only draws. Every number comes from where the game keeps it: MovementController.Hud (propel and jump
 -- timing), CombatController (punch timing and results), AbilityController (kit skills), EndlagController, the
 -- character's HT_Stagger, and the round's HT_RoundState folder. Rules in Core/HudLogic; colours, steps and
 -- timings in Ui/HudTheme; the slanted and rough-cut shapes are tinted images from Ui/Shapes. No combat input is
@@ -60,7 +60,6 @@ local S, T = HudTheme.Size, HudTheme.Time
 local ST, TT, SS, SPD = HudTheme.Stagger, HudTheme.Tile, HudTheme.Strip, HudTheme.Speed
 local make, text, colour = Components.make, Components.text, Tokens.colour
 local moveCfg = GameConfig.Movement
-local kickCfg = GameConfig.Kick
 local staggerCfg = GameConfig.Stagger
 local STAGGER_MAX = staggerCfg.Max
 local COMBATANT_TAG = "HT_Combatant"
@@ -550,7 +549,6 @@ function HudController:KnitStart()
 	local ability = Knit.GetController("AbilityController")
 	local endlag = Knit.GetController("EndlagController")
 	local lockOn = Knit.GetController("LockOnController")
-	local kickPrompt = Knit.GetController("KickPromptController")
 	local hud = movement.Hud
 
 	-- Every game-owned label on screen uses the type family, including any made later.
@@ -985,11 +983,11 @@ function HudController:KnitStart()
 	-- Jump and Punch, small, in the bottom-right corner; the class skills big, one each side of the speed dial:
 	-- Q on its left, R on its right (the owner, 2026-11-18). Q and R are children of the dial's group, so they
 	-- show, hide and scale with it; layout() places them.
-	local ORDER = { "kick", "punch", "propel", "uppercut" }
+	local ORDER = { "jump", "punch", "propel", "uppercut" }
 	local tiles: { [string]: Tile } = {}
 	do
 		local x = L.TilePad
-		for _, id in { "kick", "punch" } do
+		for _, id in { "jump", "punch" } do
 			local tile = makeTile(kit.fade, id, x, false)
 			-- drawn smaller as one piece, about its bottom-left corner, so it still stands on the row's line
 			tile.column.AnchorPoint = Vector2.new(0, 1)
@@ -1827,12 +1825,6 @@ function HudController:KnitStart()
 				+ UDim2.fromOffset(PosterEase.keyframes(NOPE, t, PosterEase.ease), 0)
 		end)
 	end
-	local function word(tile: Tile, say: string, tone: string)
-		tile.word.Text = say
-		tile.word.TextColor3 = colour(tone)
-		tile.word.Visible = true
-		tile.wordUntil = os.clock() + T.ResultWord
-	end
 	combat.PunchEvent:Connect(function(kind: string)
 		local tile = tiles.punch
 		if kind == "thrown" then
@@ -1912,10 +1904,8 @@ function HudController:KnitStart()
 	RunService.RenderStepped:Connect(function()
 		local now = os.clock()
 		local model = character
-		-- Priority: a timed kick cue or a clash steps you and your kit back. Checked every frame, because the
-		-- cue can start and end within one.
-		local cueUp = kickPrompt:IsActive()
-		local prompt = cueUp or (model ~= nil and model:GetAttribute("HT_Clash") ~= nil)
+		-- Priority: a clash steps you and your kit back. Checked every frame.
+		local prompt = model ~= nil and model:GetAttribute("HT_Clash") ~= nil
 		if prompt ~= promptActive then
 			promptActive = prompt
 			refreshGroups()
@@ -1936,7 +1926,6 @@ function HudController:KnitStart()
 			-- Each action from its own real timing.
 			local stunned = model:GetAttribute("HT_Stunned") ~= nil
 			local blocked = model:GetAttribute("HT_Stunned") ~= nil
-				or model:GetAttribute("HT_Air") == "hold"
 				or model:GetAttribute("HT_Clash") ~= nil
 				or model:GetAttribute("HT_RoundHold") ~= nil
 			local punchReady, punchTotal, canPunch = combat:GetPunchTiming()
@@ -1952,7 +1941,6 @@ function HudController:KnitStart()
 			if moveReady then
 				moveReady = math.max(moveReady, lagUntil)
 			end
-			local kicking = hud.kickTarget ~= nil or hud.kicking == true
 			local timings = {
 				punch = {
 					readyAt = punchReady,
@@ -1966,14 +1954,12 @@ function HudController:KnitStart()
 						total = moveCfg.PropelCooldown,
 						usable = hasDash and not blocked,
 					},
-				-- Space: the air kick while there's someone to follow up (or one is under way), else the jump.
-				kick = if kicking
-					then { readyAt = hud.kickReadyAt, total = kickCfg.Cooldown, usable = true }
-					else {
-						readyAt = math.max(hud.jumpReadyAt, lagUntil),
-						total = GameConfig.Jump.Cooldown,
-						usable = not blocked,
-					},
+				-- Space: the jump.
+				jump = {
+					readyAt = math.max(hud.jumpReadyAt, lagUntil),
+					total = GameConfig.Jump.Cooldown,
+					usable = not blocked,
+				},
 				uppercut = if hitReady and hitTotal
 					then { readyAt = hitReady, total = hitTotal, usable = hitUsable == true }
 					else {
@@ -2008,9 +1994,6 @@ function HudController:KnitStart()
 					Poster.setFigures(tile.seconds, secs)
 				end
 				-- above the tile: a result word for a moment, else the skill's name when names show
-				if id == "kick" and cueUp then
-					word(tile, "NOW", "gold.400")
-				end
 				tile.word.Visible = now < tile.wordUntil
 				if device == "touch" then
 					local cover, seconds = touchOverlay(actionById[id].touchAction)

@@ -1,7 +1,7 @@
 --!strict
 -- TrainingLayout - where everything in the training arena is, and when a dummy may go home, as plain
 -- maths with no Roblox instances. All of it comes from GameConfig.Training, so moving a station means
--- changing a number. The client uses it too, for the kick's rebound and the testing display.
+-- changing a number. The client uses it too, for the testing display.
 --
 -- A hub sits in the middle with the stations in a ring around it. Each station is a circular platform
 -- joined to the hub by a bridge, and "forward" on a station points away from the hub, so anything
@@ -117,8 +117,8 @@ function TrainingLayout.discs(cfg: any, arena: any): { Disc }
 	return list
 end
 
---- The platform a body is over, or else the one whose edge is nearest. Recovery and a kick's rebound
---- are judged from this, so they work the same on every platform.
+--- The platform a body is over, or else the one whose edge is nearest. (Its only caller, the air kick's
+--- rebound, was removed 2026-11-25; kept because it is plain, tested geometry.)
 function TrainingLayout.platformAt(cfg: any, arena: any, x: number, z: number): Disc
 	local best: Disc? = nil
 	local bestGap = math.huge

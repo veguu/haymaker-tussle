@@ -8,7 +8,7 @@
 -- An ATTACK ("Punch", "Kick", "Uppercut", "Cyclone") locks from its press until its strike is over
 -- (`lead`: its windup plus the active window) plus its Miss seconds. If it lands, that is cut to its
 -- Hit seconds after the hit: landing is rewarded, whiffing punished.
--- Anything else ("Dash", "Blink", "AirKick") locks for its one number from the moment given.
+-- Anything else ("Dash", "Blink") locks for its one number from the moment given.
 --
 -- The client (EndlagController) and the server (EndlagService) both keep a busyUntil on these rules;
 -- the server's is the one that counts for attacks.

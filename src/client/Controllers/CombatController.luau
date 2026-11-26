@@ -119,8 +119,7 @@ function CombatController:KnitStart()
 			return false
 		end
 		local air = character:GetAttribute("HT_Air")
-		return character:GetAttribute("HT_Skill") == nil
-			and (air == nil or (air == "float" and GameConfig.AirRecovery.PunchWhileLaunched))
+		return (air == nil or (air == "float" and GameConfig.AirRecovery.PunchWhileLaunched))
 			and character:GetAttribute("HT_Stunned") == nil
 			and character:GetAttribute("HT_RoundHold") == nil
 			and character:GetAttribute("HT_Spectating") == nil

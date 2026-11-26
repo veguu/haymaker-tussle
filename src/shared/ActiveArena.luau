@@ -4,7 +4,7 @@
 -- (Config/MapObstacles) laid over it by Round.arenaFor.
 --
 -- READS ReplicatedStorage.HT_MapState's `Map`, which MapService sets in the same step it swaps the map's
--- geometry, so spawns, the ring-out line, bots and the kick rebound always match the floor that's there.
+-- geometry, so spawns, the ring-out line, and bots always match the floor that's there.
 -- Before the first map (or with maps off) it's the base circle.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

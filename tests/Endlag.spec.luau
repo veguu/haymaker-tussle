@@ -23,7 +23,7 @@ return {
 	end,
 
 	["the other moves have one number each"] = function()
-		for _, move in { "Dash", "Blink", "AirKick" } do
+		for _, move in { "Dash", "Blink" } do
 			assert(not Endlag.isAttack(move))
 			assert(Endlag.recovery(CFG, move) == CFG[move])
 			assert(Endlag.recovery(CFG, move, true) == CFG[move], "hit or not makes no difference")

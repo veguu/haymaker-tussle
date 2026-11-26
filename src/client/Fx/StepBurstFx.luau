@@ -110,7 +110,7 @@ local pool = FxKit.pool("HT_StepBurstFx", 6, function(parent, add)
 	smoke.Drag = 2
 	smoke.Transparency = fade(0, 0.2, 0.6, 0.45, 1, 1)
 
-	-- A HEAVY LANDING ONLY (a body slammed into the floor, a dive kick landing): the same burst, plus
+	-- A HEAVY LANDING ONLY (a body slammed into the floor): the same burst, plus
 	-- thin white lines thrown up off the floor at once, and more smoke rising from 4 f. This replaces
 	-- the old ground blast (a flash, spikes, a pillar of light, embers and fire in gold and orange).
 	local upLines = add(

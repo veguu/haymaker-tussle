@@ -35,7 +35,7 @@ local ShiftLockController = Knit.CreateController({
 	Name = "ShiftLockController",
 })
 
---- Is the player in shift lock right now? This is what makes the camera aim the air kick.
+--- Is the player in shift lock right now?
 function ShiftLockController:IsLocked(): boolean
 	return self._locked == true
 end

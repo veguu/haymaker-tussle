@@ -11,7 +11,6 @@ local UserInputService = game:GetService("UserInputService")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
-local KickMeter = require(ReplicatedStorage.Shared.Core.KickMeter)
 local TrainingLayout = require(ReplicatedStorage.Shared.Core.TrainingLayout)
 local Net = require(ReplicatedStorage.Shared.Net)
 local TrainingPanel = require(script.Parent.Parent.Ui.TrainingPanel)
@@ -41,7 +40,6 @@ function TrainingController:KnitStart()
 	local tracked: { model: Model, from: Vector3, last: Vector3, at: number, far: number, high: number }? =
 		nil
 	local flight: { name: string, at: number, far: number, high: number, disc: any }? = nil
-	local watching: RBXScriptConnection? = nil
 
 	local function refreshShow()
 		panel:Show(player:GetAttribute(IN_TRAINING) == true, open)
@@ -133,41 +131,6 @@ function TrainingController:KnitStart()
 			end
 		end)
 	end
-	local impact = Net.client("KickImpact")
-	if impact then
-		impact.OnClientEvent:Connect(function(attacker: Model, target: Model)
-			if attacker == player.Character and target then
-				track(target)
-			end
-		end)
-	end
-
-	local function watchCharacter(character: Model)
-		if watching then
-			watching:Disconnect()
-		end
-		watching = character:GetAttributeChangedSignal("HT_KickGrade"):Connect(function()
-			local grade = character:GetAttribute("HT_KickGrade")
-			if grade then
-				-- the meter's named result and how close to the middle it was
-				local score = character:GetAttribute("HT_KickScore")
-				local text = string.upper(tostring(grade))
-				if typeof(score) == "Vector3" then
-					text = if score.Z < 0.5
-						then "TOO LATE"
-						else `{string.upper(KickMeter.tierAt(score.Z))} {math.floor(
-							KickMeter.accuracy(score.X) * 100 + 0.5
-						)}%`
-				end
-				panel:Set("Kick", text)
-			end
-		end)
-	end
-	player.CharacterAdded:Connect(watchCharacter)
-	if player.Character then
-		watchCharacter(player.Character)
-	end
-
 	local bodyReset = Net.client("BodyReset")
 	if bodyReset then
 		bodyReset.OnClientEvent:Connect(function(_face: Vector3, reason: string, detail: string?)

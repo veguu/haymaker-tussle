@@ -25,21 +25,12 @@ export type EventName =
 	| "UltimateStarted" -- server to all: attacker, target, kit, anchor CFrame, attacker start (anchor space), server start time, flight end
 	| "UltimateEnded" -- server to all: this attacker's ultimate on this target is over
 	| "UppercutRequest" -- client to server: I released the Uppercut. No arguments, ever.
-	| "DiveRequest" -- client to server: I started a dive kick out of a jump. No arguments, ever.
-	| "DiveLanded" -- server to all: this character's dive kick landed here, and whether it hit anyone
 	| "PunchStarted" -- server to all: this character started a swing (Left, Right, Uppercut, Cyclone or a kit swing's skill id), its place in the M1 string (0 for a skill), and a skill's windup
 	| "HitConfirmed" -- server to all: this character's swing hit this target: strength (0 for a stunning punch), the string step
 	| "Knockback" -- server to the target's client: launch velocity, and lift if airborne
 	| "BumpHappened" -- server to all: these two characters bumped
 	| "PropelRequest" -- client to server: I propelled, and how charged it was (0 to 1, only for how it looks)
 	| "PropelStarted" -- server to other clients: this player propelled, this charged (0 to 1)
-	| "DashHit" -- server to all: this character's body hit this target this hard (a charged dash, or a kicked body crashing into someone)
-	| "KickRequest" -- client to server: I jumped at someone in the air. No arguments, ever.
-	| "KickAccepted" -- server to the jumper's client: your follow-up is on, at this target, and whether it's the locked-on snap
-	| "LockOnState" -- client to server: who I'm locked onto now (a Model), or nil
-	| "KickAttach" -- client to server: I reached them. No arguments, ever.
-	| "KickCommit" -- client to server: I pressed the timing key, and the flat direction my cursor points (used only for which way a perfect kick throws them)
-	| "KickImpact" -- server to all: this character's kick landed, on this target, here
 	| "TutorialDone" -- client to server: I finished or skipped the tutorial. No arguments, ever.
 	| "PunchResult" -- server to client(s): this character's swing was hit, miss, cancelled, refused or clash
 	| "PunchDebug" -- server to all, for the hitbox display: a swing going live (and for how long) or ending, with its verdicts

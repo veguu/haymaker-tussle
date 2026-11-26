@@ -4,12 +4,11 @@
 -- and a dash or blink isn't shown to anyone.
 --
 -- The services that start moves tell it: CombatService (a punch, the launching kick, the Uppercut,
--- the Cyclone, and when one lands), PropelService (a dash), AbilityService (a blink). The end of an
--- air kick or dive kick it sees for itself, from the HT_Skill attribute KickService writes.
+-- the Cyclone, and when one lands), PropelService (a dash), AbilityService (a blink).
+-- (The dive kick's end, read from HT_Skill, went with the dive: 2026-11-25.)
 --
 -- Every time here is the server's own clock. Nothing comes from a client.
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Knit = require(ReplicatedStorage.Packages.Knit)
@@ -19,7 +18,6 @@ local Endlag = require(ReplicatedStorage.Shared.Core.Endlag)
 
 -- GameConfig's numbers, with the kits' skills' laid over them (Config/Abilities.Endlag).
 local cfg: any = Endlag.with(GameConfig.Endlag :: any, Abilities.Endlag)
-local SKILL_ATTRIBUTE = "HT_Skill"
 
 type Lock = {
 	untilAt: number,
@@ -54,30 +52,6 @@ function EndlagService:Landed(model: Model, move: string, startAt: number, hitAt
 	local lock = locks[model]
 	if lock and lock.move == move and lock.startAt == startAt then
 		lock.untilAt = Endlag.landed(cfg, move, lock.untilAt, hitAt)
-	end
-end
-
-function EndlagService:KnitStart()
-	-- An air kick or dive kick ending (landed, missed, broken off): HT_Skill goes back to nothing.
-	local function onCharacter(character: Model)
-		local was = character:GetAttribute(SKILL_ATTRIBUTE)
-		character:GetAttributeChangedSignal(SKILL_ATTRIBUTE):Connect(function()
-			local now = character:GetAttribute(SKILL_ATTRIBUTE)
-			if was ~= nil and now == nil then
-				self:Start(character, "AirKick", os.clock())
-			end
-			was = now
-		end)
-	end
-	local function onPlayer(player: Player)
-		player.CharacterAdded:Connect(onCharacter)
-		if player.Character then
-			onCharacter(player.Character)
-		end
-	end
-	Players.PlayerAdded:Connect(onPlayer)
-	for _, player in Players:GetPlayers() do
-		onPlayer(player)
 	end
 end
 

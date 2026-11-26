@@ -220,8 +220,8 @@ return {
 		covered("Back", x0 - t, x1 + t)
 		covered("Left", z0, z1)
 		covered("Right", z0, z1)
-		-- taller than the highest thing that happens in the lobby: an uppercut launch and a kick rebound
-		assert(CFG.WallHeight >= 2 * (GameConfig.KickMeter :: any).RiseMax + 100)
+		-- taller than the highest thing that happens in the lobby: an uppercut launch
+		assert(CFG.WallHeight >= 100)
 	end,
 
 	["the obby's gap in the back wall: a sill nobody on the training floor can jump, open above it"] = function()

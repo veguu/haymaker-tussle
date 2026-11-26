@@ -121,7 +121,7 @@ function HudLogic.feedLine(victim: string, attacker: string?, cause: string): st
 end
 
 --- A big entrance for a change (final two, the arena closing) only when nothing timed is on screen.
---- During a kick's timing or a clash, the change still shows, just without the emphasis.
+--- During a clash, the change still shows, just without the emphasis.
 function HudLogic.emphasize(promptActive: boolean, reducedMotion: boolean): boolean
 	return not promptActive and not reducedMotion
 end

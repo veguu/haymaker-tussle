@@ -1,7 +1,6 @@
 --!strict
 -- Spec files are required BY the runner, so this path is relative to tests/.
 local AirRecovery = require("../src/shared/Core/AirRecovery")
-local DiveKick = require("../src/shared/Core/DiveKick")
 local GameConfig = require("../src/shared/Config/GameConfig")
 local Momentum = require("../src/shared/Core/Momentum")
 
@@ -70,7 +69,7 @@ return {
 
 	["gravity eases from the top of the arc into a heavier fall, with no step"] = function()
 		assert(AIR.FallGravityScale > 1, "falling should be heavier than an ordinary rise")
-		for _, rising in { 1, KICK.AirGravityScale, KICK.MissGravityScale } do
+		for _, rising in { 1, KICK.AirGravityScale } do
 			local last = AirRecovery.gravityScale(AIR, rising, 0.001)
 			assert(near(last, rising), "still rising on the launch's own gravity")
 			for vy = 0, -AIR.FallEaseSpeed - 1, -0.25 do
@@ -249,25 +248,6 @@ return {
 		assert(pushed.knockX == 5 and pushed.knockZ == -3)
 		local hit = Momentum.applyKnock(state, MOVE, 5, -3)
 		assert(hit.propelLeft == nil, "a real hit still does")
-	end,
-
-	["the follow-up snap covers its whole range in time, under the teleport speed"] = function()
-		-- The target is held still from the moment the server accepts, so the snap only has to cover
-		-- the distance. At its top speed it must get across the furthest reach before its time runs out,
-		-- and never move so fast that the speed audit takes it for a teleport.
-		local furthest = math.max(KICK.FollowUpRange, KICK.FollowUpOwnRange)
-		assert(
-			furthest / KICK.ApproachMaxSpeed <= KICK.ApproachMaxSeconds,
-			`{furthest} studs at {KICK.ApproachMaxSpeed} can't fit in {KICK.ApproachMaxSeconds} s`
-		)
-		assert(
-			KICK.ApproachMaxSpeed < GameConfig.Security.TeleportSpeed,
-			"the snap would read as a teleport"
-		)
-		assert(
-			DiveKick.approachSeconds(KICK, furthest) <= KICK.ApproachMaxSeconds,
-			"the longest snap stays within its limit"
-		)
 	end,
 
 	["the falling lift rises like a jump, 5.5 to 8 studs, at every frame rate"] = function()
