@@ -78,12 +78,20 @@ return {
 		assert(a == MEADOW_RADIUS and b == MEADOW_RADIUS and MEADOW.StartRadius == MEADOW_RADIUS)
 	end,
 
-	["Map 1's 25 spawns sit on a circle inside the floor, facing the middle, spread out"] = function()
+	["Map 1's 25 spawns sit almost at the edge, inside the floor, facing the middle, spread out"] = function()
+		-- owner 2026-11-26: "make it so they're almost a thte edge of the arena"
 		local pts = Round.spawnPoints(MEADOW, 25, 0.3)
 		for _, p in pts do
 			local dx, dz = p.x - BASE.CenterX, p.z - BASE.CenterZ
 			local r = math.sqrt(dx * dx + dz * dz)
-			assert(math.abs(r - MEADOW_RADIUS * 0.65) < 1e-6, "on the spawn circle")
+			assert(
+				math.abs(r - MEADOW_RADIUS * 0.9) < 1e-6,
+				"on the spawn circle, 0.9 of the radius"
+			)
+			assert(
+				MEADOW_RADIUS - r >= 15 and MEADOW_RADIUS - r <= 25,
+				"almost at the edge, a dash in from the drop"
+			)
 			assert(dx * p.faceX + dz * p.faceZ < 0, "faces the middle")
 		end
 		for i = 1, #pts do

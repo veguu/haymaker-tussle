@@ -1,7 +1,8 @@
 --!strict
 -- Spec files are required BY the runner, so this path is relative to tests/.
--- The pond rules (user, 2026-11-11): basin, water and the wading slowdown. Only the old Gnomon map had a pond, and it was
--- deleted 2026-11-26, so these run on Gnomon's pond as it was, kept here as a test pond; the code stays for a future map.
+-- The pond rules (user, 2026-11-11): basin, water and the wading slowdown. The old Gnomon map's pond (Gnomon was deleted
+-- 2026-11-26) is kept here exactly; Map 1 got the same pond the same day (owner: "u could actually add the pond in the
+-- new map 1"), and its numbers must stay these, which design/maps/suite/meadow.py POND builds the basin from.
 local GameConfig = require("../src/shared/Config/GameConfig")
 local Envs = require("../src/shared/Config/MapEnvironments")
 local Round = require("../src/shared/Core/Round")
@@ -20,12 +21,44 @@ local POND: any = { -- the old Gnomon's pond, exactly
 }
 
 return {
-	["no map has a pond now (the old Gnomon was the only one), and a map's pond reaches the live arena"] = function()
+	["Map 1 has the old Gnomon pond exactly (the Blender basin is built from these numbers), no other map has one"] = function()
 		for id, entry in (Envs :: any).Maps do
-			assert(entry.pond == nil, id)
+			if id ~= "meadow" then
+				assert(entry.pond == nil, id)
+			end
 		end
-		local live: any = Round.arenaFor(GameConfig.Arena :: any, { pond = POND }, nil)
-		assert(live.Pond == POND)
+		local p: any = (Envs :: any).Maps.meadow.pond
+		assert(p, "Map 1's pond")
+		for _, k in { "x", "z", "semiX", "semiZ", "depth", "inner", "water" } do
+			assert(p[k] == POND[k], k)
+		end
+		assert(#p.wobble == #POND.wobble)
+		for i, w in POND.wobble do
+			for j = 1, 3 do
+				assert(p.wobble[i][j] == w[j], "wobble " .. i)
+			end
+		end
+	end,
+
+	["a map's pond reaches the live arena"] = function()
+		local entry: any = (Envs :: any).Maps.meadow
+		local live: any = Round.arenaFor(GameConfig.Arena :: any, entry, nil)
+		assert(live.Pond == entry.pond)
+	end,
+
+	["Map 1's pond stays clear of the spawn ring and inside the arena"] = function()
+		local entry: any = (Envs :: any).Maps.meadow
+		local p: any = entry.pond
+		local spawnR = entry.arena.semiX * entry.arena.spawnShare
+		for i = 0, 71 do
+			local a = i / 72 * 2 * math.pi
+			-- no spawn point anywhere on the ring is in or near the basin
+			assert(Pond.bedDepth(p, math.cos(a) * spawnR, math.sin(a) * spawnR) == 0)
+		end
+		assert(
+			math.max(p.semiX, p.semiZ) * 1.2 < entry.arena.semiX * 0.25,
+			"a feature, not the battlefield"
+		)
 	end,
 
 	["the basin is deepest in the middle and meets the floor at its rim"] = function()

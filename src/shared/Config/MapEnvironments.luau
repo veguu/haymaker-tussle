@@ -53,7 +53,22 @@ MapEnvironments.Default = {
 		glare = 0,
 		haze = 0.4,
 	},
-	sky = { sunAngularSize = 11 }, -- the place's own Sky textures are kept
+	-- THE SKY (owner 2026-11-26: "i dont like how the sky is splitn betwee two colors"): the place's photo sky had an
+	-- ocean under the horizon; a plain gradient instead (design/maps/suite/sky_and_shadow_images.py: deep blue overhead,
+	-- pale at the horizon, the same pale haze below it), so the horizon never splits. On every map.
+	sky = {
+		sunAngularSize = 11,
+		textures = {
+			side = "rbxassetid://97101757266736",
+			up = "rbxassetid://117323388355592",
+			down = "rbxassetid://130411038001935",
+		},
+	},
+	-- THE DISTANCE BLUR (owner 2026-11-26: "some sort of blur in the distance so it makes the isaldns from far out hard
+	-- to see, this should apply to everything"): sharp to `inFocusRadius` studs from the camera (the arena), softening
+	-- past it (the islands). Off on phones (phone = false): a full-screen blur costs them most; the haze still softens
+	-- the islands there.
+	blur = { farIntensity = 0.4, focusDistance = 0, inFocusRadius = 220, phone = false },
 	-- One wind per map: grass sways with it (gusts roll across the meadow along it), clouds sway along it,
 	-- leaves drift with it, and Workspace.GlobalWind is set from it (particles, terrain decoration).
 	wind = {
@@ -387,7 +402,8 @@ MapEnvironments.Maps = {
 }
 
 -- MAP 1 OF THE ARENA SUITE, "Grassy Plains" (owner brief 2026-11-20; design/maps/suite/meadow.py): Gnomon revamped.
--- A CIRCLE of radius 180 since 2026-11-22 (owner: "more circle than oval"; his size), clean (no pond, no obstacles),
+-- A CIRCLE of radius 180 since 2026-11-22 (owner: "more circle than oval"; his size), no obstacles, and since 2026-11-26
+-- the old Gnomon pond in its middle (`pond` below),
 -- floating in open sky with floating islands for a background. The ONLY map in the rotation since 2026-11-26 (owner: "Only Map 1",
 -- until the other maps are rebuilt); until its model is at ServerStorage.HT_Maps.Meadow a stand-in floor is built.
 -- Gnomon's light, but clearer air: the fresh review (2026-11-22) found the game milky and the floor pale next to the
@@ -612,16 +628,41 @@ local meadowEnvironment = {
 	},
 	standIn = { floor = { 110, 168, 92 }, ring = { 240, 236, 214 } },
 }
-meadowEnvironment.exposure = -0.1
+-- SUNNY (owner 2026-11-26: "change lighting to make it more like idk, sunny or smth"): a higher, brighter, warm midday
+-- sun with crisper shadows, warmer lighter shade, a little more colour; and a hazier distance with the blur (the far
+-- islands "hard to see"), the haze the sky's own pale horizon colour so the horizon line disappears. Tuned live in a
+-- play test from a fighter's eye (2026-11-26, life-2).
+-- LESS PLASTIC (owner 2026-11-26: "it kinda has that plastic vibe ... yes i want it to be sunny but add some realism";
+-- he picked B, life-4): a stronger sun against a lower, cooler shade, no specular sheen on the smooth floor, calmer
+-- colour and less glow. The ground's realism itself is the painted map under the studs (HT_GroundMap, HT_GrassGrain),
+-- which draws the same at the lowest quality; this light only adds to it where the quality allows.
+meadowEnvironment.sun =
+	{ clockTime = 13.2, latitude = 50, colour = { 255, 238, 208 }, brightness = 3.1 }
+meadowEnvironment.ambient = {
+	ambient = { 96, 104, 124 },
+	outdoor = { 118, 128, 152 },
+	bottom = { 26, 34, 20 },
+	shadowSoftness = 0.12,
+	diffuse = 0.9,
+	specular = 0,
+}
+meadowEnvironment.exposure = -0.05
 meadowEnvironment.grade =
-	{ saturation = 0.06, contrast = 0.18, brightness = 0, tint = { 255, 252, 246 } }
+	{ saturation = -0.04, contrast = 0.14, brightness = 0, tint = { 255, 248, 236 } }
+meadowEnvironment.bloom = { intensity = 0.2, size = 28, threshold = 1.6 }
+meadowEnvironment.sunRays = { intensity = 0.05, spread = 0.15 }
+-- (offset 0.35, not more: with the pale gradient sky a high offset pulls the far islands into the sky's colour and the
+-- windmill, which he wants seen turning, went ghostly; measured from a fighter's eye 2026-11-26)
+-- (haze 0: at the LOWEST graphics quality the Atmosphere's haze paints a blue band under the horizon, the split he
+-- disliked, MEASURED 2026-11-26 at quality 1; the gradient sky blends the horizon by itself, and density still hazes
+-- the far islands at every quality)
 meadowEnvironment.atmosphere = {
-	density = 0.2,
-	offset = 0.15,
-	colour = { 196, 222, 250 },
-	decay = { 132, 174, 230 },
-	glare = 0.05,
-	haze = 0.5,
+	density = 0.28,
+	offset = 0.35,
+	colour = { 196, 225, 251 },
+	decay = { 150, 196, 246 },
+	glare = 0,
+	haze = 0,
 }
 MapEnvironments.Maps.meadow = {
 	name = "Grassy Plains",
@@ -634,21 +675,40 @@ MapEnvironments.Maps.meadow = {
 	arena = {
 		semiX = 180,
 		semiZ = 180,
-		spawnShare = 0.65,
+		-- the spawns ALMOST AT THE EDGE (owner 2026-11-26: "make it so they're almost a thte edge of the arena"): a ring
+		-- at 0.9 of the radius, 162 studs out, 18 studs (about a dash) in from the drop, every fighter facing the middle
+		spawnShare = 0.9,
+	},
+	-- THE POND (owner 2026-11-26, his idea; the lily pond look picked from a sheet): the old Gnomon map's wading pond,
+	-- the same shape, in the middle of the circle (Core/Pond: wading in it slows you by GameConfig.Pond). The numbers
+	-- are design/maps/suite/meadow.py POND's in Roblox axes (z = -Blender y); the basin, the water, the lily pads and
+	-- the reeds are in the map's model (Map_Meadow_Floor_Pond*, Map_Meadow_Pond_*), the bowl's collider in HT_Collision.
+	pond = {
+		x = 0,
+		z = 0,
+		semiX = 24,
+		semiZ = 18,
+		wobble = { { 3, 0.08, 0.6 }, { 5, 0.05, 2.1 } },
+		depth = 1.6,
+		inner = 0.68,
+		water = 0.55,
 	},
 	environment = meadowEnvironment,
 	-- Shared/MapExtras: the windmill's sails turn about their hub (arena-local; design/maps/out/suite/meadow_r3/
-	-- landmarks.json; the axis points at the arena), slowly
+	-- landmarks.json; the axis points at the arena), at 9 turns a minute: noticeably moving from the arena (owner
+	-- 2026-11-26: "it should be notiacble that its moving tho, dont make it slow"; it was 3; MapMotion allows up to 12)
 	spinners = {
 		{
 			parts = { "Map_Meadow_WindmillSails_Timber_N", "Map_Meadow_WindmillSails_Cream_N" },
 			hub = { -375.39, 292.69, -797.7 }, -- the 1.7x mill on its lifted island (meadow.py, out/suite/meadow_r3)
 			axis = { 0.4258, 0, 0.9048 },
-			rpm = 3,
+			rpm = 9,
 		},
 	},
 	-- the phone path: far islands and small far detail come out of a phone's copy of the map, and so does the floor
-	-- flowers' B layer (meadow.py floor_flowers: phones keep layer A, 40% of the flowers)
+	-- flowers' B layer (meadow.py floor_flowers: phones keep layer A, 40% of the flowers), and the grass grain under
+	-- the studs (life-4: a second see-through layer over most of the screen, about 0.35 ms of GPU on a PC at quality
+	-- 10, measured 2026-11-26; phones keep the painted ground map, which carries the look)
 	phoneHide = {
 		"_FarN",
 		"_FarNE",
@@ -658,6 +718,106 @@ MapEnvironments.Maps.meadow = {
 		"_Hedges_",
 		"_FarHouse_",
 		"_FloorFlowers_B_",
+		"HT_GrassGrain",
+	},
+	-- FULL OF LIFE (owner 2026-11-26, his picks from a list; every model and motion checked by him in the Blender
+	-- preview, design/maps/suite/meadow_life.py): the pieces are in the map's model under HT_Life (Studio:
+	-- design/maps/suite/studio_life.py from the game build meadow_life_game.py), moved on each client by
+	-- Shared/MapLife with Core/MapLife's rules. Cosmetic only: nothing collides, is hit or is sent anywhere.
+	-- PHONES: `phone` = how many are kept; the vines and roots under the rim are left out (rimOnPhones).
+	life = {
+		near = 260, -- studs from the camera: past this the floor's creatures and the vines freeze
+		far = 1600, -- studs: past this the birds and the animals freeze
+		-- "you'll NEVER be able to hit the butterfly, if u dash towards a butterfly they'll move out the way while
+		-- making their wings flap faster": a fighter within `reach` coming AT one at `speed` or more (a dash, a charge),
+		-- or anyone closer than `close`, makes it dart `dart` studs aside and `rise` up, wings 4 -> 12 beats a second;
+		-- `lead`: a fighter coming at it is seen that much sooner (a 60-stud dash is within 8 studs for ~0.13 s).
+		-- `see`: farther from the camera than this it stands still (a 1-stud butterfly, a 0.3-stud bee: too small)
+		-- MORE (owner 2026-11-26, life-5: "subtle yes, but at least noticeable"), then FEWER AND FLYING (life-6: "you
+		-- kinda overdid it with the butterflies, also they should smoothly move out the way. not instantly teleport. they
+		-- also like fly around, not just fly in cricles in one spot"): the model's 14 plus copies made on each client up
+		-- to `count` (Core.extraHomes: a companion beside each in turn); `scale` 1.4 = a 1.4-stud wingspan. Each FLIES
+		-- from stop to stop up to `wander.range` studs round its home (and `lift` up), at most `speed` studs a second,
+		-- lingering `linger` seconds at each; a dodge is a quicker glide (`flee`: `quick`, `speed`, for `time` s) to a
+		-- point `dart` aside and `rise` up, so it starts and stops smoothly, never jumps. `flutter`: the little loop laid
+		-- on the flight. `lead` 0.25: seen sooner, so the smooth swerve is ~3 studs aside by the time a dash arrives.
+		butterflies = {
+			calm = 4,
+			fast = 12,
+			reach = 8,
+			close = 2.5,
+			speed = 18,
+			lead = 0.25,
+			dart = 4.2,
+			rise = 2,
+			phone = 8,
+			see = 80, -- (120 before life-5: past 80 studs a 1.4-stud butterfly is a 10-pixel dot)
+			count = 24,
+			scale = 1.4,
+			flutter = 0.3,
+			wander = {
+				range = 28,
+				lift = 2.5,
+				speed = 5,
+				quick = 1.2,
+				linger = { 0.6, 2.5 },
+				edge = 165,
+			},
+			flee = { quick = 7, speed = 14, time = 0.9 },
+			spread = { pair = { 3, 6 }, ring = { 35, 160 }, apart = 14, lift = 1.2 },
+		},
+		bees = { phone = 3, see = 60 },
+		-- birds (the preview's loops, arena-local): two gull flocks round the north and east islands, swallows under
+		-- the rim; a lap every 20 s
+		flocks = {
+			{
+				kind = "Gull",
+				centre = { -150, 70, -420 },
+				radii = { 170, 110 },
+				dir = 1,
+				period = 20,
+				count = 6,
+				spread = 14,
+				flap = 3,
+				amp = 0.55,
+			},
+			{
+				kind = "Gull",
+				centre = { 420, 55, -120 },
+				radii = { 150, 120 },
+				dir = -1,
+				period = 20,
+				count = 5,
+				spread = 14,
+				flap = 3,
+				amp = 0.55,
+				phone = false,
+			},
+			{
+				kind = "Swallow",
+				centre = { 0, -24, 0 },
+				radii = { 198, 198 },
+				dir = 1,
+				period = 20,
+				count = 6,
+				spread = 5.6,
+				flap = 5,
+				amp = 0.7,
+				phone = false,
+			},
+		},
+		balloons = { loop = 120, speed = 2.5 }, -- studs across their slow loop, studs a second
+		rimOnPhones = false,
+		rimSee = 150, -- studs: the vines and roots sway only this near the camera (at the arena's edge, looking over)
+		-- "dandelion puffs that burst when run through": within `reach` at `least` studs a second; back after `regrow` s
+		dandelions = { reach = 1.2, least = 2, regrow = 25, grow = 2, seeds = 8 },
+		splashes = { moving = 0.4, standing = 0.9, drops = 4, above = 4.5 }, -- seconds apart; `above`: root height wading
+		petals = { every = 4, count = 28, phone = 10 }, -- a gust every 4 s (the wind's gustSeconds)
+		-- NO CLOUD SHADOWS (owner 2026-11-26, after two tries: "remove the shadow shade i dont like it ... it kinda just
+		-- makes like the map isn't fully rendered"): no `shadows` entry, so MapLife hides any HT_CloudShadow it finds
+		-- and slides nothing. The ground's light and dark now come from the painted ground map (still, under the studs).
+		-- A map that wants them back gives `shadows = { tile, speed, transparency }` (Core/MapLife.problems checks it).
+		smoke = { phone = 10, phoneRate = 1.2 }, -- chimneys a phone keeps (the nearest), and their puffs a second
 	},
 	-- THE FLOOR (owner 2026-11-22, the stud style): one flat green with dirt patches and small stud flowers, all in
 	-- the map's own meshes (Map_Meadow_Floor_*, Map_Meadow_FloorFlowers_*), the studs a Texture on the floor

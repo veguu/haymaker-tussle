@@ -4,8 +4,8 @@
 -- drifting cartoon clouds, the falling leaves, and the slow bob of a map's floating scenery. Used by EnvironmentController at runtime and by the Edit-mode preview.
 --
 -- ONE OWNER: this is the only thing that writes Lighting. It adopts the first Sky / Atmosphere / Bloom /
--- ColorCorrection / SunRays it finds in Lighting (creating HT_* ones if missing) and switches off any extra
--- copies of the post effects, so two systems never fight over the look.
+-- ColorCorrection / SunRays / DepthOfField it finds in Lighting (creating HT_* ones if missing) and switches off any
+-- extra copies of the post effects, so two systems never fight over the look.
 --
 -- A Scene is everything one map adds to the world. It's built unparented (so an incoming map's sky can be
 -- made while the screen is still covered), shown in one step, moved by `step(t)` from the shared server
@@ -18,6 +18,7 @@
 -- Run endPreview before saving: the preview is for looking, not for keeping in the place.
 
 local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Environment = require(script.Parent.Core.Environment)
@@ -40,6 +41,7 @@ local OWNED = {
 	{ class = "BloomEffect", name = "HT_Bloom", effect = true },
 	{ class = "ColorCorrectionEffect", name = "HT_Grade", effect = true },
 	{ class = "SunRaysEffect", name = "HT_SunRays", effect = true },
+	{ class = "DepthOfFieldEffect", name = "HT_DistanceBlur", effect = true },
 }
 
 local LIGHTING_PROPS = {
@@ -57,11 +59,26 @@ local LIGHTING_PROPS = {
 	"GlobalShadows",
 }
 local CHILD_PROPS: { [string]: { string } } = {
-	Sky = { "SunAngularSize" },
+	Sky = {
+		"SunAngularSize",
+		"SkyboxBk",
+		"SkyboxDn",
+		"SkyboxFt",
+		"SkyboxLf",
+		"SkyboxRt",
+		"SkyboxUp",
+	},
 	Atmosphere = { "Density", "Offset", "Color", "Decay", "Glare", "Haze" },
 	BloomEffect = { "Enabled", "Intensity", "Size", "Threshold" },
 	ColorCorrectionEffect = { "Enabled", "Brightness", "Contrast", "Saturation", "TintColor" },
 	SunRaysEffect = { "Enabled", "Intensity", "Spread" },
+	DepthOfFieldEffect = {
+		"Enabled",
+		"FarIntensity",
+		"NearIntensity",
+		"FocusDistance",
+		"InFocusRadius",
+	},
 }
 
 -- The first child of a class (adopted), or a new HT_ one; extra post effects of that class are switched off.
@@ -108,6 +125,13 @@ function EnvironmentKit.applyLighting(p: any, created: { Instance }?)
 
 	local sky = own(OWNED[1], created) :: Sky
 	sky.SunAngularSize = p.sky.sunAngularSize
+	-- the sky's own pictures (a preset's sky.textures: side, up, down); none keeps the place's
+	local tex = p.sky.textures
+	if tex then
+		sky.SkyboxBk, sky.SkyboxFt, sky.SkyboxLf, sky.SkyboxRt =
+			tex.side, tex.side, tex.side, tex.side
+		sky.SkyboxUp, sky.SkyboxDn = tex.up, tex.down
+	end
 	local atmo = own(OWNED[2], created) :: Atmosphere
 	atmo.Density = p.atmosphere.density
 	atmo.Offset = p.atmosphere.offset
@@ -130,6 +154,19 @@ function EnvironmentKit.applyLighting(p: any, created: { Instance }?)
 	rays.Enabled = p.sunRays.intensity > 0
 	rays.Intensity = p.sunRays.intensity
 	rays.Spread = p.sunRays.spread
+	-- the distance blur (owner 2026-11-26: "some sort of blur in the distance so it makes the isaldns from far out
+	-- hard to see, this should apply to everything"): sharp out to `inFocusRadius` studs from the camera, softening
+	-- past it; off on phones when the preset says so (the atmosphere's haze still softens the far islands there)
+	local blur = own(OWNED[6], created) :: DepthOfFieldEffect
+	local b = p.blur
+	local phone = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	blur.Enabled = b ~= nil and b.farIntensity > 0 and not (phone and b.phone == false)
+	if b then
+		blur.FarIntensity = b.farIntensity
+		blur.NearIntensity = 0
+		blur.FocusDistance = b.focusDistance or 0
+		blur.InFocusRadius = b.inFocusRadius
+	end
 end
 
 --- Everything applyLighting can change, recorded so `restore()` puts it back (the Edit preview uses it).

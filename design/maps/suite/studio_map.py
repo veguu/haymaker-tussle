@@ -211,6 +211,8 @@ report.floorFlat = flatCount
     name = man["map"]
     centres = ",".join(f'["{k}"]={{{num(v["x"])},{num(v["y"])},{num(v["z"])}}}' for k, v in man["meshes"].items())
     poly = ",".join(f"{{{num(x)},{num(z)}}}" for x, z in col["floor"]["poly"])
+    # a floor given as triangles (Map 1 with its pond: the ring of floor round it and the bowl; arena-local x, height, z)
+    tris = ",".join("{" + ",".join(num(float(c)) for v in t for c in v) + "}" for t in col["floor"].get("tris", []))
     rows = ",".join(
         f'{{"{p["asset"]}",{num(p["x"])},{num(p["y"])},{num(p["z"])},{num(p["yaw"])},{num(p["scale"])}}}' for p in place
     )
@@ -258,6 +260,7 @@ local CENTER = Vector3.new(3000, 100, 0)
 local NAME = "{name}"
 local C = {{{centres}}}
 local POLY = {{{poly}}}
+local TRIS = {{{tris}}}
 local TOP, THICK = {num(float(col["floor"]["top"]))}, {num(float(col["floor"]["thick"]))}
 local P = {{{rows}}}
 local IMPORTS = {{{imports}}}
@@ -316,7 +319,10 @@ local function triangle(parent, a, b, c)
 	local up = bc:Cross(right).Unit
 	local back = bc.Unit
 	local height = math.abs(ab:Dot(up))
-	local down = Vector3.new(0, -THICK / 2, 0)
+	-- down along the triangle's own normal, so a SLOPED triangle's top lies on it too (Map 1's pond bowl, 2026-11-26);
+	-- for a flat one this is straight down, as it always was
+	local nUp = if right.Y >= 0 then right else -right
+	local down = -nUp * THICK / 2
 	local w1 = wedge(parent)
 	w1.Size = Vector3.new(THICK, height, math.abs(ab:Dot(back)))
 	w1.CFrame = CFrame.fromMatrix((a + b) / 2 + down, right, up, back)
@@ -366,9 +372,15 @@ task.wait()
 -- the floor's collider
 local hit = Instance.new("Folder"); hit.Name = "HT_Collision"
 local c0 = CENTER + Vector3.new(0, TOP, 0)
-for i = 1, #POLY do
-	local p, q = POLY[i], POLY[i % #POLY + 1]
-	triangle(hit, c0, CENTER + Vector3.new(p[1], TOP, p[2]), CENTER + Vector3.new(q[1], TOP, q[2]))
+if #TRIS > 0 then
+	for _, t in TRIS do
+		triangle(hit, CENTER + Vector3.new(t[1], t[2], t[3]), CENTER + Vector3.new(t[4], t[5], t[6]), CENTER + Vector3.new(t[7], t[8], t[9]))
+	end
+else
+	for i = 1, #POLY do
+		local p, q = POLY[i], POLY[i % #POLY + 1]
+		triangle(hit, c0, CENTER + Vector3.new(p[1], TOP, p[2]), CENTER + Vector3.new(q[1], TOP, q[2]))
+	end
 end
 hit.Parent = model
 -- the kit's pieces

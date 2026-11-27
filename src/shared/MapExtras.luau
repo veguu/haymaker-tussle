@@ -3,14 +3,17 @@
 --   * spinners: parts moved about a hub, by Core/MapMotion: spin (Map 1's windmill sails, owner 2026-11-20:
 --     "everything should feel like the wind is blowing on it"), swing (Map 2's derrick boom), bob (Map 3's kite).
 --     One BulkMoveTo a frame for all of them; a few parts per map (about 5 microseconds a part, measured).
---   * phoneHide: on phones (touch, no keyboard) the map's parts whose names contain any of these (plain substrings:
---     `_FarN` also takes `_FarNE`) are taken out of
+--   * phoneHide: on phones (touch, no keyboard) the map's parts, Textures and Decals whose names contain any of these
+--     (plain substrings: `_FarN` also takes `_FarNE`) are taken out of
 --     this client's copy (never replicated back), so far detail costs nothing there (the phone path).
+--   * life: the map's small life (butterflies, bees, birds, balloons, animals, vines, dandelions, splashes, cloud
+--     shadows, petals; Map 1 since 2026-11-26), Shared/MapLife, stepped here in the same frame.
 -- Reduced Motion: movers run at a third of the speed. Missing parts are skipped; nothing errors.
 
 local GuiService = game:GetService("GuiService")
 local UserInputService = game:GetService("UserInputService")
 
+local MapLife = require(script.Parent.MapLife)
 local MapMotion = require(script.Parent.Core.MapMotion)
 
 local MapExtras = {}
@@ -30,14 +33,21 @@ type Spinner = {
 
 --- Extras for `model` (the live map, pivoted on the arena's centre) from its entry, or nil when it has none.
 function MapExtras.new(model: Instance?, entry: any): Extras?
-	if not (model and model:IsA("Model") and entry and (entry.spinners or entry.phoneHide)) then
+	if
+		not (
+			model
+			and model:IsA("Model")
+			and entry
+			and (entry.spinners or entry.phoneHide or entry.life)
+		)
+	then
 		return nil
 	end
 	local centre = (model :: Model):GetPivot().Position
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	if touch and entry.phoneHide then
 		for _, d in model:GetDescendants() do
-			if d:IsA("BasePart") then
+			if d:IsA("BasePart") or d:IsA("Decal") then -- (a Texture is a Decal)
 				for _, key in entry.phoneHide do
 					if string.find(d.Name, key, 1, true) then
 						d.Parent = nil
@@ -70,12 +80,16 @@ function MapExtras.new(model: Instance?, entry: any): Extras?
 			})
 		end
 	end
+	local life = if entry.life then MapLife.new(model :: Model, entry, touch) else nil
 	local moveParts: { BasePart } = {}
 	local clock, last = 0, nil :: number?
 	local moveFrames: { CFrame } = {}
 	local self = {} :: any
 
 	function self.step(_self: Extras, t: number)
+		if life then
+			life:step(t)
+		end
 		if #spinners == 0 then
 			return
 		end
@@ -98,6 +112,10 @@ function MapExtras.new(model: Instance?, entry: any): Extras?
 	end
 
 	function self.destroy(_self: Extras)
+		if life then
+			life:destroy()
+			life = nil
+		end
 		for _, s in spinners do
 			for i, p in s.parts do
 				if p.Parent then

@@ -16,6 +16,8 @@ small village". My reading: grass everywhere, not a stone stadium.
   - The village: a hamlet on its island 1,150 studs out, high enough to show over the far rim from the middle of
     the arena and from the lobby: thatched cottages round a green, a slate-roofed barn, a windmill on a
     knoll (its sails a separate mesh, so the game can turn them). Built here, not taken from the lobby.
+  - The POND (owner 2026-11-26): the old Gnomon pond in the middle of the circle, lily pond look with tall reeds
+    (POND below); `--no-pond` builds without it.
 """
 import os
 import sys
@@ -88,6 +90,68 @@ FLOOR_STUDS = {"image": "design/maps/suite/patterns/stud_overlay.png", "tile": 4
 GRASS_GAME = (96, 148, 89)
 DIRT_GAME = (141, 114, 92)
 
+# --- THE POND (owner 2026-11-26: "u could actually add the pond in the new map 1"; he picked C "Lily pond" from
+# out/suite/pond_options/pond_sheet.png, then "make the plants next to the pond look tall"). The old Gnomon pond's shape
+# EXACTLY, in the middle of the circle where the floor is worn: Core/Pond's formula, and MapEnvironments
+# Maps.meadow.pond holds the same numbers in Roblox axes (z = -Blender y; tests/Pond.spec.luau checks them). An
+# irregular oval 24 x 18, a smooth bowl 1.6 deep, the water 0.55 under the floor: at most about a stud of water. The
+# hole in the floor is cut on the dirt's 2-stud grid (a cell is basin when its centre is inside the rim); a sand shore
+# and the bed are floor meshes (flat colours, studded in Studio), then the water, block lily pads and pebbles, and TALL
+# reeds (3 to 6 studs) at the water's edge. Only the bowl's own collider collides (collision.json floor "tris").
+# `--no-pond` builds Map 1 as it was.
+POND_ON = "--no-pond" not in sys.argv
+POND = dict(x=0.0, y=0.0, semiX=24.0, semiY=18.0, wobble=[(3, 0.08, 0.6), (5, 0.05, 2.1)], depth=1.6, inner=0.68, water=0.55)
+POND_SAND = (226, 200, 146)  # the shore, as on the approved sheet
+POND_WET = (150, 132, 96)  # the bed under the water
+POND_WATER = (64, 166, 186)
+POND_WATER_CLEAR = 0.2  # the water's Transparency in the game (0.8 opaque on the sheet)
+# the game's colours: first guesses from the floor's own retune (the game's light lifts colours), measured and
+# retuned in a play test like the floor (part Color and Transparency: no upload)
+POND_SAND_GAME = (190, 170, 128)
+POND_WET_GAME = (126, 112, 88)
+POND_WATER_GAME = (56, 140, 160)
+
+
+def _pond_ss(e0, e1, x):
+    t = np.clip((np.asarray(x, float) - e0) / (e1 - e0), 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def pond_rho(x, y):
+    """Core/Pond.rho in Blender's x, y (floats or numpy arrays): 1 on the bank's rim."""
+    u = (np.asarray(x, float) - POND["x"]) / POND["semiX"]
+    v = (np.asarray(y, float) - POND["y"]) / POND["semiY"]
+    th = np.arctan2(v, u)
+    wob = 1.0 + sum(a * np.sin(k * th + ph) for k, a, ph in POND["wobble"])
+    return np.hypot(u, v) / wob
+
+
+def pond_bed(x, y):
+    """How far under the floor the pond's bed is here (Core/Pond.bedDepth)."""
+    return POND["depth"] * _pond_ss(1.0, POND["inner"], pond_rho(x, y))
+
+
+def pond_outline(r, n):
+    """n points round the pond at oval radius r (1 = the rim), Blender x, y."""
+    pts = []
+    for k in range(n):
+        th = k / n * math.tau
+        wob = 1.0 + sum(a * math.sin(kk * th + ph) for kk, a, ph in POND["wobble"])
+        pts.append((POND["x"] + math.cos(th) * POND["semiX"] * r * wob, POND["y"] + math.sin(th) * POND["semiY"] * r * wob))
+    return pts
+
+
+def pond_water_rho():
+    """The oval radius where the bed meets the water's surface."""
+    lo, hi = POND["inner"], 1.0
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        if float(POND["depth"] * _pond_ss(1.0, POND["inner"], mid)) > POND["water"]:
+            lo = mid
+        else:
+            hi = mid
+    return lo
+
 
 # --- the fighting surface ----------------------------------------------------------------------------------------
 def _dirt_mask():
@@ -118,6 +182,27 @@ def _dirt_mask():
 
 
 DIRT_N, DIRT_MASK, DIRT_X, DIRT_Y, DIRT_RAD = _dirt_mask()
+# the pond's cells, and the dirt the floor shows round it. DIRT_MASK itself stays as it was: the flowers' draws read it,
+# so the approved layout is the same everywhere but at the pond
+POND_MASK = (pond_rho(DIRT_X, DIRT_Y) < 1.0) if POND_ON else np.zeros_like(DIRT_MASK)
+FLOOR_DIRT = DIRT_MASK & ~POND_MASK
+for _ in range(64):  # no two holes in the green meeting only at a corner: a pinched corner's empty cells become dirt
+    _hole = FLOOR_DIRT | POND_MASK
+    _a, _b, _c, _d = _hole[:-1, :-1], _hole[1:, :-1], _hole[:-1, 1:], _hole[1:, 1:]
+    _pinch = (_a & _d & ~_b & ~_c) | (_b & _c & ~_a & ~_d)
+    if not _pinch.any():
+        break
+    for _sl in ((slice(None, -1), slice(None, -1)), (slice(1, None), slice(None, -1)), (slice(None, -1), slice(1, None)), (slice(1, None), slice(1, None))):
+        FLOOR_DIRT[_sl] |= _pinch
+    FLOOR_DIRT &= ~POND_MASK
+else:
+    raise SystemExit("the floor round the pond still has holes meeting at a corner after 64 passes")
+
+
+def on_floor_dirt(x, y):
+    """Is this point (Blender x, y) on a dirt cell of the floor as built (with the pond)?"""
+    i, j = int(math.floor(x / CELL)) + DIRT_N, int(math.floor(y / CELL)) + DIRT_N
+    return 0 <= i < 2 * DIRT_N and 0 <= j < 2 * DIRT_N and bool(FLOOR_DIRT[i, j])
 
 
 def on_dirt(x, y):
@@ -144,18 +229,26 @@ def surface():
     and the green everywhere else out to the lip. No texture and no UVs: each is one flat colour set in Studio (so the
     owner can retune a colour without an upload), with the stud Texture over it."""
     # the dirt: its cells merged into as few flat faces as its outline allows
-    dm = bmesh.new()
-    for i, j in zip(*np.nonzero(DIRT_MASK)):
-        x0, y0 = float((i - DIRT_N) * CELL), float((j - DIRT_N) * CELL)
-        dm.faces.new([dm.verts.new((x0 + dx, y0 + dy, 0.0)) for dx, dy in ((0, 0), (CELL, 0), (CELL, CELL), (0, CELL))])
-    bmesh.ops.remove_doubles(dm, verts=dm.verts[:], dist=0.001)
-    bmesh.ops.dissolve_limit(dm, angle_limit=0.01, verts=dm.verts[:], edges=dm.edges[:])
-    dm.normal_update()
-    outline = [(e.verts[0].co.copy(), e.verts[1].co.copy()) for e in dm.edges if len(e.link_faces) == 1]
+    def cells_mesh(mask):
+        bm = bmesh.new()
+        for i, j in zip(*np.nonzero(mask)):
+            x0, y0 = float((i - DIRT_N) * CELL), float((j - DIRT_N) * CELL)
+            bm.faces.new([bm.verts.new((x0 + dx, y0 + dy, 0.0)) for dx, dy in ((0, 0), (CELL, 0), (CELL, CELL), (0, CELL))])
+        bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=0.001)
+        bmesh.ops.dissolve_limit(bm, angle_limit=0.01, verts=bm.verts[:], edges=bm.edges[:])
+        bm.normal_update()
+        return bm
+
+    dm = cells_mesh(FLOOR_DIRT)
+    # the green's holes: the dirt and the pond's basin together (the pond's own meshes fill its cells: pond())
+    hm = cells_mesh(FLOOR_DIRT | POND_MASK)
+    outline = [(e.verts[0].co.copy(), e.verts[1].co.copy()) for e in hm.edges if len(e.link_faces) == 1]
+    hm.free()
     bmesh.ops.triangulate(dm, faces=dm.faces[:])
     dm.normal_update()
     dirt_area, dirt_down = _area_up(dm)
-    cells = int(DIRT_MASK.sum())
+    cells = int(FLOOR_DIRT.sum())
+    pond_area = float(POND_MASK.sum()) * CELL * CELL
     assert dirt_down < 1e-6 and abs(dirt_area - cells * CELL * CELL) < 0.5, ("dirt mesh", dirt_area, dirt_down, cells)
     # the green: the whole circle, FLOOR_OUT past the edge (out to the lip's roll), with the dirt's outline cut out
     # of it: the very same corner points, so the two meshes meet without a crack
@@ -183,13 +276,14 @@ def surface():
     gm.normal_update()
     grass_area, grass_down = _area_up(gm)
     disc = 0.5 * n * r * r * math.sin(math.tau / n)
-    assert grass_down < 1e-6 and abs(grass_area + dirt_area - disc) < 1.0, ("floor does not add up", grass_area, dirt_area, disc)
+    assert grass_down < 1e-6 and abs(grass_area + dirt_area + pond_area - disc) < 1.0, ("floor does not add up", grass_area, dirt_area, pond_area, disc)
     for part, bm, rgb in (("Grass", gm, GRASS), ("Dirt", dm, DIRT)):
         obj = make(f"Map_{NAME}_Floor", part, "turf", bm, "Map")
         obj.data.materials.append(flat_material(f"Map_{NAME}_Floor_{part}_Flat", rgb))
         PAINTED.append(obj)  # no baked paint: a flat colour
         print(f"FLOOR {obj.name}: {len(obj.data.polygons)} triangles", flush=True)
-    print(f"FLOOR radius {RADIUS}: dirt {cells} cells, {dirt_area / disc:.1%} of the floor", flush=True)
+    print(f"FLOOR radius {RADIUS}: dirt {cells} cells, {dirt_area / disc:.1%} of the floor; pond {int(POND_MASK.sum())} cells "
+          f"(dirt as drawn {int(DIRT_MASK.sum())})", flush=True)
     DATA["floor"] = {"colour": list(GRASS_GAME), "material": "Grass"}  # the collider's (what footsteps and dust read)
     DATA["floor_studs"] = dict(FLOOR_STUDS, colours={f"Map_{NAME}_Floor_Grass": list(GRASS_GAME), f"Map_{NAME}_Floor_Dirt": list(DIRT_GAME)})
 
@@ -220,7 +314,21 @@ def edge():
     n = 96
     top = [core.verts.new(W(*oval(i / n * math.tau, 2.0)[:2], -0.3)) for i in range(n)]
     bot = [core.verts.new(W(*oval(i / n * math.tau, 26.0)[:2], -36.0)) for i in range(n)]
-    core.faces.new(top)
+    if POND_ON:
+        # the core's top is 0.3 under the floor: under the pond it would fill the basin (found on the pond sheet,
+        # 2026-11-26), so it has a pit there, rim at the pond's bank, floor below the bed; it stays a closed mesh
+        ring = pond_outline(1.0, 48)
+        hi = [core.verts.new((x, y, -0.3)) for x, y in ring]
+        lo = [core.verts.new((x, y, -POND["depth"] - 0.4)) for x, y in ring]
+        rim = [core.edges.new((top[i], top[(i + 1) % n])) for i in range(n)]
+        rim += [core.edges.new((hi[k], hi[(k + 1) % len(hi)])) for k in range(len(hi))]
+        bmesh.ops.triangle_fill(core, use_beauty=True, use_dissolve=False, edges=rim, normal=(0.0, 0.0, 1.0))
+        for k in range(len(hi)):
+            m = (k + 1) % len(hi)
+            core.faces.new((hi[k], hi[m], lo[m], lo[k]))
+        core.faces.new(lo)
+    else:
+        core.faces.new(top)
     core.faces.new(list(reversed(bot)))
     for i in range(n):
         j = (i + 1) % n
@@ -345,6 +453,244 @@ def crag():
             core.faces.new((a[i], b[i], b[j], a[j]))
     bmesh.ops.recalc_face_normals(core, faces=core.faces[:])
     add("Core", "Stone", "stone_rock", core)
+
+
+# --- THE POND's pieces (POND at the top; the look is pond_options.py's C, the same draws, so the same layout) ---------
+# the lily pads', pebbles' and reeds' palette: one image (one draw a mesh), a 64 px cell per colour; the first two rows
+# print one stud in the cell's middle (on a squarish block face, as the flowers do), the last two are plain (long faces:
+# a stud stretched up a 5-stud stalk would read as a smear)
+POND_DECO = [(86, 172, 80), (124, 198, 98), (255, 150, 190), (255, 206, 60),  # pad, pad lit, bloom, yolk
+             (70, 150, 74), (96, 172, 84), (58, 128, 66), (122, 84, 60),  # reeds (three greens), cattail
+             (150, 156, 176), (184, 188, 200), (128, 134, 156)]  # pebbles
+POND_WADE = (5.0, 3.0)  # the review's wading fighter (the pads keep clear of it, as on the sheet)
+POND_RIM = []  # the bank's rim for the collider, arena-local Roblox (x, height, z)
+POND_TRIS = []  # the bowl's collider triangles, the same axes
+
+
+def _pond_palette(path):
+    f = _stud_factor(32)
+    img = np.zeros((256, 512, 3))
+    for k, rgb in enumerate(POND_DECO):
+        for cell, studded in ((k, True), (16 + k, False)):
+            cx, cy = cell % 8, cell // 8
+            c = np.broadcast_to(P.rgb(*rgb), (64, 64, 3)).copy()
+            if studded:
+                c[16:48, 16:48] = c[16:48, 16:48] * f[..., None]
+            img[cy * 64 : cy * 64 + 64, cx * 64 : cx * 64 + 64] = c
+    P.save_png(path, np.clip(img, 0, 1))
+
+
+def pond():
+    if not POND_ON:
+        return
+    basin = {(int(i) - DIRT_N, int(j) - DIRT_N) for i, j in zip(*np.nonzero(POND_MASK))}
+    wet = {c for c in basin if float(pond_bed(c[0] * CELL + CELL / 2, c[1] * CELL + CELL / 2)) > POND["water"]}
+    shore = basin - wet
+    rho_w = pond_water_rho()
+
+    def cells_at(x, y):
+        """The cells whose closed square holds the point."""
+        xs = {math.floor(x / CELL)} | ({round(x / CELL) - 1} if abs(x / CELL - round(x / CELL)) < 1e-6 else set())
+        ys = {math.floor(y / CELL)} | ({round(y / CELL) - 1} if abs(y / CELL - round(y / CELL)) < 1e-6 else set())
+        return [(int(i), int(j)) for i in xs for j in ys]
+
+    def z(x, y):
+        """The bed's height (Core/Pond's bowl), exactly 0 on the basin's outline so it meets the floor."""
+        if any(c not in basin for c in cells_at(x, y)):
+            return 0.0
+        return -float(pond_bed(x, y))
+
+    def sheet(cells):
+        """The cells as one surface on a 1-stud grid, the bowl's height at each corner."""
+        bm = bmesh.new()
+        vs = {}
+
+        def v(x, y):
+            k = (round(x, 3), round(y, 3))
+            if k not in vs:
+                vs[k] = bm.verts.new((x, y, z(x, y)))
+            return vs[k]
+
+        for i, j in cells:
+            for a in range(2):
+                for b in range(2):
+                    x0, y0 = i * CELL + a, j * CELL + b
+                    bm.faces.new([v(x0, y0), v(x0 + 1, y0), v(x0 + 1, y0 + 1), v(x0, y0 + 1)])
+        bmesh.ops.triangulate(bm, faces=bm.faces[:])
+        return bm
+
+    made = {}
+    for part, cells, rgb in (("PondShore", shore, POND_SAND), ("PondBed", wet, POND_WET)):
+        obj = make(f"Map_{NAME}_Floor", part, "turf", sheet(cells), "Map")
+        obj.data.materials.append(flat_material(f"Map_{NAME}_Floor_{part}_Flat", rgb))
+        PAINTED.append(obj)
+        made[part] = len(obj.data.polygons)
+    # the water: a flat surface at the waterline along a smooth shore, thick to below the bed (never paper-thin)
+    pts = pond_outline(rho_w * 1.01, 160)
+    bm = bmesh.new()
+    top = [bm.verts.new((x, y, -POND["water"])) for x, y in pts]
+    bot = [bm.verts.new((x, y, -POND["depth"] - 0.1)) for x, y in pts]
+    bm.faces.new(top)
+    bm.faces.new(list(reversed(bot)))
+    for k in range(len(pts)):
+        m = (k + 1) % len(pts)
+        bm.faces.new((top[k], bot[k], bot[m], top[m]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bmesh.ops.triangulate(bm, faces=bm.faces[:])
+    obj = make(f"Map_{NAME}_Pond", "Water", "stone_slate", bm, "Map")
+    obj.data.materials.append(flat_material(f"Map_{NAME}_Pond_Water_Flat", POND_WATER))
+    PAINTED.append(obj)
+    made["Water"] = len(obj.data.polygons)
+    # the lily pads, blooms and pebbles (no shadows), the tall reeds (shadows): pond_options.py look C, the same draws
+    bags = {}
+    for name in ("Deco", "Reeds"):
+        b = bmesh.new()
+        bags[name] = (b, b.loops.layers.uv.new("UVMap"))
+
+    def block(name, rgb, x, y, z0, sx, sy, sz):
+        b, uvl = bags[name]
+        k = POND_DECO.index(rgb)
+        vs = [b.verts.new((x + dx * sx, y + dy * sy, z0 + dz * sz)) for dz in (0, 1) for dx, dy in ((0, 0), (1, 0), (1, 1), (0, 1))]
+        for f, w, h in (((0, 1, 5, 4), sx, sz), ((1, 2, 6, 5), sy, sz), ((2, 3, 7, 6), sx, sz), ((3, 0, 4, 7), sy, sz), ((4, 5, 6, 7), sx, sy)):
+            cell = k if max(w, h) <= 2.0 * min(w, h) else 16 + k
+            u0, v0 = (cell % 8 * 64 + 16) / 512.0, (cell // 8 * 64 + 16) / 256.0
+            face = b.faces.new([vs[q] for q in f])
+            for lp, uv in zip(face.loops, ((u0, v0), (u0 + 0.0625, v0), (u0 + 0.0625, v0 + 0.125), (u0, v0 + 0.125))):
+                lp[uvl].uv = uv
+
+    rng = random.Random(1126)  # the sheet's seed
+    w = POND["water"]
+    u = 0.3
+    pads = []
+    while len(pads) < 11:
+        x, y = rng.uniform(-22, 22), rng.uniform(-16, 16)
+        if float(pond_rho(x, y)) < rho_w * 0.86 and math.dist((x, y), POND_WADE) > 4.5 and all(math.dist((x, y), p) > 3.2 for p in pads):
+            pads.append((x, y))
+    for k, (x, y) in enumerate(pads):
+        leaf = POND_DECO[0] if k % 3 else POND_DECO[1]
+        notch = rng.randrange(4)
+        for a in range(-2, 3):
+            for b in range(-2, 3):
+                if abs(a) + abs(b) > 3 or (notch == 0 and a == 0 and b > 0) or (notch == 1 and a == 0 and b < 0) or \
+                        (notch == 2 and b == 0 and a > 0) or (notch == 3 and b == 0 and a < 0):
+                    continue
+                block("Deco", leaf, x + a * u - u / 2, y + b * u - u / 2, -w - 0.04, u, u, 0.1)
+        if k % 3 == 0:
+            block("Deco", POND_DECO[2], x - u / 2 + 0.3, y - u / 2 + 0.3, -w + 0.06, u, u, u)
+            block("Deco", POND_DECO[3], x + 0.38, y + 0.38, -w + 0.36, 0.14, 0.14, 0.14)
+    # TALL reeds in clumps at the waterline (owner: "make the plants next to the pond look tall"): chest height to a
+    # little over a fighter's head, stalks of three blocks stepping a little sideways (a bend on the grid), cattail
+    # heads, long flat leaves
+    reeds = 0
+    for ang in (3.6, 5.5, 1.1, 2.45):
+        for _ in range(14):
+            r = rho_w * rng.uniform(0.93, 1.07)
+            th = ang + rng.uniform(-0.16, 0.16)
+            wob = 1.0 + sum(a * math.sin(kk * th + ph) for kk, a, ph in POND["wobble"])
+            x, y = math.cos(th) * POND["semiX"] * r * wob, math.sin(th) * POND["semiY"] * r * wob
+            x, y = round(x / 0.14) * 0.14, round(y / 0.14) * 0.14
+            h = rng.uniform(3.0, 6.0)
+            base = z(x, y) - 0.1
+            green = rng.choice((POND_DECO[4], POND_DECO[5], POND_DECO[6]))
+            reeds += 1
+            if rng.random() < 0.35:  # a long flat leaf, leaning out in two steps
+                lx, ly = rng.choice(((0.14, 0), (-0.14, 0), (0, 0.14), (0, -0.14)))
+                block("Reeds", green, x, y, base, 0.42 if lx == 0 else 0.1, 0.1 if lx == 0 else 0.42, (h * 0.55) - base)
+                block("Reeds", green, x + lx, y + ly, h * 0.55, 0.42 if lx == 0 else 0.1, 0.1 if lx == 0 else 0.42, h * 0.3)
+                continue
+            dx, dy = rng.choice(((0.07, 0), (-0.07, 0), (0, 0.07), (0, -0.07)))
+            seg = (h - base) / 3
+            for s in range(3):
+                block("Reeds", green, x + dx * s, y + dy * s, base + seg * s, 0.2, 0.2, seg)
+            if rng.random() < 0.6:
+                block("Reeds", POND_DECO[7], x + dx * 2 - 0.06, y + dy * 2 - 0.06, h - 0.9, 0.32, 0.32, 0.75)
+                block("Reeds", green, x + dx * 2 + 0.03, y + dy * 2 + 0.03, h - 0.15, 0.14, 0.14, 0.45)
+    for ang0, ang1 in ((0.2, 0.9), (2.2, 2.9), (4.2, 4.8)):  # block pebbles in three arcs on the shore, wide gaps
+        for _ in range(7):
+            th = rng.uniform(ang0, ang1)
+            r = rng.uniform(0.92, 1.02)
+            wob = 1.0 + sum(a * math.sin(kk * th + ph) for kk, a, ph in POND["wobble"])
+            x, y = math.cos(th) * POND["semiX"] * r * wob, math.sin(th) * POND["semiY"] * r * wob
+            s = rng.choice((0.42, 0.56, 0.7))
+            grey = rng.choice((POND_DECO[8], POND_DECO[9], POND_DECO[10]))
+            z0 = z(x, y) - s * 0.4
+            block("Deco", grey, x, y, z0, s, s * rng.choice((1, 1.4)), s * 0.8)
+    mat = None
+    if not DRY:
+        path = os.path.join(TEX, f"Map_{NAME}_Pond_Color.png")
+        _pond_palette(path)
+        mat = S.image_material(f"Map_{NAME}_Pond_Painted", {"colour": path}, roughness=0.9)
+    for name, (b, _uvl) in bags.items():
+        bmesh.ops.triangulate(b, faces=b.faces[:])
+        tallest = max(v.co.z for v in b.verts)
+        obj = make(f"Map_{NAME}_Pond", name, "leaf_lip", b, "Map")
+        if mat is not None:
+            obj.data.materials.append(mat)
+        PAINTED.append(obj)
+        made[name] = len(obj.data.polygons)
+        print(f"POND {obj.name}: tallest {tallest:.2f}", flush=True)
+    # the collider: the bowl as rings of the formula's level lines (each ring is level: the bed's depth depends only
+    # on rho), 24 points round, and a flat middle; the floor round it is built in floor_collision (below)
+    rob = lambda x, y, hgt: (round(x, 3), round(hgt, 3), round(-y, 3))  # noqa: E731
+    levels = [1.0, 0.92, 0.84, 0.76, POND["inner"]]
+    rings = [[rob(x, y, -float(pond_bed(x, y)) if lv < 1.0 else 0.0) for x, y in pond_outline(lv, 24)] for lv in levels]
+    POND_RIM[:] = rings[0]
+    POND_TRIS.clear()
+    for k in range(len(rings) - 1):
+        a_, b_ = rings[k], rings[k + 1]
+        for i in range(24):
+            j = (i + 1) % 24
+            POND_TRIS.append((a_[i], a_[j], b_[j]))
+            POND_TRIS.append((a_[i], b_[j], b_[i]))
+    mid = rob(POND["x"], POND["y"], -POND["depth"])
+    for i in range(24):
+        POND_TRIS.append((mid, rings[-1][i], rings[-1][(i + 1) % 24]))
+    DATA["floor_studs"]["colours"][f"Map_{NAME}_Floor_PondShore"] = list(POND_SAND_GAME)
+    DATA["floor_studs"]["colours"][f"Map_{NAME}_Floor_PondBed"] = list(POND_WET_GAME)
+    DATA["pond"] = {
+        "shape": {"x": POND["x"], "z": 0.0 - POND["y"], "semiX": POND["semiX"], "semiZ": POND["semiY"], "wobble": POND["wobble"],
+                  "depth": POND["depth"], "inner": POND["inner"], "water": POND["water"]},
+        "water": {"mesh": f"Map_{NAME}_Pond_Water", "colour": list(POND_WATER_GAME), "transparency": POND_WATER_CLEAR},
+        "decor": {f"Map_{NAME}_Pond_Deco": {"shadow": False}, f"Map_{NAME}_Pond_Reeds": {"shadow": True}},
+        "cells": len(basin), "water_cells": len(wet), "pads": len(pads), "reeds": reeds,
+    }
+    print(f"POND {len(basin)} cells ({len(wet)} wet, {len(shore)} shore), water rho {rho_w:.3f}, triangles {made}, "
+          f"collider {len(POND_TRIS)} bowl triangles", flush=True)
+
+
+def _ring_tris(outer, inner):
+    """Triangles filling the ring between two closed outlines round the same middle (both star-shaped about it),
+    walked together by angle. Points are (x, height, z)."""
+    def ang(p):
+        return math.atan2(p[2], p[0]) % math.tau
+
+    o, i = sorted(outer, key=ang), sorted(inner, key=ang)
+    no, ni = len(o), len(i)
+    out, a, b = [], 0, 0
+    while a < no or b < ni:
+        na = ang(o[(a + 1) % no]) + (math.tau if a + 1 >= no else 0.0)
+        nb = ang(i[(b + 1) % ni]) + (math.tau if b + 1 >= ni else 0.0)
+        if b >= ni or (a < no and na <= nb):
+            out.append((o[a % no], o[(a + 1) % no], i[b % ni]))
+            a += 1
+        else:
+            out.append((o[a % no], i[(b + 1) % ni], i[b % ni]))
+            b += 1
+    return out
+
+
+_base_floor_collision = floor_collision
+
+
+def floor_collision(top=0.0, thick=4.0, n=128):
+    """base.floor_collision (the circle's polygon, kept), plus with the pond the floor as TRIANGLES: the ring of floor
+    round the pond and the pond's bowl (arena-local Roblox x, height, z). studio_map.py builds "tris" when present."""
+    _base_floor_collision(top, thick, n)
+    if POND_TRIS:
+        outer = [(p[0], top, p[1]) for p in COLLISION["floor"]["poly"]]
+        tris = _ring_tris(outer, POND_RIM) + POND_TRIS
+        COLLISION["floor"]["tris"] = [[list(v) for v in t] for t in tris]
+        print("COLLIDER", len(tris), "triangles (floor ring", len(tris) - len(POND_TRIS), "+ bowl", len(POND_TRIS), ")", flush=True)
 
 
 # --- the backdrop: floating islands in open sky (owner, 2026-11-20: "it should feel like we're fighting in the sky";
@@ -1081,15 +1427,26 @@ def floor_flowers():
                 continue
             layer = "A" if lay.random() < FLOWER_SHARE_A else "B"
             key = (layer, f"{1 if x < 0 else 2}{1 if -y < 0 else 2}")  # tiles by arena-local x and z (z = -y)
+            # in or at the pond (or on a cell the pond turned to dirt): drawn all the same, so every other flower keeps
+            # its place in the approved layout, then thrown away
+            gone = POND_ON and (float(pond_rho(x, y)) < 1.08 or on_floor_dirt(x, y))
+            if gone:
+                key = ("gone", "")
             if key not in bags:
                 bm = bmesh.new()
                 bags[key] = (bm, bm.loops.layers.uv.new("UVMap"))
             here[0] = bags[key]
             rng.choices((tulip, daisy, tuft), weights=(4, 4, 3))[0](x, y, bloom if rng.random() < 0.85 else rng.choice(BLOOMS))
+            if gone:
+                count["gone"] = count.get("gone", 0) + 1
+                continue
             count[layer] += 1
     made = {"A": 0, "B": 0}
     tallest = 0.0
     for (layer, tile), (bm, _uvl) in sorted(bags.items()):
+        if layer == "gone":
+            bm.free()
+            continue
         tallest = max(tallest, max(v.co.z for v in bm.verts))
         bmesh.ops.triangulate(bm, faces=bm.faces[:])
         obj = make(f"Map_{NAME}_FloorFlowers", f"{layer}_{tile}", "leaf_lip", bm, "Map")
@@ -1255,6 +1612,10 @@ def meadow_cameras():
     cams["Ankle"] = C.camera("Ankle", (sx + 5.5, sy - 6.0, 1.5), (sx + 0.6, sy + 0.6, 0.75), lens=30)
     cams["Feet"] = C.camera("Feet", (16, -64, 6.0), (-4, -40, 1.0), lens=28)
     cams["Top"] = C.camera("Top", (0, -1, 2.9 * RADIUS), (0, 0, 0), lens=28)
+    if POND_ON:  # the pond sheet's three views
+        cams["PondFight"] = C.camera("PondFight", (6.0, -46.0, 9.5), (0.0, 4.0, -0.5), lens=24)
+        cams["PondWade"] = C.camera("PondWade", (-6.0, -21.0, 4.8), (4.0, 3.0, -0.4), lens=26)
+        cams["PondOver"] = C.camera("PondOver", (62.0, -88.0, 70.0), (0.0, 0.0, -1.0), lens=30)
     return cams
 
 
@@ -1290,7 +1651,7 @@ def _stud_material(name, rgb, studs_per_square=1.0):
     return m
 
 
-def _fighter(x, y, shirt, face):
+def _fighter(x, y, shirt, face, z=0.0):
     ink, skin, top = flat_material("fighter", (30, 32, 46)), flat_material("fighter", (240, 200, 160)), flat_material("fighter", shirt)
     col = preview_collection()
     for size, off, m in (((0.95, 0.95, 2.0), (-0.5, 0, 1.0), ink), ((0.95, 0.95, 2.0), (0.5, 0, 1.0), ink), ((2.0, 1.0, 2.0), (0, 0, 3.0), top),
@@ -1304,7 +1665,7 @@ def _fighter(x, y, shirt, face):
         o = bpy.data.objects.new("PreviewFighter", me)
         col.objects.link(o)
         v = Matrix.Rotation(face, 4, "Z") @ Vector(off)
-        o.matrix_world = Matrix.Translation((x + v.x, y + v.y, v.z)) @ Matrix.Rotation(face, 4, "Z") @ Matrix.Diagonal((*size, 1.0))
+        o.matrix_world = Matrix.Translation((x + v.x, y + v.y, z + v.z)) @ Matrix.Rotation(face, 4, "Z") @ Matrix.Diagonal((*size, 1.0))
 
 
 _base_add_lobby = add_lobby
@@ -1322,6 +1683,18 @@ def add_lobby():
             _fighter(x, y, shirt, face)
         sx, sy = DATA.get("flower_show", (34.0, -58.0))
         _fighter(sx, sy, (60, 170, 90), 0.5)
+        if POND_ON:  # the pond's studded shore and bed, the water as on the sheet (80% opaque), someone wading
+            for part, rgb in (("PondShore", POND_SAND), ("PondBed", POND_WET)):
+                obj = bpy.data.objects.get(f"Map_{NAME}_Floor_{part}")
+                if obj is not None:
+                    obj.data.materials.clear()
+                    obj.data.materials.append(_stud_material(obj.name + "_Studs", rgb))
+            water = bpy.data.objects.get(f"Map_{NAME}_Pond_Water")
+            if water is not None:
+                bsdf = water.data.materials[0].node_tree.nodes["Principled BSDF"]
+                bsdf.inputs["Alpha"].default_value = 1.0 - POND_WATER_CLEAR
+                bsdf.inputs["Roughness"].default_value = 0.35
+            _fighter(*POND_WADE, (52, 96, 214), 2.4, z=-float(pond_bed(*POND_WADE)))
     if NEAR_ONLY:
         build = os.path.join(MAPS, "out", "suite", ISLANDS_FROM)
         col = preview_collection()
@@ -1335,5 +1708,5 @@ def add_lobby():
     _base_add_lobby()
 
 
-BUILDERS = [surface, edge, crag, floor_flowers] if NEAR_ONLY else [surface, edge, crag, islands, village, farm, groves, pack, floor_flowers]
+BUILDERS = [surface, edge, crag, pond, floor_flowers] if NEAR_ONLY else [surface, edge, crag, pond, islands, village, farm, groves, pack, floor_flowers]
 run(NAME, BUILDERS, cameras=meadow_cameras)
